@@ -1,0 +1,629 @@
+-- engine/hand_eval.lua
+-- Deterministic hand evaluation: classify a played set, then reproduce the
+-- Balatro scoring pipeline to produce a HandEvaluation.
+--
+-- PURE: consumes a GameState + a list of played cards. Never touches G.
+-- This is the file that golden-tests validate against the live game.
+--
+-- Scoring pipeline (simplified but order-faithful; see DESIGN.md §1.4):
+--   1. base chips/mult from the hand level
+--   2. each SCORING card, left->right: chip value, enhancement, edition,
+--      then per-card individual joker effects   (Red Seal => processed twice)
+--   3. each HELD card: Steel xmult, on_held joker effects (Red Seal / Mime retrigger)
+--   4. each joker, left->right: on_hand effect + joker edition (Blueprint copies)
+--   5. score = floor(chips * mult)
+--
+-- Copy jokers (Blueprint/Brainstorm) are resolved into an "effective joker" list
+-- (see effective_jokers) so a copy participates in EVERY phase at the copier's
+-- position -- per-card, held, retrigger and on_hand -- not just on_hand.
+
+local Cards = require("util.cards")
+local Jokers = require("engine.joker_effects")
+
+local HandEval = {}
+
+-- Optional cooperative-yield hook. The live overlay runs heavy valuations
+-- (Monte-Carlo simulation, pack measurement) inside a coroutine and pumps them a
+-- few ms per frame; setting this to coroutine.yield makes every best_play
+-- enumeration a slice boundary, so NOTHING blocks rendering. It is set ONLY for
+-- the duration of a coroutine.resume by the driver and cleared immediately after,
+-- so synchronous/headless callers (and the tests) never see it -> pure by default.
+-- Calling it affects scheduling only, never the computed result.
+local YIELD = nil
+function HandEval.set_yield(fn) YIELD = fn end
+
+-- Base (level 1) chips/mult for every Balatro poker hand.
+HandEval.HAND_BASE = {
+  ["Flush Five"]      = { chips = 160, mult = 16 },
+  ["Flush House"]     = { chips = 140, mult = 14 },
+  ["Five of a Kind"]  = { chips = 120, mult = 12 },
+  ["Straight Flush"]  = { chips = 100, mult = 8 },
+  ["Four of a Kind"]  = { chips = 60,  mult = 7 },
+  ["Full House"]      = { chips = 40,  mult = 4 },
+  ["Flush"]           = { chips = 35,  mult = 4 },
+  ["Straight"]        = { chips = 30,  mult = 4 },
+  ["Three of a Kind"] = { chips = 30,  mult = 3 },
+  ["Two Pair"]        = { chips = 20,  mult = 2 },
+  ["Pair"]            = { chips = 10,  mult = 2 },
+  ["High Card"]       = { chips = 5,   mult = 1 },
+}
+
+-- ---- Classification ---------------------------------------------------------
+
+local function rank_counts(cards)
+  local counts, ids = {}, {}
+  for _, c in ipairs(cards) do
+    if not Cards.is_stone(c) then
+      local id = Cards.rank_id(c)
+      counts[id] = (counts[id] or 0) + 1
+      ids[#ids + 1] = id
+    end
+  end
+  return counts, ids
+end
+
+-- Flush detection. mods.four_fingers lowers the threshold to 4; mods.smeared
+-- groups Hearts/Diamonds and Clubs/Spades together (by colour). Wild cards fill
+-- any group.
+local function is_flush(cards, mods)
+  mods = mods or {}
+  local min_len = mods.four_fingers and 4 or 5
+  local function group_of(c)
+    if mods.smeared then return Cards.color(c) end
+    return c.suit
+  end
+  local n, wilds, groups = 0, 0, {}
+  for _, c in ipairs(cards) do
+    if not Cards.is_stone(c) then
+      n = n + 1
+      if Cards.is_wild(c) then wilds = wilds + 1
+      else local k = group_of(c); groups[k] = (groups[k] or 0) + 1 end
+    end
+  end
+  if n < min_len then return false end
+  -- all played non-stone cards must fall in a single group (wilds fill any)
+  for _, cnt in pairs(groups) do
+    if cnt + wilds == n then return true end
+  end
+  if wilds == n then return true end -- all wild
+  return false
+end
+
+-- Are the (sorted, distinct) ids one consecutive run? mods.shortcut allows a
+-- single-rank gap (step of 1 OR 2).
+local function consecutive(sorted, shortcut)
+  local max_step = shortcut and 2 or 1
+  for i = 2, #sorted do
+    local step = sorted[i] - sorted[i - 1]
+    if step < 1 or step > max_step then return false end
+  end
+  return true
+end
+
+-- Straight detection over the rank ids of the played cards. Requires the played
+-- non-stone cards to be all-distinct and form a run of length 5 (or 4 with Four
+-- Fingers). Shortcut allows single-rank gaps. Ace-low wheel supported for the
+-- classic step-1 form. NOTE: a 5-card hand where only 4 cards form a straight
+-- is NOT classified here -- best_play enumerates the 4-card subset instead.
+local function is_straight(ids, mods)
+  mods = mods or {}
+  local min_len = mods.four_fingers and 4 or 5
+  local seen, distinct, total = {}, {}, 0
+  for _, id in ipairs(ids) do
+    total = total + 1
+    if not seen[id] then seen[id] = true; distinct[#distinct + 1] = id end
+  end
+  local n = #distinct
+  if n ~= total then return false end          -- duplicate rank -> not a straight
+  if n < min_len or n > 5 then return false end
+  table.sort(distinct)
+  if consecutive(distinct, mods.shortcut) then return true end
+  -- wheel: A,2,3,4,5 -> {2,3,4,5,14}
+  if n == 5 and distinct[1] == 2 and distinct[2] == 3 and distinct[3] == 4
+     and distinct[4] == 5 and distinct[5] == 14 then return true end
+  return false
+end
+
+-- Returns: hand_type, scoring_set(map index->true over `played`), contains-table
+-- mods (optional): { four_fingers, shortcut, smeared } adjust flush/straight.
+function HandEval.analyze(played, mods)
+  mods = mods or {}
+  local counts, ids = rank_counts(played)
+  local flush = is_flush(played, mods)
+  local straight = is_straight(ids, mods)
+
+  -- count multiplicities
+  local maxc, n_pairs, n_three, n_four, n_five = 0, 0, 0, 0, 0
+  for _, cnt in pairs(counts) do
+    if cnt >= 5 then n_five = n_five + 1 end
+    if cnt >= 4 then n_four = n_four + 1 end
+    if cnt >= 3 then n_three = n_three + 1 end
+    if cnt >= 2 then n_pairs = n_pairs + 1 end
+    if cnt > maxc then maxc = cnt end
+  end
+  local full_house = (n_three >= 1 and n_pairs >= 2) -- a triple + a separate pair
+
+  local contains = {
+    pair     = n_pairs >= 1,
+    two_pair = n_pairs >= 2,
+    three    = n_three >= 1,
+    four     = n_four >= 1,
+    straight = straight,
+    flush    = flush,
+    full_house = full_house,
+  }
+
+  -- Decide hand type (highest first).
+  local ht
+  if n_five >= 1 and flush then ht = "Flush Five"
+  elseif full_house and flush then ht = "Flush House"
+  elseif n_five >= 1 then ht = "Five of a Kind"
+  elseif straight and flush then ht = "Straight Flush"
+  elseif n_four >= 1 then ht = "Four of a Kind"
+  elseif full_house then ht = "Full House"
+  elseif flush then ht = "Flush"
+  elseif straight then ht = "Straight"
+  elseif n_three >= 1 then ht = "Three of a Kind"
+  elseif n_pairs >= 2 then ht = "Two Pair"
+  elseif n_pairs >= 1 then ht = "Pair"
+  else ht = "High Card" end
+
+  -- Determine which cards score.
+  local scoring = {}
+  local function score_all() for i = 1, #played do scoring[i] = true end end
+  local function score_ranks_with(minCount, limit)
+    -- score cards whose rank appears >= minCount, up to `limit` distinct ranks
+    local chosen, taken = {}, 0
+    -- pick ranks by descending count then rank for determinism
+    local order = {}
+    for id, cnt in pairs(counts) do order[#order + 1] = { id = id, cnt = cnt } end
+    table.sort(order, function(a, b)
+      if a.cnt ~= b.cnt then return a.cnt > b.cnt end
+      return a.id > b.id
+    end)
+    for _, e in ipairs(order) do
+      if e.cnt >= minCount and (not limit or taken < limit) then
+        chosen[e.id] = true; taken = taken + 1
+      end
+    end
+    for i, c in ipairs(played) do
+      if not Cards.is_stone(c) and chosen[Cards.rank_id(c)] then scoring[i] = true end
+    end
+  end
+
+  if ht == "Flush Five" or ht == "Flush House" or ht == "Five of a Kind"
+     or ht == "Straight Flush" or ht == "Full House" or ht == "Flush"
+     or ht == "Straight" then
+    score_all()
+  elseif ht == "Four of a Kind" then score_ranks_with(4, 1)
+  elseif ht == "Three of a Kind" then score_ranks_with(3, 1)
+  elseif ht == "Two Pair" then score_ranks_with(2, 2)
+  elseif ht == "Pair" then score_ranks_with(2, 1)
+  else -- High Card: single highest card
+    local best_i, best_id = nil, -1
+    for i, c in ipairs(played) do
+      if not Cards.is_stone(c) then
+        local id = Cards.rank_id(c)
+        if id > best_id then best_id = id; best_i = i end
+      end
+    end
+    if best_i then scoring[best_i] = true end
+  end
+
+  -- Stone cards ALWAYS score.
+  for i, c in ipairs(played) do if Cards.is_stone(c) then scoring[i] = true end end
+
+  return ht, scoring, contains
+end
+
+-- ---- Effective jokers (copy resolution) -------------------------------------
+
+-- Resolve gs.jokers into a list of effect-bearing entries, expanding copy
+-- jokers (Blueprint copies the joker to its right; Brainstorm the leftmost) so
+-- a copy contributes through ALL phases at the COPIER's position. Each entry:
+--   { impl, edition, position, hookj }
+-- where `impl` is the effect table to run, `edition` is the COPIER's own edition
+-- (a polychrome Blueprint still applies x1.5), and `hookj` is the joker table
+-- passed to hooks (the copier, but carrying the TARGET's key/ability so a copied
+-- scaling joker reads the target's live counter). impl is nil for unmodelled or
+-- dangling copies (no effect, but the edition still applies).
+function HandEval.effective_jokers(gs)
+  local jokers = gs.jokers or {}
+  local out = {}
+  for idx, j in ipairs(jokers) do
+    local impl = Jokers.get(j.key)
+    if impl and impl.copy then
+      -- follow the copy chain to the first concrete (non-copy) joker, cycle-safe
+      local ti = (impl.copy == "right") and (idx + 1) or 1
+      local steps, tj, timpl = 0, nil, nil
+      while ti and ti >= 1 and ti <= #jokers and steps <= #jokers do
+        tj = jokers[ti]
+        timpl = tj and Jokers.get(tj.key)
+        if timpl and timpl.copy then
+          ti = (timpl.copy == "right") and (ti + 1) or 1
+          tj, timpl = nil, nil
+        else
+          break
+        end
+        steps = steps + 1
+      end
+      local hookj
+      if tj then
+        hookj = { key = tj.key, name = j.name, position = idx, edition = j.edition,
+                  ability = tj.ability, sell_value = j.sell_value }
+      else
+        hookj = j
+      end
+      out[#out + 1] = { impl = timpl, edition = j.edition, position = idx, hookj = hookj }
+    else
+      out[#out + 1] = { impl = impl, edition = j.edition, position = idx, hookj = j }
+    end
+  end
+  return out
+end
+
+-- Collect the boolean hand-modifier flags contributed by the effective jokers.
+local function joker_mods(effective)
+  local m = { splash = false, all_faces = false, four_fingers = false,
+              shortcut = false, smeared = false }
+  for _, e in ipairs(effective) do
+    local impl = e.impl
+    if impl then
+      if impl.splash then m.splash = true end
+      if impl.all_faces then m.all_faces = true end
+      if impl.four_fingers then m.four_fingers = true end
+      if impl.shortcut then m.shortcut = true end
+      if impl.smeared then m.smeared = true end
+    end
+  end
+  return m
+end
+
+-- ---- Scoring ----------------------------------------------------------------
+
+local function base_for(gs, ht)
+  local lvl = gs.run and gs.run.hand_levels and gs.run.hand_levels[ht]
+  local chips, mult
+  if lvl and lvl.chips and lvl.mult then
+    chips, mult = lvl.chips, lvl.mult
+  else
+    local b = HandEval.HAND_BASE[ht]
+    chips, mult = b.chips, b.mult
+  end
+  -- boss: The Flint halves base chips & mult
+  if gs.boss_effect and gs.boss_effect.halve_base then chips, mult = chips / 2, mult / 2 end
+  return { chips = chips, mult = mult }
+end
+
+-- A card scores nothing if the live game flagged it debuffed OR the boss debuffs
+-- its suit/face (gs.boss_effect, set by the simulation for drawn cards the live
+-- debuff flag doesn't cover).
+local function is_debuffed(gs, card)
+  if card.debuffed then return true end
+  local be = gs.boss_effect
+  if not be then return false end
+  if be.debuff_faces and Cards.is_face(card) then return true end
+  if be.debuff_suit and Cards.is_suit(card, be.debuff_suit) then return true end
+  return false
+end
+
+local function held_cards(gs, played)
+  local played_ids = {}
+  for _, c in ipairs(played) do if c.id ~= nil then played_ids[c.id] = true end end
+  local held = {}
+  for _, c in ipairs(gs.hand or {}) do
+    if c.id == nil or not played_ids[c.id] then held[#held + 1] = c end
+  end
+  return held
+end
+
+-- Apply an effect table to running (chips, mult). Returns new chips, mult.
+local function apply_effect(chips, mult, eff, log, src)
+  if not eff then return chips, mult end
+  if eff.chips then chips = chips + eff.chips end
+  if eff.mult  then mult = mult + eff.mult end
+  if eff.xmult then mult = mult * eff.xmult end
+  if log and (eff.chips or eff.mult or eff.xmult) then
+    log[#log + 1] = { source = src, chips = eff.chips, mult = eff.mult, xmult = eff.xmult }
+  end
+  return chips, mult
+end
+
+-- Edition effect on a card or joker (foil/holo/poly).
+local function edition_effect(edition)
+  if edition == "foil" then return { chips = 50 }
+  elseif edition == "holo" then return { mult = 10 }
+  elseif edition == "polychrome" then return { xmult = 1.5 } end
+  return nil
+end
+-- K5: a JOKER's edition applies in two parts around the joker's OWN effect. The ADDITIVE part
+-- (foil +50 chips / holo +10 mult) applies BEFORE the effect, so an xmult joker multiplies it
+-- too -- a Holo Cavendish is (mult+10)*3 in-game, not mult*3+10. The MULTIPLICATIVE part
+-- (polychrome x1.5) applies AFTER. (For a scored CARD, edition_effect is used as-is.)
+local function joker_edition_pre(edition)
+  if edition == "foil" then return { chips = 50 }
+  elseif edition == "holo" then return { mult = 10 } end
+  return nil
+end
+local function joker_edition_post(edition)
+  if edition == "polychrome" then return { xmult = 1.5 } end
+  return nil
+end
+
+-- Enhancement effect when a card SCORES.
+local function scored_enhancement_effect(enh)
+  if enh == "m_bonus" then return { chips = 30 }
+  elseif enh == "m_mult" then return { mult = 4 }
+  elseif enh == "m_glass" then return { xmult = 2 }
+  elseif enh == "m_lucky" then return { mult = 4, approx = true } -- expected: 1/5 * 20
+  end
+  return nil
+end
+
+-- score(gs, played) -> HandEvaluation
+-- Resolves the effective jokers (copy expansion) + hand-modifier flags, then
+-- delegates to score_with. Both depend only on gs.jokers (NOT on `played`), so
+-- callers that score many subsets of one hand (best_play / best_play_target /
+-- each_subset) precompute them ONCE and call score_with directly -- that hoist
+-- removes the dominant per-subset allocation in the Monte-Carlo hot path.
+function HandEval.score(gs, played)
+  local effective = HandEval.effective_jokers(gs)
+  local mods = joker_mods(effective)
+  return HandEval.score_with(gs, played, effective, mods)
+end
+
+-- Score `played` with PRECOMPUTED effective jokers + mods (see HandEval.score).
+function HandEval.score_with(gs, played, effective, mods)
+  local ht, scoring, contains = HandEval.analyze(played, mods)
+  local base = base_for(gs, ht)
+  local chips, mult = base.chips, base.mult
+  -- guaranteed floor: same scoring but excluding probabilistic UPSIDE (lucky,
+  -- misprint, bloodstone...), so we can tell a reliable clear from a hopeful one.
+  local cmin, mmin = base.chips, base.mult
+  local log = { { source = "base:" .. ht, chips = base.chips, mult = base.mult } }
+  local approx = false
+  local money = 0 -- in-blind $ from scoring, RETRIGGER-AWARE (gold seal/lucky/jokers)
+
+  -- splash: every played card scores
+  if mods.splash then for i = 1, #played do scoring[i] = true end end
+
+  local scoring_cards = {}
+  for i, c in ipairs(played) do if scoring[i] and not is_debuffed(gs, c) then scoring_cards[#scoring_cards + 1] = c end end
+  local held = held_cards(gs, played)
+
+  local njokers = #(gs.jokers or {})
+  local joker_slots = (gs.shop and gs.shop.joker_slots) or (gs.run and gs.run.joker_slots) or 5
+  local ctx = {
+    hand_type = ht, played = played, scoring = scoring_cards, held = held,
+    gs = gs, contains = contains,
+    dollars = (gs.economy and gs.economy.dollars) or 0,
+    discards_left = (gs.blind and gs.blind.discards_left) or 0,
+    hands_left = (gs.blind and gs.blind.hands_left) or 1,
+    njokers = njokers,
+    empty_joker_slots = math.max(0, joker_slots - njokers),
+    all_faces = mods.all_faces,
+    flags = {},
+  }
+
+  -- apply a hook effect to the running totals (mutates chips/mult and the
+  -- guaranteed-floor cmin/mmin; approx effects are excluded from the floor).
+  local function apply(c, m, eff, src)
+    if eff and eff.approx then approx = true
+    else cmin, mmin = apply_effect(cmin, mmin, eff, nil, nil) end
+    return apply_effect(c, m, eff, log, src)
+  end
+
+  -- 2. scoring cards, left -> right. Debuffed cards score nothing -- both the
+  --    live game's per-card flag AND the boss suit/face debuff (gs.boss_effect).
+  for i, card in ipairs(played) do
+    if scoring[i] and not is_debuffed(gs, card) then
+      -- total triggers = 1 + Red Seal + joker retriggers
+      local extra = 0
+      for _, e in ipairs(effective) do
+        if e.impl and e.impl.on_retrigger then extra = extra + (e.impl.on_retrigger(card, ctx, e.hookj) or 0) end
+      end
+      local triggers = 1 + ((card.seal == "Red") and 1 or 0) + extra
+      for _ = 1, triggers do
+        chips, mult = apply(chips, mult, { chips = Cards.chips(card) }, "card:" .. Cards.label(card))
+        chips, mult = apply(chips, mult, scored_enhancement_effect(card.enhancement), "enh:" .. tostring(card.enhancement))
+        chips, mult = apply(chips, mult, edition_effect(card.edition), "edition:" .. tostring(card.edition))
+        for _, e in ipairs(effective) do
+          if e.impl and e.impl.on_card_scored then
+            local eff = e.impl.on_card_scored(card, ctx, e.hookj)
+            chips, mult = apply(chips, mult, eff, "joker:" .. e.hookj.key)
+            if eff and eff.dollars then money = money + eff.dollars end -- e.g. Rough Gem $/diamond
+          end
+        end
+        -- per-trigger card money: Gold seal pays $3 EACH trigger; Lucky pays its
+        -- expected $ ($20 at 1/15) each trigger. This is why a first-card
+        -- retrigger (Hanging Chad) on a money card is worth ordering for.
+        if card.seal == "Gold" then money = money + 3 end
+        if card.enhancement == "m_lucky" then money = money + 20 / 15 end
+      end
+    end
+  end
+
+  -- 3. held cards (debuffed cards contribute nothing). Held effects retrigger on
+  --    a Red Seal and via held-retrigger jokers (Mime).
+  for _, card in ipairs(held) do
+    if not is_debuffed(gs, card) then
+      local extra = 0
+      for _, e in ipairs(effective) do
+        if e.impl and e.impl.on_held_retrigger then extra = extra + (e.impl.on_held_retrigger(card, ctx, e.hookj) or 0) end
+      end
+      local triggers = 1 + ((card.seal == "Red") and 1 or 0) + extra
+      for _ = 1, triggers do
+        if card.enhancement == "m_steel" then
+          chips, mult = apply(chips, mult, { xmult = 1.5 }, "steel-held:" .. Cards.label(card))
+        end
+        for _, e in ipairs(effective) do
+          if e.impl and e.impl.on_held then
+            chips, mult = apply(chips, mult, e.impl.on_held(card, ctx, e.hookj), "joker:" .. e.hookj.key)
+          end
+        end
+      end
+    end
+  end
+
+  -- 4. main jokers, left -> right (copies already resolved into `effective`)
+  for _, e in ipairs(effective) do
+    -- K5: foil/holo (additive) apply BEFORE the joker's own effect (so an xmult joker
+    -- multiplies the +chips/+mult too); polychrome (x1.5) applies AFTER.
+    chips, mult = apply(chips, mult, joker_edition_pre(e.edition), "joker-edition:" .. tostring(e.edition))
+    if e.impl and e.impl.on_hand then
+      chips, mult = apply(chips, mult, e.impl.on_hand(ctx, e.hookj), "joker:" .. e.hookj.key)
+    end
+    chips, mult = apply(chips, mult, joker_edition_post(e.edition), "joker-edition:" .. tostring(e.edition))
+  end
+
+  local score = math.floor(chips * mult + 1e-9)
+
+  return {
+    hand_type = ht,
+    chips = chips,
+    mult = mult,
+    score = score,
+    score_min = math.floor(cmin * mmin + 1e-9), -- guaranteed floor (no RNG upside)
+    approx = approx,           -- true if any RNG-expected value was used
+    money = money,             -- retrigger-aware in-blind $ from scoring
+    scoring_cards = scoring_cards,
+    contains = contains,       -- {pair,two_pair,three,four,straight,flush,full_house}
+    triggers = log,
+  }
+end
+
+-- Enumerate all 1..5 card subsets of `cards`, calling f(ev, sel) for each. An
+-- optional `filter(sel, hand_type)` drops plays a boss restriction forbids
+-- (Psychic min-5, Eye no-repeat, Mouth single-type).
+local function each_subset(gs, cards, f, filter)
+  local n = #cards
+  -- effective jokers + hand mods are constant across every subset of one hand,
+  -- so resolve them ONCE here and score each subset via score_with (hoisted out
+  -- of the per-subset path -- this is the Monte-Carlo simulation's hottest loop).
+  local effective = HandEval.effective_jokers(gs)
+  local mods = joker_mods(effective)
+  if YIELD then YIELD() end   -- cooperative slice boundary (no-op unless driven)
+  local function copy(t) local o = {} for i = 1, #t do o[i] = t[i] end return o end
+  local function rec(start, sel)
+    if #sel >= 1 and #sel <= 5 then
+      local ev = HandEval.score_with(gs, sel, effective, mods)
+      if not filter or filter(sel, ev.hand_type) then f(ev, sel, copy) end
+    end
+    if #sel == 5 then return end
+    for i = start, n do
+      sel[#sel + 1] = cards[i]
+      rec(i + 1, sel)
+      sel[#sel] = nil
+    end
+  end
+  rec(1, {})
+end
+
+-- Top plays by score, ONE per hand type (for diagnostics / the F7 dump). Shows
+-- the realistic range of options (best High Card / Pair / Trips / Flush / ...)
+-- rather than dozens of subset variants, so it's easy to see whether the engine
+-- valued e.g. an Ace pair correctly. Returns a desc-sorted list of
+-- { hand_type, score, cards }, capped at n.
+function HandEval.top_plays(gs, cards, n)
+  n = n or 8
+  local best_by_type = {}
+  each_subset(gs, cards, function(ev, sel, copy)
+    local cur = best_by_type[ev.hand_type]
+    if not cur or ev.score > cur.score then
+      best_by_type[ev.hand_type] = { hand_type = ev.hand_type, score = ev.score, cards = copy(sel) }
+    end
+  end)
+  local out = {}
+  for _, e in pairs(best_by_type) do out[#out + 1] = e end
+  -- Total-order sort: tie-break equal scores by hand_type name so the result order is
+  -- process-independent (best_by_type is STRING-keyed; pairs() order is per-process-random
+  -- under LuaJIT strhash, so a plain score-only sort leaves tied plays in a random order).
+  table.sort(out, function(a, b)
+    if a.score ~= b.score then return a.score > b.score end
+    return a.hand_type < b.hand_type
+  end)
+  while #out > n do out[#out] = nil end
+  return out
+end
+
+-- Highest-scoring play (vanity max). Used for measurement / accumulation.
+function HandEval.best_play(gs, cards)
+  local best, best_sel
+  each_subset(gs, cards, function(ev, sel, copy)
+    if not best or ev.score > best.score then best = ev; best_sel = copy(sel) end
+  end)
+  return best, best_sel
+end
+
+-- Money (dollars) banked by playing this exact set. The scored-card money (Gold
+-- seals, Lucky, joker $/card like Rough Gem) is taken RETRIGGER-AWARE from the
+-- evaluation (ev.money), so a hand that retriggers a money card counts it each
+-- time. Then -$3 per Gold-enhanced card PLAYED (you forfeit the $3 it would pay
+-- if you HELD it to round end). `ev` is the HandEvaluation of `played`.
+function HandEval.play_econ(gs, ev, played)
+  local v = (ev and ev.money) or 0
+  for _, c in ipairs(played or {}) do
+    if c.enhancement == "m_gold" then v = v - 3 end -- played -> can't hold for $3
+  end
+  return v
+end
+
+-- SURVIVAL-oriented play: the goal is to BEAT THE BLIND (reach `remaining`), not
+-- to maximise a single hand. Preference order, highest first:
+--   tier 2: plays whose GUARANTEED floor clears `remaining` (lock in the win)
+--   tier 1: plays that clear in expectation (take the shot if none are guaranteed)
+--   tier 0: otherwise accumulate toward the requirement
+-- Tie-breaks: in tier 2 the extra score is WASTED overkill, so maximise MONEY
+-- (banked seals, held gold cards) then score; tier 0 maximises score. Within
+-- tier 1, equal expected scores prefer the higher guaranteed floor (F7).
+function HandEval.best_play_target(gs, cards, remaining, filter)
+  remaining = remaining or 0
+  local best, best_sel, bt, be, bs, bmin
+  each_subset(gs, cards, function(ev, sel, copy)
+    local tier = 0
+    if remaining > 0 then
+      if (ev.score_min or ev.score) >= remaining then tier = 2
+      elseif ev.score >= remaining then tier = 1 end
+    end
+    local econ = (tier == 2) and HandEval.play_econ(gs, ev, sel) or 0
+    local better
+    if not best then better = true
+    elseif tier ~= bt then better = tier > bt
+    elseif tier == 2 and econ ~= be then better = econ > be
+    elseif ev.score ~= bs then better = ev.score > bs
+    elseif tier == 1 then better = (ev.score_min or ev.score) > bmin
+    else better = false end
+    if better then
+      best, best_sel, bt, be, bs, bmin = ev, copy(sel), tier, econ, ev.score,
+        (ev.score_min or ev.score)
+    end
+  end, filter)
+  return best, best_sel
+end
+
+-- Best play that FEEDS scaling jokers. Same survival tiers as best_play_target
+-- (guaranteed clear > expected clear > accumulate), so it NEVER trades the clear
+-- away; it only differs in the tie-break, preferring the play with the most
+-- scaling FUEL among equally-safe options, then score. fuel(played, ev) -> credit.
+-- Returns the chosen evaluation, its cards, and that play's fuel credit.
+function HandEval.best_fuel_play(gs, cards, remaining, fuel)
+  remaining = remaining or 0
+  local best, best_sel, bt, bf, bs
+  each_subset(gs, cards, function(ev, sel, copy)
+    local tier = 0
+    if remaining > 0 then
+      if (ev.score_min or ev.score) >= remaining then tier = 2
+      elseif ev.score >= remaining then tier = 1 end
+    end
+    local f = fuel(sel, ev) or 0
+    local better
+    if not best then better = true
+    elseif tier ~= bt then better = tier > bt
+    elseif f ~= bf then better = f > bf
+    else better = ev.score > bs end
+    if better then best, best_sel, bt, bf, bs = ev, copy(sel), tier, f, ev.score end
+  end)
+  return best, best_sel, bf
+end
+
+return HandEval

@@ -1,0 +1,80 @@
+-- engine/skip_advisor.lua
+-- Should you SKIP the (Small/Big) blind to take its tag, or PLAY it? Compares
+-- the tag's value against what playing gives up: the blind reward, the shop
+-- visit, and the unused-hand money you'd bank. Boss blinds can't be skipped.
+-- PURE.
+
+local Tags = require("engine.tags")
+local Mechanics = require("engine.mechanics")
+local Generators = require("engine.generators")
+
+local SK = {}
+
+-- Rough value of the shop visit you forgo by skipping (purchasing opportunity).
+SK.SHOP_VALUE = 6
+-- ...but the shop is where your BUILD comes from, and it's worth far more the emptier
+-- your board: skipping your FIRST shop leaves you with a bare deck into the boss (a
+-- real, sim-confirmed cause of early deaths -- the engine arrived at ante-1 Big/Boss
+-- with ZERO jokers because it skipped Small for a tag). Scale the forgone-shop value up
+-- as the board empties, so a boardless engine plays to buy its first jokers; a full
+-- board values the shop less, so a strong tag can still justify a skip.
+SK.BOARDLESS_SHOP_MULT = 2.0
+-- Hysteresis: skipping forgoes a guaranteed shop + reward + build progress for a
+-- speculative tag, so the tag must CLEARLY beat playing, not merely edge it out --
+-- otherwise the engine skips every time a tag's raw $-equivalent tops playing.
+SK.SKIP_MARGIN = 1.25
+
+-- Deterministic per-state RNG so the measured tag values (Orbital, pack tags) are
+-- stable across re-evaluations of the same blind-select.
+local function lcg(seed)
+  local s = seed % 2147483647
+  if s <= 0 then s = s + 2147483646 end
+  return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end
+end
+local function state_seed(gs)
+  local d = #(gs.deck or {}) * 40503 + ((gs.economy and gs.economy.dollars) or 0) * 7919
+  d = math.floor(math.abs(d)) % 2147483647
+  return (d <= 0) and 1 or d
+end
+
+-- recommend(gs, opts) -> { recommend="SKIP"|"PLAY", tag, tag_value, play_value, reason }
+-- or nil if not a skippable situation / no tag info.
+function SK.recommend(gs, opts)
+  opts = opts or {}
+  local b = gs.blind or {}
+  local btype = b.blind_type
+  if btype == "Boss" then return nil end          -- can't skip the boss
+  local tag_key = b.skip_tag
+  if not tag_key then return nil end              -- no offered tag known
+
+  local tval, tname = Tags.value(gs, tag_key,
+    { rng = opts.rng or lcg(state_seed(gs)), samples = opts.samples or 8 })
+  local reward = Mechanics.BLIND_REWARD[btype] or 3
+  -- you'd also bank ~$1 per hand you don't need to play; assume you clear with a
+  -- couple to spare on a non-boss blind
+  local hand_money = math.max(0, ((b.base_hands or 4) - 2))
+  -- jokers that fire when you SELECT the blind (Cartomancer/Riff-Raff/Marble)
+  -- are free value you forgo by skipping -> credit them to PLAYING.
+  local gen_v, gen_note = Generators.blind_select_value(gs)
+  -- the forgone-shop value scales up as the board empties (don't skip your first joker)
+  local njokers = #(gs.jokers or {})
+  local slots = (gs.run and gs.run.joker_slots) or 5
+  local fill = math.min(1, njokers / math.max(1, slots))
+  local shop_value = SK.SHOP_VALUE * (1 + SK.BOARDLESS_SHOP_MULT * (1 - fill))
+  local play_value = reward + shop_value + hand_money + gen_v
+  local gen_str = (gen_note ~= "" and (" + " .. gen_note)) or ""
+
+  local skip = tval > play_value * SK.SKIP_MARGIN
+  local pv = math.floor(play_value + 0.5)   -- play_value is now fractional (board-scaled shop)
+  return {
+    recommend = skip and "SKIP" or "PLAY",
+    tag = tname, tag_value = tval, play_value = play_value,
+    reason = skip
+      and string.format("Skip: %s tag (~$%d) beats playing (~$%d: $%d reward + shop + hands%s).",
+            tname, tval, pv, reward, gen_str)
+      or string.format("Play: %s tag (~$%d) < playing (~$%d: $%d reward + shop + hands%s).",
+            tname, tval, pv, reward, gen_str),
+  }
+end
+
+return SK

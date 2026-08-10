@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(luajit tests/runner.lua)",
+      "Bash(luajit tests/runner_sim.lua)"
+    ]
+  }
+}

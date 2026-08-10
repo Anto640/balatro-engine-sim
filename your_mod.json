@@ -1,0 +1,15 @@
+{
+  "id": "balatroenginesim",
+  "name": "Balatro Engine Sim",
+  "display_name": "Engine Sim - Decision Assistant",
+  "author": ["kisala.dawid"],
+  "description": "Reads live game state and recommends the best move with confidence, win probability, EV and reasoning.",
+  "prefix": "bes",
+  "main_file": "main.lua",
+  "priority": 0,
+  "version": "0.4.2",
+  "badge_colour": "4F86C6",
+  "dependencies": [
+    "Steamodded (>=1.0.0~)"
+  ]
+}

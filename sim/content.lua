@@ -1,0 +1,770 @@
+-- sim/content.lua
+-- PHASE 1: shop / pack CONTENT GENERATION + the shop interaction loop.
+--
+-- This is the fidelity CRUX. Aggregate winrate is only correct if these match the real
+-- game's DISTRIBUTIONS, so EVERY probability/cost/pool here is -- VERIFY-tagged against
+-- the decompiled source and the numbers are isolated as named constants for easy audit.
+-- We sample our own uniform RNG from these distributions (we do NOT clone Balatro's
+-- pseudohash); calibration (SELFPLAY_PLAN.md §6) is the check that catches any wrong odd.
+--
+-- Pools are taken from the engine's OWN catalogues (joker_data, consumable_value planets,
+-- packs sizing) so the generator and the advisor can never disagree about what exists.
+
+local JokerData       = require("engine.joker_data")
+local ConsumableValue = require("engine.consumable_value")
+local Packs           = require("engine.packs")
+local ShopAdvisor     = require("engine.shop_advisor")
+local PackOpenAdvisor = require("engine.pack_open_advisor")
+local GS              = require("model.game_state")
+local Json            = require("util.json")
+local JokerTick       = require("sim.joker_tick")
+local BuildPlan       = require("engine.build_plan")
+
+local Content = {}
+
+-- ============================================================================
+-- ODDS / COSTS  (all -- VERIFY against decompiled source)
+-- ============================================================================
+
+-- A base shop has 2 main card slots; each rolls a TYPE then content of that type.
+-- Base type weights (white stake, no spectral/playing-card-enabling deck). -- VERIFY
+Content.SHOP_SLOTS    = 2
+Content.SLOT_TYPE_W   = { Joker = 20, Tarot = 4, Planet = 4 }   -- VERIFY (Spectral/Card need decks)
+
+-- Joker rarity within a joker roll. -- VERIFY (Common 70 / Uncommon 25 / Rare 5)
+Content.RARITY_W      = { Common = 70, Uncommon = 25, Rare = 5 }
+
+-- Edition roll on a generated shop joker. VERIFIED (E-11) vs balatrowiki.org/w/Editions
+-- ("Appearance rates", base shop, no voucher): none 96%, Foil 2%, Holographic 1.4%,
+-- Polychrome 0.3%, Negative 0.3% -- Negative jokers DO appear in the base shop pool.
+-- A negative joker is SLOT-FREE: see the note_negative_gain/loss accounting below.
+Content.EDITION_W     = { none = 960, foil = 20, holo = 14, polychrome = 3, negative = 3 }  -- /1000
+
+-- Booster pack TYPE + SIZE weights, and costs. -- VERIFY all
+Content.PACK_TYPE_W   = { arcana = 4, celestial = 4, standard = 4, buffoon = 1.2, spectral = 0.6 }
+Content.PACK_SIZE_W   = { normal = 4, jumbo = 2, mega = 0.5 }    -- A9: mega ~2x over-offered (was 1)
+-- A9: per-edition shop price adder (was a flat +$1 for any edition). -- VERIFY
+Content.EDITION_COST  = { foil = 2, holo = 3, polychrome = 5, negative = 5 }
+Content.PACK_COST     = { normal = 4, jumbo = 6, mega = 8 }      -- VERIFY (Arcana/Celestial/Standard)
+Content.PACK_SLOTS    = 2                                        -- packs offered per shop -- VERIFY
+
+Content.VOUCHER_SLOTS = 1                                        -- one voucher per ante -- VERIFY
+Content.BASE_REROLL   = 5                                        -- white-stake base reroll cost -- VERIFY
+Content.REROLL_STEP   = 1                                        -- +$1 per reroll this shop -- VERIFY
+
+-- ---- static pools -----------------------------------------------------------
+
+-- 22 standard Tarots. -- VERIFY spellings (the game misspells "heirophant").
+Content.TAROTS = {
+  "c_fool", "c_magician", "c_high_priestess", "c_empress", "c_emperor", "c_heirophant",
+  "c_lovers", "c_chariot", "c_justice", "c_hermit", "c_wheel_of_fortune", "c_strength",
+  "c_hanged_man", "c_death", "c_temperance", "c_devil", "c_tower", "c_star", "c_moon",
+  "c_sun", "c_judgement", "c_world",
+}
+-- Non-secret planets only (the secret hands aren't reachable until unlocked). -- VERIFY
+Content.PLANETS = {
+  "c_pluto", "c_mercury", "c_uranus", "c_venus", "c_saturn", "c_jupiter",
+  "c_earth", "c_mars", "c_neptune",
+}
+-- Spectrals (Soul/Black Hole appear only in Spectral packs at low weight). -- VERIFY pool
+Content.SPECTRALS = {}
+do
+  for k in pairs(ConsumableValue.SPECTRAL_BASE or {}) do Content.SPECTRALS[#Content.SPECTRALS + 1] = k end
+  table.sort(Content.SPECTRALS)  -- deterministic order for reproducible sampling
+end
+-- Base (non-upgrade) vouchers -- the upgrades require their base owned first. -- VERIFY pairs
+-- W4: the pool offers ONLY vouchers the world MODELS. v_magic_trick (playing cards in shop)
+-- and v_directors_cut (boss reroll -- needs an engine action that doesn't exist) were pure
+-- no-ops the engine still paid $10 for; until modelled they are excluded rather than sold as
+-- phantoms. v_blank stays: it is a genuine no-op in real Balatro too (engine values it 0).
+Content.BASE_VOUCHERS = {
+  "v_overstock_norm", "v_clearance_sale", "v_hone", "v_reroll_surplus", "v_crystal_ball",
+  "v_telescope", "v_grabber", "v_wasteful", "v_tarot_merchant", "v_planet_merchant",
+  "v_seed_money", "v_blank", "v_hieroglyph", "v_paint_brush",
+}
+
+-- joker keys grouped by rarity, built once from the catalogue (excludes the misspelled alias).
+local POOLS
+local function pools()
+  if POOLS then return POOLS end
+  POOLS = { Common = {}, Uncommon = {}, Rare = {}, Legendary = {} }
+  for key, d in pairs(JokerData.ALL or {}) do
+    if key ~= "j_gluttenous_joker" then          -- skip the duplicate misspelled alias
+      local r = d.rarity or "Common"
+      if POOLS[r] then POOLS[r][#POOLS[r] + 1] = key end
+    end
+  end
+  for _, list in pairs(POOLS) do table.sort(list) end   -- deterministic sampling order
+  return POOLS
+end
+
+-- ---- weighted pick ----------------------------------------------------------
+-- Selects a key with probability proportional to its weight. CRITICAL: it walks the
+-- keys in SORTED order, not pairs() order. pairs() iteration order over string keys is
+-- randomized PER PROCESS (LuaJIT/Lua hash seed), so a pairs()-order walk returns a
+-- DIFFERENT key for the same rng roll in different processes -- which made the same seed
+-- generate different shops/packs/tags across processes (cross-process-nondeterministic
+-- runs, breaking every batch A/B comparison). Sorted order makes selection reproducible.
+local function sorted_keys(t)
+  local ks = {}; for k in pairs(t) do ks[#ks + 1] = k end
+  table.sort(ks); return ks
+end
+local function pick_weighted(rng, weights)   -- weights = { key = w, ... } -> key
+  local keys = sorted_keys(weights)
+  local total = 0
+  for _, k in ipairs(keys) do total = total + weights[k] end
+  local roll = rng() * total
+  for _, k in ipairs(keys) do roll = roll - weights[k]; if roll <= 0 then return k end end
+  return keys[#keys]                              -- fallback (float slop; shouldn't happen)
+end
+local function pick_uniform(rng, list)
+  if #list == 0 then return nil end
+  local i = math.floor(rng() * #list) + 1
+  if i < 1 then i = 1 elseif i > #list then i = #list end
+  return list[i]
+end
+
+-- ============================================================================
+-- GENERATORS
+-- ============================================================================
+
+local function owned_joker_keys(run)
+  local set = {}
+  for _, j in ipairs(run.jokers or {}) do set[j.key] = true end
+  return set
+end
+
+-- E-11: a NEGATIVE-edition joker occupies no board slot (real rule). Modelled the same
+-- way tag_negative already is -- the joker carries its own +1 joker_slot on gain and
+-- takes it back on loss -- so every `#run.jokers >= run.joker_slots` check (world AND
+-- engine, which both compare count vs joker_slots) stays consistent everywhere else.
+local function note_negative_gain(run, j)
+  if j and j.edition == "negative" then run.joker_slots = (run.joker_slots or 5) + 1 end
+end
+local function note_negative_loss(run, j)
+  if j and j.edition == "negative" then run.joker_slots = math.max(1, (run.joker_slots or 5) - 1) end
+end
+Content._note_negative_gain, Content._note_negative_loss = note_negative_gain, note_negative_loss
+
+-- A4: voucher-adjusted generation. Prices (Clearance -25%), slot-type weights (Tarot/Planet
+-- merchant x2), and edition weights (Hone x2 on every edition) read the flags apply_voucher set.
+local function priced(run, base) return math.max(0, math.floor((base or 0) * (run._price_mult or 1) + 0.5)) end
+Content._priced = priced   -- exposed for the A4 voucher tests
+local function slot_type_weights(run)
+  local w = { Joker = Content.SLOT_TYPE_W.Joker, Tarot = Content.SLOT_TYPE_W.Tarot, Planet = Content.SLOT_TYPE_W.Planet }
+  if run._tarot_boost then w.Tarot = w.Tarot * 2 end
+  if run._planet_boost then w.Planet = w.Planet * 2 end
+  return w
+end
+-- A4/E-11: Hone doubles EVERY edition rate INCLUDING Negative (balatrowiki.org/w/Editions:
+-- Hone -> Foil 4% / Holo 2.8% / Poly 0.6% / Negative 0.6%; Glow Up would be x4 but is an
+-- upgrade voucher the sim pool never offers). `none` absorbs the difference so the weights
+-- keep the same /1000 total (the boosted rates stay ABSOLUTE, not merely relative).
+local function edition_weights(run)
+  if not run._edition_boost then return Content.EDITION_W end
+  local w, total, boosted = {}, 0, 0
+  for k, v in pairs(Content.EDITION_W) do
+    total = total + v
+    if k ~= "none" then w[k] = v * 2; boosted = boosted + w[k] end
+  end
+  w.none = math.max(0, total - boosted)
+  return w
+end
+Content._edition_weights = edition_weights   -- exposed for the E-11 edition-rate tests
+
+-- A shop joker POD: rarity-weighted key (excluding owned), base cost from the catalogue,
+-- a rare edition, and the standard sell value floor(cost/2) (min $1). -- VERIFY sell formula
+function Content.gen_joker(run, rng)
+  local P = pools()
+  local owned = owned_joker_keys(run)
+  local rarity = pick_weighted(rng, Content.RARITY_W)
+  local list = P[rarity] or P.Common
+  -- a few attempts to avoid offering a duplicate of an owned joker
+  local key
+  for _ = 1, 6 do
+    local cand = pick_uniform(rng, list)
+    if cand and not owned[cand] then key = cand; break end
+    key = key or cand
+  end
+  if not key then return nil end
+  local d = JokerData.resolve(key)
+  local edition = pick_weighted(rng, edition_weights(run))   -- A4/E-11: Hone doubles every edition
+  if edition == "none" then edition = nil end
+  local cost = d.cost or 5
+  if edition then cost = cost + (Content.EDITION_COST[edition] or 1) end   -- A9: per-edition adder
+  cost = priced(run, cost)                            -- A4: Clearance Sale -25%
+  return GS.joker{ key = key, name = d.name or key, cost = cost,
+    sell_value = math.max(1, math.floor(cost / 2)), edition = edition,
+    rarity = d.rarity, ability = { extra = {} } }
+end
+
+-- A standalone shop consumable (Tarot or Planet) item. Base $3 (Clearance-discounted). -- VERIFY
+function Content.gen_consumable(set, rng, run)
+  local key = (set == "Planet") and pick_uniform(rng, Content.PLANETS) or pick_uniform(rng, Content.TAROTS)
+  return { set = set, key = key, name = key, cost = run and priced(run, 3) or 3 }
+end
+
+-- Roll one main shop slot: a Joker, or a standalone Tarot/Planet.
+local function gen_shop_slot(run, rng)
+  local t = pick_weighted(rng, slot_type_weights(run))   -- A4: Tarot/Planet Merchant double their weight
+  if t == "Joker" then
+    local j = Content.gen_joker(run, rng)
+    return j and { kind = "joker", joker = j } or nil
+  end
+  return { kind = "consumable", item = Content.gen_consumable(t, rng, run) }
+end
+
+-- A booster pack offer: weighted type + size, with cost (Clearance-discounted).
+function Content.gen_pack(rng, run)
+  local typ  = pick_weighted(rng, Content.PACK_TYPE_W)
+  local size = pick_weighted(rng, Content.PACK_SIZE_W)
+  local key  = "p_" .. typ .. "_" .. size
+  return { key = key, name = Packs.display_name(key, typ), cost = priced(run, Content.PACK_COST[size] or 4) }
+end
+
+-- A voucher offer (one not already owned; upgrades only when their base is owned). -- VERIFY
+function Content.gen_voucher(run, rng)
+  local owned = {}
+  for _, v in ipairs(run.vouchers_owned or {}) do owned[v] = true end
+  for _ = 1, 8 do
+    local key = pick_uniform(rng, Content.BASE_VOUCHERS)
+    if key and not owned[key] then return { key = key, name = key, cost = 10 } end  -- VERIFY base $10
+  end
+  return nil
+end
+
+-- Generate a full shop (shop_state shape). Reroll cost comes from the run's per-shop counter.
+function Content.gen_shop(run, rng)
+  local jokers, consumables = {}, {}
+  local nslots = run.shop_slots or Content.SHOP_SLOTS        -- A4: Overstock adds a card slot
+  for _ = 1, nslots do
+    local slot = gen_shop_slot(run, rng)
+    if slot and slot.kind == "joker" then jokers[#jokers + 1] = slot.joker
+    elseif slot and slot.kind == "consumable" then consumables[#consumables + 1] = slot.item end
+  end
+  local boosters = {}
+  for _ = 1, Content.PACK_SLOTS do boosters[#boosters + 1] = Content.gen_pack(rng, run) end
+  -- A4: ONE voucher per ANTE (not per shop). Generate at the ante's first shop and persist the
+  -- SAME offer across that ante's shops (real Balatro restocks the voucher slot once per ante);
+  -- cleared on purchase (apply_action). Fixes the ~3x over-exposure the audit flagged.
+  if run._voucher_ante ~= run.ante then
+    run._voucher_ante = run.ante
+    run._voucher = Content.gen_voucher(run, rng)
+  end
+  local vouchers = {}
+  if run._voucher then vouchers[1] = run._voucher end
+  return {
+    jokers = jokers, consumables = consumables, vouchers = vouchers, boosters = boosters,
+    reroll_cost = run.reroll_cost or Content.BASE_REROLL, joker_slots = run.joker_slots,
+  }
+end
+
+-- ---- pack contents ----------------------------------------------------------
+-- A random playing card for Standard packs. Modifier odds VERIFIED (E-11) vs
+-- balatrowiki.org/w/Card_Modifiers ("Booster Packs" appearance rates): 40% Enhancement
+-- (uniform over the 8), 20% Seal (uniform over Gold/Red/Blue/Purple), 8% Edition split
+-- Foil 4% / Holographic 2.8% / Polychrome 1.2% (pack cards never roll Negative).
+local SUITS = { "Spades", "Hearts", "Clubs", "Diamonds" }
+-- A9: a run-scoped monotonic card id (was `1000 + i`, which COLLIDED across packs -- two packs
+-- both produced ids 1001,1002,... breaking any id-keyed tie-break). Per-run -> deterministic.
+local function next_card_id(run)
+  if not run then return 1000 end
+  run._next_card_id = (run._next_card_id or 1000) + 1
+  return run._next_card_id
+end
+local function gen_card(rng, run)
+  local rank = 2 + math.floor(rng() * 13)         -- 2..14
+  local suit = SUITS[math.floor(rng() * 4) + 1]
+  local enh, seal, ed
+  if rng() < 0.40 then  -- 40% enhanced (uniform over the 8 enhancements; was ~12%)
+    enh = ({ "m_bonus", "m_mult", "m_glass", "m_steel", "m_gold", "m_lucky", "m_wild", "m_stone" })[math.floor(rng() * 8) + 1]
+  end
+  if rng() < 0.20 then  -- 20% sealed (uniform over the 4 seals; was ~4%)
+    seal = ({ "Gold", "Red", "Blue", "Purple" })[math.floor(rng() * 4) + 1]
+  end
+  local e = rng()       -- one banded edition roll, rarest first (mirrors the game's poll_edition)
+  if     e < 0.012 then ed = "polychrome"        -- 1.2%
+  elseif e < 0.040 then ed = "holo"              -- +2.8%
+  elseif e < 0.080 then ed = "foil" end          -- +4.0%  (8% edition total; was ~3%)
+  return GS.card{ id = next_card_id(run), rank_id = rank, suit = suit, enhancement = enh, seal = seal, edition = ed }
+end
+Content._gen_card = gen_card   -- exposed for the E-11 rate tests
+
+-- reverse of PLANET_KEY_HAND (hand name -> planet key) + a cheap "most-played" proxy (the
+-- run's most-leveled hand) for A4 Telescope. Built once; no MC needed.
+local HAND_TO_PLANET = {}
+for pk, hn in pairs(ConsumableValue.PLANET_KEY_HAND or {}) do HAND_TO_PLANET[hn] = pk end
+local function most_leveled_hand(run)
+  local best, blvl = nil, 1
+  for h, lv in pairs(run.hand_levels or {}) do
+    if (lv.level or 1) > blvl then best, blvl = h, lv.level or 1 end
+  end
+  return best
+end
+
+-- Open a pack: produce its revealed items (the gs.pack.items shape the advisor consumes),
+-- plus picks_left (how many you may take). Sizes from engine/packs (single source of truth).
+function Content.open_pack(pack, run, rng)
+  local kind, n, k = Packs.size_of(pack.key or pack.name)
+  n = n or 3; k = k or 1
+  local items = {}
+  for i = 1, n do
+    if kind == "joker" then
+      local j = Content.gen_joker(run, rng)
+      if j then items[#items + 1] = { set = "Joker", key = j.key, name = j.name, joker = j } end
+    elseif kind == "tarot" then
+      local key = pick_uniform(rng, Content.TAROTS); items[#items + 1] = { set = "Tarot", key = key, name = key }
+    elseif kind == "planet" then
+      local key = pick_uniform(rng, Content.PLANETS)
+      -- A4 Telescope: the first planet in a Celestial pack is your best (most-leveled) hand's.
+      if i == 1 and run and run._telescope then
+        local bp = HAND_TO_PLANET[most_leveled_hand(run) or ""]
+        if bp then key = bp end
+      end
+      items[#items + 1] = { set = "Planet", key = key, name = key }
+    elseif kind == "spectral" then
+      local key = pick_uniform(rng, Content.SPECTRALS); items[#items + 1] = { set = "Spectral", key = key, name = key }
+    else -- standard (playing cards)
+      items[#items + 1] = { set = "Standard", card = gen_card(rng, run) }
+    end
+  end
+  return { items = items, picks_left = k }
+end
+
+-- ============================================================================
+-- APPLY + the SHOP PHASE (driver hook)
+-- ============================================================================
+
+local function dollars(run) return run.economy.dollars end
+local function spend(run, c) run.economy.dollars = run.economy.dollars - (c or 0) end
+-- W4: Credit Card lets a real player spend down to -$20; the engine already counts that
+-- credit (OwnedSynergy.credit), but the world rejected any over-cash buy -- apply_action
+-- returned false and shop_phase BROKE, silently ending the whole shop. Honour the debt.
+-- (Interest is already negative-safe: Mechanics.interest clamps at max(0, money).)
+local function credit(run)
+  for _, j in ipairs(run.jokers or {}) do if j.key == "j_credit_card" then return 20 end end
+  return 0
+end
+local function can_afford(run, c) return dollars(run) + credit(run) >= (c or 0) end
+
+-- Build the POD gs the shop/pack advisors consume.
+local function shop_gs(run, shop, pack)
+  return GS.new{
+    meta = { ante = run.ante, round = run.round, state = "SHOP", seed_hash = tostring(run.seed) },
+    deck = run.deck, jokers = run.jokers, consumables = run.consumables,
+    economy = run.economy,
+    run = { hand_levels = run.hand_levels, vouchers_owned = run.vouchers_owned, tags = run.tags,
+            hand_size = run.hand_size, consumable_slots = run.consumable_slots,
+            joker_slots = run.joker_slots, boss_key = run._next_boss,
+            hand_type_plays = run.hand_type_plays, hands_played = run.hands_played,
+            build_plan = run.build_plan },  -- K1/K2 + Phase 5 persistent archetype
+    shop = shop, pack = pack,
+  }
+end
+
+-- A4: faithful voucher effects. Previously ~3 of 16 were modelled (the rest inert) and
+-- Hieroglyph had the WRONG SIGN (+1 hand instead of -1). Resource vouchers mutate run state
+-- directly; shop-generation vouchers set flags read by gen_shop/gen_joker/pricing/reroll.
+-- -- VERIFY magnitudes against the decompiled source.
+local function apply_voucher(run, key)
+  run.vouchers_owned[#run.vouchers_owned + 1] = key
+  -- resource / economy
+  if key == "v_overstock_norm" then run.shop_slots = (run.shop_slots or Content.SHOP_SLOTS) + 1   -- +1 shop CARD slot
+  elseif key == "v_crystal_ball" then run.consumable_slots = run.consumable_slots + 1              -- +1 consumable slot
+  elseif key == "v_grabber" then run.base_hands = run.base_hands + 1                               -- +1 hand / round
+  elseif key == "v_wasteful" then run.base_discards = run.base_discards + 1                        -- +1 discard / round
+  elseif key == "v_paint_brush" then run.hand_size = run.hand_size + 1                             -- +1 hand size
+  elseif key == "v_hieroglyph" then run.base_hands = math.max(1, run.base_hands - 1)               -- -1 hand ...
+    run._ante_back = (run._ante_back or 0) + 1  -- W4: ... AND -1 ante. The driver consumes this at the
+    -- next ante boundary by REPLAYING the ante (one extra ante of blinds/shops/income before ante 8) --
+    -- the runway benefit of the real -1 ante. (Immediate requirement relief for the CURRENT ante's
+    -- remaining blinds is not modelled.) Before W4 only the -1 hand cost existed, so the engine paid
+    -- $10 for a strictly-harmful effect in 26/160 runs.
+  elseif key == "v_seed_money" then run.economy.interest_cap = math.max(run.economy.interest_cap, 10)  -- interest cap -> $10 (was +1)
+  elseif key == "v_money_tree" then run.economy.interest_cap = math.max(run.economy.interest_cap, 20)  -- (upgrade; unreached -- BASE only)
+  -- shop generation (flags read at generation time)
+  elseif key == "v_hone" or key == "v_glow_up" then run._edition_boost = true                      -- every edition x2 (incl. negative)
+  elseif key == "v_tarot_merchant" then run._tarot_boost = true                                    -- Tarots x2 in shop
+  elseif key == "v_planet_merchant" then run._planet_boost = true                                  -- Planets x2 in shop
+  elseif key == "v_clearance_sale" then run._price_mult = 0.75                                     -- cards/packs 25% off
+  elseif key == "v_reroll_surplus" then run._reroll_discount = (run._reroll_discount or 0) + 2     -- rerolls -$2
+  elseif key == "v_telescope" then run._telescope = true                                           -- Celestial packs -> best planet
+  -- UNMODELLED (documented simplifications): v_blank (nothing -- faithful, it does nothing in
+  -- real Balatro either). v_magic_trick / v_directors_cut are excluded from BASE_VOUCHERS (W4)
+  -- until modelled, so they can no longer be sold as no-ops.
+  end
+end
+Content._apply_voucher = apply_voucher   -- exposed for the A4 voucher tests
+
+-- emit one action-trace record (stamped with the current ante) if tracing is on.
+local function trace(run, rec)
+  if run._emit then rec.ante = run.ante; run._emit(rec) end
+end
+
+-- A6: USE a picked consumable IMMEDIATELY (no slot) so a pack pick is never silently lost
+-- when the 2 consumable slots are full (real Balatro applies Arcana/Celestial/Spectral picks
+-- at open). Reuses the A2 world executor with a freshly-sampled hand (so enhancement/suit
+-- tarots mutate real deck cards -> the mutation persists), routing money/generator/spectral/
+-- planet effects through the single faithful path. Returns the use descriptor (or nil).
+local function apply_pack_consumable_now(run, it, rng)
+  local World = require("sim.world")   -- lazy: content never top-level-requires world (no cycle)
+  local hand
+  if run.deck and #run.deck >= 1 then
+    local sh = World.shuffle(run.deck, rng)
+    local hs = math.min(run.hand_size or 8, #sh)
+    hand = {}; for i = 1, hs do hand[i] = sh[i] end
+  end
+  -- temporarily hold it so use_consumable can find + apply + remove it (it consumes FIRST,
+  -- freeing the slot for any generator output before creating).
+  run.consumables[#run.consumables + 1] = { set = it.set, key = it.key, name = it.name }
+  local uses = {}
+  World._use_consumable(run, { use_names = { it.key } }, uses, nil, hand, nil)
+  return uses[1]
+end
+Content._apply_pack_consumable_now = apply_pack_consumable_now   -- exposed for the A6 tests
+
+-- Apply the open-pack pick(s) to the run.
+local function take_pack(run, pack, rng)
+  local opened = Content.open_pack(pack, run, rng)
+  -- Hallucination: a 1-in-2 chance to CREATE a Tarot whenever ANY booster pack is OPENED --
+  -- independent of the pick/skip decision, so it fires here at the open point. VERIFIED
+  -- (balatrowiki.org/w/Jokers): "1 in 2 chance to create a Tarot card when any Booster Pack is
+  -- opened (Must have room)". Reuses the world's grant_consumable_world helper (which enforces
+  -- "Must have room"). OWNERSHIP-GATED + run.rng (the world stream) so a run WITHOUT Hallucination
+  -- consumes no RNG here and its packs stay byte-identical.
+  for _, j in ipairs(run.jokers or {}) do
+    if j.key == "j_hallucination" then
+      if run.rng() < 0.5 then require("sim.world").grant_consumable_world(run, run.rng, "Tarot") end
+      break
+    end
+  end
+  local gs = shop_gs(run, run._shop, opened)
+  local ok, po = pcall(PackOpenAdvisor.recommend, gs, {})
+  if not ok or not po then return end
+  -- trace the pack: what it revealed (with the engine's PER-ITEM valuation, P3d) and
+  -- what it advised. po.ranked = { { it, key, name, v, meas }, ... } -> map by item identity.
+  local ival = {}
+  for _, e in ipairs(po.ranked or {}) do if e.it then ival[e.it] = e.v end end
+  local items = {}
+  for _, it in ipairs(opened.items) do items[#items + 1] = { set = it.set, key = it.key, value = ival[it] } end
+  trace(run, { kind = "pack", items = Json.array(items), advice = po.best and { type = po.best.type,
+    target = po.best.target and (po.best.target.name or po.best.target.key), reason = po.reason } or nil })
+  local picks = po.picks or (po.best and { po.best } or {})
+  if #picks == 0 and po.skip then return end
+  -- SELL-TO-MAKE-ROOM (world fidelity, CORE-PROTECTED): on a FULL board the engine's pack advice
+  -- may recommend selling a DISPOSABLE joker to slot a better pack joker (`po.sell` = { name, index };
+  -- set only when the best pack joker beats the weakest SWAP-ELIGIBLE joker -- weakest_owned_joker now
+  -- refuses to nominate a compounding core / flat scorer, so a winning all-scorer board yields no sell
+  -- and keeps the pick declined). The world used to IGNORE po.sell and silently VOID the paid-for pick
+  -- whenever slots were full (sim: 50% of opened Buffoon packs delivered nothing). Execute the advised
+  -- swap (mirrors SELL_JOKER: refund sell_value, remove at the index), gated to full-board joker picks.
+  -- Deterministic (no rng); a run that never hits a full-board joker pick with po.sell is byte-identical.
+  local sold_for_room = false
+  for _, p in ipairs(picks) do
+    local it = p.it or p
+    if it.set == "Joker" and it.joker then
+      local room = (it.joker.edition == "negative") or (#run.jokers < run.joker_slots)
+      if (not room) and (not sold_for_room) and po.sell and po.sell.index and run.jokers[po.sell.index] then
+        local sold = run.jokers[po.sell.index]
+        run.economy.dollars = (run.economy.dollars or 0) + (sold.sell_value or 1)
+        table.remove(run.jokers, po.sell.index)
+        JokerTick.on_joker_sold(run)   -- Campfire +0.25x per joker sold
+        trace(run, { kind = "joker_loss", key = sold.key, via = "pack_swap" })
+        sold_for_room, room = true, true
+      end
+      if room then
+        run.jokers[#run.jokers + 1] = it.joker
+        note_negative_gain(run, it.joker)   -- E-11: a negative joker is slot-free
+        trace(run, { kind = "joker_gain", key = it.joker.key, via = "pack" })
+      end
+    elseif it.set == "Tarot" or it.set == "Planet" or it.set == "Spectral" then
+      if #run.consumables < run.consumable_slots then
+        -- a slot is free: hold it (the engine times the use in-blind with LEVEL_USE_CREDIT etc.)
+        run.consumables[#run.consumables + 1] = { set = it.set, key = it.key, name = it.name }
+        trace(run, { kind = "consumable_gain", key = it.key, via = "pack" })
+      else
+        -- A6: slots full -> USE it immediately instead of silently dropping the paid-for pick
+        apply_pack_consumable_now(run, it, rng)
+        trace(run, { kind = "consumable_use", key = it.key, set = it.set, via = "pack" })
+      end
+    elseif it.set == "Standard" and it.card then
+      run.deck[#run.deck + 1] = it.card
+      JokerTick.on_cards_added(run, 1)   -- A1: Hologram +0.25x per playing card added
+    end
+  end
+end
+Content._take_pack = take_pack   -- exposed for the Hallucination pack-open regression test
+
+-- Apply one shop action; returns true if it changed state (so the loop continues).
+local function apply_action(run, shop, a, rng)
+  local tp = a.type
+  if tp == "BUY_JOKER" and a.target then
+    -- E-11: a negative-edition joker is slot-free -> buyable even on a full board
+    local slot_ok = (#run.jokers < run.joker_slots) or (a.target.edition == "negative")
+    if not can_afford(run, a.cost) or not slot_ok then return false end
+    local before = dollars(run)
+    spend(run, a.cost); run.jokers[#run.jokers + 1] = a.target
+    note_negative_gain(run, a.target)
+    trace(run, { kind = "joker_gain", key = a.target.key, via = "shop",
+      dollars_before = before, dollars_after = dollars(run) })
+    for i, j in ipairs(shop.jokers) do if j == a.target then table.remove(shop.jokers, i); break end end
+    return true
+  elseif tp == "BUY_CONSUMABLE" and a.target then
+    if not can_afford(run, a.cost) then return false end
+    spend(run, a.cost)
+    if #run.consumables < run.consumable_slots then
+      run.consumables[#run.consumables + 1] = { set = a.target.set, key = a.target.key, name = a.target.name }
+    end
+    for i, c in ipairs(shop.consumables) do if c == a.target then table.remove(shop.consumables, i); break end end
+    return true
+  elseif tp == "BUY_VOUCHER" and a.target then
+    if not can_afford(run, a.cost) then return false end
+    local before = dollars(run)
+    spend(run, a.cost); apply_voucher(run, a.target.key)
+    run._voucher = nil    -- A4: bought -> clear the ante's voucher so it isn't re-offered
+    trace(run, { kind = "voucher_gain", key = a.target.key, via = "shop",
+      dollars_before = before, dollars_after = dollars(run) })  -- P5: mirror joker_gain
+    for i, v in ipairs(shop.vouchers) do if v == a.target then table.remove(shop.vouchers, i); break end end
+    return true
+  elseif tp == "BUY_PACK" and a.target then
+    if not can_afford(run, a.cost) then return false end
+    spend(run, a.cost); take_pack(run, a.target, rng)
+    for i, b in ipairs(shop.boosters) do if b == a.target then table.remove(shop.boosters, i); break end end
+    return true
+  elseif tp == "SELL_JOKER" and a.target then
+    for i, j in ipairs(run.jokers) do
+      if j == a.target then
+        run.economy.dollars = run.economy.dollars + (j.sell_value or 1); table.remove(run.jokers, i)
+        note_negative_loss(run, j)   -- E-11: a sold negative joker takes its +1 slot with it
+        JokerTick.on_joker_sold(run) -- Campfire +0.25x per joker sold
+        trace(run, { kind = "joker_loss", key = j.key, via = "sell" }); break
+      end
+    end
+    return true
+  elseif tp == "SELL_TO_BUY" and a.target then
+    -- sell the funder, then re-roll the loop so the now-affordable buy is taken next pass
+    for i, j in ipairs(run.jokers) do
+      if j == a.target then
+        run.economy.dollars = run.economy.dollars + (j.sell_value or 1); table.remove(run.jokers, i)
+        note_negative_loss(run, j)   -- E-11: a sold negative joker takes its +1 slot with it
+        JokerTick.on_joker_sold(run) -- Campfire +0.25x per joker sold
+        trace(run, { kind = "joker_loss", key = j.key, via = "sell" }); return true
+      end
+    end
+    for i, c in ipairs(run.consumables) do
+      if c == a.target then run.economy.dollars = run.economy.dollars + 1; table.remove(run.consumables, i); return true end
+    end
+    return false
+  elseif tp == "USE_CONSUMABLE" and a.target and a.kind == "income" then
+    -- F6 shop funding: cash an owned Hermit/Temperance, then re-run the advisor
+    -- so the now-affordable measured purchase is taken on the next loop.
+    local uses = {}
+    local consumed = require("sim.world")._use_consumable(run,
+      { use_names = a.use_names or { a.target.key } }, uses, nil, nil, nil)
+    if consumed and uses[1] then
+      local u = uses[1]
+      trace(run, { kind = "consumable_use", key = u.key, set = u.set,
+        money_delta = u.money_delta, via = "shop_funding" })
+    end
+    return consumed
+  elseif tp == "REROLL" then
+    if not can_afford(run, shop.reroll_cost) then return false end
+    spend(run, shop.reroll_cost)
+    run.reroll_cost = (run.reroll_cost or Content.BASE_REROLL) + Content.REROLL_STEP
+    -- a reroll refreshes the main card slots (jokers + standalone consumables), not packs/voucher.
+    -- Overstock's +1 slot applies here too (was the fixed SHOP_SLOTS constant, so the bought
+    -- slot silently VANISHED on every reroll -- the voucher's exposure benefit half-broken).
+    shop.jokers, shop.consumables = {}, {}
+    for _ = 1, (run.shop_slots or Content.SHOP_SLOTS) do
+      local slot = gen_shop_slot(run, rng)
+      if slot and slot.kind == "joker" then shop.jokers[#shop.jokers + 1] = slot.joker
+      elseif slot and slot.kind == "consumable" then shop.consumables[#shop.consumables + 1] = slot.item end
+    end
+    shop.reroll_cost = run.reroll_cost
+    return true
+  end
+  return false  -- SAVE / unknown -> stop
+end
+Content._apply_action = apply_action   -- exposed for the W4 credit-card regression test
+
+-- ============================================================================
+-- SKIP TAGS  (a major calibration gap -- the real $58 came partly from Investment)
+-- ============================================================================
+-- The offered-tag pool (one tag per skippable Small/Big blind). VERIFIED (E-11): the real
+-- pick is uniform over the ANTE-ELIGIBLE pool (the game's pseudorandom_element over the
+-- tag pool with min_ante-gated entries removed).
+Content.TAG_POOL = {
+  "tag_investment", "tag_economy", "tag_coupon", "tag_voucher", "tag_d6", "tag_speed",
+  "tag_handy", "tag_garbage", "tag_uncommon", "tag_rare", "tag_negative", "tag_foil",
+  "tag_holo", "tag_polychrome", "tag_double", "tag_buffoon", "tag_meteor", "tag_charm",
+  "tag_ethereal", "tag_standard", "tag_orbital", "tag_top_up", "tag_juggle", "tag_boss",
+}
+-- E-11 ante gate. balatrowiki.org/w/Tags: "During Ante 1, the Negative Tag, Standard Tag,
+-- Meteor Tag, Buffoon Tag, Handy Tag, Garbage Tag, Ethereal Tag, Top-up Tag, and Orbital
+-- Tag cannot be encountered." (min_ante 2 in the game data; all other tags are ante-1 legal.)
+Content.TAG_MIN_ANTE = {
+  tag_negative = 2, tag_standard = 2, tag_meteor = 2, tag_buffoon = 2, tag_handy = 2,
+  tag_garbage = 2, tag_ethereal = 2, tag_top_up = 2, tag_orbital = 2,
+}
+-- `ante` defaults to 1 (the conservative pool) so a caller that omits it can never offer
+-- an ante-gated tag early. TAG_POOL's array order is fixed, so the filtered list -- and
+-- therefore the pick -- stays cross-process deterministic.
+function Content.gen_tag(rng, ante)
+  ante = ante or 1
+  local pool = {}
+  for _, k in ipairs(Content.TAG_POOL) do
+    if (Content.TAG_MIN_ANTE[k] or 1) <= ante then pool[#pool + 1] = k end
+  end
+  return pick_uniform(rng, pool)
+end
+
+-- level the deck's most-worthwhile hand by n (Orbital tag / Meteor planets).
+local function level_hand(run, hand, n)
+  local inc = require("engine.mechanics").HAND_PLANET[hand]
+  if not inc then return end
+  local cur = run.hand_levels[hand] or { level = 1, chips = inc.base_chips, mult = inc.base_mult }
+  run.hand_levels[hand] = { level = (cur.level or 1) + n,
+    chips = (cur.chips or 0) + inc.dchips * n, mult = (cur.mult or 0) + inc.dmult * n }
+end
+local function best_hand(run)
+  local gs = GS.new{ deck = run.deck,
+    run = { hand_levels = run.hand_levels, build_plan = run.build_plan } }
+  local bp = ConsumableValue.best_planet(gs, { rng = run.rng, samples = 4 })
+  return (bp and bp.hand) or "Pair"
+end
+local function grant_joker(run, rng, rarity_w, edition)
+  if #run.jokers >= run.joker_slots then return end
+  local saved = Content.RARITY_W; if rarity_w then Content.RARITY_W = rarity_w end
+  local j = Content.gen_joker(run, rng)
+  Content.RARITY_W = saved
+  if j then
+    if edition then j.edition = edition end
+    run.jokers[#run.jokers + 1] = j
+    note_negative_gain(run, j)   -- E-11: gen_joker's own roll can now land a negative
+  end
+end
+Content.grant_joker = grant_joker   -- A2: exposed so the world can execute Judgement/Soul
+local function open_free_pack(run, key, rng)
+  take_pack(run, { key = key, name = key, cost = 0 }, rng)  -- defined below; forward ref ok at call time
+end
+
+-- Apply a skipped tag's effect to the run. High-value/economy/build tags are modelled
+-- faithfully; minor tags get a light approximation. -- VERIFY exact effects
+function Content.apply_tag(run, key, rng)
+  if key == "tag_investment" then
+    run._pending_investment = (run._pending_investment or 0) + 25     -- +$25 after the next boss
+  elseif key == "tag_economy" then
+    run.economy.dollars = run.economy.dollars + math.min(run.economy.dollars, 40)
+  elseif key == "tag_orbital" then
+    level_hand(run, best_hand(run), 3)
+  elseif key == "tag_negative" then
+    run.joker_slots = run.joker_slots + 1                            -- the negative joker's extra slot
+  elseif key == "tag_charm"   then open_free_pack(run, "p_arcana_mega", rng)
+  elseif key == "tag_buffoon" then open_free_pack(run, "p_buffoon_mega", rng)
+  elseif key == "tag_meteor"  then open_free_pack(run, "p_celestial_mega", rng)
+  elseif key == "tag_ethereal" then open_free_pack(run, "p_spectral_normal", rng)
+  elseif key == "tag_standard" then open_free_pack(run, "p_standard_mega", rng)
+  elseif key == "tag_uncommon" then grant_joker(run, rng, { Uncommon = 1 })
+  elseif key == "tag_rare"     then grant_joker(run, rng, { Rare = 1 })
+  elseif key == "tag_top_up"   then grant_joker(run, rng, { Common = 1 }); grant_joker(run, rng, { Common = 1 })
+  elseif key == "tag_foil"       then grant_joker(run, rng, nil, "foil")
+  elseif key == "tag_holo"       then grant_joker(run, rng, nil, "holo")
+  elseif key == "tag_polychrome" then grant_joker(run, rng, nil, "polychrome")
+  elseif key == "tag_voucher" then local v = Content.gen_voucher(run, rng); apply_voucher(run, v and v.key or "v_blank")
+  elseif key == "tag_coupon" then run._coupon = true                 -- A5: next shop -> initial jokers/packs free
+  elseif key == "tag_d6" then run._free_reroll = true                -- A5: next shop -> rerolls start at $0
+  -- A5: one-time payouts based on run history (counters accrued by the driver). -- VERIFY
+  elseif key == "tag_handy"   then run.economy.dollars = run.economy.dollars + (run._hands_played or 0)     -- $1 / hand played
+  elseif key == "tag_garbage" then run.economy.dollars = run.economy.dollars + (run._unused_discards or 0)  -- $1 / unused discard
+  elseif key == "tag_speed"   then run.economy.dollars = run.economy.dollars + 5 * (run._blinds_skipped or 0) -- $5 / blind skipped
+  elseif key == "tag_juggle"  then run._juggle = 3                    -- A5: +3 hand size for the NEXT round only
+  -- UNMODELLED (documented): tag_boss (reroll the Boss blind), tag_double (copy the next
+  -- selected tag -- cross-skip chaining). Left as no-ops; the engine under-values them anyway (B6).
+  end
+end
+
+-- Pay out any tag-deferred money once a boss is defeated (Investment $25 each).
+function Content.on_boss_cleared(run)
+  if run._pending_investment and run._pending_investment > 0 then
+    run.economy.dollars = run.economy.dollars + run._pending_investment
+    run._pending_investment = 0
+  end
+end
+
+-- emit a "shop" trace record: the full OFFER (jokers + costs + packs) and the engine's
+-- recommendation. This is what lets the analyzer surface jokers the engine SKIPPED
+-- (offered but never taken) -- including a strong one it under-valued that would have
+-- carried the run (the counterfactual the player asked for).
+local function emit_shop(run, shop, ranked)
+  if not run._emit then return end
+  -- The engine's valuation of EVERY offer (P3) -- keyed by the offer table identity, so
+  -- it survives onto a SAVE record too (every rejected offer keeps its value). This is
+  -- the quantitative counterfactual: we can see it rated a strong SKIPPED joker BELOW a
+  -- weak one it bought (the T1.3 valuation bug) -- now for packs/consumables/vouchers too.
+  local val, reroll_value = {}, nil
+  local function consider(act)
+    if not act then return end
+    if act.target then val[act.target] = act.value end
+    if act.type == "REROLL" then reroll_value = act.value end
+  end
+  consider(ranked and ranked.best)
+  for _, a in ipairs((ranked and ranked.alternatives) or {}) do consider(a) end
+
+  local oj = {}
+  for _, j in ipairs(shop.jokers) do oj[#oj + 1] = { key = j.key, cost = j.cost, value = val[j] } end
+  -- P3b: each pack offer carries the engine's pack valuation, not just a name.
+  local op = {}
+  for _, b in ipairs(shop.boosters) do op[#op + 1] = { name = b.name or b.key, key = b.key, cost = b.cost, value = val[b] } end
+  local oc = {}
+  for _, c in ipairs(shop.consumables or {}) do oc[#oc + 1] = { set = c.set, key = c.key, cost = c.cost, value = val[c] } end
+  local ov = {}
+  for _, v in ipairs(shop.vouchers or {}) do ov[#ov + 1] = { key = v.key, cost = v.cost, value = val[v] } end
+
+  local best = ranked and ranked.best
+  run._emit({ kind = "shop", ante = run.ante, dollars = run.economy.dollars,
+    reroll_cost = shop.reroll_cost, reroll_value = reroll_value,       -- P3c: always logged
+    offer_jokers = Json.array(oj), offer_packs = Json.array(op),
+    offer_consumables = Json.array(oc), offer_vouchers = Json.array(ov),
+    advice = best and { type = best.type,
+      target = best.target and (best.target.name or best.target.key), reason = best.reason } or nil })
+end
+local function offer_sig(shop)
+  local t = { "r" .. tostring(shop.reroll_cost) }
+  for _, j in ipairs(shop.jokers) do t[#t + 1] = (j.key or "?") .. "@" .. tostring(j.cost) end
+  return table.concat(t, "|")
+end
+
+-- The driver hook: open a shop, let the engine spend until it SAVEs (or a safety cap).
+-- opts.emit (optional) collects the action trace (shop offers/advice, buys, sells, packs).
+function Content.shop_phase(run, opts)
+  local rng = run.rng
+  run._emit = opts and opts.emit
+  local base_reroll = math.max(0, Content.BASE_REROLL - (run._reroll_discount or 0))  -- A4: Reroll Surplus -$2
+  if run._free_reroll then base_reroll = 0; run._free_reroll = nil end                -- A5: D6 tag -> $0 reroll base (one shop)
+  run.reroll_cost = base_reroll
+  local shop = Content.gen_shop(run, rng)
+  -- A5: Coupon tag -> the initial jokers & booster packs in THIS shop are free (one shop).
+  if run._coupon then
+    for _, j in ipairs(shop.jokers) do j.cost = 0 end
+    for _, b in ipairs(shop.boosters) do b.cost = 0 end
+    run._coupon = nil
+  end
+  run._shop = shop
+  local guard, last_sig = 0, nil
+  while guard < 40 do
+    guard = guard + 1
+    local gs = shop_gs(run, shop)
+    run.build_plan = BuildPlan.advance(gs, run.build_plan)
+    gs.run.build_plan = run.build_plan
+    local ok, ranked = pcall(ShopAdvisor.recommend, gs, {})
+    if not ok or not ranked or not ranked.best then break end
+    -- record the offering whenever it changes (shop open + after each reroll)
+    local sig = offer_sig(shop)
+    if sig ~= last_sig then emit_shop(run, shop, ranked); last_sig = sig end
+    if ranked.best.type == "SAVE" then break end
+    if not apply_action(run, shop, ranked.best, rng) then break end
+  end
+  run._shop = nil; run._emit = nil
+end
+
+return Content
