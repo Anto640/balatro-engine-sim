@@ -766,6 +766,78 @@ poor engine's conversion problem is elsewhere, most likely in what it buys with 
 
 ---
 
+## 5g. LEVELING: the engine declines ~13 affordable offers per run
+
+The money dose–response gave a price ($1 ≈ 0.005 progress at low dose). The **leveling**
+dose–response prices the channel `rich` says money converts into (n=80/cell, paired vs the n=344
+baseline):
+
+| free levels | progress Δ | winrate | p |
+|---|---|---|---|
+| +1/ante | **+0.879** | 13.8% | 0.0012 |
+| +2/ante | **+1.829** | 18.8% | ~0 |
+| +3/ante | **+2.332** | 41.2% | ~0 |
+
+### Supply is abundant and the declines are NOT poverty
+
+| | per run | affordable | taken | take rate (affordable) |
+|---|---|---|---|---|
+| Celestial packs | 10.31 | — | — | 6.4% |
+| loose planets | 4.52 | — | — | 10.1% |
+| **total leveling** | **14.83** | **12.7** | **1.1** | **8.6%** |
+
+**Only 15% of declined leveling offers were unaffordable.** The other 85% were affordable and
+declined — a valuation choice. Take rate on affordable offers *falls* from 16.3% at ante 1 to
+~5–8% from ante 3 on, exactly where the board locks (§5a-bis) and levels become the only growth axis.
+
+### The engine's own valuations (from telemetry, n=344)
+
+| offer type | mean value | median | % rated positive |
+|---|---|---|---|
+| loose Planet | **−0.210** | −0.360 | 35.4% |
+| Celestial pack | **−0.736** | −0.436 | 36.5% |
+| shop Joker | **+8.462** | +5.004 | 90.0% |
+
+### Mechanism — and why the obvious fix is NOT worth batching
+
+`CV.card_value` prices a planet as `level_persist × f × level_gain / need`. Decomposed at ante 3
+(`need` = 1000): one level of Straight is worth **+300 chips-equivalent, 30% of a boss hand** — but
+`f` (from `CV.hand_frequencies`) is the probability that hand is **currently your best play**, and
+0.125 crushes it to 0.0375.
+
+`f` is the wrong counterfactual: **leveling a hand redirects which hand you play**, so the purchase
+changes the very number used to price it — a self-fulfilling underestimate that stops concentration
+ever starting. Measured directly (bump the level, re-run `hand_frequencies`):
+
+| hand | f now | f after +1 | f after +4 | vfrac now | vfrac after +1 |
+|---|---|---|---|---|---|
+| High Card | 0.100 | 0.250 | 0.900 | 0.0081 | 0.0203 |
+| Pair | 0.225 | 0.600 | 0.825 | 0.0402 | 0.1072 |
+| Two Pair | 0.375 | 0.375 | 0.400 | 0.0975 | 0.0975 |
+
+> **The correction is real but ~2.7× at best, and the gap is ~12×.** Pair's shop value moves from
+> ≈ −0.73 to ≈ −0.31 — **still negative, so it would change almost no decisions.** Shipping the
+> `f` fix alone is predictably INERT; do not spend a batch on it. Recorded as a genuine
+> mis-specification, not a lever.
+
+### Honest caveat on the price
+
+The free-levels probe grants a level **every ante to the best hand** — a concentrated, compounding
+*program*. Dividing its total gain by the level count overstates the marginal value of one level
+bought in isolation. **So "the engine underprices a level by 12×" is NOT established.** What is
+established: a sustained leveling program is worth +0.9 to +2.3 progress, and a greedy per-purchase
+valuation structurally cannot see it — the same supermodularity failure as §1.2, now quantified on
+the leveling axis. That points at program-level valuation (commitment/concentration), not a constant.
+
+### The experiment in flight
+
+`levelbuy` / `levelbuy10` / `levelbuy20` (`Probe.level_first`) simply **take the affordable leveling
+offers the engine declines**, keeping its choice whenever it actually wants a joker it can afford.
+This asks the causal question directly — *would taking them help?* — without depending on a
+well-chosen constant, and its answer is what any valuation redesign should be justified by.
+
+---
+
 ## 5b. What has SHIPPED so far (2026-08-11)
 
 Phase A's probe harness and Phase B1's feature emission are implemented and verified.

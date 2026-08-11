@@ -173,6 +173,47 @@ function Probe.expert(run, shop)
 end
 
 -- ---------------------------------------------------------------------------
+-- LEVEL-FIRST override (WINRATE_V3_PLAN §5g). The engine is OFFERED ~14.8 leveling
+-- opportunities per run and takes 1.1 of them; 85% of the declines are affordable, so it is a
+-- VALUATION choice, not poverty. It prices a loose planet at mean -0.21 utility and a Celestial
+-- pack at -0.74, against +8.46 for a shop joker -- while the free-levels probe says a sustained
+-- leveling program is worth +0.9 to +2.3 progress.
+--
+-- Rather than guess a new valuation, this probe asks the question directly: if the engine simply
+-- TOOK the affordable leveling offers it currently declines, would it do better? That is the
+-- experiment the valuation redesign should be justified by -- and unlike a re-weight it cannot be
+-- confounded by a badly-chosen constant. It keeps the engine's own choice whenever the engine
+-- already wants to buy a joker it can afford, so this is a reallocation of the MARGIN, not a
+-- wholesale policy replacement.
+local function is_celestial(b) return tostring(b and b.key or ""):find("celestial") ~= nil end
+
+function Probe.level_first(run, shop, ranked)
+  local p = run.probe
+  if not (p and p.level_first) then return nil end
+  local best = ranked and ranked.best
+  -- never override an actual joker acquisition -- the board still has to survive the next boss
+  if best and (best.type == "BUY_JOKER" or best.type == "SELL_TO_BUY") then return nil end
+  local cash = run.economy.dollars
+  local keep = p.level_reserve or 0        -- cash to leave behind after the buy
+  -- prefer a Celestial pack (a CHOICE of planet, so it can concentrate) over a loose one
+  for _, b in ipairs(shop.boosters or {}) do
+    if is_celestial(b) and cash - (b.cost or 0) >= keep then
+      return { best = { type = "BUY_PACK", target = b, cost = b.cost, value = 0,
+                        reason = "probe: level-first" }, alternatives = {} }
+    end
+  end
+  if #(run.consumables or {}) < (run.consumable_slots or 2) then
+    for _, c in ipairs(shop.consumables or {}) do
+      if c.set == "Planet" and cash - (c.cost or 0) >= keep then
+        return { best = { type = "BUY_CONSUMABLE", target = c, cost = c.cost, value = 0,
+                          reason = "probe: level-first" }, alternatives = {} }
+      end
+    end
+  end
+  return nil
+end
+
+-- ---------------------------------------------------------------------------
 -- Config plumbing
 -- ---------------------------------------------------------------------------
 
@@ -199,6 +240,11 @@ Probe.CONFIGS = {
   level1       = { free_levels = 1 },
   level2       = { free_levels = 2 },
   level3       = { free_levels = 3 },
+  -- take the affordable leveling offers the engine currently declines (see Probe.level_first).
+  -- The reserve variants ask how much of the reallocation the economy can actually stand.
+  levelbuy     = { level_first = true, level_reserve = 0 },
+  levelbuy10   = { level_first = true, level_reserve = 10 },
+  levelbuy20   = { level_first = true, level_reserve = 20 },
   slots        = { joker_slots = 8 },
   -- +1 and +2 slots: unlike the 8-slot bound, these ARE reachable in a real run (the
   -- Antimatter voucher chain, negative-edition jokers), so they measure how much of the

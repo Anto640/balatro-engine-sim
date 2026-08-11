@@ -836,6 +836,12 @@ function Content.shop_phase(run, opts)
     if policy then ok, ranked = pcall(policy, run, shop)
     else ok, ranked = pcall(ShopAdvisor.recommend, gs, {}) end
     if not ok or not ranked or not ranked.best then break end
+    -- Phase A level-first OVERRIDE: takes an affordable leveling offer the engine declined.
+    -- Runs AFTER the advisor (so it can see what the engine wanted) and is inert without a probe.
+    if run.probe and run.probe.level_first then
+      local ov = Probe.level_first(run, shop, ranked)
+      if ov then ranked = ov end
+    end
     -- record the offering whenever it changes (shop open + after each reroll)
     local sig = offer_sig(shop)
     if sig ~= last_sig then emit_shop(run, shop, ranked); last_sig = sig end
