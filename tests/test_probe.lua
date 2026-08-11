@@ -92,6 +92,26 @@ return function(t)
     t.ok(rr.type ~= "REROLL", "the scripted expert never pays to reroll")
   end
 
+  -- ---- free-levels probe (the leveling dose-response) ---------------------
+  do
+    local run = World.new_run(5)
+    local before = 0
+    for _, h in pairs(run.hand_levels) do before = before + (h.level or 1) end
+    Content.grant_free_levels(run, 2)
+    local after, hands = 0, 0
+    for _, h in pairs(run.hand_levels) do after = after + (h.level or 1); hands = hands + 1 end
+    t.eq(hands, 1, "free levels go to exactly ONE hand (the one the deck wants)")
+    t.eq(after - before, 2 + 1, "levelling an unlevelled hand by 2 lands it at level 3")
+    -- a no-op for 0/nil, so an unconfigured probe cannot perturb anything
+    local r2 = World.new_run(5)
+    Content.grant_free_levels(r2, 0)
+    Content.grant_free_levels(r2, nil)
+    t.eq(next(r2.hand_levels), nil, "grant_free_levels(0/nil) changes nothing")
+    -- and the driver leaves it alone with no probe
+    local r3 = World.new_run(5)
+    t.eq(r3.probe, nil, "a normal run has no free-levels probe")
+  end
+
   -- ---- A3 top-tier pool lesion -------------------------------------------
   do
     local JokerData = require("engine.joker_data")

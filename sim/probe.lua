@@ -191,6 +191,14 @@ Probe.CONFIGS = {
   rich10       = { income_bonus = 10 },
   rich25       = { income_bonus = 25 },
   rich50       = { income_bonus = 50 },
+  -- LEVELING dose-response. The money curve gives a PRICE ($1 ~= 0.005 progress at low dose),
+  -- and a hand level costs $3-6 (a loose planet / a Celestial pack pick) -- so a level must be
+  -- worth >~0.025 progress to be the right thing to buy. `rich` shows leveling is what money
+  -- converts INTO (hand_lv_sum 1.9 -> 10.4 in winning rich runs vs ~2 in the baseline), so this
+  -- measures whether the engine is systematically under-buying the one channel that converts.
+  level1       = { free_levels = 1 },
+  level2       = { free_levels = 2 },
+  level3       = { free_levels = 3 },
   slots        = { joker_slots = 8 },
   -- +1 and +2 slots: unlike the 8-slot bound, these ARE reachable in a real run (the
   -- Antimatter voucher chain, negative-edition jokers), so they measure how much of the

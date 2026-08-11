@@ -695,6 +695,15 @@ local function best_hand(run)
   local bp = ConsumableValue.best_planet(gs, { rng = run.rng, samples = 4 })
   return (bp and bp.hand) or "Pair"
 end
+-- Phase A probe (WINRATE_V3_PLAN §5g): grant N free levels to the hand the deck actually wants
+-- to level, once per ante. Isolates the marginal value of LEVELING the same way income_bonus
+-- isolates the marginal value of money -- so the two can be priced against each other
+-- ($1 ~= 0.005 progress, a level costs $3-6). Inert unless a probe config sets free_levels.
+function Content.grant_free_levels(run, n)
+  if not n or n <= 0 then return end
+  level_hand(run, best_hand(run), n)
+end
+
 local function grant_joker(run, rng, rarity_w, edition)
   if #run.jokers >= run.joker_slots then return end
   local saved = Content.RARITY_W; if rarity_w then Content.RARITY_W = rarity_w end

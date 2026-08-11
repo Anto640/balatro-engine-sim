@@ -197,6 +197,11 @@ function Driver.run(seed, opts)
   local ante = 1
   while ante <= max_ante do
     run.ante = ante
+    -- Phase A probe: free hand levels per ante (sim/probe.lua). Applied BEFORE the ante's
+    -- snapshot so the feature vector reflects them. Inert on every normal run.
+    if run.probe and run.probe.free_levels and content.grant_free_levels then
+      content.grant_free_levels(run, run.probe.free_levels)
+    end
     if ante > 1 then
       local r = { kind = "ante", ante = ante, metrics = metrics(run) }
       local b = board(run); for k, v in pairs(b) do r[k] = v end
