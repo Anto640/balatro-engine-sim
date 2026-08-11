@@ -1031,6 +1031,25 @@ advises a human, and this user demonstrably plays these builds.
 the committed-archetype planner) is no longer an abstraction. It now has a named mechanism, a worked
 example from a real winning run, and its blind spot located at a specific line of code.
 
+### ⚠ The fixes make the archetype POSSIBLE, not LIKELY — and that gap IS hypothesis 2
+
+Measured on the first 50 runs after the fix: **Five of a Kind played once; Cryptid used twice.** The
+chain now works end to end, but it fires at ~2% of runs, because nothing in the engine wants it:
+`CV.SPECTRAL_BASE` prices Ouija at **0.3** and Cryptid at **0.4** — flat generic priors, with no term
+for "this card concentrates ranks, which is the only route to a hand worth 120 chips × the levels I
+have already sunk." Every link is valued in isolation, so the product is never assembled.
+
+That is supermodularity stated concretely, and it is the same shape as the xmult-stack problem:
+
+> A human buys Cryptid because they can see three Kings and a plan. The engine buys Cryptid only if
+> Cryptid is worth 0.4 on its own — which it never is.
+
+**So the remaining lever is not "value spectrals higher" (a magnitude tweak, refuted class). It is
+making the planner's COMMITMENT feed back into card valuation** — once committed to a hand, the cards
+that assemble it must be priced by the commitment, not by their standalone prior. `BP.planet_credit`
+already does exactly this for planets; the deck-shaping cards have no equivalent. That is the concrete,
+located next step.
+
 ---
 
 ## 5b. What has SHIPPED so far (2026-08-11)
