@@ -650,6 +650,46 @@ term.** (Note this lands on the leveling channel, which `rich` shows is how mone
 
 ---
 
+## 5e. Does the arc GENERALIZE? (the seed-overfitting test — pilot run, full run in flight)
+
+Revising CLAUDE.md's #1 tuning rule surfaced a question nobody has asked: **every verdict in this
+project's history was measured on the same seed pool (`s*1000+3`) that changes were selected on.**
+Keeping only changes that measure positive on a fixed sample fits that sample. So how much of the
+retained arc (3.345 → 3.832, **+0.487**) generalizes?
+
+**Design (difference-in-differences).** Engine-on-held-out vs engine-on-tuned is confounded — the
+pools may differ in difficulty. So the **scripted expert** (`sim/probe.lua`), never tuned on either
+pool, serves as the difficulty control:
+
+`DiD = (engine_heldout − engine_tuned) − (expert_heldout − expert_tuned)`
+
+**Pilot, n=40/cell** (`tools/overfit_report.lua`):
+
+| cell | mean | sd | SE |
+|---|---|---|---|
+| engine tuned (+3) | 4.244 | 1.582 | 0.250 |
+| engine held-out (+7) | **3.867** | 1.695 | 0.268 |
+| expert tuned (+3) | 3.257 | 1.510 | 0.239 |
+| expert held-out (+7) | **3.342** | 1.644 | 0.260 |
+
+engine held-out − tuned = **−0.377** · expert (control) = **+0.085** · **DiD = −0.462 (SE 0.509,
+t = −0.91)**. Engine wins also fell 2/40 → 0/40 while the expert stayed at 0/40.
+
+The direction is exactly what overfitting looks like — the engine drops off its tuned pool while a
+never-tuned policy does not — and the magnitude (−0.462) is comparable to **the entire shipped arc.**
+
+> ⚠️ **But by this document's own standard, that is NOT evidence. MDE at n=40/cell is 1.425 — about
+> 3× the arc.** A run this size cannot detect the effect it is looking for, whatever it prints. Filed
+> as a *pilot*, not a result. **`tools/overfit_test.sh` runs the properly-powered version at
+> n≈343/cell** (~3.5 h), which is the number the report tool derives from the pilot's own variance.
+
+If the full run confirms a negative DiD, the consequence is large: much of the tuning arc is sample
+fitting, and **every future verdict must be confirmed out of sample** (`BES_SEED_OFF`) before it
+enters the baseline. If it comes back null at proper power, the arc is real and the method is sound —
+which is equally worth knowing.
+
+---
+
 ## 5b. What has SHIPPED so far (2026-08-11)
 
 Phase A's probe harness and Phase B1's feature emission are implemented and verified.
