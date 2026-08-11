@@ -1,2 +1,9 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Captured telemetry is DATA, not source: store and check it out byte-for-byte.
+# The game writes pure LF; with core.autocrlf=true a normalized checkout would put
+# CRLF in the working tree, which diverges from the game's output and leaves a
+# trailing \r inside the last JSON value for any line-based reader.
+data/*.jsonl -text
+data/*.txt   -text
