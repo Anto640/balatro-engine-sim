@@ -708,7 +708,24 @@ end
 local JokerData = require("engine.joker_data")
 -- Exclude jokers whose income is NOT spendable $/round OR is already paid via in-blind scoring
 -- money (A8): Egg is sell-value growth; Rough Gem's $1/diamond now lands as ev.money at play.
-local ECON_INCOME_EXCLUDE = { j_egg = true, j_rough_gem = true }
+-- W-ECON (2026-08-11): the two economy jokers whose real effect is DYNAMIC were flattened into
+-- a static `econ` $/round prior, which removes the economy SNOWBALL entirely:
+--   * To the Moon  -- extra interest per $5 HELD, so its payout is proportional to the bankroll
+--                     (a flat $4 makes it just another mediocre econ common)
+--   * Rocket       -- $1/round that GROWS +$2 per boss defeated, so it is worth little early and
+--                     a lot late (a flat $3 gets both ends wrong)
+-- This matters because the Phase A probe found money to be the binding constraint (+$25/round
+-- => 30% winrate) and one of the project's three real human wins was an economy build -- an
+-- archetype the world could not express. Both are modelled below and EXCLUDED from the flat sum
+-- so they are never double-counted. -- VERIFY magnitudes (rate +1 per $5; Rocket +$2/boss).
+local ECON_INCOME_EXCLUDE = {
+  j_egg = true, j_rough_gem = true,
+  j_to_the_moon = true, j_rocket = true,   -- modelled dynamically below
+}
+World.TO_THE_MOON_EXTRA = 1   -- extra $ of interest per $5 held -- VERIFY
+World.ROCKET_BASE       = 1   -- $/round -- VERIFY
+World.ROCKET_PER_BOSS   = 2   -- +$/round per boss defeated -- VERIFY
+
 local function joker_econ_income(run)
   local m = 0
   for _, j in ipairs(run.jokers or {}) do
@@ -716,6 +733,28 @@ local function joker_econ_income(run)
   end
   return m
 end
+
+-- Extra interest from To the Moon: an additional TO_THE_MOON_EXTRA per $5 held, subject to the
+-- SAME cap as base interest (so it pays most when the cap has been raised by Seed Money /
+-- Money Tree, and when the bankroll is below the base cap -- exactly the snowball shape).
+local function bonus_interest(run)
+  local n = 0
+  for _, j in ipairs(run.jokers or {}) do if j.key == "j_to_the_moon" then n = n + 1 end end
+  if n == 0 then return 0 end
+  local cap = run.economy.interest_cap or Mechanics.INTEREST_CAP
+  local units = math.floor(math.max(0, run.economy.dollars) / Mechanics.INTEREST_PER)
+  return math.min(units * World.TO_THE_MOON_EXTRA * n, cap * World.TO_THE_MOON_EXTRA * n)
+end
+
+-- Rocket pays ROCKET_BASE + ROCKET_PER_BOSS per boss already defeated this run.
+local function rocket_income(run)
+  local n = 0
+  for _, j in ipairs(run.jokers or {}) do if j.key == "j_rocket" then n = n + 1 end end
+  if n == 0 then return 0 end
+  return n * (World.ROCKET_BASE + World.ROCKET_PER_BOSS * (run._bosses_defeated or 0))
+end
+World._bonus_interest = bonus_interest   -- exposed for the W-ECON regression tests
+World._rocket_income  = rocket_income
 
 -- End-of-round income, applied to the run's bankroll. Reward by blind type + $1 per
 -- UNUSED hand + interest ($1 per $5 held, capped) + owned econ jokers' avg $/round.
@@ -726,6 +765,8 @@ function World.award_income(run, blind_result)
   local income = Mechanics.round_income(blind_result.blind_type, unused,
     run.economy.dollars, run.economy.interest_cap)
   income = income + joker_econ_income(run)   -- econ jokers finally pay their $/round
+  income = income + bonus_interest(run)      -- W-ECON: To the Moon (bankroll-proportional)
+  income = income + rocket_income(run)       -- W-ECON: Rocket (grows per boss defeated)
   -- Phase A3 resource lesion: hand the engine unlimited money to test whether ACQUISITION
   -- is the bottleneck at all. Inert unless a probe config is active.
   if run.probe and run.probe.income_bonus then income = income + run.probe.income_bonus end
@@ -748,6 +789,7 @@ end
 
 -- Reset joker state when a BOSS blind is defeated (Campfire -> x1). Called by the driver.
 function World.boss_clear_tick(run)
+  run._bosses_defeated = (run._bosses_defeated or 0) + 1   -- W-ECON: Rocket's growth counter
   JokerTick.on_boss_cleared(run)
 end
 

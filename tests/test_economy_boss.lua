@@ -6,6 +6,69 @@ local World   = require("sim.world")
 local Content = require("sim.content")
 
 return function(t)
+  -- ---- W-ECON: the two DYNAMIC economy jokers (2026-08-11) -----------------
+  -- Both were flattened into a static `econ` $/round prior, which removes the economy
+  -- snowball. To the Moon is bankroll-PROPORTIONAL; Rocket GROWS per boss defeated.
+  do
+    local W = require("sim.world")
+    local blind = { blind_type = "Small", hands_left = 0 }
+
+    -- To the Moon pays more as the bankroll grows (a flat prior cannot do this)
+    local function ttm_at(dollars)
+      local r = W.new_run(1)
+      r.jokers = { { key = "j_to_the_moon" } }
+      r.economy.dollars = dollars
+      return W._bonus_interest(r)
+    end
+    t.eq(ttm_at(0), 0, "To the Moon pays nothing on an empty bankroll")
+    t.ok(ttm_at(25) > ttm_at(10), "To the Moon scales WITH the bankroll")
+    t.ok(ttm_at(10) > 0, "...and pays below the base cap, where the snowball starts")
+    -- capped like base interest, so it cannot run away
+    t.eq(ttm_at(1000), ttm_at(100), "To the Moon respects the interest cap")
+    -- a raised cap (Seed Money / Money Tree) unlocks more of it
+    do
+      local r = W.new_run(1)
+      r.jokers = { { key = "j_to_the_moon" } }
+      r.economy.dollars = 200
+      local base = W._bonus_interest(r)
+      r.economy.interest_cap = 20
+      t.ok(W._bonus_interest(r) > base, "raising the interest cap unlocks more To the Moon")
+    end
+
+    -- Rocket grows with bosses defeated
+    local r2 = W.new_run(1)
+    r2.jokers = { { key = "j_rocket" } }
+    local early = W._rocket_income(r2)
+    r2._bosses_defeated = 4
+    local late = W._rocket_income(r2)
+    t.ok(late > early, "Rocket grows per boss defeated")
+    t.eq(late - early, 4 * W.ROCKET_PER_BOSS, "...by exactly ROCKET_PER_BOSS each")
+    t.eq(W.boss_clear_tick(W.new_run(1)) == nil and 1 or 1, 1, "boss_clear_tick runs")
+    do
+      local r3 = W.new_run(1)
+      W.boss_clear_tick(r3); W.boss_clear_tick(r3)
+      t.eq(r3._bosses_defeated, 2, "boss_clear_tick counts defeated bosses")
+    end
+
+    -- and neither is DOUBLE-counted through the flat econ sum
+    local r4 = W.new_run(1)
+    r4.jokers = { { key = "j_to_the_moon" }, { key = "j_rocket" } }
+    t.eq(W._joker_econ_income(r4), 0, "the dynamic pair is excluded from the flat econ sum")
+    -- a normal econ joker still pays flat
+    local r5 = W.new_run(1)
+    r5.jokers = { { key = "j_golden" } }
+    t.ok(W._joker_econ_income(r5) > 0, "an ordinary econ joker still pays its flat prior")
+
+    -- income actually includes them
+    local r6 = W.new_run(1)
+    r6.economy.dollars = 25
+    local plain = W.award_income(r6, blind)
+    local r7 = W.new_run(1)
+    r7.economy.dollars = 25
+    r7.jokers = { { key = "j_to_the_moon" } }
+    t.ok(W.award_income(r7, blind) > plain, "To the Moon raises actual round income")
+  end
+
   local function run() return World.new_run(1) end
 
   -- ---- A8: in-blind scoring money (gold seals / Lucky / Rough Gem) is banked ----

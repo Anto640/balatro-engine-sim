@@ -842,6 +842,12 @@ function Content.shop_phase(run, opts)
       local ov = Probe.level_first(run, shop, ranked)
       if ov then ranked = ov end
     end
+    -- Phase A HOARD lesion: refuse a purchase that would drop the bankroll below the floor.
+    -- Fires in every shop of every run (see Probe.hoard); inert without a probe config.
+    if run.probe and run.probe.min_bank then
+      local hv = Probe.hoard(run, shop, ranked)
+      if hv then ranked = hv end
+    end
     -- record the offering whenever it changes (shop open + after each reroll)
     local sig = offer_sig(shop)
     if sig ~= last_sig then emit_shop(run, shop, ranked); last_sig = sig end

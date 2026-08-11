@@ -161,6 +161,21 @@ empirically; the table above is why.
   is no reason to pull it — but it was pulled because a concrete mechanism explained the harm: it damped
   rerolls that were earning value through CONSUMABLES, which `e_best` never prices.)
 
+**THE FREQUENCY CEILING (2026-08-11 — check this BEFORE writing any fix).** A change can only move a
+verdict if it FIRES often enough. Measure the firing rate first; if it is low, do not batch it:
+
+| change touches | typical firing rate | can it move an n=160 verdict? |
+|---|---|---|
+| ONE joker's behaviour | **~5% of runs** | **No.** W-ECON (To the Moon + Rocket) came back 153/160 seeds TIED |
+| a rare voucher / tag chain | ~5–10% | No — the voucher-upgrade fix, −0.064 n.s. |
+| a rare shop situation | ~2.5 events/run (rerolls) | Marginal — the reroll gate, +0.024 n.s. |
+| every shop of every run | 100% | **Yes** — this is the only class worth batching |
+
+This single rule retro-explains W7, W8, the voucher upgrades, the reroll gate AND W-ECON. **Individual
+card/joker fidelity is a dead end for winrate** (it is still worth fixing for a human following the live
+overlay — just do not expect a batch to show it). Only SYSTEMS qualify: the shop loop, the economy
+formula, the play engine, the leveling channel, the requirement curve, the starting conditions.
+
 **Still true and unchanged:** in-blind changes cascade the seeded RNG, so prefer narrow/late-firing
 changes whose sd is small enough to actually measure; prefer the screen-then-batch harness; a fix pays
 only when the thing it fixes is BOTH strong AND frequent (W6 yes, W7 weak, W8 too rare).

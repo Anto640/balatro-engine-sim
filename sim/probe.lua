@@ -214,6 +214,30 @@ function Probe.level_first(run, shop, ranked)
 end
 
 -- ---------------------------------------------------------------------------
+-- HOARD override (WINRATE_V3_PLAN §5i). The causal test of the one replicated correlation
+-- this project has: at ante 3, runs that reach ante 6+ hold MORE cash (+2.85/+1.27 across two
+-- independent batches) and own FEWER econ jokers and vouchers. The engine holds a median of
+-- **$1 at ante 2** and $7 at ante 3 -- it spends to the floor -- which also forfeits ~$28 of
+-- interest over a run (§5f).
+--
+-- Unlike a joker-level fidelity fix (capped at ~5% firing), this touches EVERY shop of EVERY
+-- run, which is the frequency property that separates this project's wins from its inert
+-- changes. It is a lesion, not a proposed policy: refuse any purchase that would drop the
+-- bankroll below `min_bank` before `hoard_until` ante, forcing SAVE instead.
+function Probe.hoard(run, shop, ranked)
+  local p = run.probe
+  if not (p and p.min_bank) then return nil end
+  if (run.ante or 1) >= (p.hoard_until or 99) then return nil end
+  local best = ranked and ranked.best
+  if not best or best.type == "SAVE" then return nil end
+  local cost = best.cost or 0
+  if cost <= 0 then return nil end
+  if run.economy.dollars - cost >= p.min_bank then return nil end   -- affordable within the floor
+  return { best = { type = "SAVE", value = 0, reason = "probe: hoard to $" .. p.min_bank },
+           alternatives = {} }
+end
+
+-- ---------------------------------------------------------------------------
 -- Config plumbing
 -- ---------------------------------------------------------------------------
 
@@ -245,6 +269,11 @@ Probe.CONFIGS = {
   levelbuy     = { level_first = true, level_reserve = 0 },
   levelbuy10   = { level_first = true, level_reserve = 10 },
   levelbuy20   = { level_first = true, level_reserve = 20 },
+  -- HOARD: refuse purchases that drop the bankroll below the floor, before the given ante.
+  -- Fires in EVERY shop of EVERY run (unlike a joker fix, capped at ~5% firing).
+  hoard10      = { min_bank = 10, hoard_until = 5 },
+  hoard20      = { min_bank = 20, hoard_until = 5 },
+  hoard25a4    = { min_bank = 25, hoard_until = 4 },
   slots        = { joker_slots = 8 },
   -- +1 and +2 slots: unlike the 8-slot bound, these ARE reachable in a real run (the
   -- Antimatter voucher chain, negative-edition jokers), so they measure how much of the
