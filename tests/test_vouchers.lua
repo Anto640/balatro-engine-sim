@@ -129,4 +129,69 @@ return function(t)
     local opened = Content.open_pack({ key = "p_celestial_normal" }, r, World.lcg(7))
     t.eq(opened.items[1].key, "c_jupiter", "Telescope: first Celestial planet is Flush's (Jupiter)")
   end
+
+  -- ---- W-SLOT: the UPGRADE tier (2026-08-11) ------------------------------
+  -- gen_voucher's comment promised "upgrades only when their base is owned" but the code
+  -- only sampled BASE_VOUCHERS, so v_antimatter (+1 JOKER SLOT) could never be offered --
+  -- the one legal in-run source of the resource the Phase A probe measured as binding.
+  do
+    -- the upgrade EFFECTS
+    t.eq(run_with_voucher("v_antimatter").joker_slots, World.JOKER_SLOTS + 1,
+      "Antimatter: +1 JOKER slot")
+    t.eq(run_with_voucher("v_nacho_tong").base_hands, World.BASE_HANDS + 1, "Nacho Tong: +1 hand")
+    t.eq(run_with_voucher("v_recyclomancy").base_discards, World.BASE_DISCARDS + 1,
+      "Recyclomancy: +1 discard")
+    t.eq(run_with_voucher("v_palette").hand_size, World.HAND_SIZE + 1, "Palette: +1 hand size")
+    t.eq(run_with_voucher("v_overstock_plus").shop_slots, Content.SHOP_SLOTS + 1,
+      "Overstock Plus: +1 shop card slot")
+    t.eq(run_with_voucher("v_money_tree").economy.interest_cap, 20, "Money Tree: interest cap -> $20")
+    t.near(run_with_voucher("v_liquidation")._price_mult, 0.50, "Liquidation: 50% off")
+    -- stacking: base then upgrade both apply
+    do
+      local r = World.new_run(1)
+      Content._apply_voucher(r, "v_reroll_surplus"); Content._apply_voucher(r, "v_reroll_glut")
+      t.eq(r._reroll_discount, 4, "Reroll Surplus + Glut stack to -$4")
+      local r2 = World.new_run(1)
+      Content._apply_voucher(r2, "v_grabber"); Content._apply_voucher(r2, "v_nacho_tong")
+      t.eq(r2.base_hands, World.BASE_HANDS + 2, "Grabber + Nacho Tong stack to +2 hands")
+    end
+    do
+      local r = World.new_run(1)
+      Content._apply_voucher(r, "v_petroglyph")
+      t.eq(r.base_discards, World.BASE_DISCARDS - 1, "Petroglyph: -1 discard")
+      t.eq(r._ante_back, 1, "Petroglyph: -1 ante of runway")
+    end
+
+    -- the POOL GATE: an upgrade is offered only once its base is owned, and never twice
+    local function offers(owned, n)
+      local r = World.new_run(3)
+      for _, k in ipairs(owned) do r.vouchers_owned[#r.vouchers_owned + 1] = k end
+      local rng, seen = World.lcg(11), {}
+      for _ = 1, n do
+        local v = Content.gen_voucher(r, rng)
+        if v then seen[v.key] = true end
+      end
+      return seen
+    end
+    t.ok(not offers({}, 400)["v_antimatter"],
+      "Antimatter is NOT offered before Blank is owned")
+    t.ok(offers({ "v_blank" }, 400)["v_antimatter"],
+      "Antimatter IS offered once Blank is owned")
+    t.ok(not offers({ "v_blank" }, 400)["v_blank"],
+      "an OWNED voucher is never re-offered (the old 8-retry fallthrough could)")
+    t.ok(not offers({ "v_blank", "v_antimatter" }, 400)["v_antimatter"],
+      "an owned UPGRADE is never re-offered")
+    -- every upgrade in the table must have an effect the world models (the W4 rule)
+    for base, up in pairs(Content.UPGRADE_VOUCHERS) do
+      local before, after = World.new_run(1), run_with_voucher(up)
+      local changed = (after.joker_slots ~= before.joker_slots)
+        or (after.shop_slots or Content.SHOP_SLOTS) ~= (before.shop_slots or Content.SHOP_SLOTS)
+        or (after.base_hands ~= before.base_hands) or (after.base_discards ~= before.base_discards)
+        or (after.hand_size ~= before.hand_size) or (after._price_mult ~= before._price_mult)
+        or (after._reroll_discount ~= before._reroll_discount)
+        or (after.economy.interest_cap ~= before.economy.interest_cap)
+        or (after._ante_back ~= before._ante_back)
+      t.ok(changed, "upgrade " .. up .. " (of " .. base .. ") actually does something in the world")
+    end
+  end
 end

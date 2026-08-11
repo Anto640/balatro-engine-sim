@@ -109,6 +109,16 @@ SA.FIRST_SCORER_BONUS = 2.0
 SA.REROLL_MIN_IMPROVEMENT = 0.2  -- boss-hand-fraction the expected joker must beat the
                                  -- current best by before a PAID reroll is worth it
 SA.REROLL_APPETITE_RICH = 0.7    -- above-cap appetite (was 1.0 -- maximal eagerness)
+-- TRIED AND REVERTED (2026-08-11, WINRATE_V3_PLAN §5d): a full-board FEASIBILITY gate on the
+-- reroll. The reroll is priced off the JOKER a fresh shop would surface (`e_best`), but only
+-- money was checked for feasibility -- never whether a SLOT exists for it. Measured: 98% of
+-- the n=40 baseline's rerolls (99/101) happened on a FULL board. Attenuating the joker term
+-- there measured +0.024 (t=0.12, p=0.90) with the sign test leaning NEGATIVE (8 better/17
+-- worse/15 tied) -> churn by this project's standard, reverted.
+-- THE LIKELY REASON, and the better next fix: a reroll ALSO refreshes the loose tarots/planets,
+-- which ARE buyable on a full board, but `e_best` prices only jokers. So full-board rerolls
+-- were probably earning their keep through CONSUMABLES, and damping them removed real value.
+-- Add the consumable-refresh term rather than damping the joker term.
 
 local function clamp(x, lo, hi) return math.max(lo, math.min(hi, x)) end
 

@@ -77,6 +77,26 @@ local function expected_joker_fv(gs, opts)
   return VU.frac_to_fv(frac)
 end
 
+-- ---- Blank as an OPTION on Antimatter --------------------------------------
+-- Blank does nothing by itself; its whole worth is that owning it makes Antimatter
+-- (+1 joker slot) eligible to appear. Priced as an option rather than a flat prior:
+--   P(Antimatter is ever offered) x (what Antimatter is worth) x a discount
+-- One voucher is offered per ante, drawn ~uniformly from the eligible pool, so the
+-- chance of seeing it across the remaining antes is 1 - (1 - 1/pool)^runway.
+V.BLANK_POOL_SIZE  = 13   -- ~eligible vouchers competing for the one slot -- VERIFY
+V.BLANK_OPTION_FRAC = 0.35 -- discount: you must still FIND, AFFORD and BUY Antimatter ($10 more)
+V.BLANK_MIN_RUNWAY  = 2   -- with fewer antes left there is no time to collect on the option
+V.BLANK_CAP         = 3.0 -- never let a do-nothing voucher outrank a real one outright
+
+function V.blank_option_fv(gs, opts)
+  local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
+  local runway = math.max(0, 8 - ante)          -- voucher slots left before the ante-8 race ends
+  if runway < V.BLANK_MIN_RUNWAY then return 0 end
+  local p = 1 - ((1 - 1 / V.BLANK_POOL_SIZE) ^ runway)
+  local antimatter = 8.0 + clamp(2 * expected_joker_fv(gs, opts), 0, 4)
+  return clamp(V.BLANK_OPTION_FRAC * p * antimatter, 0, V.BLANK_CAP)
+end
+
 local function entry(name, value, econ, note, sit)
   return { name = name, value = value, econ = econ or 0, note = note, sit = sit }
 end
@@ -127,7 +147,14 @@ local DATA = {
   -- shop pool measures strong.
   v_antimatter     = entry("Antimatter", 8.0, 0, "+1 joker slot",
     function(gs, opts) return clamp(2 * expected_joker_fv(gs, opts), 0, 4) end),
-  v_blank          = entry("Blank", 0.0, 0, "nothing (unlocks Antimatter)"),
+  -- Blank does nothing ON ITS OWN, and 0.0 was the CORRECT value while the world could never
+  -- offer Antimatter. Now that upgrade vouchers generate (sim/content.lua UPGRADE_VOUCHERS),
+  -- 0.0 is wrong: Blank is the ONLY key to +1 joker slot, and the Phase A ceiling probe measured
+  -- the slot as the binding constraint (~+0.33 progress per slot; see WINRATE_V3_PLAN §5a).
+  -- Priced as an OPTION: a fraction of Antimatter's worth, decayed by the runway left to
+  -- actually be offered it (one voucher slot per ante), and worthless with no antes to spare.
+  v_blank          = entry("Blank", 0.0, 0, "unlocks Antimatter (+1 joker slot)",
+    function(gs, opts) return V.blank_option_fv(gs, opts) end),
   v_magic_trick    = entry("Magic Trick", 2.0, 0, "playing cards in shop"),
   v_illusion       = entry("Illusion", 2.5, 0, "shop cards can have enhancements"),
   -- ante / boss: skipping an ante is a big structural boon, more so when pressured.

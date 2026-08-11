@@ -127,6 +127,23 @@ return function(t)
     t.ok(econ > 0, "Money Tree has recurring economy value")
   end
 
+  -- ---- W-SLOT: Blank is an OPTION on Antimatter, not a flat zero ----------
+  -- 0.0 was CORRECT while the world could never offer Antimatter; once upgrade vouchers
+  -- generate (sim/content.lua UPGRADE_VOUCHERS) it is wrong -- Blank is the only key to the
+  -- +1 joker slot the Phase A probe measured as the binding constraint.
+  do
+    local early = ({ Vouchers.value(GS.new{ meta = { ante = 1 } }, "v_blank") })[1]
+    local mid   = ({ Vouchers.value(GS.new{ meta = { ante = 4 } }, "v_blank") })[1]
+    local late  = ({ Vouchers.value(GS.new{ meta = { ante = 7 } }, "v_blank") })[1]
+    t.ok(early > 0, "Blank is worth something EARLY (runway to collect on the option)")
+    t.ok(early > mid, "Blank decays as the runway shrinks")
+    t.eq(late, 0, "Blank is worth NOTHING with no antes left to be offered Antimatter")
+    t.ok(early <= Vouchers.BLANK_CAP + 1e-9, "the Blank option is capped")
+    -- it must never out-value the thing it is an option ON
+    local anti = ({ Vouchers.value(GS.new{ meta = { ante = 1 } }, "v_antimatter") })[1]
+    t.ok(anti > early, "Antimatter always outranks the option on it")
+  end
+
   -- ---- Phase 2: vouchers are SITUATIONAL, not a flat table ----
   do
     -- a focused Hearts deck (concentrated on Flush) vs a full mixed deck (play

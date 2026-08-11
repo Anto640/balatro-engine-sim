@@ -1,6 +1,78 @@
 # NEXT_SESSION.md — fresh-session handoff (updated 2026-07-14, W6 win)
 
-**Read order for a new session:** this file → `WINRATE_AUDIT.md` (esp. the top status banner, §2
+> 🔴 **2026-08-11 — PHASE A RESULT: THE BOTTLENECK IS **MONEY** (see `WINRATE_V3_PLAN.md` §5a).**
+> Paired n=40 ceiling probes, ENGINE UNTOUCHED: **$100/round → progress +3.090, winrate 5%→72.5%
+> (t=10.39, sign 36/2/2)**; +3 joker slots → +0.984, 5%→15%; +1 slot → +0.342 (n.s.); a scripted
+> static tier list → −0.987 (the measured valuation EARNS ITS KEEP). **Money is worth ~3× slots.**
+> Both are BOUNDS, not levers (the engine can't award itself either) — their value is diagnostic:
+> **with resource scarcity fully removed the engine still loses 27.5%**, and that residual is pure
+> decision quality + world fidelity. Money converts via LEVELING (`hand_lv_sum` 1.9→10.4, the
+> known winning archetype) while `tier_sum` crawls 25→36 — money and slots are COMPLEMENTS, which
+> is why even `rich` isn't 100%. **Sharpest open question: how should a POOR engine acquire money?**
+> (Endogenous econ investment correlates NEGATIVELY with survival — see below — while exogenous
+> money is overwhelmingly positive: the engine's money-acquisition methods are bad, not money.)
+> _(Superseded headline: "the bottleneck is joker slots" — written before the `rich` control landed.)_
+> Dose–response ≈ **+0.33 progress per slot** (6 slots: +0.342, n.s. at n=40). Mechanism, from the
+> new B1 feature vectors: **`slots_free` is 0.00 at ante 5 in the baseline — the board is
+> permanently saturated, so acquisition simply HALTS from ~ante 4** and the build freezes at
+> whatever it assembled by then. Given room, the same engine buys exactly the compounding axes
+> (xmult +0.52, xmult_scaling +0.32, scaling +0.89). Meanwhile a scripted static tier list is
+> DECISIVELY WORSE than the engine (−0.987, p=0.0008) — **the measured valuation earns its keep;
+> do not pursue "simplify the ranking rule".**
+> **W-SLOT (attempted, 2026-08-11): voucher UPGRADES now generate — KEPT AS FIDELITY, WINRATE-NEUTRAL**
+> (−0.064, p=0.66, sign 5/8/27). `gen_voucher` never produced upgrades despite its comment; it now
+> does, `v_antimatter` (+1 joker slot) exists, and a latent bug (the 8-retry sampler could return an
+> ALREADY-OWNED voucher) is fixed. **Why it didn't pay: `v_blank` was bought 0 times → Antimatter
+> offered 0 times.** Blank's new option price (~1.7 FV) loses to all 13 competing vouchers. Do NOT
+> just raise that constant — the channel is structurally rare (two $10 buys + a 1-in-13 offer).
+> **Also recorded, deliberately NOT batched:** the engine prices a negative edition's slot at ~1.5 FV
+> (`eval_function.lua:105`) vs the SAME +1-slot effect at 8–12 FV as Antimatter (`vouchers.lua:128`)
+> — a real 5–8× internal inconsistency, but negative editions roll at 0.3%/joker (~12% of runs), the
+> W8 "too rare → inert" profile.
+> **CORRECTION (same session, `tools/acquisition_profile.lua`):** the slot finding is a bound on the
+> WORLD, not engine headroom — the engine can only get slots from rare content, so most of the +0.984
+> is NOT capturable by better decisions. Two things the profile established instead: (1) **the board
+> LOCKS at ante 3–4** — acquisitions collapse 94→51→21→6 and from ante 4 gains≈losses exactly (pure
+> churn equilibrium), so **the run is decided by the ante-3/4 board**; (2) **the "blocked keystone"
+> story is FALSE** — only **15 of 40 runs** ever had a tier≥7 joker declined on a full board (~0.4/run),
+> which explains the 0-for-4 swap-eagering record: those levers targeted a rare event.
+> **REROLL FEASIBILITY GATE (attempted, REVERTED):** the reroll is priced off the joker a fresh shop
+> would surface but gates feasibility on MONEY ONLY — never on having a SLOT. **98% of baseline
+> rerolls (99/101) happen on a full board**, and under `rich` this explodes to ~20 rerolls/ante vs
+> ~0.1 joker buys/ante. Damping the joker term there: **+0.024, p=0.90, sign 8/17/15 → churn,
+> reverted.** Likely reason and the better fix: a reroll also refreshes loose tarots/planets, which
+> ARE buyable on a full board, but `e_best` prices only jokers — so **ADD the consumable-refresh
+> term instead of damping the joker term** (and note that lands on the LEVELING channel, which the
+> `rich` probe shows is how money actually converts to wins).
+> **➡ BEST-MOTIVATED NEXT EXPERIMENT: damp `w_econ` for antes 1–3.** Replicated across two independent
+> n=40 batches, the ante-3 board features that predict reaching ante 6+ are: **less `econ_total`
+> (−0.84/−0.85), fewer `vouchers` (−0.39/−0.34), MORE cash held (+2.85/+1.27)**, broader `tier_sum`,
+> more `scaling`/leveling/`enhanced`. That is the early-game mirror of **E-13** (the only reliable
+> win-producer, which collapsed econ weight LATE), while `SA.weights` currently tilts TOWARD economy
+> when secure. Fires EVERY run (the frequency property that separates wins from inert changes).
+> ⚠️ **Correlation only — reverse causation is very plausible** (a poor shop stream leaves nothing to
+> buy but econ, and also kills you). Test by INTERVENTION (paired n≥40), do not ship on the correlation.
+> **➡ THE OTHER TARGET is the SATURATION ITSELF** (`slots_free`=0.00 from ante 5):
+> the full-board acquisition policy. 0-for-4 history says isolated swap changes churn — but the probe
+> supplies the missing direction: those attempts made swaps *lateral and eager*; the lesion rewards
+> continued *upward* acquisition. Treat as a COUPLED retune. Also still unrun: the `rich` control
+> (`BES_PROBE=rich bash tools/sim_par.sh 40 pa_rich` — needs ~1.5h, nearly every run reaches ante 8).
+> Caveats: n=40, wide CIs, confirm at n=160; 8 slots is a diagnostic BOUND, not a strategy; the
+> `rich` ($100/round) control did NOT complete, so capacity vs purchasing power is not yet fully
+> separated. Probe harness: `BES_PROBE=<config> bash tools/sim_par.sh <n> <name>`.
+>
+> ⚠️ **2026-08-10 — READ `WINRATE_V3_PLAN.md` FIRST.** It re-audits the *method* rather than the engine
+> and lands two results that change how verdicts are read: (1) **`wins` is not a usable verdict metric** —
+> 4/160 has Poisson sd ≈ 2.0, so every "wins 2→4"/"wins 4→2" in the log below is inside its own error bar;
+> switch to `reach-6+` or capacity-at-ante-8. (2) **The scale gap:** every lever ever shipped totals
+> +0.487 progress; a 50% winrate needs ≥ +2.17 more (**4.5×** the entire project history), so incremental
+> single-lever tuning is converging to a plateau, not to a win. It also *refuted* its own headline
+> hypothesis (Δprogress vs Δwins is **positively** correlated, r=+0.58 over 17 batches — the engine is
+> NOT systematically too risk-averse). Proposed: ceiling probe → learned win-probability model replacing
+> `engine/pacing.lua` → ΔP(win) objective + a fast shop-replay screen → data-mined archetype recipes.
+
+**Read order for a new session:** this file → `WINRATE_V3_PLAN.md` (method audit + the plan) →
+`WINRATE_AUDIT.md` (esp. the top status banner, §2
 roadmap, and the §4/§5/§6 implementation logs) → `CLAUDE.md` (architecture + the self-play loop).
 The `selfplay-system-plan` auto-memory is the full chronological running log. Older plans are in
 `docs/archive/` (see `docs/archive/HISTORY.md`) — historical, do not act on them.

@@ -19,6 +19,7 @@ local GS          = require("model.game_state")
 local ShopAdvisor = require("engine.shop_advisor")
 local Decision    = require("engine.decision_engine")
 local ConsumableV = require("engine.consumable_value")
+local JokerData   = require("engine.joker_data")   -- B1 feature vector
 
 local Driver = {}
 
@@ -68,7 +69,61 @@ local function metrics(run)
   if ok and p then m.pace_margin = p.margin; m.on_pace = p.on_pace; m.capacity = p.capacity end
   local ok2, rs = pcall(Eval.run_strength, gs, { measure = false })
   if ok2 then m.run_strength = rs end
+  m.features = Driver.features(run)   -- B1: the learned-win-model feature vector
   return m
+end
+
+-- B1 (WINRATE_V3_PLAN Phase B): the per-ante FEATURE VECTOR for fitting a win-probability
+-- model on self-play data. Pure counting over the run state -- no rng, no measurement, no
+-- engine call -- so it cannot perturb the seeded stream (an additive measurement that is
+-- NOT stream-neutral is a documented way to churn a batch; see WINRATE_AUDIT §7).
+--
+-- These replace `engine/pacing.lua`'s six invented growth coefficients with something that
+-- can be FITTED. Labels come from the run outcome: dense `reach(ante+1)` per boundary plus
+-- the sparse `win`, which is what makes 4-positives-per-160 trainable at all.
+function Driver.features(run)
+  local f = {
+    ante = run.ante, round = run.round, dollars = run.economy.dollars,
+    njokers = #(run.jokers or {}), joker_slots = run.joker_slots,
+    consumables = #(run.consumables or {}), consumable_slots = run.consumable_slots,
+    vouchers = #(run.vouchers_owned or {}),
+    hand_size = run.hand_size, hands = run.base_hands, discards = run.base_discards,
+    xmult = 0, xmult_scaling = 0, scaling = 0, copier = 0, econ_jokers = 0,
+    econ_total = 0, negative = 0, tier_sum = 0, tier_max = 0,
+  }
+  f.slots_free = math.max(0, (run.joker_slots or 5) - f.njokers)
+  for _, j in ipairs(run.jokers or {}) do
+    local d = JokerData.resolve(j.key) or {}
+    local cat = d.cat or ""
+    if JokerData.is_xmult(j.key) then f.xmult = f.xmult + 1 end
+    if cat == "xmult_scaling" then f.xmult_scaling = f.xmult_scaling + 1 end
+    if JokerData.is_scaling(j.key) then f.scaling = f.scaling + 1 end
+    if j.key == "j_blueprint" or j.key == "j_brainstorm" then f.copier = f.copier + 1 end
+    local e = d.econ or 0
+    if e > 0 then f.econ_jokers = f.econ_jokers + 1; f.econ_total = f.econ_total + e end
+    if j.edition == "negative" then f.negative = f.negative + 1 end
+    local t = d.tier or 0
+    f.tier_sum = f.tier_sum + t
+    if t > f.tier_max then f.tier_max = t end
+  end
+  -- leveling: the win-CONVERTER in every run this project has seen reach ante 8
+  local lv_max, lv_sum, n_lv = 0, 0, 0
+  for _, h in pairs(run.hand_levels or {}) do
+    local over = math.max(0, (h.level or 1) - 1)
+    lv_sum = lv_sum + over
+    if over > 0 then n_lv = n_lv + 1 end
+    if over > lv_max then lv_max = over end
+  end
+  f.hand_lv_max, f.hand_lv_sum, f.hands_leveled = lv_max, lv_sum, n_lv
+  -- deck shaping
+  local enh, seal, edn = 0, 0, 0
+  for _, c in ipairs(run.deck or {}) do
+    if c.enhancement then enh = enh + 1 end
+    if c.seal then seal = seal + 1 end
+    if c.edition then edn = edn + 1 end
+  end
+  f.deck_size, f.enhanced, f.sealed, f.editioned = #(run.deck or {}), enh, seal, edn
+  return f
 end
 
 local function joker_keys(run)

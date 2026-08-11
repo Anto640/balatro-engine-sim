@@ -19,6 +19,7 @@ local GS              = require("model.game_state")
 local Json            = require("util.json")
 local JokerTick       = require("sim.joker_tick")
 local BuildPlan       = require("engine.build_plan")
+local Probe           = require("sim.probe")   -- Phase A ceiling probe; inert without a config
 
 local Content = {}
 
@@ -81,6 +82,35 @@ Content.BASE_VOUCHERS = {
   "v_overstock_norm", "v_clearance_sale", "v_hone", "v_reroll_surplus", "v_crystal_ball",
   "v_telescope", "v_grabber", "v_wasteful", "v_tarot_merchant", "v_planet_merchant",
   "v_seed_money", "v_blank", "v_hieroglyph", "v_paint_brush",
+}
+
+-- W-SLOT (2026-08-11): the UPGRADE tier. `gen_voucher`'s comment claimed "upgrades only when
+-- their base is owned", but the code only ever sampled BASE_VOUCHERS -- so NO upgrade could
+-- ever appear. That made **v_antimatter (+1 joker slot) unreachable**, while v_blank -- whose
+-- entire purpose in real Balatro is to unlock Antimatter -- sat in the pool as a permanently
+-- dead option (71 of the voucher offers across an n=40 baseline led nowhere).
+--
+-- This matters because the WINRATE_V3_PLAN Phase A ceiling probe measured the joker slot as the
+-- BINDING CONSTRAINT: +3 slots = +0.984 progress and 3x the winrate with the engine untouched,
+-- dose-response ~+0.33 progress per slot. Antimatter is the one legal in-run source of one.
+--
+-- W4 RULE OBSERVED: only upgrades whose effect the world actually MODELS are listed. Offering a
+-- voucher the world no-ops is how the engine ends up paying $10 for nothing (the Magic Trick /
+-- Director's Cut mistake). Deliberately EXCLUDED until modelled:
+--   v_glow_up / v_tarot_tycoon / v_planet_tycoon -- their bases set a BOOLEAN flag, so the
+--     upgrade would be a paid no-op (needs the flags to become multipliers first)
+--   v_omen_globe (spectral in Arcana packs), v_observatory (planet x1.5 on its hand),
+--     v_illusion, v_retcon -- effects not modelled at all
+Content.UPGRADE_VOUCHERS = {
+  v_blank           = "v_antimatter",      -- +1 JOKER SLOT  <- the point
+  v_overstock_norm  = "v_overstock_plus",  -- +1 more shop card slot
+  v_clearance_sale  = "v_liquidation",     -- 50% off (from 25%)
+  v_reroll_surplus  = "v_reroll_glut",     -- rerolls -$2 more
+  v_grabber         = "v_nacho_tong",      -- +1 more hand
+  v_wasteful        = "v_recyclomancy",    -- +1 more discard
+  v_paint_brush     = "v_palette",         -- +1 more hand size
+  v_seed_money      = "v_money_tree",      -- interest cap $20 (apply_voucher already had this)
+  v_hieroglyph      = "v_petroglyph",      -- -1 more ante, -1 discard
 }
 
 -- joker keys grouped by rarity, built once from the catalogue (excludes the misspelled alias).
@@ -179,6 +209,16 @@ function Content.gen_joker(run, rng)
   local owned = owned_joker_keys(run)
   local rarity = pick_weighted(rng, Content.RARITY_W)
   local list = P[rarity] or P.Common
+  -- Phase A3 resource lesion: restrict the pool to top-tier jokers, so "the shop never
+  -- offered the piece" is eliminated as an explanation. Inert unless a probe is active.
+  if run and run.probe and run.probe.top_pool then
+    local min_tier = run.probe.top_pool_tier or 7
+    local filt = {}
+    for _, k in ipairs(list) do
+      if ((JokerData.resolve(k) or {}).tier or 0) >= min_tier then filt[#filt + 1] = k end
+    end
+    if #filt > 0 then list = filt end
+  end
   -- a few attempts to avoid offering a duplicate of an owned joker
   local key
   for _ = 1, 6 do
@@ -222,15 +262,28 @@ function Content.gen_pack(rng, run)
   return { key = key, name = Packs.display_name(key, typ), cost = priced(run, Content.PACK_COST[size] or 4) }
 end
 
--- A voucher offer (one not already owned; upgrades only when their base is owned). -- VERIFY
+-- A voucher offer: uniform over everything currently ELIGIBLE -- unowned base vouchers, plus
+-- an upgrade whenever its base is owned (W-SLOT; see Content.UPGRADE_VOUCHERS). The old
+-- implementation sampled BASE_VOUCHERS with up to 8 retries, which could both (a) never offer
+-- an upgrade and (b) fall through and return an ALREADY-OWNED voucher on the 8th try.
+--
+-- The eligible list is built by walking BASE_VOUCHERS in its fixed array order (bases first,
+-- then upgrades), so it is deterministic across processes -- the cross-process determinism
+-- property every paired A/B verdict depends on.
 function Content.gen_voucher(run, rng)
   local owned = {}
   for _, v in ipairs(run.vouchers_owned or {}) do owned[v] = true end
-  for _ = 1, 8 do
-    local key = pick_uniform(rng, Content.BASE_VOUCHERS)
-    if key and not owned[key] then return { key = key, name = key, cost = 10 } end  -- VERIFY base $10
+  local pool = {}
+  for _, base in ipairs(Content.BASE_VOUCHERS) do
+    if not owned[base] then pool[#pool + 1] = base end
   end
-  return nil
+  for _, base in ipairs(Content.BASE_VOUCHERS) do
+    local up = Content.UPGRADE_VOUCHERS[base]
+    if up and owned[base] and not owned[up] then pool[#pool + 1] = up end
+  end
+  local key = pick_uniform(rng, pool)
+  if not key then return nil end
+  return { key = key, name = key, cost = 10 }   -- VERIFY base $10
 end
 
 -- Generate a full shop (shop_state shape). Reroll cost comes from the run's per-shop counter.
@@ -369,11 +422,19 @@ end
 local function apply_voucher(run, key)
   run.vouchers_owned[#run.vouchers_owned + 1] = key
   -- resource / economy
-  if key == "v_overstock_norm" then run.shop_slots = (run.shop_slots or Content.SHOP_SLOTS) + 1   -- +1 shop CARD slot
+  if key == "v_overstock_norm" or key == "v_overstock_plus" then
+    run.shop_slots = (run.shop_slots or Content.SHOP_SLOTS) + 1                                    -- +1 shop CARD slot
+  -- W-SLOT: Antimatter is the one legal in-run source of a JOKER slot -- the constraint the
+  -- Phase A ceiling probe measured as binding (~+0.33 progress per slot).
+  elseif key == "v_antimatter" then run.joker_slots = (run.joker_slots or 5) + 1                   -- +1 JOKER slot
   elseif key == "v_crystal_ball" then run.consumable_slots = run.consumable_slots + 1              -- +1 consumable slot
-  elseif key == "v_grabber" then run.base_hands = run.base_hands + 1                               -- +1 hand / round
-  elseif key == "v_wasteful" then run.base_discards = run.base_discards + 1                        -- +1 discard / round
-  elseif key == "v_paint_brush" then run.hand_size = run.hand_size + 1                             -- +1 hand size
+  elseif key == "v_grabber" or key == "v_nacho_tong" then run.base_hands = run.base_hands + 1      -- +1 hand / round
+  elseif key == "v_wasteful" or key == "v_recyclomancy" then
+    run.base_discards = run.base_discards + 1                                                      -- +1 discard / round
+  elseif key == "v_paint_brush" or key == "v_palette" then run.hand_size = run.hand_size + 1       -- +1 hand size
+  elseif key == "v_petroglyph" then                                                                -- -1 ante, -1 discard
+    run.base_discards = math.max(0, run.base_discards - 1)
+    run._ante_back = (run._ante_back or 0) + 1
   elseif key == "v_hieroglyph" then run.base_hands = math.max(1, run.base_hands - 1)               -- -1 hand ...
     run._ante_back = (run._ante_back or 0) + 1  -- W4: ... AND -1 ante. The driver consumes this at the
     -- next ante boundary by REPLAYING the ante (one extra ante of blinds/shops/income before ante 8) --
@@ -387,7 +448,9 @@ local function apply_voucher(run, key)
   elseif key == "v_tarot_merchant" then run._tarot_boost = true                                    -- Tarots x2 in shop
   elseif key == "v_planet_merchant" then run._planet_boost = true                                  -- Planets x2 in shop
   elseif key == "v_clearance_sale" then run._price_mult = 0.75                                     -- cards/packs 25% off
-  elseif key == "v_reroll_surplus" then run._reroll_discount = (run._reroll_discount or 0) + 2     -- rerolls -$2
+  elseif key == "v_liquidation" then run._price_mult = 0.50                                        -- cards/packs 50% off
+  elseif key == "v_reroll_surplus" or key == "v_reroll_glut" then
+    run._reroll_discount = (run._reroll_discount or 0) + 2                                         -- rerolls -$2 (cumulative)
   elseif key == "v_telescope" then run._telescope = true                                           -- Celestial packs -> best planet
   -- UNMODELLED (documented simplifications): v_blank (nothing -- faithful, it does nothing in
   -- real Balatro either). v_magic_trick / v_directors_cut are excluded from BASE_VOUCHERS (W4)
@@ -756,7 +819,13 @@ function Content.shop_phase(run, opts)
     local gs = shop_gs(run, shop)
     run.build_plan = BuildPlan.advance(gs, run.build_plan)
     gs.run.build_plan = run.build_plan
-    local ok, ranked = pcall(ShopAdvisor.recommend, gs, {})
+    -- Phase A1 policy lesion: a scripted static-priority expert replaces the measured
+    -- engine valuation. `policy_for` returns nil on every normal run, so the pcall below
+    -- is the untouched baseline path.
+    local ok, ranked
+    local policy = Probe.policy_for(run)
+    if policy then ok, ranked = pcall(policy, run, shop)
+    else ok, ranked = pcall(ShopAdvisor.recommend, gs, {}) end
     if not ok or not ranked or not ranked.best then break end
     -- record the offering whenever it changes (shop open + after each reroll)
     local sig = offer_sig(shop)

@@ -119,6 +119,7 @@ function World.new_run(seed, opts)
     base_discards = opts.base_discards or World.BASE_DISCARDS,
     consumable_slots = opts.consumable_slots or World.CONSUMABLE_SLOTS,
     joker_slots = opts.joker_slots or World.JOKER_SLOTS,
+    probe = opts.probe,   -- Phase A ceiling probe (sim/probe.lua); nil on every normal run
     ante = 1,
     round = 0,
     dead = false,
@@ -725,6 +726,9 @@ function World.award_income(run, blind_result)
   local income = Mechanics.round_income(blind_result.blind_type, unused,
     run.economy.dollars, run.economy.interest_cap)
   income = income + joker_econ_income(run)   -- econ jokers finally pay their $/round
+  -- Phase A3 resource lesion: hand the engine unlimited money to test whether ACQUISITION
+  -- is the bottleneck at all. Inert unless a probe config is active.
+  if run.probe and run.probe.income_bonus then income = income + run.probe.income_bonus end
   run.economy.dollars = run.economy.dollars + income
   return income
 end

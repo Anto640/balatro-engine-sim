@@ -113,15 +113,52 @@ p3_levelneed 3.569 → p4_surv 3.612 → p4_f6f7 3.625 → p5_commit 3.663**.
 **Verdict standard is now PAIRED n≥160** (the sim is byte-deterministic per seed; a residual determinism
 bug was fixed 2026-07-07). Compare with `analyze_runs.lua <A> compare <B>` (sign test + progress Δ).
 
-**THE #1 TUNING RULE (proven across every phase): ship UNIT/MECHANISM/CORRECTNESS fixes freely; ANY
-isolated measurement/value re-weight that doesn't co-move the constants tuned around it BACKFIRES.** The
-consistent revert set: C1, B3, F3, F4, F8 (Phase 2–4) + the whole pre-audit graveyard (swap-damp,
-leveling-need-on-broken-world, coupled, cost-discount, xmult-floor). The wins were all correctness/mechanism
-(A1–A9 fidelity, B1/C2-C3/B5/B2/K-fixes), the additive "boost a needed piece" shape (first-scorer +0.163;
-leveling-need-on-FAITHFUL-world +0.012 — it FLIPPED once the world was fixed), or a superior-machinery swap
-(F1/F2 boss-aware survival arbitration, +0.038 sign 31/18 — the best single-lever signal of the effort).
-**Corollary:** in-blind changes CASCADE the seeded RNG — a balanced sign test + high variance = churn, not a
-win (F4/F8). NOTE: `xmult_scaling` jokers ARE xmult — use `JokerData.is_xmult()`.
+**THE #1 TUNING RULE — REVISED 2026-08-11. The old rule ("ship correctness freely; revert ANY lever
+that doesn't measure positive") was half right, and the wrong half has been quietly deciding most
+keep/revert calls by coin flip.** Read this before reverting anything.
+
+**The power problem, in the project's own numbers.** A paired batch's sensitivity depends on how much
+the change CASCADES the seeded RNG (the per-seed sd), not on `n` alone. Minimum detectable effect at
+80% power ≈ 2.8 × sd/√n:
+
+| change shape | typical sd | MDE at n=160 |
+|---|---|---|
+| narrow / late-firing (E-13 sd 0.066, E-6 sd 0.067) | ~0.07 | **~0.015** |
+| broad re-weight or world change (sd 0.9–1.9) | ~1.2 | **~0.27** |
+
+Now compare the levers actually shipped: E-6 +0.006 · E-13 +0.012 · leveling-need +0.012 · stdsync
++0.017 · V2c +0.020 · commit25 +0.024 · F1/F2 +0.038 · coupled +0.040 · pack-pick +0.054 · W3 +0.054 ·
+W4 +0.066 · W6 +0.070 · E-5 +0.146. **Every BROAD change ever kept or reverted on a |Δ| below ~0.27 was
+decided by noise.** The narrow ones (E-13, E-6) are genuinely detectable — which is exactly why the
+"E-13 shape" (late, low-cascade) kept producing the only trustworthy verdicts. That was discovered
+empirically; the table above is why.
+
+**Two consequences the old rule got wrong:**
+
+1. **"n.s." ≠ "no effect."** Reverting a logically-correct fix because a *underpowered* batch didn't
+   move is optimizing the measurement, not the game. State the MDE before calling a verdict.
+2. **Keeping only positive-measuring changes on a FIXED seed set overfits the seed set.** The retained
+   baseline (3.345 → 3.832 across the arc) is selected on the same 160 seeds it is measured on, so some
+   unknown part of that gain is sampling noise banked as progress. **Any retained change must be
+   confirmed on HELD-OUT seeds before it enters the baseline** (`BES_SEED_OFF` — see tools/sim_batch.lua).
+
+**The replacement rule — burden of proof by change class:**
+
+- **Correctness / fidelity / feasibility** (the code was provably wrong): **ship it**, unless it measures
+  significantly NEGATIVE. Justify by mechanism, not by the metric. Correctness compounds, and the live
+  mod advises a HUMAN — wrong advice is bad even when sim-neutral.
+- **Magnitude / weight tuning** (a constant moved): still requires positive evidence, still backfires in
+  isolation, and should be calibrated JOINTLY with the constants tuned around it. The old revert set
+  (C1, B3, F3, F4, F8, swap-damp, cost-discount, xmult-floor…) is all this class and stays refuted.
+- **Revert on MECHANISM, not on a null result.** A change should be pulled when you can say *why* it is
+  wrong. (Worked example: the 2026-08-11 reroll feasibility gate measured +0.024 n.s. — by itself that
+  is no reason to pull it — but it was pulled because a concrete mechanism explained the harm: it damped
+  rerolls that were earning value through CONSUMABLES, which `e_best` never prices.)
+
+**Still true and unchanged:** in-blind changes cascade the seeded RNG, so prefer narrow/late-firing
+changes whose sd is small enough to actually measure; prefer the screen-then-batch harness; a fix pays
+only when the thing it fixes is BOTH strong AND frequent (W6 yes, W7 weak, W8 too rare).
+NOTE: `xmult_scaling` jokers ARE xmult — use `JokerData.is_xmult()`.
 
 **THREE REAL HUMAN WINS analyzed** (`bes_runs.jsonl`; `winning-archetype-from-real-run` memory) — Flush
 House+leveling / Hologram+copier / economy→Bull+xmult; common thread = an XMULT stack the human KEPT.

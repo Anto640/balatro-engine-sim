@@ -19,12 +19,26 @@ package.path = table.concat({ here .. "../?.lua", here .. "../?/init.lua", packa
 
 local Driver  = require("sim.driver")
 local Content = require("sim.content")
+local Probe   = require("sim.probe")
 local Json    = require("util.json")
 
 local n    = tonumber(arg[1]) or 16
 local name = arg[2] or "batch"
 local cap  = tonumber(arg[3])
 if cap then _G.BES_MC_CAP = cap end
+
+-- Phase A ceiling probe (WINRATE_V3_PLAN §4.A). Selected by ENV so tools/sim_par.sh needs no
+-- new positional arg: `BES_PROBE=expert bash tools/sim_par.sh 40 a1_expert`. Unset (or
+-- "engine") = the untouched baseline: Probe.opts returns nil and no probe code path runs.
+local probe_name = os.getenv("BES_PROBE")
+local probe_opts = Probe.opts(probe_name)
+
+-- HELD-OUT SEEDS (CLAUDE.md "THE #1 TUNING RULE", revised 2026-08-11). Every verdict in this
+-- project's history was measured on the SAME seed pool (s*1000+3) that changes were selected on,
+-- so retained gains are partly fit to that sample. `BES_SEED_OFF` shifts the pool to a disjoint
+-- one (e.g. BES_SEED_OFF=7 -> s*1000+7) so a retained change can be CONFIRMED out of sample.
+-- Default 3 keeps every existing batch byte-identical.
+local seed_off = tonumber(os.getenv("BES_SEED_OFF") or "") or 3
 
 -- Optional SHARDING for parallel runs (see tools/sim_par.sh). When nshards is given, this
 -- process runs ONLY the seeds assigned to `shard` (interleaved: seed index s belongs to
@@ -41,8 +55,10 @@ if not fh then
   os.exit(1)
 end
 
-io.write(string.format("running %d sim seeds -> %s%s\n", n, outpath,
-  cap and (" (mc_cap=" .. cap .. ")") or " (full fidelity)"))
+io.write(string.format("running %d sim seeds -> %s%s%s\n", n, outpath,
+  cap and (" (mc_cap=" .. cap .. ")") or " (full fidelity)",
+  (probe_opts and ("  [PROBE " .. probe_name .. "]") or "")
+  .. ((seed_off ~= 3) and ("  [SEEDS +" .. seed_off .. "]") or "")))
 io.flush()
 
 local wins, hist = 0, {}
@@ -52,8 +68,10 @@ local tag = nshards and string.format("w%d ", shard) or ""
 local t0 = os.clock()
 for s = 1, n do
   if (not nshards) or ((s - 1) % nshards) == shard then
-    local seed = s * 1000 + 3
-    local res = Driver.run(seed, { content = Content, max_ante = 8 })
+    local seed = s * 1000 + seed_off
+    local ropts = { content = Content, max_ante = 8 }
+    if probe_opts then for k, v in pairs(probe_opts) do ropts[k] = v end end
+    local res = Driver.run(seed, ropts)
     for _, r in ipairs(res.records) do fh:write(Json.encode(r) .. "\n") end
     fh:flush()                                   -- so progress is visible live
     if res.won then wins = wins + 1 else hist[res.death_ante or 0] = (hist[res.death_ante or 0] or 0) + 1 end
