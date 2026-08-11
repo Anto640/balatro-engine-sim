@@ -1,5 +1,23 @@
 # NEXT_SESSION.md — fresh-session handoff (updated 2026-07-14, W6 win)
 
+> 🟢 **START HERE — 2026-08-11 FINAL STATE (full detail in `WINRATE_V3_PLAN.md` §5k).**
+> **No winrate gain; the value is diagnostic and it eliminates most cheap hypotheses by MEASUREMENT.**
+> The engine's economic policy is close to optimal for its budget: earning is ~maxed (~$28 headroom),
+> **HOARDING IS MONOTONICALLY HARMFUL** (−0.393 / −1.191 / −1.637 at $10/$20/$25 floors, n=160 each —
+> the "winners hold more cash" correlation was REVERSE-CAUSAL), reallocating toward leveling hurts
+> (−0.229), its joker selection beats a static tier list (+0.987), and **scoring coverage is complete
+> (84/84 scoring jokers implemented — no W6-style void left)**.
+> **ONLY TWO HYPOTHESES SURVIVE:**
+> 1. **The sim is harsher than real Balatro** — the engine needs ~$25/round extra to look human and
+>    holds a median of $1 at ante 2. **Compare the dollar trajectory in `bes_runs.jsonl` vs the sim.**
+>    Cheap, decisive, W6-class. The file is on another device; the user is providing it. **DO THIS FIRST.**
+> 2. **The architecture can't build multiplicative stacks** (supermodularity, §1.2) — the committed-
+>    archetype planner. Large, high-variance, but the only engine-side hypothesis left above the
+>    frequency ceiling.
+> **DO NOT SPEND EFFORT ON:** individual joker/voucher/tag fidelity (below the frequency ceiling),
+> economy tuning of any kind, leveling purchases, reroll policy. All measured; all dead.
+>
+> _(Session detail below.)_
 > 🟡 **2026-08-11 SESSION SUMMARY — DIAGNOSTIC VALUE ONLY; NO WINRATE GAIN. Read `WINRATE_V3_PLAN.md`.**
 > Every resource axis was probed with the engine UNTOUCHED, and every one is a **BOUND, not a lever**:
 > money (+$25/rd → 30% winrate, but interest headroom is only ~$28/run), joker slots (+3 → 15%, only

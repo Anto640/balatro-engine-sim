@@ -875,6 +875,78 @@ tuning.
 
 ---
 
+## 5i. HOARDING IS HARMFUL — the cash correlation was reverse-causal
+
+The one replicated correlation this project had (§5a-ter: at ante 3, runs reaching ante 6+ hold
+MORE cash, +2.85/+1.27 across two independent batches) was flagged there as probably reverse-causal.
+`Probe.hoard` tests it causally — refuse any purchase that drops the bankroll below a floor. It fires
+in **every shop of every run**, so it clears the frequency ceiling. n=160/cell, paired:
+
+| floor | progress Δ | t | p | sign |
+|---|---|---|---|---|
+| $10 (to ante 5) | **−0.393** | −2.58 | 0.010 | 66/87 |
+| $20 (to ante 5) | **−1.191** | −7.10 | ~0 | 38/115 |
+| $25 (to ante 4) | **−1.637** | −9.97 | ~0 | 28/125 |
+
+**Monotonically harmful.** Winners hold cash *because* they are winning (a stronger board clears
+blinds with hands to spare → more income), not the other way round. **The engine's spend-to-the-floor
+policy is CORRECT** — money in hand is worth less than what it buys. Do not re-derive a hoarding or
+econ-weight lever from that correlation; this is the causal answer.
+
+## 5j. Scoring coverage: no void
+
+W6 (the biggest lever in project history) was a scoring-fidelity void, so it is worth checking
+whether another exists. Audited the catalogue against `joker_effects`:
+
+**84 scoring-category jokers, 84 covered, 0 uncovered.** (The 66 remaining are economy/utility
+jokers with no direct scoring effect.) There is no W6-style scoring void left to find.
+
+## 5k. CONSOLIDATED CONCLUSION (2026-08-11)
+
+**No winrate improvement was achieved this session. The value is diagnostic — and it is substantial,
+because it eliminates most of the cheap hypotheses with measurements rather than argument.**
+
+Probes (engine untouched — these are BOUNDS, not levers):
+
+| probe | result | can the engine obtain it? |
+|---|---|---|
+| static tier list | −0.987 | — (the measured valuation earns its keep) |
+| +3 joker slots | +0.984, 15% | no — rare content only |
+| +$25/round | +1.941, 30% | no — ~$28/run of headroom exists |
+| +2 free levels/ante | +1.829, 18.8% | no — purchasing them is net-negative |
+
+Interventions (all inert or negative):
+
+| intervention | result | why |
+|---|---|---|
+| voucher upgrade tier | −0.064 n.s. | below the frequency ceiling |
+| reroll feasibility gate | +0.024 n.s. | ~2.5 rerolls/run; reverted on mechanism |
+| levelbuy (take declined levels) | −0.229 | levels cost ≈ what they return |
+| W-ECON (To the Moon/Rocket) | −0.055 n.s. | 5% ownership → 153/160 tied |
+| hoard cash | −0.393 → −1.637 | the correlation was reverse-causal |
+
+**What this establishes:** the engine's economic policy is close to optimal for its budget — earning
+is ~maxed, hoarding hurts, and reallocating toward leveling hurts. Its joker selection beats a static
+tier list. Its scoring coverage is complete. **It is near a local optimum for its architecture, and
+every resource axis is a bound it cannot raise.**
+
+**The two hypotheses that survive:**
+
+1. **The sim is harsher than real Balatro.** The engine needs ~$25/round of extra income to look
+   human, and holds a median of **$1 at ante 2 / $7 at ante 3**. If real human runs are richer at the
+   same point, every conclusion above is conditioned on a too-poor world. **Test: compare the dollar
+   trajectory in `bes_runs.jsonl` against the sim.** Cheap, decisive, and the same class as W6. The
+   file is not in the repo — the user is providing it.
+2. **The architecture cannot build multiplicative stacks** (the §1.2 supermodularity thesis). Greedy
+   per-purchase valuation prices the first piece of a product at ~0. This is the audit's
+   committed-archetype planner, and it is a large, high-variance bet — but it is now the ONLY
+   remaining engine-side hypothesis that clears the frequency ceiling.
+
+**Do not** spend further effort on: individual joker/voucher/tag fidelity (below the frequency
+ceiling), economy tuning of any kind (§5f/§5i), leveling purchases (§5g), or reroll policy (§5d).
+
+---
+
 ## 5b. What has SHIPPED so far (2026-08-11)
 
 Phase A's probe harness and Phase B1's feature emission are implemented and verified.
