@@ -182,6 +182,15 @@ Probe.CONFIGS = {
   engine       = {},
   expert       = { policy = "expert" },
   rich         = { income_bonus = 100 },
+  -- MONEY DOSE-RESPONSE. `rich` ($100/round) proved money is the dominant constraint
+  -- (+3.090 progress, 5% -> 72.5% winrate) but $100/round is unreachable. These measure the
+  -- SHAPE of the curve, which decides whether "acquire money better" is a viable strategy at
+  -- all: if most of the gain arrives by ~$10-25/round, endogenous sources (interest discipline,
+  -- skip-tag economy, not over-spending) can plausibly supply it. If the curve is flat until
+  -- $50+, the money thread is a dead end for a real policy and should be abandoned.
+  rich10       = { income_bonus = 10 },
+  rich25       = { income_bonus = 25 },
+  rich50       = { income_bonus = 50 },
   slots        = { joker_slots = 8 },
   -- +1 and +2 slots: unlike the 8-slot bound, these ARE reachable in a real run (the
   -- Antimatter voucher chain, negative-edition jokers), so they measure how much of the

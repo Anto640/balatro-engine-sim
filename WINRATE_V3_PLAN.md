@@ -713,6 +713,59 @@ problem from CLAUDE.md's revised rule, demonstrated on the project's own baselin
 
 ---
 
+## 5f. Can the engine MANUFACTURE money? (interest headroom, n=344 baseline)
+
+`rich` proved money is the dominant constraint, so the obvious follow-up is: how much more money
+could better play actually produce? The largest endogenous source is **interest** ($1 per $5 held,
+capped at $5/round — `Mechanics.INTEREST_PER/CAP`). Measured on the n=344 baseline:
+
+| ante | median $ | mean $ | interest earned (of $5 max) | forgone per ante |
+|---|---|---|---|---|
+| 2 | **$1** | 1.6 | 0.23 | $14.3 |
+| 3 | $7 | 8.3 | 1.44 | $10.7 |
+| 4 | $18 | 18.0 | 3.15 | $5.5 |
+| 5 | $25 | 24.6 | 4.09 | $2.7 |
+| 6–8 | ~$27 | ~30 | ~4.4 | ~$1.7 |
+
+**Total forgone interest ≈ $28 per run.** The engine is broke early (median **$1** at ante 2) and
+is already at the interest cap from ante 5 on — the economy is close to fully extracted.
+
+**So money is a BOUND, not a lever — the same shape as slots.** Against the ~$2,000/run that `rich`
+injects, a perfect-interest policy recovers $28. Even at a generous marginal rate this is far below
+the n=344 paired MDE (~0.2–0.28), so **interest discipline is not worth pursuing** and neither, by
+the same arithmetic, is any other endogenous source of comparable size.
+
+> ⚠️ The linear conversion (3.090 progress / $2000 ≈ 0.0015/$) is almost certainly wrong at low
+> doses — marginal dollars are worth more when poor. That is exactly what the money DOSE–RESPONSE
+> (`rich10`/`rich25`/`rich50`, in flight) measures. If +$10/round already buys most of the gain, the
+> low-dose slope is much steeper and small recoveries matter more than this table suggests.
+
+### The reframe this forces: **conversion efficiency, not acquisition**
+
+The `rich` shop-action profile shows where the money actually goes, per run per ante:
+
+| action | rich ($100/rd) | baseline |
+|---|---|---|
+| REROLL | **~20** | 0.6–0.8 |
+| BUY_PACK | 2.5–3.5 | 0.3–0.9 |
+| BUY_JOKER | **~0.1** | 0.1–0.5 |
+
+At escalating reroll costs ($5, $6, $7 …) **~20 rerolls is ~$290/ante — roughly 90% of the budget —
+returning ~0.1 joker purchases.** Meanwhile ~3 packs/ante cost ~$20 and drive the leveling that
+actually wins (`hand_lv_sum` 1.9 → 10.4).
+
+Two consequences:
+1. **The rich probe's 72.5% is a FLOOR on what money is worth, not a ceiling** — it is achieved while
+   wasting most of the money. Efficient conversion would need far less income to reach the same place.
+2. **The lever is progress-per-dollar, not dollars.** That is a different and much more tractable
+   target than "acquire more money", and it is where the remaining effort should go.
+
+(Note the earlier full-board reroll gate — §5d — attacked exactly this, and was inert *in the poor
+regime* because the baseline only rerolls ~2.5×/run. The pathology is real but rich-specific; the
+poor engine's conversion problem is elsewhere, most likely in what it buys with its ~$10–20/ante.)
+
+---
+
 ## 5b. What has SHIPPED so far (2026-08-11)
 
 Phase A's probe harness and Phase B1's feature emission are implemented and verified.
