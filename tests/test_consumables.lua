@@ -56,6 +56,161 @@ return function(t)
     t.eq(run3.economy.dollars, 12, "Temperance adds total joker sell value (5 + 7 = 12)")
   end
 
+  -- ---- the fifteen spectrals the world used to CONSUME FOR ZERO EFFECT (2026-08-11) ----
+  -- Ouija / Sigil / Cryptid are the rank- and suit-CONCENTRATING cards, i.e. the only route
+  -- to Five of a Kind / Flush Five / Flush House. Without them the sim could not express the
+  -- secret-hand archetype the one human WIN used. See WINRATE_V3_PLAN.md 5m.
+  do
+    local function hand_of(n)
+      local h = {}
+      for i = 1, n do h[i] = { id = i, rank_id = 5 + i, suit = ({ "Spades", "Hearts", "Clubs", "Diamonds" })[(i % 4) + 1] } end
+      return h
+    end
+    local function use_on(run, key, hand)
+      run.consumables = { held(key, "Spectral") }
+      return World._use_consumable(run, { use_names = { key } }, nil, nil, hand, nil)
+    end
+
+    -- Ouija: every card in hand becomes ONE rank -> five-of-a-kind becomes reachable
+    do
+      local run, h = new_run(), hand_of(8)
+      local hs = run.hand_size or 8
+      use_on(run, "c_ouija", h)
+      local rank = h[1].rank_id
+      local same = 0
+      for _, c in ipairs(h) do if c.rank_id == rank then same = same + 1 end end
+      t.eq(same, 8, "Ouija converts every card in hand to a single rank")
+      t.ok(same >= 5, "...which is what makes Five of a Kind reachable at all")
+      t.eq(run.hand_size, hs - 1, "Ouija costs -1 hand size")
+    end
+
+    -- Sigil: one suit (the Flush / Flush House / Flush Five enabler)
+    do
+      local run, h = new_run(), hand_of(8)
+      use_on(run, "c_sigil", h)
+      local suit, same = h[1].suit, 0
+      for _, c in ipairs(h) do if c.suit == suit then same = same + 1 end end
+      t.eq(same, 8, "Sigil converts every card in hand to a single suit")
+    end
+
+    -- Cryptid: two copies of a card, added to the DECK with fresh ids
+    do
+      local run, h = new_run(), hand_of(8)
+      local before = #run.deck
+      use_on(run, "c_cryptid", h)
+      t.eq(#run.deck, before + 2, "Cryptid adds two cards to the deck")
+      local ids = {}
+      for _, c in ipairs(run.deck) do
+        t.ok(not ids[c.id], "every deck card keeps a unique id after Cryptid")
+        ids[c.id] = true
+      end
+    end
+
+    -- Familiar / Grim / Incantation: destroy 1, add N enhanced cards of a rank family
+    do
+      local cases = { { "c_familiar", 3, 2 }, { "c_grim", 2, 1 }, { "c_incantation", 4, 3 } }
+      for _, c in ipairs(cases) do
+        local key, add, net = c[1], c[2], c[3]
+        local run, h = new_run(), hand_of(8)
+        local before = #run.deck
+        use_on(run, key, h)
+        t.eq(#run.deck, before + net, key .. " destroys 1 card and adds " .. add)
+      end
+      -- the ADDED cards come from the right rank family and are always enhanced
+      local FAMILY = {
+        c_grim     = { [14] = true },                                  -- Aces
+        c_familiar = { [11] = true, [12] = true, [13] = true },        -- face cards
+      }
+      for key, ranks in pairs(FAMILY) do
+        local run, h = new_run(), hand_of(8)
+        local before = #run.deck
+        use_on(run, key, h)
+        local added = 0
+        for i = before, #run.deck do            -- destroy-1 shifts, so scan the tail
+          local c = run.deck[i]
+          if c and ranks[c.rank_id] and c.enhancement then added = added + 1 end
+        end
+        t.ok(added >= 2, key .. " adds enhanced cards of the correct rank family (got " .. added .. ")")
+      end
+    end
+
+    -- seals + Aura: exactly one card upgraded
+    do
+      for key, seal in pairs({ c_talisman = "Gold", c_deja_vu = "Red", c_trance = "Blue", c_medium = "Purple" }) do
+        local run, h = new_run(), hand_of(8)
+        use_on(run, key, h)
+        local n = 0
+        for _, c in ipairs(h) do if c.seal == seal then n = n + 1 end end
+        t.eq(n, 1, key .. " adds exactly one " .. seal .. " seal")
+      end
+      local run, h = new_run(), hand_of(8)
+      use_on(run, "c_aura", h)
+      local n = 0
+      for _, c in ipairs(h) do if c.edition then n = n + 1 end end
+      t.eq(n, 1, "Aura adds an edition to exactly one card")
+    end
+
+    -- Wraith: a Rare joker, and your bankroll goes to $0
+    do
+      local run = new_run({ economy = { dollars = 30, interest_cap = 5 } })
+      use_on(run, "c_wraith", nil)
+      t.eq(run.economy.dollars, 0, "Wraith wipes your money to $0")
+      t.eq(#run.jokers, 1, "Wraith creates a joker")
+    end
+
+    -- Ectoplasm: negative edition (which carries its own joker slot) and -1 hand size
+    do
+      local run = new_run({ jokers = { { key = "j_joker", ability = { extra = {} } } } })
+      local hs, slots = run.hand_size or 8, run.joker_slots
+      use_on(run, "c_ectoplasm", nil)
+      t.eq(run.jokers[1].edition, "negative", "Ectoplasm makes a joker Negative")
+      t.eq(run.joker_slots, slots + 1, "...and a Negative joker brings its own slot")
+      t.eq(run.hand_size, hs - 1, "...at the cost of -1 hand size")
+    end
+
+    -- Ankh / Hex DESTROY your other jokers -- the reason consumable_value subtracts them
+    do
+      local run = new_run({ jokers = {
+        { key = "j_joker", ability = { extra = {} } }, { key = "j_mad", ability = { extra = {} } },
+        { key = "j_zany", ability = { extra = {} } } } })
+      use_on(run, "c_ankh", nil)
+      t.eq(#run.jokers, 2, "Ankh leaves one joker plus its copy (the others are destroyed)")
+      t.eq(run.jokers[1].key, run.jokers[2].key, "...and the survivor is the one that was copied")
+
+      local run2 = new_run({ jokers = {
+        { key = "j_joker", ability = { extra = {} } }, { key = "j_mad", ability = { extra = {} } },
+        { key = "j_zany", ability = { extra = {} } } } })
+      use_on(run2, "c_hex", nil)
+      t.eq(#run2.jokers, 1, "Hex destroys every joker but one")
+      t.eq(run2.jokers[1].edition, "polychrome", "...and makes the survivor Polychrome")
+    end
+
+    -- the whole point: NONE of these is a silent no-op any more
+    do
+      local KEYS = { "c_ouija", "c_sigil", "c_cryptid", "c_familiar", "c_grim", "c_incantation",
+                     "c_talisman", "c_deja_vu", "c_trance", "c_medium", "c_aura",
+                     "c_wraith", "c_ectoplasm", "c_ankh", "c_hex" }
+      for _, key in ipairs(KEYS) do
+        local run = new_run({ jokers = { { key = "j_joker", ability = { extra = {} } },
+                                         { key = "j_mad", ability = { extra = {} } } } })
+        local h = hand_of(8)
+        local snap = { deck = #run.deck, jokers = #run.jokers, hs = run.hand_size or 8,
+                       cash = run.economy.dollars, slots = run.joker_slots }
+        use_on(run, key, h)
+        local changed = (#run.deck ~= snap.deck) or (#run.jokers ~= snap.jokers)
+          or ((run.hand_size or 8) ~= snap.hs) or (run.economy.dollars ~= snap.cash)
+          or (run.joker_slots ~= snap.slots)
+        if not changed then   -- seal/suit/rank spectrals mutate cards in place
+          for _, c in ipairs(h) do
+            if c.seal or c.edition or c.rank_id == h[1].rank_id then changed = true end
+          end
+        end
+        t.ok(changed, key .. " has a real effect on the world (no longer consumed for nothing)")
+        t.eq(#run.consumables, 0, key .. " is actually consumed")
+      end
+    end
+  end
+
   -- ---- spectrals: Black Hole (level all hands) + Immolate (+$20, destroy 5) ----
   do
     local run = new_run()
@@ -63,6 +218,12 @@ return function(t)
     use(run, "c_black_hole")
     t.eq(run.hand_levels["Pair"] and run.hand_levels["Pair"].level, 2, "Black Hole levels Pair to 2")
     t.eq(run.hand_levels["Flush"] and run.hand_levels["Flush"].level, 2, "Black Hole levels Flush to 2 (every hand)")
+    -- EVERY hand means the three SECRET hands too: both Black Holes in the live telemetry
+    -- fired as a burst of exactly 12 level_up records, not 9.
+    for _, h in ipairs({ "Five of a Kind", "Flush House", "Flush Five" }) do
+      t.eq(run.hand_levels[h] and run.hand_levels[h].level, 2,
+        "Black Hole levels the secret hand " .. h .. " too")
+    end
 
     local run2 = new_run({ economy = { dollars = 3, interest_cap = 5 } })
     run2.consumables = { held("c_immolate", "Spectral") }

@@ -137,6 +137,48 @@ return function(t)
     lone.meta.ante = 2
     t.ok(BP.advance(lone, nil) == nil, "a lone scaler (2.0) still does not commit")
 
+    -- ---- the four hands the planner used to be BLIND to (2026-08-11) ----
+    -- The one human WIN committed to Five of a Kind and leveled it nine times; under the
+    -- old HAND_ORDER those levels scored ZERO and the planner could never commit to it.
+    do
+      -- sunk levels in a secret hand now register as a commitment signal
+      local secret = board({ "j_duo" })
+      secret.meta.ante = 3
+      secret.run = { hand_levels = { ["Five of a Kind"] = { level = 5 } } }
+      local sc = BP.advance(secret, nil)
+      t.ok(sc ~= nil and sc.hand == "Five of a Kind",
+        "four sunk levels in Five of a Kind now anchor a commitment to it")
+
+      -- ...but ONLY via sunk levels: a bare board never commits to a secret hand
+      -- speculatively (there are no handtype: tags pointing at one)
+      local bare = board({ "j_duo", "j_trio" })
+      bare.meta.ante = 3
+      bare.run = { hand_levels = {} }
+      local bc = BP.advance(bare, nil)
+      t.ok(bc == nil or bc.hand ~= "Five of a Kind",
+        "no levels -> the planner never commits to a secret hand speculatively")
+
+      -- Straight Flush is likewise reachable now
+      local sf = board({ "j_four_fingers" })
+      sf.meta.ante = 2
+      sf.run = { hand_levels = { ["Straight Flush"] = { level = 4 } } }
+      t.eq(BP.advance(sf, nil).hand, "Straight Flush", "Straight Flush can anchor a commitment")
+    end
+
+    -- CONTAINS semantics: a run committed to a strong hand still fires its weak-hand jokers
+    do
+      t.ok(BP.hand_matches("Five of a Kind", "Pair"), "Five of a Kind contains Pair")
+      t.ok(BP.hand_matches("Five of a Kind", "Four of a Kind"), "Five of a Kind contains Four of a Kind")
+      t.ok(BP.hand_matches("Flush House", "Flush"), "Flush House contains Flush")
+      t.ok(BP.hand_matches("Flush House", "Full House"), "Flush House contains Full House")
+      t.ok(BP.hand_matches("Flush Five", "Five of a Kind"), "Flush Five contains Five of a Kind")
+      t.ok(BP.hand_matches("Straight Flush", "Straight"), "Straight Flush contains Straight")
+      t.ok(BP.hand_matches("Straight Flush", "Flush"), "Straight Flush contains Flush")
+      -- and the relation stays one-way (a Pair hand does not fire Five-of-a-Kind jokers)
+      t.ok(not BP.hand_matches("Pair", "Five of a Kind"), "containment is one-way")
+      t.ok(not BP.hand_matches("Five of a Kind", "Flush"), "Five of a Kind does NOT contain Flush")
+    end
+
     local committed = board({ "j_duo", "j_jolly" })
     committed.run.build_plan = cp
     local plan = BP.analyze(committed); plan.commit_active = true

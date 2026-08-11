@@ -185,6 +185,22 @@ NOTE: `xmult_scaling` jokers ARE xmult — use `JokerData.is_xmult()`.
 House+leveling / Hologram+copier / economy→Bull+xmult; common thread = an XMULT stack the human KEPT.
 In-blind PLAY verified near-optimal; the losses are BUILD, not play.
 
+**THE WORLD IS VALIDATED (2026-08-11) — `tools/real_vs_sim.lua`, live telemetry vs the n=344 baseline.**
+Median dollars at ante 2 are **$1 in BOTH** (real mean is a fat right tail, not a shifted centre);
+`njokers` matches exactly, `run_strength` to ±0.01 through ante 4, pack-type supply within ~1.5pp of
+real AND of the wiki weights, progress ≈3.5 vs ≈3.55. **The "sim is a poorer world" hypothesis is dead —
+stop conditioning conclusions on it.** The ONE divergence is hand levels late (real ~5× at ante 5–6).
+
+**➡ CHECK EXPRESSIBILITY BEFORE CONCLUDING "THE ENGINE CAN'T".** The level gap was NOT policy: the sim
+uses MORE planets/run than the human (1.67 vs 1.05) and concentrates like one. The real cause was that
+**the three deepest human runs each committed to a SECRET hand** (the WIN leveled Five of a Kind 9×,
+antes 3–8) and the project could not express that build in FOUR places — secret planets excluded from
+the pool outright, Black Hole leveling 9 hands not 12, **15 of 18 spectrals silent no-ops** (incl.
+Ouija/Sigil/Cryptid, the only rank/suit CONCENTRATING cards), and `build_plan.HAND_ORDER` listing 8 of
+12 hands so sunk secret-hand levels scored ZERO toward commitment. All four are fixed (`WINRATE_V3_PLAN.md`
+§5m). This is the SECOND time an "architectural" conclusion turned out to be an inexpressible-world
+artifact — **audit the FACTS layer for the archetype before blaming the OPINION layer.**
+
 **THE REMAINING WALL is BUILD-ASSEMBLY.** Phase-3 confirmed deck-shaping levers stay refuted on the faithful
 world because a greedy per-decision valuation can't *commit to and assemble* an archetype across many shops
 (offer-rate-limited + cascade-dominated). **The evidence-backed next big lever is the committed-archetype

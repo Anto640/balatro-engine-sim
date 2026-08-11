@@ -945,6 +945,92 @@ every resource axis is a bound it cannot raise.**
 **Do not** spend further effort on: individual joker/voucher/tag fidelity (below the frequency
 ceiling), economy tuning of any kind (§5f/§5i), leveling purchases (§5g), or reroll policy (§5d).
 
+> **⚠ SUPERSEDED IN PART by §5m.** Hypothesis 1 above is now **REFUTED** by the real telemetry, and
+> hypothesis 2 has been given a concrete, located mechanism. Read §5m before acting on this table.
+
+---
+
+## 5m. REAL vs SIM (`data/bes_runs.jsonl`) — the world is fair; the ENGINE IS BLIND
+
+The user supplied the live telemetry (22 runs started, 14 completed: **1 win, 13 deaths**). This is
+the test §5k flagged as *"cheap, decisive, DO THIS FIRST"*. Tool: **`tools/real_vs_sim.lua`**
+(`lua tools/real_vs_sim.lua data/bes_runs.jsonl sim_out/of_engine_tuned.jsonl`). Sim reference =
+the n=344 engine baseline.
+
+### ✅ Hypothesis 1 is REFUTED: the sim is NOT a poorer world
+
+| ante | dollars REAL med (mean) | dollars SIM med (mean) | jokers REAL / SIM | run_str REAL / SIM |
+|---|---|---|---|---|
+| 2 | **1.0** (7.3) | **1.0** (1.6) | 3.0 / 3.0 | 0.27 / 0.28 |
+| 3 | 8.0 (17.4) | 6.7 (8.3) | 5.0 / 5.0 | 0.41 / 0.41 |
+| 4 | 25.5 (32.4) | 18.0 (18.0) | 5.0 / 5.0 | 0.47 / 0.46 |
+| 5 | 55.5 (52.2) | 25.0 (24.6) | 5.0 / 5.0 | 0.57 / 0.50 |
+
+**The median human bankroll at ante 2 is $1 — identical to the sim's.** §5k's premise ("the engine
+holds a median of $1 at ante 2, which surely can't be human") was simply wrong: that *is* human. The
+mean gap is a fat right TAIL, not a shifted centre, and from ante 4 it is conditioned on survival
+(real n falls to 6, then 3). Board size matches exactly; `run_strength` matches to ±0.01 through
+ante 4; the death/progress distributions are comparable (real progress ≈3.5, sim ≈3.55).
+
+**Pack supply is faithful too** — sim vs real share of pack offers: Celestial 31.3/30.1, Standard
+29.5/31.5, Arcana 27.3/26.0, Buffoon 7.2/8.2, Spectral 4.7/4.2. All within ~1.5pp, and matching the
+wiki's published weights. **The world is validated. Every §5a–§5k bound stands on a fair world.**
+
+### The one real divergence: hand LEVELS — and its cause is not what it looked like
+
+Real survivors carry ~5× the sim's hand levels at ante 5–6 (median 10.5 vs 2.0; 19 vs 4.3). But the
+sim is not lazy about leveling — it *uses more planets per run* (1.67 vs 1.05) and **concentrates
+just like a human** (1.38 vs 1.64 distinct hands leveled; 80% median concentration). So it is
+neither supply, nor take-rate, nor spray.
+
+Splitting the real `level_up` records by burst (a burst of exactly 12 in one second = Black Hole)
+found the answer:
+
+| hand | DELIBERATE level-ups | via Black Hole |
+|---|---|---|
+| Two Pair | 23 | 2 |
+| **Five of a Kind** | **15** | 2 |
+| Four of a Kind | 8 | 2 |
+| **Flush House** | **4** | 2 |
+
+**The three deepest human runs each committed to a SECRET hand.** The winning run (`IRXRZRWV`)
+leveled **Five of a Kind nine times, antes 3→8**; `81XB8PIN` six times; `H129ZGT1` took Flush House.
+Across **344 sim runs the engine leveled a secret hand zero times.** *(Credit to the user for
+pushing back on this — my first reading dismissed these as hands nobody plays. They are strong and
+very playable with deck fixing, and the data agreed with the user, not with me.)*
+
+### Why the engine never does it: FOUR expressibility holes, all now closed
+
+This is the same confound that already invalidated one major conclusion in `WINRATE_AUDIT.md` ("a sim
+world that couldn't express the winning archetypes"). It was still present, in four places:
+
+| # | hole | evidence | fix |
+|---|---|---|---|
+| 1 | `Content.PLANETS` **permanently excluded** Planet X / Ceres / Eris | `sim/content.lua:65` "the secret hands aren't reachable until unlocked" | `Content.planet_pool(run)` — a secret planet enters the pool once its hand has been PLAYED (`run.hand_type_plays`) |
+| 2 | Black Hole leveled **9 hands, not 12** | both real Black Holes fired as bursts of exactly 12 | `BH_HANDS` completed |
+| 3 | **15 of 18 spectrals were silent no-ops** — consumed for zero effect, incl. **Ouija / Sigil / Cryptid**, the only rank- and suit-CONCENTRATING cards in the game | facts-vs-opinion audit: 1.2% of consumable uses (0.058/run) did nothing | all 15 implemented in `use_consumable` |
+| 4 | `build_plan.HAND_ORDER` listed **8 of 12 hands** | sunk levels credit only `if HAND_NAME[hand]` → the winning run's 9 Five-of-a-Kind levels would score **ZERO** toward committing | all 12 listed; `hand_matches` containment extended so a committed secret hand still fires its Pair/Trips anchors |
+
+Hole 4 is the sharpest: the engine could not *commit* to the archetype even if it stumbled into it,
+because the planner's own signal function could not see the investment. Holes 1+3 meant it could
+never stumble into it in the first place. **Deck fixing → duplicate ranks → the hand → the planet →
+the commitment: every link in that chain was broken.**
+
+Safety of hole-4's fix: a secret hand scores **only** via sunk levels, and levels come only from a
+planet that unlocks after the hand is played. So the planner still cannot commit speculatively —
+it is feasibility-gated by construction (test-pinned in `test_build_plan.lua`).
+
+### Honest expectations
+
+Measured firing rates put holes 1–3 **below the frequency ceiling** (~0.06 no-op spectral uses/run;
+secret hands in ~9% of human runs). Per the revised #1 tuning rule these are **correctness-class:
+ship by mechanism, do not expect a paired batch to move.** They matter regardless — the live mod
+advises a human, and this user demonstrably plays these builds.
+
+**What actually changed in the argument:** hypothesis 1 is dead, and hypothesis 2 (supermodularity /
+the committed-archetype planner) is no longer an abstraction. It now has a named mechanism, a worked
+example from a real winning run, and its blind spot located at a specific line of code.
+
 ---
 
 ## 5b. What has SHIPPED so far (2026-08-11)

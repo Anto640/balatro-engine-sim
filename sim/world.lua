@@ -266,10 +266,65 @@ local function grant_consumable_world(run, rng, set)   -- High Priestess (Planet
 end
 World.grant_consumable_world = grant_consumable_world  -- reused by sim.content (Hallucination on pack-open)
 
--- every poker hand Black Hole levels (secret hands aren't reachable in this world)
+-- Black Hole upgrades EVERY poker hand, including the three secret ones -- confirmed in the
+-- live telemetry, where both Black Holes fired as a burst of exactly 12 `level_up` records
+-- (data/bes_runs.jsonl, seed H129ZGT1). The sim was leveling only 9, under-paying the card
+-- by a quarter. -- VERIFY
 local BH_HANDS = { "High Card", "Pair", "Two Pair", "Three of a Kind", "Straight",
-                   "Flush", "Full House", "Four of a Kind", "Straight Flush" }
+                   "Flush", "Full House", "Four of a Kind", "Straight Flush",
+                   "Five of a Kind", "Flush House", "Flush Five" }
 local WOF_EDITIONS = { "foil", "holo", "polychrome" }
+
+-- ---- SPECTRALS (2026-08-11) -------------------------------------------------------------
+-- Fifteen of the eighteen spectrals the ENGINE prices were silently discarded by the world:
+-- the card was consumed for zero effect. That is the FACTS/OPINION asymmetry CLAUDE.md warns
+-- about, and it mattered here specifically because Ouija / Sigil / Cryptid are the cards that
+-- CONCENTRATE ranks and suits -- i.e. the only way to reach Five of a Kind / Flush Five /
+-- Flush House. With them absent the sim could not express the secret-hand archetype at all,
+-- which is the build the one human WIN used (data/bes_runs.jsonl, seed IRXRZRWV).
+-- Measured firing rate is only ~0.06 no-op uses/run, so this is a CORRECTNESS fix and is not
+-- expected to move a paired batch (CLAUDE.md, THE FREQUENCY CEILING). -- VERIFY effects
+
+local SEAL_SPECTRAL = { c_talisman = "Gold", c_deja_vu = "Red", c_trance = "Blue", c_medium = "Purple" }
+-- destroy 1 random card in hand, then add N random enhanced cards of a given rank family
+local ADD_SPECTRAL = {
+  c_familiar    = { n = 3, ranks = { 11, 12, 13 } },              -- 3 random enhanced FACE cards
+  c_grim        = { n = 2, ranks = { 14 } },                      -- 2 random enhanced ACES
+  c_incantation = { n = 4, ranks = { 2, 3, 4, 5, 6, 7, 8, 9, 10 } }, -- 4 random enhanced NUMBERED
+}
+local ENHANCEMENTS = { "m_bonus", "m_mult", "m_glass", "m_steel", "m_gold", "m_lucky", "m_wild" }
+local SUIT_LIST = { "Spades", "Hearts", "Clubs", "Diamonds" }
+
+-- the cards a hand-targeting spectral acts on: the drawn hand if we're mid-blind, else a
+-- hand-sized slice of the deck (shop-time use -- real Balatro requires a hand, but the engine
+-- may propose one in the shop; acting on a deck slice keeps the effect faithful in scale)
+local function spectral_targets(run, hand)
+  if hand and #hand > 0 then return hand end
+  local out = {}
+  for i = 1, math.min(run.hand_size or 8, #(run.deck or {})) do out[i] = run.deck[i] end
+  return out
+end
+
+-- add a freshly generated card to the deck (and to the live hand/draw pile when mid-blind)
+local function add_card_to_deck(run, card, hand, draw_pile)
+  run.deck[#run.deck + 1] = card
+  if draw_pile then draw_pile[#draw_pile + 1] = card end
+  return card
+end
+
+-- Ankh/Hex destroy every OTHER joker. Returns the surviving joker (or nil).
+local function keep_one_joker(run, idx)
+  local keep = run.jokers[idx]
+  if not keep then return nil end
+  local Content = require("sim.content")
+  for i = #run.jokers, 1, -1 do
+    if i ~= idx then
+      Content._note_negative_loss(run, run.jokers[i])
+      table.remove(run.jokers, i)
+    end
+  end
+  return keep
+end
 
 -- Planets level a hand; suit/enhancement tarots MUTATE the deck (persist); A2 adds the rest:
 -- money (Hermit/Temperance/Immolate), leveling (Black Hole), and generators (Judgement/Soul ->
@@ -324,6 +379,89 @@ local function use_consumable(run, action, uses, targets, hand, draw_pile)
             local j = run.jokers[math.floor(rng() * #run.jokers) + 1]
             if j and not j.edition then j.edition = WOF_EDITIONS[math.floor(rng() * 3) + 1] end
           end
+
+        -- ---- spectrals that RESHAPE THE DECK (the archetype enablers) ----
+        elseif key == "c_ouija" then          -- all cards in hand -> ONE random rank; -1 hand size
+          local tg = spectral_targets(run, hand)
+          local rank = 2 + math.floor(rng() * 13)
+          for _, c in ipairs(tg) do c.rank_id = rank end
+          run.hand_size = math.max(1, (run.hand_size or 8) - 1)
+          shape = { shape = "rank", n = #tg }
+        elseif key == "c_sigil" then          -- all cards in hand -> ONE random suit
+          local tg = spectral_targets(run, hand)
+          local suit = SUIT_LIST[math.floor(rng() * 4) + 1]
+          for _, c in ipairs(tg) do c.suit = suit end
+          shape = { shape = "suit", suit = suit, n = #tg }
+        elseif key == "c_cryptid" then        -- 2 copies of one selected card
+          local tg = spectral_targets(run, hand)
+          if #tg > 0 then
+            local src = tg[math.floor(rng() * #tg) + 1]
+            for _ = 1, 2 do
+              add_card_to_deck(run, GS.card{ id = require("sim.content").next_card_id(run),
+                rank_id = src.rank_id, suit = src.suit, enhancement = src.enhancement,
+                seal = src.seal, edition = src.edition }, hand, draw_pile)
+            end
+            shape = { shape = "copy", n = 2 }
+          end
+        elseif ADD_SPECTRAL[key] then         -- Familiar / Grim / Incantation: destroy 1, add N
+          local spec = ADD_SPECTRAL[key]
+          destroy_random_deck(run, 1, hand, draw_pile)
+          local Content = require("sim.content")
+          for _ = 1, spec.n do
+            add_card_to_deck(run, GS.card{ id = Content.next_card_id(run),
+              rank_id = spec.ranks[math.floor(rng() * #spec.ranks) + 1],
+              suit = SUIT_LIST[math.floor(rng() * 4) + 1],
+              enhancement = ENHANCEMENTS[math.floor(rng() * #ENHANCEMENTS) + 1] }, hand, draw_pile)
+          end
+          shape = { shape = "add", n = spec.n }
+
+        -- ---- spectrals that upgrade ONE card ----
+        elseif SEAL_SPECTRAL[key] then        -- Talisman/Deja Vu/Trance/Medium: add a seal
+          local tg = spectral_targets(run, hand)
+          if #tg > 0 then
+            tg[math.floor(rng() * #tg) + 1].seal = SEAL_SPECTRAL[key]
+            shape = { shape = "seal", n = 1 }
+          end
+        elseif key == "c_aura" then           -- a random edition on one card in hand
+          local tg = spectral_targets(run, hand)
+          if #tg > 0 then
+            tg[math.floor(rng() * #tg) + 1].edition = WOF_EDITIONS[math.floor(rng() * 3) + 1]
+            shape = { shape = "edition", n = 1 }
+          end
+
+        -- ---- spectrals that act on JOKERS ----
+        elseif key == "c_wraith" then         -- a random RARE joker, and your money -> $0
+          grant_joker_world(run, rng, { Rare = 1 })
+          run.economy.dollars = 0
+        elseif key == "c_ectoplasm" then      -- NEGATIVE edition on a random joker; -1 hand size
+          if #(run.jokers or {}) > 0 then
+            local j = run.jokers[math.floor(rng() * #run.jokers) + 1]
+            if j and j.edition ~= "negative" then
+              j.edition = "negative"
+              require("sim.content")._note_negative_gain(run, j)
+            end
+          end
+          run.hand_size = math.max(1, (run.hand_size or 8) - 1)
+        elseif key == "c_ankh" then           -- copy one joker, DESTROY all the others
+          if #(run.jokers or {}) > 0 then
+            local idx = math.floor(rng() * #run.jokers) + 1
+            local src = run.jokers[idx]
+            local keep = keep_one_joker(run, idx)
+            if keep and src then
+              local copy = {}
+              for k2, v2 in pairs(src) do copy[k2] = v2 end
+              copy.edition = (src.edition ~= "negative") and src.edition or nil
+              copy.ability = { extra = {} }
+              run.jokers[#run.jokers + 1] = copy
+            end
+          end
+        elseif key == "c_hex" then            -- polychrome on one joker, DESTROY all the others
+          if #(run.jokers or {}) > 0 then
+            local idx = math.floor(rng() * #run.jokers) + 1
+            local keep = keep_one_joker(run, idx)
+            if keep then keep.edition = "polychrome" end
+          end
+
         else
           shape = apply_deck_tarot(run, key, hand, draw_pile)    -- suit/enh/rank/thin (+ Lovers, + Hierophant alias)
         end

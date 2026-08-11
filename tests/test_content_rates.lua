@@ -113,6 +113,35 @@ return function(t)
     t.eq(r.joker_slots, 5, "non-negative editions never touch the slot count")
   end
 
+  -- ---- SECRET planets unlock by PLAYING their hand (real-vs-sim, 2026-08-11) ----
+  -- The sim excluded Planet X / Ceres / Eris from the pool outright, so the secret-hand
+  -- archetypes could never be leveled -- and that is precisely the build the one human
+  -- WIN in data/bes_runs.jsonl used (Five of a Kind leveled 9 times, antes 3-8).
+  do
+    local function in_pool(pool, key)
+      for _, k in ipairs(pool) do if k == key then return true end end
+      return false
+    end
+    local locked = Content.planet_pool({ hand_type_plays = {} })
+    t.eq(#locked, #Content.PLANETS, "no secret hand played -> the base nine planets only")
+    t.ok(not in_pool(locked, "c_planet_x"), "Planet X is absent until Five of a Kind is played")
+
+    local unlocked = Content.planet_pool({ hand_type_plays = { ["Five of a Kind"] = 1 } })
+    t.eq(#unlocked, #Content.PLANETS + 1, "playing Five of a Kind adds exactly one planet")
+    t.ok(in_pool(unlocked, "c_planet_x"), "...and that planet is Planet X")
+    t.ok(not in_pool(unlocked, "c_ceres"), "...but Ceres stays locked (Flush House unplayed)")
+
+    local all = Content.planet_pool({ hand_type_plays = {
+      ["Five of a Kind"] = 2, ["Flush House"] = 1, ["Flush Five"] = 1 } })
+    t.eq(#all, #Content.PLANETS + 3, "all three secret hands played -> all twelve planets")
+
+    -- a run that has unlocked nothing must sample BYTE-IDENTICALLY to the old fixed table,
+    -- so the fix cannot cascade the seeded RNG of the 99.8% of runs that never get there
+    t.eq(Content.planet_pool({ hand_type_plays = {} }), Content.PLANETS,
+      "the locked pool is the SAME table -- no reallocation, no sampling drift")
+    t.eq(Content.planet_pool(nil), Content.PLANETS, "a run without play history is treated as locked")
+  end
+
   -- a DESTROYED negative joker (decay/self-destruct path) frees its slot too
   do
     local j = { key = "j_popcorn", edition = "negative", ability = { mult = 4, extra = {} } }

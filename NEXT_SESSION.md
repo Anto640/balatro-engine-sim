@@ -1,6 +1,36 @@
 # NEXT_SESSION.md — fresh-session handoff (updated 2026-07-14, W6 win)
 
-> 🟢 **START HERE — 2026-08-11 FINAL STATE (full detail in `WINRATE_V3_PLAN.md` §5k).**
+> 🔵 **START HERE — 2026-08-11 (LATEST; supersedes the 🟢 block below). Detail: `WINRATE_V3_PLAN.md` §5m.**
+> The user supplied `data/bes_runs.jsonl`, so the flagged "DO THIS FIRST" test is **DONE**:
+> **`lua tools/real_vs_sim.lua data/bes_runs.jsonl sim_out/of_engine_tuned.jsonl`**
+>
+> ✅ **HYPOTHESIS 1 IS REFUTED — the sim world is FAIR.** Median dollars at ante 2 are **$1 in BOTH**
+> (the human's $1 median is the same as the engine's; the real MEAN is a fat right tail, not a shifted
+> centre). `njokers` matches exactly, `run_strength` to ±0.01 through ante 4, pack supply within ~1.5pp
+> of real AND of the wiki weights, progress ≈3.5 vs ≈3.55. **Stop conditioning conclusions on a
+> "too-poor world" — every §5a–§5k bound stands.**
+>
+> 🎯 **THE ONE DIVERGENCE, AND ITS REAL CAUSE.** Real survivors carry ~5× the hand levels at ante 5–6.
+> It is NOT policy: the sim uses MORE planets/run (1.67 vs 1.05) and concentrates like a human. The
+> cause: **the three deepest human runs each committed to a SECRET hand** — the WIN (`IRXRZRWV`)
+> leveled **Five of a Kind 9× across antes 3–8**; the engine did it **0 times in 344 runs**. Four
+> expressibility holes, ALL NOW FIXED: secret planets excluded from the pool outright; Black Hole
+> leveling 9 hands not 12; **15 of 18 spectrals silent no-ops** (incl. Ouija/Sigil/Cryptid — the only
+> rank/suit CONCENTRATING cards); and `build_plan.HAND_ORDER` listing 8 of 12 hands, so the winning
+> run's 9 sunk levels would have scored **ZERO** toward committing.
+>
+> ⚠️ **Expect NO batch movement from those four** — all measured below the frequency ceiling
+> (~0.06 no-op spectral uses/run). They are CORRECTNESS-class: shipped by mechanism, and they matter
+> for the live mod because this user plays these builds.
+>
+> **NEXT:** hypothesis 2 (the committed-archetype planner) is now the only survivor — and it is no
+> longer abstract: it has a named mechanism, a worked example from a real win, and its blind spot was
+> located at a specific line. **Second lesson: audit the FACTS layer for the archetype before blaming
+> the OPINION layer — this is the SECOND time an "architectural" conclusion was an inexpressible-world
+> artifact.**
+>
+> _(Previous state below — hypothesis 1 there is now dead.)_
+> 🟢 **2026-08-11 (SUPERSEDED IN PART; full detail in `WINRATE_V3_PLAN.md` §5k).**
 > **No winrate gain; the value is diagnostic and it eliminates most cheap hypotheses by MEASUREMENT.**
 > The engine's economic policy is close to optimal for its budget: earning is ~maxed (~$28 headroom),
 > **HOARDING IS MONOTONICALLY HARMFUL** (−0.393 / −1.191 / −1.637 at $10/$20/$25 floors, n=160 each —

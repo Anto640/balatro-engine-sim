@@ -62,11 +62,40 @@ Content.TAROTS = {
   "c_hanged_man", "c_death", "c_temperance", "c_devil", "c_tower", "c_star", "c_moon",
   "c_sun", "c_judgement", "c_world",
 }
--- Non-secret planets only (the secret hands aren't reachable until unlocked). -- VERIFY
+-- The nine always-available planets. -- VERIFY
 Content.PLANETS = {
   "c_pluto", "c_mercury", "c_uranus", "c_venus", "c_saturn", "c_jupiter",
   "c_earth", "c_mars", "c_neptune",
 }
+-- The three SECRET planets. In real Balatro these are not permanently absent: a secret
+-- hand's planet enters the pool once you have PLAYED that hand. The sim used to exclude
+-- them outright, which made an entire archetype family inexpressible -- and that family is
+-- exactly what the human's one winning run used (seed IRXRZRWV leveled Five of a Kind NINE
+-- times, antes 3-8; 81XB8PIN six times). See WINRATE_V3_PLAN.md 5m. -- VERIFY unlock rule
+Content.SECRET_PLANETS = {
+  { key = "c_planet_x", hand = "Five of a Kind" },
+  { key = "c_ceres",    hand = "Flush House" },
+  { key = "c_eris",     hand = "Flush Five" },
+}
+
+-- The planet pool visible to `run` right now: the base nine plus any secret planet whose
+-- hand this run has already played. Appended in a fixed order after the base nine, so a run
+-- that has unlocked nothing samples byte-identically to the old fixed table.
+function Content.planet_pool(run)
+  local plays = run and run.hand_type_plays
+  if not plays then return Content.PLANETS end
+  local pool
+  for _, sp in ipairs(Content.SECRET_PLANETS) do
+    if (plays[sp.hand] or 0) > 0 then
+      if not pool then
+        pool = {}
+        for i, k in ipairs(Content.PLANETS) do pool[i] = k end
+      end
+      pool[#pool + 1] = sp.key
+    end
+  end
+  return pool or Content.PLANETS
+end
 -- Spectrals (Soul/Black Hole appear only in Spectral packs at low weight). -- VERIFY pool
 Content.SPECTRALS = {}
 do
@@ -240,7 +269,7 @@ end
 
 -- A standalone shop consumable (Tarot or Planet) item. Base $3 (Clearance-discounted). -- VERIFY
 function Content.gen_consumable(set, rng, run)
-  local key = (set == "Planet") and pick_uniform(rng, Content.PLANETS) or pick_uniform(rng, Content.TAROTS)
+  local key = (set == "Planet") and pick_uniform(rng, Content.planet_pool(run)) or pick_uniform(rng, Content.TAROTS)
   return { set = set, key = key, name = key, cost = run and priced(run, 3) or 3 }
 end
 
@@ -342,6 +371,9 @@ local function gen_card(rng, run)
   return GS.card{ id = next_card_id(run), rank_id = rank, suit = suit, enhancement = enh, seal = seal, edition = ed }
 end
 Content._gen_card = gen_card   -- exposed for the E-11 rate tests
+-- exposed so the world's card-CREATING spectrals (Cryptid/Familiar/Grim/Incantation) mint ids
+-- from the same counter -- two cards sharing an id would break every remove-by-object path.
+Content.next_card_id = next_card_id
 
 -- reverse of PLANET_KEY_HAND (hand name -> planet key) + a cheap "most-played" proxy (the
 -- run's most-leveled hand) for A4 Telescope. Built once; no MC needed.
@@ -368,7 +400,7 @@ function Content.open_pack(pack, run, rng)
     elseif kind == "tarot" then
       local key = pick_uniform(rng, Content.TAROTS); items[#items + 1] = { set = "Tarot", key = key, name = key }
     elseif kind == "planet" then
-      local key = pick_uniform(rng, Content.PLANETS)
+      local key = pick_uniform(rng, Content.planet_pool(run))
       -- A4 Telescope: the first planet in a Celestial pack is your best (most-leveled) hand's.
       if i == 1 and run and run._telescope then
         local bp = HAND_TO_PLANET[most_leveled_hand(run) or ""]

@@ -103,7 +103,16 @@ local HAND_TAG = {
   straight = "Straight", flush = "Flush", fullhouse = "Full House",
   four = "Four of a Kind", highcard = "High Card",
 }
-local HAND_ORDER = { "Full House", "Four of a Kind", "Three of a Kind",
+-- All TWELVE poker hands. The four strongest used to be missing, which made the planner
+-- structurally blind to them: `commitment_signals` credits sunk hand levels only through
+-- HAND_NAME, so a run that had leveled Five of a Kind scored ZERO toward committing to it.
+-- That is exactly the build the one human WIN used (data/bes_runs.jsonl seed IRXRZRWV
+-- leveled Five of a Kind nine times, antes 3-8). Listing them cannot make the engine commit
+-- SPECULATIVELY: a secret hand scores only via sunk levels, and levels only come from a
+-- planet that (per sim/content.lua) unlocks after you have actually PLAYED the hand. So the
+-- commitment stays feasibility-gated by construction. -- see WINRATE_V3_PLAN.md 5m
+local HAND_ORDER = { "Flush Five", "Flush House", "Five of a Kind", "Straight Flush",
+  "Full House", "Four of a Kind", "Three of a Kind",
   "Two Pair", "Pair", "Flush", "Straight", "High Card" }
 local HAND_NAME = {}
 for _, hand in ipairs(HAND_ORDER) do HAND_NAME[hand] = true end
@@ -127,6 +136,16 @@ function BP.hand_matches(committed, trigger)
     ["Three of a Kind"] = { Pair = true },
     ["Full House"] = { Pair = true, ["Two Pair"] = true, ["Three of a Kind"] = true },
     ["Four of a Kind"] = { Pair = true, ["Two Pair"] = true, ["Three of a Kind"] = true },
+    -- the strong hands CONTAIN the weak ones, so a Pair/Trips-triggered joker still fires
+    -- for a run committed to a secret hand. Without these, committing to Five of a Kind
+    -- made every anchor joker read as "doesn't fire" and the commitment starved itself.
+    ["Straight Flush"] = { Straight = true, Flush = true },
+    ["Five of a Kind"] = { Pair = true, ["Two Pair"] = true, ["Three of a Kind"] = true,
+                           ["Four of a Kind"] = true },
+    ["Flush House"] = { Pair = true, ["Two Pair"] = true, ["Three of a Kind"] = true,
+                        ["Full House"] = true, Flush = true },
+    ["Flush Five"] = { Pair = true, ["Two Pair"] = true, ["Three of a Kind"] = true,
+                       ["Four of a Kind"] = true, ["Five of a Kind"] = true, Flush = true },
   }
   return contains[committed] and contains[committed][trigger] or false
 end
