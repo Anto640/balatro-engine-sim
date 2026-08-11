@@ -39,9 +39,24 @@
 > → the target is **LINE-FINDING**: is there a reachable winning end-state from here, and does this
 >   action advance the best one? A planning/search problem — which is why every *magnitude* lever failed
 >   and the structural planner is the only thing that ever measured positive.
-> **Cheap first step:** a retrospective ORACLE over each LOST run's recorded offer stream, to measure how
-> often a winning line actually existed. That number is the real ceiling and should replace the
-> resource-probe bounds as the headline diagnostic.
+> ✅ **THE ORACLE IS BUILT AND RUN** (`tools/line_oracle.lua`, n=652; `WINRATE_V3_PLAN.md` §5o).
+> Verdict: **§5n partly holds, with a sharp qualification.** At the modal death antes (2–4) the doomed
+> runs were offered essentially the SAME material as the survivors (tier within 5%), and the engine
+> converts offered tier onto its board at an IDENTICAL rate (84% vs 84% at a4) — **it is not failing to
+> spend.** The discriminator is **XMULT DENSITY**: at ante 5 doomed runs hold **1.41** xmult, winning
+> boards carry **3**; it converts 85% of offered tier while keeping only ~55% of affordable xmult.
+> That is supermodularity measured, and it CLEARS THE FREQUENCY CEILING (xmult offers appear in
+> essentially every run) — the first thing all session that does.
+> ⚠️ **But the sequencing INVERTS at ante 2:** eventual winners are xmult-POOR early (0.38 vs 0.50 held)
+> and xmult-rich by a4–a5. Winners build base/economy first and stack xmult second — the human
+> "economy → Bull → xmult" archetype. **So "buy xmult earlier" is CONTRADICTED by the data; front-loading
+> xmult is what the LOSING runs do.** This also explains why the bare `xmult-floor` lever was refuted.
+> → **Do NOT retry a bare xmult weight bump.** The licensed shape is xmult density as a
+>   **commitment-conditioned, ANTE-STAGED target** co-calibrated with the planner constants:
+>   economy/base through ante 2, then drive toward 3 xmult by ante 5.
+> → Caveat: deep runs were also *offered* more xmult (2.67 vs 1.99 at a4), partly a money→reroll
+>   feedback loop — i.e. partly a consequence of surviving, not a cause. Retention/sequencing findings
+>   do not depend on it.
 > **Best telemetry to ask for:** not more runs in aggregate — **human WINS played with the overlay on.**
 > The mod logs `advice` at every shop next to what was actually taken, so a winning run is a labelled
 > record of DIVERGENCE POINTS (where the human took what the engine priced low, and it paid).

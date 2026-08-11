@@ -1148,6 +1148,86 @@ one input the simulator cannot generate for itself.
 
 ---
 
+## 5o. THE LINE ORACLE — testing §5n's claim (`tools/line_oracle.lua`, n=652)
+
+§5n predicted that most lost runs were offered enough material to win. This measures it, on
+the two clean engine baselines (652 runs, 12 wins, 640 deaths). **The claim is PARTLY
+supported, and the qualification is the interesting part.**
+
+Method: walk each run's recorded offer stream and, with hindsight, build the best 5-joker board
+from offers that were **affordable at the moment they appeared**. Target = the median winning
+board (**tier_sum ≥ 34, xmult ≥ 3**). It is an upper bound — buying one offer starves the next,
+and it ignores in-blind play.
+
+### The naive number is CONFOUNDED — do not quote it
+
+Only **17.3%** of lost runs were offered a full win-target board. But a run that dies at ante 2
+sees a fraction of the shops one that reaches ante 8 does, so *"no material"* and *"died before
+the material arrived"* are indistinguishable. **Exposure must be controlled**, comparing only
+runs that reached the same cutoff:
+
+| material offered by end of ante N | died shallow (≤N+1) | went deep (≥N+3)/won |
+|---|---|---|
+| a2 | tier 21.9 · xmult 0.72 | tier 23.6 · xmult 0.84 |
+| a3 | tier 27.4 · xmult 1.29 | tier 28.2 · xmult 1.60 |
+| a4 | tier 30.2 · xmult 1.99 | tier 31.9 · xmult 2.67 |
+| a5 | tier 31.9 · xmult 2.56 | tier 34.2 · xmult 3.79 |
+
+**At the modal death antes (2–4) the doomed runs were offered essentially what the survivors
+were offered** — tier within 5%. §5n holds where it matters most.
+
+### The engine is not failing to SPEND
+
+Conversion of offered tier onto the actual board is **identical** between the two groups:
+
+| cutoff | shallow: offered → held (conv.) | deep: offered → held (conv.) |
+|---|---|---|
+| a3 | 27.4 → 21.3 (**78%**) | 28.2 → 22.7 (**80%**) |
+| a4 | 30.2 → 25.2 (**84%**) | 31.9 → 26.9 (**84%**) |
+| a5 | 31.9 → 27.3 (**85%**) | 34.2 → 30.3 (**89%**) |
+
+The board is full and the money is spent. **The difference is entirely in WHAT it is spent on.**
+
+### The discriminator is XMULT DENSITY — and the sequencing inverts
+
+| xmult by cutoff | shallow: offered / held / kept | deep: offered / held / kept |
+|---|---|---|
+| a2 | 0.72 / **0.50** / 70% | 0.84 / **0.38** / 45% |
+| a3 | 1.29 / 0.79 / 61% | 1.60 / **1.10** / 68% |
+| a4 | 1.99 / 1.14 / 57% | 2.67 / **1.69** / 63% |
+| a5 | 2.56 / 1.41 / 55% | 3.79 / **2.17** / 57% |
+
+Two findings, one of them counter-intuitive:
+
+1. **The engine is xmult-light at the point it dies.** At ante 5 the doomed runs hold **1.41**
+   xmult; winning boards carry **3**. It converts 85% of offered *tier* while keeping only ~55%
+   of affordable *xmult* — it is substituting tier for multiplicativity, filling five slots with
+   equally-tiered but multiplicatively-worse jokers. **This is supermodularity, measured.** And
+   unlike everything else tested this session it clears the frequency ceiling: affordable xmult
+   offers appear in essentially every run.
+2. **⚠ At ante 2 the relationship INVERTS.** The runs that go on to die deep-in hold *more* xmult
+   at ante 2 (0.50 vs 0.38) and keep a *higher* share (70% vs 45%). The eventual winners are
+   xmult-POOR early and xmult-rich by a4–a5. That matches the analyzed human archetype
+   "economy → Bull → xmult" exactly: **build base and economy first, stack xmult second.**
+   So the naive reading ("buy xmult earlier") is contradicted by the data — the winners buy it
+   LATER. The failure is one of SEQUENCING, which is precisely what a greedy per-decision
+   valuation cannot represent and a planner can.
+
+### What this licenses, and what it forbids
+
+- **FORBIDDEN: a bare xmult floor/weight bump.** That exact lever (`xmult-floor`) is already in
+  the refuted set, and finding 2 explains *why* it failed — front-loading xmult is what the
+  LOSING runs do.
+- **LICENSED: xmult density as a COMMITMENT-CONDITIONED, ANTE-STAGED target**, co-calibrated with
+  the planner constants (the revised #1 rule's "calibrate jointly" clause). The shape the data
+  asks for is: economy/base through ante 2, then drive toward 3 xmult by ante 5.
+- **Caveat, stated plainly:** deep runs were also *offered* more xmult (2.67 vs 1.99 at a4). Some
+  of that is a money → reroll → more-offers feedback loop, so part of the gap is upstream of
+  joker choice and is a consequence of surviving, not a cause. The retention and sequencing
+  findings do not depend on it; the "offered" gap should not be read as pure luck OR pure skill.
+
+---
+
 ## 5b. What has SHIPPED so far (2026-08-11)
 
 Phase A's probe harness and Phase B1's feature emission are implemented and verified.
