@@ -1090,6 +1090,64 @@ not more fidelity work. Fidelity was necessary; it was never going to be suffici
 
 ---
 
+## 5n. THE REFRAME (user, 2026-08-11) — **there is almost always a winning line; the engine finds none**
+
+> *"it's not that there's a special key like secret planets — I could very easily do it without them,
+> or do a run without other things or without taking something. Statistically there's basically always
+> something else which, if everything is acted upon, allows for wins."*
+
+**This is a better frame than §5m's and it should govern the next session.** The secret-hand result is
+an *instance*, not a cause. A strong player does not need Five of a Kind, or any named archetype — they
+need to notice which of the several viable lines *this* run is offering and commit to one. Runs are not
+won by holding a particular card; they are won by **converting whatever the run offers into a line**.
+
+### The existing data already supports this, and I had it filed under the wrong heading
+
+The `rich` probe gave the engine **+$100/round** — an absurd, unearnable sum, ~20× the interest
+headroom — and it won **72.5%**, not ~100% (§4/§5a, `sim_out/dose_rich50.jsonl`). The user asked at the
+time *"surely with $100 per round it should be 100% win rate no questions asked?"* and the honest answer
+is: **for a player who acts on everything, yes.** The engine, handed effectively unlimited purchasing
+power, still fails a quarter of its runs. That is not a resource constraint. **It is a conversion
+failure**, and it is the cleanest measurement in this whole document:
+
+| what was removed as a constraint | winrate | reading under the reframe |
+|---|---|---|
+| money (+$100/round) | 72.5% | unlimited resources ≠ wins — **conversion is the bottleneck** |
+| money (+$25/round) | 30% | |
+| joker slots (+3) | 15% | |
+| leveling (+2/ante) | 18.8% | |
+| nothing (baseline) | ~1.3% | |
+
+Every one of those probes handed the engine a resource and measured how much of it the engine could
+turn into a win. **None of them reached the ceiling, because none of them changed the policy.** The
+ceiling probes were measuring the *greedy policy's conversion rate*, and I had been reading them as
+statements about resource scarcity.
+
+### What this changes about the plan
+
+1. **Do NOT chase secret hands.** §5m's fixes are correctness (keep them — the world must be honest,
+   and the live overlay advises a human who plays those builds), but "add the missing archetype" is
+   the wrong lesson. The next archetype would be just as inert (it measured **exactly** 0.000).
+2. **Stop probing resources.** The axis is exhausted: even the absurd dose leaves 27.5% on the table.
+3. **The target is LINE-FINDING**: at each decision, is there a reachable end-state that wins from
+   here, and does this action advance the best one? That is a planning/search problem, not a valuation
+   problem — which is why every *magnitude* lever in the graveyard failed, and why the one structural
+   lever (the Phase-5 planner) is the only thing that ever measured positive.
+4. **The measurable version of the user's claim** (worth doing first, cheap): for each LOST run, was a
+   winning line available? A retrospective oracle over the recorded offer stream would put a number on
+   "basically always" — and that number is the true ceiling this engine is failing to reach, replacing
+   the resource-probe bounds as the headline diagnostic.
+
+### The highest-value telemetry to collect next
+
+Not more runs in aggregate — **runs where the human WINS, played with the overlay on.** The mod already
+logs the engine's `advice` at every shop alongside what was actually taken, so a winning human run is a
+labelled record of **divergence points**: every place the human took something the engine priced low,
+and it paid. That tests the reframe at the decision level instead of the archetype level, and it is the
+one input the simulator cannot generate for itself.
+
+---
+
 ## 5b. What has SHIPPED so far (2026-08-11)
 
 Phase A's probe harness and Phase B1's feature emission are implemented and verified.

@@ -191,6 +191,18 @@ Median dollars at ante 2 are **$1 in BOTH** (real mean is a fat right tail, not 
 real AND of the wiki weights, progress ≈3.5 vs ≈3.55. **The "sim is a poorer world" hypothesis is dead —
 stop conditioning conclusions on it.** The ONE divergence is hand levels late (real ~5× at ante 5–6).
 
+**➡ THE GOVERNING FRAME (user, 2026-08-11): THERE IS ALMOST ALWAYS A WINNING LINE; THE ENGINE FINDS NONE.**
+Wins do not come from holding a particular card or archetype — a strong player notices which of several
+viable lines *this* run offers and COMMITS. The proof is already in the data and was filed under the wrong
+heading: the `rich` probe handed the engine **+$100/round** (~20× the interest headroom) and it won **72.5%,
+not ~100%**. Unlimited resources ≠ wins. **Every ceiling probe was measuring the greedy policy's CONVERSION
+RATE, not resource scarcity.** So: do NOT chase archetypes (adding the secret hands measured **exactly**
+0.000), do NOT probe resources further (axis exhausted), and treat the target as **LINE-FINDING** — is there
+a reachable winning end-state from here, and does this action advance the best one? That is a planning/search
+problem, which is why every magnitude lever failed and the structural planner is the only positive. Cheap
+first step: a retrospective oracle over each LOST run's recorded offer stream to measure how often a winning
+line existed. Full argument: `WINRATE_V3_PLAN.md` §5n.
+
 **➡ CHECK EXPRESSIBILITY BEFORE CONCLUDING "THE ENGINE CAN'T".** The level gap was NOT policy: the sim
 uses MORE planets/run than the human (1.67 vs 1.05) and concentrates like one. The real cause was that
 **the three deepest human runs each committed to a SECRET hand** (the WIN leveled Five of a Kind 9×,

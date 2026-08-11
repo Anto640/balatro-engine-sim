@@ -28,7 +28,25 @@
 > though: Five of a Kind played 3×, Flush House 3×, `c_planet_x` reached a shop twice — content that
 > was structurally unreachable before.
 >
-> 🎯 **NEXT — THE ONE LOCATED LEVER.** The fixes made the archetype POSSIBLE, not LIKELY (~4% of runs
+> 🔴 **READ THIS FIRST — THE GOVERNING FRAME (user, 2026-08-11; `WINRATE_V3_PLAN.md` §5n).**
+> **There is almost always a winning line in a run; the engine finds none.** Wins are not about holding
+> a particular card or archetype — you notice which of several viable lines *this* run offers and commit.
+> **The proof was already in our data, filed under the wrong heading:** the `rich` probe gave the engine
+> **+$100/round** (~20× the interest headroom) and it won **72.5%, not ~100%**. Unlimited resources ≠ wins.
+> **Every ceiling probe was measuring the greedy policy's CONVERSION RATE, not resource scarcity.**
+> → do **NOT** chase archetypes (adding the secret hands measured *exactly* 0.000)
+> → do **NOT** probe resources further (axis exhausted — even the absurd dose leaves 27.5%)
+> → the target is **LINE-FINDING**: is there a reachable winning end-state from here, and does this
+>   action advance the best one? A planning/search problem — which is why every *magnitude* lever failed
+>   and the structural planner is the only thing that ever measured positive.
+> **Cheap first step:** a retrospective ORACLE over each LOST run's recorded offer stream, to measure how
+> often a winning line actually existed. That number is the real ceiling and should replace the
+> resource-probe bounds as the headline diagnostic.
+> **Best telemetry to ask for:** not more runs in aggregate — **human WINS played with the overlay on.**
+> The mod logs `advice` at every shop next to what was actually taken, so a winning run is a labelled
+> record of DIVERGENCE POINTS (where the human took what the engine priced low, and it paid).
+>
+> 🎯 **NEXT — THE ONE LOCATED LEVER (subordinate to the frame above).** The fixes made the archetype POSSIBLE, not LIKELY (~4% of runs
 > touch a secret hand). Nothing in the engine WANTS it: `CV.SPECTRAL_BASE` prices Ouija **0.3** and
 > Cryptid **0.4** as flat generic priors, with no term for "this concentrates ranks toward the hand I
 > have already sunk levels into". Every link is priced alone, so the product is never assembled.
