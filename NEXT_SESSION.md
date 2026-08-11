@@ -23,11 +23,24 @@
 > (~0.06 no-op spectral uses/run). They are CORRECTNESS-class: shipped by mechanism, and they matter
 > for the live mod because this user plays these builds.
 >
-> **NEXT:** hypothesis 2 (the committed-archetype planner) is now the only survivor — and it is no
-> longer abstract: it has a named mechanism, a worked example from a real win, and its blind spot was
-> located at a specific line. **Second lesson: audit the FACTS layer for the archetype before blaming
-> the OPINION layer — this is the SECOND time an "architectural" conclusion was an inexpressible-world
-> artifact.**
+> 📏 **MEASURED (paired n=160, both arms):** world fixes 1–3 = **−0.019, p=0.66, 136/160 TIED**.
+> Planet-fix 4 alone = **Δ 0.0000, sd 0.000, 160/160 TIED** — *exactly* inert. Chain verified live
+> though: Five of a Kind played 3×, Flush House 3×, `c_planet_x` reached a shop twice — content that
+> was structurally unreachable before.
+>
+> 🎯 **NEXT — THE ONE LOCATED LEVER.** The fixes made the archetype POSSIBLE, not LIKELY (~4% of runs
+> touch a secret hand). Nothing in the engine WANTS it: `CV.SPECTRAL_BASE` prices Ouija **0.3** and
+> Cryptid **0.4** as flat generic priors, with no term for "this concentrates ranks toward the hand I
+> have already sunk levels into". Every link is priced alone, so the product is never assembled.
+> **The lever is NOT "value spectrals higher" (magnitude class, refuted in isolation). It is making
+> the planner's COMMITMENT feed back into card valuation** — `BP.planet_credit(gs, hand)` already does
+> this for planets and every leveling channel consumes it; the deck-shaping cards have no equivalent.
+> Build `BP.shape_credit`-style feedback and co-calibrate it with the commitment constants.
+>
+> 🧠 **Two lessons worth keeping.** (1) Audit the FACTS layer for the archetype before blaming the
+> OPINION layer — this was the SECOND time an "architectural" conclusion was an inexpressible-world
+> artifact. (2) **Fidelity was necessary and is not sufficient:** four hard blocks removed, needle
+> moved 0.000. Capability ≠ intent.
 >
 > _(Previous state below — hypothesis 1 there is now dead.)_
 > 🟢 **2026-08-11 (SUPERSEDED IN PART; full detail in `WINRATE_V3_PLAN.md` §5k).**

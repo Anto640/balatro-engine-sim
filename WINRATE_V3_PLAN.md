@@ -1070,6 +1070,24 @@ that assemble it must be priced by the commitment, not by their standalone prior
 already does exactly this for planets; the deck-shaping cards have no equivalent. That is the concrete,
 located next step.
 
+### ✅ The sharpest confirmation: hole 4 alone is EXACTLY inert (`ship_state` vs `spec_fix`)
+
+Running the full ship state (all four fixes) against the world-only arm isolates the planner fix:
+
+```
+progress  A 3.772   B 3.772   Δ +0.0000   sd 0.000   SE 0.0000
+SIGN TEST: better 0 / worse 0 / TIED 160        DEATH-ANTE: 160 unchanged
+```
+
+**160 of 160 seeds identical, standard deviation exactly zero.** The planner fix changed nothing,
+anywhere, because the engine never accumulates enough secret-hand levels to reach a commitment in the
+first place (only 5 ante-snapshots in 160 runs show any secret-hand level at all).
+
+This is the thesis in one measurement: **fixing the CAPABILITY changes nothing until something makes
+the engine WANT the archetype.** Holes 1–4 removed four hard blocks and moved the needle by 0.000 —
+which is the correct outcome and precisely why the next step must be the valuation feedback above,
+not more fidelity work. Fidelity was necessary; it was never going to be sufficient.
+
 ---
 
 ## 5b. What has SHIPPED so far (2026-08-11)
