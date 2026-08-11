@@ -137,10 +137,16 @@ empirically; the table above is why.
 
 1. **"n.s." ≠ "no effect."** Reverting a logically-correct fix because a *underpowered* batch didn't
    move is optimizing the measurement, not the game. State the MDE before calling a verdict.
-2. **Keeping only positive-measuring changes on a FIXED seed set overfits the seed set.** The retained
-   baseline (3.345 → 3.832 across the arc) is selected on the same 160 seeds it is measured on, so some
-   unknown part of that gain is sampling noise banked as progress. **Any retained change must be
-   confirmed on HELD-OUT seeds before it enters the baseline** (`BES_SEED_OFF` — see tools/sim_batch.lua).
+2. **Seed overfitting was the obvious worry — it was TESTED and is NOT a problem.** Selecting changes
+   on the same 160 seeds they are measured on could fit that sample. Measured (2026-08-11,
+   `tools/overfit_test.sh`, n=344 tuned vs n=308 held-out): **held-out − tuned = −0.050 (SE 0.133,
+   95% CI [−0.31, +0.21])** — an arc-sized effect (0.487) is excluded. The retained arc generalizes.
+   Keep `BES_SEED_OFF` for spot-confirming a big retained change, but out-of-sample confirmation is
+   NOT required for every lever.
+   **The real lesson from that run is POWER, not overfitting:** the same engine on the same pool
+   measured **3.716 at n=344 but 4.244 at n=40** — a +0.53 error, larger than the whole arc. So:
+   **never quote an UNPAIRED mean from a small batch, and always PAIR** (same seeds, both arms), which
+   cuts the SE from ~0.25 to ~0.10 and is what makes any of this measurable at all.
 
 **The replacement rule — burden of proof by change class:**
 

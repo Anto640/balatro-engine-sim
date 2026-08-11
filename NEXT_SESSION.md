@@ -1,5 +1,14 @@
 # NEXT_SESSION.md — fresh-session handoff (updated 2026-07-14, W6 win)
 
+> ✅ **2026-08-11 — SEED OVERFITTING TESTED AND RULED OUT (`WINRATE_V3_PLAN.md` §5e).** Every verdict
+> here was measured on the pool it selected changes on, so the arc could have been sample-fitting.
+> Measured at n=344 tuned vs n=308 held-out: **−0.050 (SE 0.133, 95% CI [−0.31,+0.21])** — an arc-sized
+> effect (0.487) is EXCLUDED. The tuning arc generalizes. (An n=40 pilot said −0.377; it was noise.)
+> **⚠️ THE REAL LESSON IS POWER:** the same engine on the same pool measured **3.716 at n=344 vs 4.244
+> at n=40** — a +0.53 error, bigger than the whole arc. **Never quote an unpaired mean from a small
+> batch; always PAIR.** Paired verdicts (SE ~0.10) are what make anything here measurable — which is
+> why the Phase A probe results below still stand while their absolute means do not.
+>
 > 🔴 **2026-08-11 — PHASE A RESULT: THE BOTTLENECK IS **MONEY** (see `WINRATE_V3_PLAN.md` §5a).**
 > Paired n=40 ceiling probes, ENGINE UNTOUCHED: **$100/round → progress +3.090, winrate 5%→72.5%
 > (t=10.39, sign 36/2/2)**; +3 joker slots → +0.984, 5%→15%; +1 slot → +0.342 (n.s.); a scripted

@@ -680,13 +680,36 @@ never-tuned policy does not — and the magnitude (−0.462) is comparable to **
 
 > ⚠️ **But by this document's own standard, that is NOT evidence. MDE at n=40/cell is 1.425 — about
 > 3× the arc.** A run this size cannot detect the effect it is looking for, whatever it prints. Filed
-> as a *pilot*, not a result. **`tools/overfit_test.sh` runs the properly-powered version at
-> n≈343/cell** (~3.5 h), which is the number the report tool derives from the pilot's own variance.
+> as a *pilot*, not a result.
 
-If the full run confirms a negative DiD, the consequence is large: much of the tuning arc is sample
-fitting, and **every future verdict must be confirmed out of sample** (`BES_SEED_OFF`) before it
-enters the baseline. If it comes back null at proper power, the arc is real and the method is sound —
-which is equally worth knowing.
+### ✅ RESULT (n=344 tuned / n=308 held-out): **no overfitting. The concern is NOT supported.**
+
+| cell | mean | sd | n | SE |
+|---|---|---|---|---|
+| engine tuned (+3) | 3.716 | 1.630 | 344 | 0.088 |
+| engine held-out (+7) | 3.665 | 1.763 | 308 | 0.100 |
+
+**engine held-out − tuned = −0.050 (SE 0.133, t = −0.38), 95% CI ≈ [−0.31, +0.21].**
+
+The pilot's −0.377 collapsed to −0.050 — textbook regression to the mean, exactly as its own MDE
+warned. **An arc-sized overfitting effect (0.487) is excluded at 95% confidence**, since the CI's
+worst case (−0.31) is well inside it. The never-tuned expert control is only needed if the two pools
+differ in difficulty; with the engine difference at ~0 it cannot change the conclusion (its n=40
+estimate, +0.085, points the other way anyway). **The retained tuning arc generalizes. The method is
+sound on this axis** — a real doubt, tested and closed.
+
+### ⚠️ The secondary finding is the one to actually act on
+
+**At n=40 the same engine on the same seed pool measured 3.716 → 4.244 — an error of +0.53, larger
+than the entire shipped arc.** The first 40 seeds are simply unrepresentative. This is the power
+problem from CLAUDE.md's revised rule, demonstrated on the project's own baseline.
+
+**What this does and does not invalidate:**
+- ❌ **Unpaired absolute means at n=40 are near-worthless.** Any "progress = X" quoted from a 40-seed
+  batch carries ~±0.5 of error.
+- ✅ **The Phase A probe verdicts SURVIVE**, because they were *paired* — same seeds, both arms — with
+  SE 0.20–0.30. `slots` +0.984 and `rich` +3.090 stand unchanged. Pairing is doing very heavy lifting
+  here, and is the reason the probe results are trustworthy while their absolute means are not.
 
 ---
 
