@@ -1,5 +1,23 @@
 # NEXT_SESSION.md — fresh-session handoff (updated 2026-07-14, W6 win)
 
+> 🟡 **2026-08-11 SESSION SUMMARY — DIAGNOSTIC VALUE ONLY; NO WINRATE GAIN. Read `WINRATE_V3_PLAN.md`.**
+> Every resource axis was probed with the engine UNTOUCHED, and every one is a **BOUND, not a lever**:
+> money (+$25/rd → 30% winrate, but interest headroom is only ~$28/run), joker slots (+3 → 15%, only
+> obtainable from rare content), leveling (+2 free levels/ante → 18.8%, but **purchasing them is
+> net-NEGATIVE**, −0.229). Reallocating within the ~$80/run the engine already spends is worth at
+> most ~+0.4 by the measured money-price ($1 ≈ 0.005 progress), while a 50% winrate needs +2.8.
+> **The engine looks near a local optimum for its architecture and budget** — consistent with all five
+> interventions tried this session measuring inert or negative (voucher upgrades −0.064, reroll
+> feasibility gate +0.024, levelbuy −0.229, levelbuy10 −0.002, levelbuy20 −0.084).
+> **DO NOT RETRY:** leveling-by-purchase (explains the old E-17 revert), the `f`/hand-frequency fix in
+> `CV.card_value` (measured: moves Pair's shop value −0.73 → −0.31, still negative → inert), interest
+> discipline (~$28 available), reroll damping (98% of rerolls are full-board but only ~2.5/run).
+> **HIGHEST-VALUE UNTRIED STEP: compare the sim's DOLLAR TRAJECTORY against real human runs.** The
+> engine needs ~$25/round of extra income to look human, and its median cash is **$1 at ante 2 / $7 at
+> ante 3** — if real runs are richer at the same point, the sim's economy is the bottleneck and every
+> engine conclusion above is conditioned on a too-poor world. This needs `bes_runs.jsonl`, which is
+> NOT in the repo — ask the user for it. (This is the same class as W6, the biggest lever ever found.)
+>
 > ✅ **2026-08-11 — SEED OVERFITTING TESTED AND RULED OUT (`WINRATE_V3_PLAN.md` §5e).** Every verdict
 > here was measured on the pool it selected changes on, so the arc could have been sample-fitting.
 > Measured at n=344 tuned vs n=308 held-out: **−0.050 (SE 0.133, 95% CI [−0.31,+0.21])** — an arc-sized

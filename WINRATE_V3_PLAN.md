@@ -829,12 +829,49 @@ established: a sustained leveling program is worth +0.9 to +2.3 progress, and a 
 valuation structurally cannot see it — the same supermodularity failure as §1.2, now quantified on
 the leveling axis. That points at program-level valuation (commitment/concentration), not a constant.
 
-### The experiment in flight
+### ❌ RESULT: buying the declined leveling offers does NOT help. Thread closed.
 
-`levelbuy` / `levelbuy10` / `levelbuy20` (`Probe.level_first`) simply **take the affordable leveling
-offers the engine declines**, keeping its choice whenever it actually wants a joker it can afford.
-This asks the causal question directly — *would taking them help?* — without depending on a
-well-chosen constant, and its answer is what any valuation redesign should be justified by.
+`Probe.level_first` takes the affordable leveling offers the engine declines (n=80/cell, paired):
+
+| variant | progress Δ | sign | wins |
+|---|---|---|---|
+| `levelbuy` ($0 reserve) | **−0.229** (t=−1.22) | 28/43 | 1→1 |
+| `levelbuy10` | −0.002 (t=−0.01) | 27/29 | 1→1 |
+| `levelbuy20` | −0.084 (t=−1.04) | 19/20 | 1→0 |
+
+**The levels landed** — this is not a case of the intervention failing to fire:
+
+| batch | levels/run | deepest hand | hands leveled | concentration |
+|---|---|---|---|---|
+| baseline | 2.52 | 1.39 | 1.63 | 0.55 |
+| `levelbuy` (paid) | **5.51** | 2.34 | 3.29 | 0.42 |
+| `level1` (free) | 8.88 | 4.51 | 3.73 | 0.51 |
+
+`levelbuy` more than doubled total levels at similar concentration, and still lost. **The
+concentration hypothesis is not what separates them either.** The arithmetic that does fit: ~10
+extra buys × ~$4.50 ≈ $45 ≈ **−0.22 progress** in money terms, against an observed −0.229 — i.e.
+**the purchased levels contributed ≈ zero net**, while free levels are worth ~0.176 each.
+
+**Conclusion: leveling is valuable but NOT PURCHASABLE at a net gain.** The engine's 8.6% take rate
+is, if anything, roughly correct. The free-levels probe measures "free stuff is good", not a lever.
+Do not re-attempt leveling pushes via purchase; the graveyard entry for E-17 ("money diversion lost
+wins") was right and is now explained.
+
+### What this closes, and what it leaves
+
+Every resource axis probed this session is a **BOUND, not a lever**:
+
+| axis | probe result | can the engine get it? |
+|---|---|---|
+| money | +$25/rd → 30% winrate | **no** — interest headroom is only ~$28/run (§5f) |
+| joker slots | +3 → 15% winrate | **no** — only via rare content (§5a) |
+| leveling | +2/ante free → 18.8% | **no** — purchasing is net-negative (above) |
+
+And reallocation *within* the ~$80/run the engine already spends is worth at most ~+0.4 by the
+money-price, while a 50% winrate needs +2.8. **The engine appears to be near a local optimum for
+its architecture and its budget.** That is consistent with every intervention this session measuring
+inert or negative, and it is why the remaining candidates are architectural or fidelity-side, not
+tuning.
 
 ---
 
