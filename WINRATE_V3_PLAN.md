@@ -1027,6 +1027,26 @@ secret hands in ~9% of human runs). Per the revised #1 tuning rule these are **c
 ship by mechanism, do not expect a paired batch to move.** They matter regardless — the live mod
 advises a human, and this user demonstrably plays these builds.
 
+**✅ MEASURED (`sim_out/spec_fix.jsonl`, paired n=160 vs `of_engine_tuned`) — world fixes 1–3 alone:**
+
+| metric | value |
+|---|---|
+| paired progress Δ | **−0.019** (sd 0.546, SE 0.043) |
+| t / p | −0.44 / **0.66 (n.s.)** |
+| sign test | 10 better / 14 worse / **136 TIED** |
+| wins | **2** (fixed) vs 1 (baseline) — Poisson noise, do not read into it |
+
+**136 of 160 seeds byte-identical** — the prediction was right to the seed, and it also confirms the
+fixes barely perturb the seeded RNG. −0.019 with SE 0.043 is nowhere near "significantly negative",
+so the correctness class ships. *This is the rule working as intended: the batch was run to check for
+harm, not to justify the change.*
+
+**The chain is verified live, end to end.** Across those 160 runs the sim produced content that was
+structurally unreachable before: **Five of a Kind played 3×, Flush House 3×, and `c_planet_x` reached
+a shop/pack twice** (played the hand → unlocked the planet → offered it). Previously-dead spectrals
+also did real work (Cryptid ×2, Sigil, Familiar, Ectoplasm, Medium). Rate: ~4% of runs touch a secret
+hand — real, and exactly as rare as the ceiling analysis said.
+
 **What actually changed in the argument:** hypothesis 1 is dead, and hypothesis 2 (supermodularity /
 the committed-archetype planner) is no longer an abstraction. It now has a named mechanism, a worked
 example from a real winning run, and its blind spot located at a specific line of code.
