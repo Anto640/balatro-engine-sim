@@ -1364,3 +1364,38 @@ It costs ~1.1s even with **zero jokers**, so the driver is the in-blind play sea
 valuation. This matches the `LONG DT` frame-stall spam in the live log. It is a live-usability
 problem rather than a winrate one, and any fix must be a pure no-behaviour-change optimisation —
 changing decision QUALITY mid-collection would make the human runs mutually incomparable.
+
+### 5p-bis. Run 3 — a THIRD distinct winning archetype, and what the divergence data can/can't yet say
+
+`4NN97569`, won at ante 9 on **Photograph · Hanging Chad · Astronomer · Constellation · Cavendish ·
+Family** (6 slots — a negative edition supplied the extra). Final hand levels: **40**, against the
+engine's sim median of 9 at ante 8. Three runs, three wins, three unrelated lines:
+
+| run | archetype | final hand-lv |
+|---|---|---|
+| W9WKT1UE | retrigger (Chad ×2 / Photograph / Sock and Buskin) | 15 |
+| GU73QPLY | xmult stack (Cavendish / Driver's License / Lucky Cat) | 32 |
+| 4NN97569 | planet engine (Astronomer / Constellation / Cavendish) | **40** |
+
+Run 2 opened on **$2 and one joker**; run 3 on $14 and one joker. Neither start predicted the win.
+This is §5n's claim demonstrated rather than argued.
+
+**Two uncovered jokers, both LEVELING engines, both on the highest-leveling boards.** `j_astronomer`
+(Planets and Celestial Packs become free) and `j_burnt` (upgrades the first discarded hand each
+round) have no `joker_effects` implementation. This does NOT contradict §5j's "84/84 scoring jokers
+covered" — both are non-scoring, so they were correctly outside that audit. But the engine therefore
+cannot value *making leveling free* or *generating a level per round*, and the two runs that finished
+on 32 and 40 levels were built on exactly those. Individually each is ~5% of runs (below the
+frequency ceiling, §5m); together they point at the **leveling channel** yet again.
+
+**⚠ The divergence analysis is NOT yet usable — a logging-coverage artifact, not a finding.**
+`ranked` capture only began partway through run 2, so a first pass showing "Astronomer, Constellation,
+Family, Driver's License, Burnt: never priced" is mostly an artifact of those offers pre-dating the
+instrumentation. `j_family`, `j_drivers_license` and `j_constellation` ARE covered and priced by the
+engine; their absence means the log missed them, not that the engine is blind. Where coverage does
+exist the engine **agrees** with the human on the classic scorers — Hanging Chad **19.89**,
+Cavendish **16.79**, Sock and Buskin **13.07**, all recommended.
+
+**Consequence for data collection:** runs 4+ carry full `ranked` + `blind_result` logging from the
+first shop, so they are worth materially more per run than runs 1–3. The divergence question — *where
+does a winning human take what the engine prices low?* — needs them.
