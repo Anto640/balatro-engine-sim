@@ -369,10 +369,36 @@ function BES.scene_of(gs)
     for _, it in ipairs(gs.pack.items or {}) do items[#items + 1] = { set = it.set, key = it.key } end
     scene.pack = { items = items }
   end
+  -- BLIND SELECT: what was on offer and (by the NEXT record) what the player did with it.
+  -- Without this a skipped blind is invisible in the log -- the ante just advances -- so a
+  -- player who skips to save time produces data indistinguishable from one who played and
+  -- won. `blind_type` + `skip_tag` make skip-vs-play recoverable after the fact.
+  if meta.in_blind_select then
+    scene.blind_select = {
+      blind_type = gs.blind and gs.blind.blind_type,
+      skip_tag = gs.blind and gs.blind.skip_tag,
+      target_chips = gs.blind and gs.blind.target_chips,
+    }
+  end
+
   local last = BES.last
   if last and last.ranked and last.ranked.best then
     local a = last.ranked.best
     scene.advice = { type = a.type, target = (a.target and a.target.name) or a.hand_type, reason = a.reason }
+    -- The engine's MEASURED value for every option it considered, best first. The sim logs
+    -- this per offer and it is what makes divergence analysis quantitative ("the human took
+    -- what the engine priced at -0.6"); the live log used to throw it away, leaving only the
+    -- single chosen action. Capped so a big shop cannot bloat the run log.
+    local ranked, n = {}, 0
+    local function push(c)
+      if not c or n >= 12 then return end
+      n = n + 1
+      ranked[n] = { type = c.type, target = (c.target and c.target.name) or c.hand_type,
+                    value = c.value }
+    end
+    push(a)
+    for _, c in ipairs(last.ranked.alternatives or {}) do push(c) end
+    scene.ranked = ranked
   end
   return scene
 end

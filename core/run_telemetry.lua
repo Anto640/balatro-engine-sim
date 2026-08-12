@@ -277,7 +277,7 @@ function Telemetry:trace(scene)
     self.board = { seed = scene.seed, jokers = countmap(scene.jokers),
       consumables = countmap(scene.consumables), levels = copy_map(scene.hand_levels),
       dollars = scene.dollars }
-    self.shop_sig, self.pack_sig = nil, nil
+    self.shop_sig, self.pack_sig, self.blind_sig = nil, nil, nil
   end
   local b = self.board
 
@@ -316,6 +316,23 @@ function Telemetry:trace(scene)
     end
   end
 
+  -- BLIND SELECT, once per distinct (ante, blind) pairing. Emitted when the player is on the
+  -- blind-select screen, so PLAY-vs-SKIP is recoverable: a Small blind_select followed by a
+  -- Big blind_select at the same ante means the Small was skipped. Without it a skipped blind
+  -- leaves no trace at all and the ante simply advances.
+  if scene.blind_select then
+    local bs = scene.blind_select
+    local sig = tostring(scene.ante) .. "|" .. tostring(bs.blind_type)
+    if sig ~= self.blind_sig then
+      self.blind_sig = sig
+      self.emit({ kind = "blind_select", seed = scene.seed, t = now, ante = scene.ante,
+        blind_type = bs.blind_type, skip_tag = bs.skip_tag, target_chips = bs.target_chips,
+        dollars = scene.dollars, njokers = #(scene.jokers or {}),
+        ranked = scene.ranked and Json.array(scene.ranked) or nil,
+        advice = scene.advice })
+    end
+  else self.blind_sig = nil end
+
   -- shop offer + engine advice, once per distinct offering (a reroll changes the sig)
   if scene.shop then
     local sig = shop_signature(scene.shop)
@@ -325,6 +342,7 @@ function Telemetry:trace(scene)
         dollars = scene.dollars, reroll_cost = scene.shop.reroll_cost,
         offer_jokers = Json.array(scene.shop.offer_jokers or {}),
         offer_packs = Json.array(scene.shop.offer_packs or {}),
+        ranked = scene.ranked and Json.array(scene.ranked) or nil,
         advice = scene.advice })
     end
   else self.shop_sig = nil end
@@ -335,7 +353,9 @@ function Telemetry:trace(scene)
     if sig ~= self.pack_sig then
       self.pack_sig = sig
       self.emit({ kind = "pack", seed = scene.seed, t = now, ante = scene.ante,
-        items = Json.array(scene.pack.items or {}), advice = scene.advice })
+        items = Json.array(scene.pack.items or {}),
+        ranked = scene.ranked and Json.array(scene.ranked) or nil,
+        advice = scene.advice })
     end
   else self.pack_sig = nil end
 

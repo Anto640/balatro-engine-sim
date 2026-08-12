@@ -230,6 +230,69 @@ return function(t)
     t.eq(#recs, 0, "blank-seed frame produces no records")
   end
 
+  -- ====================== blind select + engine valuations ==============
+  -- Added 2026-08-12 after the first human WIN was logged: the live log recorded only the
+  -- engine's single chosen action, so (a) a SKIPPED blind left no trace at all -- the ante
+  -- just advanced -- and (b) there was no way to say "the human took what the engine priced
+  -- at -0.6", which is the whole point of collecting human runs.
+  do
+    local tel, recs = recorder()
+    tel:observe(frame{ seed = "BS", ante = 2 })
+    local base = { seed = "BS", ante = 2, dollars = 12, jokers = {}, consumables = {}, hand_levels = {} }
+    local function trace(extra)
+      local f = {}
+      for k, v in pairs(base) do f[k] = v end
+      for k, v in pairs(extra) do f[k] = v end
+      tel:trace(f)
+    end
+
+    -- Small blind offered, engine says PLAY
+    trace{ blind_select = { blind_type = "Small", skip_tag = "tag_investment", target_chips = 300 },
+           advice = { type = "PLAY", reason = "play it" },
+           ranked = { { type = "PLAY", value = 23 }, { type = "SKIP", target = "Investment", value = 9 } } }
+    local b = first_kind(recs, "blind_select")
+    t.ok(b ~= nil, "blind_select is logged (a skipped blind is no longer invisible)")
+    t.eq(b.blind_type, "Small", "blind_select records which blind was on offer")
+    t.eq(b.skip_tag, "tag_investment", "blind_select records the skip tag on offer")
+    t.eq(b.target_chips, 300, "blind_select records the requirement")
+    t.eq(b.ranked[1].value, 23, "blind_select carries the engine's ranked valuations")
+    t.eq(b.ranked[2].type, "SKIP", "...including what it thought skipping was worth")
+
+    -- the SAME blind re-ticking does not spam the log
+    trace{ blind_select = { blind_type = "Small", skip_tag = "tag_investment", target_chips = 300 } }
+    t.eq(count_kind(recs, "blind_select"), 1, "blind_select is emitted once per (ante, blind)")
+
+    -- moving to the Big blind emits a second one -> Small was PLAYED or SKIPPED, and the
+    -- pairing is what makes that recoverable after the fact
+    trace{ blind_select = { blind_type = "Big", skip_tag = "tag_charm", target_chips = 450 } }
+    t.eq(count_kind(recs, "blind_select"), 2, "a different blind emits a new blind_select")
+
+    -- leaving the blind-select screen clears the signature, so returning re-emits
+    trace{ shop = { reroll_cost = 5, offer_jokers = {}, offer_packs = {} } }
+    trace{ blind_select = { blind_type = "Big", skip_tag = "tag_charm", target_chips = 450 } }
+    t.eq(count_kind(recs, "blind_select"), 3, "re-entering blind select re-emits")
+  end
+
+  -- the engine's per-option valuations ride along on shop and pack records too
+  do
+    local tel, recs = recorder()
+    tel:observe(frame{ seed = "RK", ante = 2 })
+    tel:trace{ seed = "RK", ante = 2, dollars = 10, jokers = {}, consumables = {}, hand_levels = {},
+      shop = { reroll_cost = 5, offer_jokers = { { key = "j_baron", cost = 6 } }, offer_packs = {} },
+      advice = { type = "SAVE", reason = "bank it" },
+      ranked = { { type = "SAVE", value = 2 }, { type = "BUY_JOKER", target = "Baron", value = -0.6 } } }
+    local s = first_kind(recs, "shop")
+    t.ok(s.ranked ~= nil, "shop record carries the engine's ranked valuations")
+    t.eq(s.ranked[2].value, -0.6, "a DECLINED option keeps its measured value (the divergence signal)")
+
+    tel:trace{ seed = "RK", ante = 2, dollars = 10, jokers = {}, consumables = {}, hand_levels = {},
+      pack = { items = { { set = "Joker", key = "j_mime" } } },
+      advice = { type = "PICK", target = "Mime" },
+      ranked = { { type = "PICK", target = "Mime", value = 1.4 } } }
+    local p = first_kind(recs, "pack")
+    t.eq(p.ranked[1].value, 1.4, "pack record carries the engine's valuation of each pick")
+  end
+
   -- ====================== action trace ==================================
 
   -- a buy: a joker appears while in the shop and money drops -> joker_gain via shop;
