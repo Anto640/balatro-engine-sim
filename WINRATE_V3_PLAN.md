@@ -1274,3 +1274,93 @@ death records match field-for-field outside the metrics block. `Driver.features`
 - **The live mod must stay fast.** A ~25-weight logistic model is fine in the overlay; shop MCTS
   needs a hard budget. Keep the pure-engine architecture intact — `V` is a pure function of the POD
   `GameState`, so nothing about the `state_extraction → model → engine → ui` discipline changes.
+
+---
+
+## 5p. TWO HUMAN WINS, TWO DIFFERENT LINES — and the first 100%-frequency gap
+
+Live capture, red deck / white stake, overlay hidden (`data/bes_runs_live_2026-08-12.jsonl`).
+**Two runs, two wins, two unrelated archetypes** — itself direct support for §5n:
+
+| run | seed | final board | hand-lv at end |
+|---|---|---|---|
+| 1 | W9WKT1UE | Hanging Chad ×2 · Photograph · Sock and Buskin · Blueprint (**retrigger**) | 15 |
+| 2 | GU73QPLY | Cavendish · Driver's License · Lucky Cat · Burnt · Hanging Chad (**xmult stack**) | **32** |
+
+Run 2 also started *poor* — **$2 and ONE joker at ante 2** — and still won. A bad start did not
+preclude a line. (Run 1 was the opposite: $27 and two jokers, banked deliberately.) The engine's
+sim median is 9 hand-levels at ante 8; these runs finished on **15 and 32**.
+
+### The finding: THE ENGINE LEAVES DISCARDS ON THE TABLE
+
+The new `blind_result` record made in-blind behaviour visible for the first time. The human spends
+**every discard even when the clear is already assured**:
+
+| ante | blind | hands used | discards used | clear margin |
+|---|---|---|---|---|
+| a7 | Small | 2 | **6** | 3.9× |
+| a7 | Big | 2 | **6** | 6.5× |
+| a7 | Boss | 4 | **6** | 11.9× |
+
+The engine, across **3345 sim blinds**:
+
+| discards left at blind end | blinds | share |
+|---|---|---|
+| 0 (spent all) | 1138 | 34% |
+| 1–3 | 1356 | 41% |
+| **4 (spent NONE)** | **821** | **25%** |
+
+**Mean 1.92 discards unused per blind; a quarter of blinds are cleared without discarding at all.**
+
+**Mechanism.** The engine's in-blind objective is *clear the blind safely*. Once the clear is
+assured a remaining discard is worth exactly zero to it, so it plays the winning hand immediately.
+To the human a discard you will not need is a **free lottery ticket**: more draws mean more Lucky
+and Gold card money, better scaler fuel, and more tarot targets. The user described this unprompted
+("not instantly playing a winning hand but instead discarding and digging for lucky cards or
+something to use my tarots on to make more money").
+
+**Why this one is different from everything else tested this session:**
+
+- **100% frequency** — every blind of every run, ~3345 events per 344 runs. Far above the ceiling
+  that killed W-ECON, the voucher fix and the secret-hand work (§5m).
+- **Not in the refuted set.** Unlike the xmult-floor family, this lever has never been tried.
+- **Human-confirmed mechanism**, not inferred from survivorship.
+- `engine/scaling_fuel` already establishes the principle (feed scalers when survival allows); this
+  extends it from *feeding a scaler* to *spending a guaranteed-surplus resource*.
+
+**The guardrail it needs:** digging is only free when the clear is genuinely assured. Discarding
+into a worse board and failing is the failure mode, so the trigger must be a margin/confidence gate,
+not "always dig". That makes it a natural companion to the existing `pace_margin` machinery.
+
+**Next step:** probe it — a policy variant that spends remaining discards once the clear is assured,
+measured paired at n≥160. This is the first candidate all session that can actually move a batch.
+
+### Two smaller confirmations from the same session
+
+1. **The reroll/consumable gap is real, and the human named it.** §5d reverted the reroll feasibility
+   gate on the *mechanism* that it damped rerolls earning value through CONSUMABLES, which `e_best`
+   never prices. Asked why they rerolled, the user said: *"i wasnt looking for something specific
+   just things like tarots and planets, maybe also some jokers like blueprint."* That is precisely
+   the untracked term, and it independently vindicates reverting on mechanism rather than on the
+   n.s. metric. The remaining fix is still the one named at `shop_advisor.lua:118` — add the
+   consumable-refresh term to reroll value.
+2. **Reroll cost mechanics are modelled correctly** — `content.lua:848` resets to base each shop and
+   `REROLL_STEP` adds $1 within it, so the user's "spread rerolls across rounds because the price
+   resets" is faithfully represented. `SA.REROLL_DISCOUNT` also already encodes "a fresh shop is free
+   next round". No fidelity bug here.
+
+### A real PERFORMANCE bug (live UX, not winrate)
+
+The user noticed shop evaluation felt slower after buying Turtle Bean (+5 hand size). **Confirmed
+headlessly** — decision cost is driven by hand size, not board size:
+
+| hand size | ms/decision | vs 8 |
+|---|---|---|
+| 8 | 1269 | 1.0× |
+| 12 | 1916 | 1.5× |
+| 13 (Turtle Bean) | 2586 | **2.0×** |
+
+It costs ~1.1s even with **zero jokers**, so the driver is the in-blind play search, not joker
+valuation. This matches the `LONG DT` frame-stall spam in the live log. It is a live-usability
+problem rather than a winrate one, and any fix must be a pure no-behaviour-change optimisation —
+changing decision QUALITY mid-collection would make the human runs mutually incomparable.
