@@ -30,6 +30,11 @@ local function keep_value(c)
   elseif c.seal then v = v + 15 end                     -- keep Gold/Blue/Red sealed cards
   return v
 end
+-- exposed so the surplus-dig (decision_engine, DE.DIG_SURPLUS) pitches its spare discards
+-- CHAFF-FIRST. The first version threw the first non-clearing cards in hand order and lost
+-- money at every ante, because a held Gold card pays $3 at round end and held Steel/Glass
+-- carry xmult -- value this function already prices and that version ignored.
+DV.keep_value = keep_value
 
 local function shuffled(list, rng)
   local a = {}

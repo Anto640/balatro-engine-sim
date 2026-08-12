@@ -744,6 +744,40 @@ return function(t)
     -- with NO discards left there is nothing to spend, so it plays
     t.eq(DE.decide(state(0)).best.type, "PLAY", "no discards left -> plays (nothing to dig with)")
 
+    -- v2: the dig must pitch CHAFF, not held value. v1 threw the first non-clearing cards in
+    -- hand order and lost money at every ante -- a held Gold card pays $3 at round end and
+    -- Steel/Glass carry xmult while held.
+    do
+      DE.DIG_SURPLUS = true
+      local gs = GS.new{
+        hand = {
+          card{ id = 1, rank = "Ace", suit = "Spades" }, card{ id = 2, rank = "Ace", suit = "Hearts" },
+          card{ id = 3, rank = "Ace", suit = "Clubs" }, card{ id = 4, rank = "Ace", suit = "Diamonds" },
+          -- the spare cards: a Gold and a Steel worth HOLDING, and two worthless low cards
+          card{ id = 5, rank = "2", suit = "Spades", enhancement = "m_gold" },
+          card{ id = 6, rank = "3", suit = "Hearts", enhancement = "m_steel" },
+          card{ id = 7, rank = "4", suit = "Clubs" },
+          card{ id = 8, rank = "5", suit = "Diamonds" },
+        },
+        deck = (function()
+          local d = {}
+          for i = 1, 40 do d[i] = card{ id = 100 + i, rank = "7", suit = "Spades" } end
+          return d
+        end)(),
+        run = { hand_levels = {}, hand_size = 8 },
+        blind = { target_chips = 30, chips_scored = 0, hands_left = 4, discards_left = 2,
+                  base_hands = 4, base_discards = 4, played_hand_types = {} },
+      }
+      local best = DE.decide(gs).best
+      t.eq(best.type, "DISCARD", "still digs with a surplus discard")
+      local pitched = {}
+      for _, c in ipairs(best.cards or {}) do pitched[c.id] = true end
+      t.ok(not pitched[5], "the dig does NOT pitch the Gold card (it pays $3 held)")
+      t.ok(not pitched[6], "the dig does NOT pitch the Steel card (xmult while held)")
+      t.ok(pitched[7] or pitched[8], "...it pitches the worthless low cards instead")
+      DE.DIG_SURPLUS = false
+    end
+
     -- restore the default so the flag never leaks into another suite
     DE.DIG_SURPLUS = false
     t.eq(DE.decide(state(4)).best.type, "PLAY", "flag restored -> baseline behaviour again")

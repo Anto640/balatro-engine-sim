@@ -157,6 +157,12 @@ DE.SURV_MARGIN  = 0.06
 DE.DIG_SURPLUS = false      -- probe flag: dig with surplus discards once the clear is locked
 DE.DIG_MIN_HANDS = 1        -- require at least this many hands left (a discard costs no hand)
 DE.DIG_KEEP_GUARANTEE = true -- only pitch cards OUTSIDE the guaranteed play, so it stays guaranteed
+-- Pitch only cards whose DiscardValue.keep_value is below this. Ordering alone is not enough:
+-- a dig may legally throw 5 cards, so "cheapest first" still ends up discarding a Gold card
+-- once the chaff runs out. Any enhancement or edition adds >= 25 and any non-Purple seal >= 15,
+-- while a plain card is at most ~11 (Ace) -- so 20 cleanly separates true chaff from held
+-- value. A PURPLE seal scores only +3 (it spawns a Tarot when DISCARDED), so it stays pitchable.
+DE.DIG_MAX_KEEP = 20
 
 local function planet_use(gs, base_ev, remaining, held, gs2)
   if not held or #held == 0 or not base_ev then return nil end
@@ -410,10 +416,23 @@ function DE.decide(gs, opts)
     if DE.DIG_KEEP_GUARANTEE then
       for _, c in ipairs(play_cards or {}) do keep[c] = true end
     end
-    local pitch = {}
-    for _, c in ipairs(hand) do
-      if not keep[c] and #pitch < 5 then pitch[#pitch + 1] = c end
+    -- CHAFF-FIRST. v1 pitched the first non-clearing cards in hand order and measured
+    -- -0.150 with money down at EVERY ante: it was throwing away held value (a Gold card
+    -- pays $3 at round end, Steel/Glass carry xmult while held). DiscardValue.keep_value
+    -- already prices exactly this, so sort by it and pitch the cheapest.
+    local spare = {}
+    for i, c in ipairs(hand) do
+      if not keep[c] and DiscardValue.keep_value(c) < DE.DIG_MAX_KEEP then
+        spare[#spare + 1] = { c = c, i = i }
+      end
     end
+    table.sort(spare, function(a, b)
+      local ka, kb = DiscardValue.keep_value(a.c), DiscardValue.keep_value(b.c)
+      if ka ~= kb then return ka < kb end
+      return a.i < b.i                                  -- stable -> deterministic
+    end)
+    local pitch = {}
+    for i = 1, math.min(5, #spare) do pitch[i] = spare[i].c end
     if #pitch > 0 then
       dig_action = {
         type = "DISCARD", cards = pitch,
