@@ -29,6 +29,8 @@ local function frame(o)
     njokers = o.njokers or 0, joker_keys = o.joker_keys or {},
     hand_level_sum = o.hand_level_sum or 0, consumables = o.consumables or 0,
     has_hand = (o.has_hand ~= false),
+    -- the blind's starting allowance (mirrors frame_of), so blind_result can report SPEND
+    base_hands = o.base_hands, base_discards = o.base_discards,
   }
 end
 
@@ -228,6 +230,47 @@ return function(t)
     local tel, recs = recorder()
     tel:observe(frame{ seed = "" })
     t.eq(#recs, 0, "blank-seed frame produces no records")
+  end
+
+  -- ====================== blind result (in-blind objective) =============
+  -- Added 2026-08-12: clearing a blind on hand 1 and spending four hands DIGGING (discarding
+  -- a winning hand to hunt lucky cards / tarot targets, farming money rather than clearing)
+  -- produced identical live telemetry. hands_used/discards_used make the difference visible.
+  do
+    local tel, recs = recorder()
+    tel:observe(frame{ seed = "BR", ante = 3, has_hand = false })
+    -- in the blind: 4 hands / 4 discards allowed, 3 hands and 4 discards spent, cleared big
+    tel:observe(frame{ seed = "BR", ante = 3, blind_type = "Big", target = 1200, scored = 4800,
+      hands_left = 1, discards_left = 0, base_hands = 4, base_discards = 4, has_hand = true })
+    -- blind ends (hand goes away)
+    tel:observe(frame{ seed = "BR", ante = 3, has_hand = false, dollars = 30, njokers = 4 })
+    local br = first_kind(recs, "blind_result")
+    t.ok(br ~= nil, "blind_result emitted when the blind ends")
+    t.eq(br.ante, 3, "blind_result records the ante")
+    t.eq(br.blind_type, "Big", "blind_result records which blind")
+    t.eq(br.hands_used, 3, "hands_used = base - left (dug for three hands)")
+    t.eq(br.discards_used, 4, "discards_used = base - left (spent every discard)")
+    t.eq(br.ratio, 4, "ratio = scored/target (cleared with 4x margin)")
+    t.eq(br.dollars, 30, "blind_result carries the post-blind bankroll")
+
+    -- a one-hand clear is distinguishable from the dig above
+    local tel2, recs2 = recorder()
+    tel2:observe(frame{ seed = "BR2", ante = 3, has_hand = false })
+    tel2:observe(frame{ seed = "BR2", ante = 3, blind_type = "Small", target = 800, scored = 900,
+      hands_left = 3, discards_left = 4, base_hands = 4, base_discards = 4, has_hand = true })
+    tel2:observe(frame{ seed = "BR2", ante = 3, has_hand = false })
+    local br2 = first_kind(recs2, "blind_result")
+    t.eq(br2.hands_used, 1, "a one-hand clear reports hands_used = 1")
+    t.eq(br2.discards_used, 0, "...and no discards spent")
+
+    -- a DEATH must not also emit a blind_result (the death record already carries it)
+    local tel3, recs3 = recorder()
+    tel3:observe(frame{ seed = "BR3", ante = 3, has_hand = false })
+    tel3:observe(frame{ seed = "BR3", ante = 3, blind_type = "Boss", target = 5000, scored = 900,
+      hands_left = 0, discards_left = 0, base_hands = 4, base_discards = 4, has_hand = true })
+    tel3:observe(frame{ seed = "BR3", ante = 3, state = "GAME_OVER", has_hand = false })
+    t.eq(count_kind(recs3, "blind_result"), 0, "a death does not double-report as a blind_result")
+    t.eq(count_kind(recs3, "death"), 1, "...it reports as a death")
   end
 
   -- ====================== blind select + engine valuations ==============

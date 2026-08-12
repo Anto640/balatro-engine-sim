@@ -62,6 +62,10 @@ function Telemetry.frame_of(gs)
     dollars = econ.dollars or 0,
     hands_left = b.hands_left or 0,
     discards_left = b.discards_left or 0,
+    -- the blind's STARTING allowance, so blind_result can report how many hands/discards
+    -- were actually spent (clearing on hand 1 vs digging for four look identical without it)
+    base_hands = b.base_hands,
+    base_discards = b.base_discards,
     njokers = #(gs.jokers or {}),
     joker_keys = joker_keys(gs),
     hand_level_sum = hand_level_sum(gs),
@@ -163,6 +167,33 @@ function Telemetry:observe(frame, ctx)
   -- the run died (the death-state snapshot has the blind fields cleared).
   if frame.has_hand and frame.target and frame.target > 0 then
     self.last_play = frame
+  end
+
+  -- BLIND RESULT (2026-08-12). The live log had no in-blind data at all, so a player who
+  -- clears a blind on hand 1 and one who deliberately spends four hands DIGGING -- discarding
+  -- a winning hand to hunt lucky cards or tarot targets, farming money instead of just
+  -- clearing -- produced identical telemetry. That is a different OBJECTIVE from the one the
+  -- engine optimises (clear the blind), and it was invisible. Emitted on the has_hand ->
+  -- no-hand transition, using the last active-blind frame.
+  do
+    local was = self.last_play
+    if was and self.prev and self.prev.has_hand and not frame.has_hand
+       and not self.GAME_OVER_STATES[frame.state] then
+      local used_hands = (was.base_hands and was.hands_left)
+        and (was.base_hands - was.hands_left) or nil
+      local used_discards = (was.base_discards and was.discards_left)
+        and (was.base_discards - was.discards_left) or nil
+      self.emit({
+        kind = "blind_result", seed = frame.seed, t = self:_now(),
+        ante = was.ante, blind_type = was.blind_type, boss = was.boss or false,
+        target = was.target, scored = was.scored,
+        ratio = (was.target and was.target > 0) and (was.scored / was.target) or nil,
+        hands_left = was.hands_left, discards_left = was.discards_left,
+        hands_used = used_hands, discards_used = used_discards,
+        dollars = frame.dollars, njokers = frame.njokers,
+      })
+      self.last_play = nil
+    end
   end
 
   -- death: entered a game-over state, once per run
