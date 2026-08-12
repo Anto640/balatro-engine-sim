@@ -495,7 +495,78 @@ end
 -- Enumerate all 1..5 card subsets of `cards`, calling f(ev, sel) for each. An
 -- optional `filter(sel, hand_type)` drops plays a boss restriction forbids
 -- (Psychic min-5, Eye no-repeat, Mouth single-type).
+-- WORK BUDGET (2026-08-12). each_subset enumerates every subset of size 1..5 and allocates a
+-- scoring table per subset: 218 at hand size 8, 637 at 10, 2379 at 13. best_play is called ~80x
+-- per decision (Monte-Carlo redraws x discard candidates), so a hand of 13 produces ~190k tables
+-- in ONE decision. In-game that exhausted LuaJIT's heap outright:
+--     [BES] [ERROR] decide failed: not enough memory
+-- and soft-locked a live run at hand size 10 (Juggler). Reported by the user, who also spotted
+-- the slowdown (2.0x from hand 8 -> 13) that preceded it.
+--
+-- Above HAND_BUDGET cards we enumerate over the most play-relevant subset of the hand instead of
+-- all of it. The ranking deliberately preserves the STRUCTURES a truncation could otherwise
+-- destroy -- flush (dominant suit) and rank-pairing -- rather than just keeping high cards.
+-- At or below the budget nothing changes at all, so the simulator (hand size 8 in the
+-- overwhelming majority of states) and every previously captured run stay byte-identical.
+HandEval.HAND_BUDGET = 8
+
+-- The `budget` most play-relevant cards. Built CONSTRUCTIVELY rather than by an additive score:
+-- a weighted ranking cannot guarantee that five cards of one suit survive together, so it can
+-- silently destroy the very flush it is meant to protect (caught by the tests below). Instead we
+-- reserve the structures a 5-card hand can be made of, in order, then fill with high cards.
+local function budget_cards(cards, budget)
+  local suit_n, rank_n = {}, {}
+  for _, c in ipairs(cards) do
+    if c.suit then suit_n[c.suit] = (suit_n[c.suit] or 0) + 1 end
+    if c.rank_id then rank_n[c.rank_id] = (rank_n[c.rank_id] or 0) + 1 end
+  end
+
+  -- stable, deterministic ordering: highest rank first, original index as tie-break
+  local order = {}
+  for i, c in ipairs(cards) do order[i] = { c = c, i = i } end
+  table.sort(order, function(a, b)
+    local ra, rb = a.c.rank_id or 0, b.c.rank_id or 0
+    if ra ~= rb then return ra > rb end
+    return a.i < b.i
+  end)
+
+  local out, taken = {}, {}
+  local function take(c)
+    if taken[c] or #out >= budget then return end
+    taken[c] = true; out[#out + 1] = c
+  end
+
+  -- (1) the dominant suit, if a flush is live -- its best `budget`-many cards, taken FIRST so
+  --     the flush can never be broken up by high off-suit cards
+  local dom, domn = nil, 0
+  for _, s in ipairs({ "Clubs", "Diamonds", "Hearts", "Spades" }) do   -- fixed order = stable
+    local k = suit_n[s] or 0
+    if k > domn then dom, domn = s, k end
+  end
+  -- capped at 5: a flush needs exactly five, and letting a 9-card suit eat the whole budget
+  -- would drop the pair/trips material that Flush House and Full House depend on
+  if dom and domn >= 5 then
+    local n = 0
+    for _, e in ipairs(order) do
+      if e.c.suit == dom and n < 5 then take(e.c); n = n + 1 end
+    end
+  end
+
+  -- (2) every card of a DUPLICATED rank (pairs / trips / quads, and the straight-flush and
+  --     full-house material that depends on them), best ranks first
+  for _, e in ipairs(order) do
+    if (rank_n[e.c.rank_id or 0] or 1) > 1 then take(e.c) end
+  end
+
+  -- (3) fill the remainder with the highest cards left
+  for _, e in ipairs(order) do take(e.c) end
+  return out
+end
+HandEval._budget_cards = budget_cards   -- exposed for the work-budget tests
+
 local function each_subset(gs, cards, f, filter)
+  local budget = HandEval.HAND_BUDGET
+  if budget and #cards > budget then cards = budget_cards(cards, budget) end
   local n = #cards
   -- effective jokers + hand mods are constant across every subset of one hand,
   -- so resolve them ONCE here and score each subset via score_with (hoisted out

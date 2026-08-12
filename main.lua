@@ -173,6 +173,12 @@ function BES.evaluate(with_sim, gs)
   end
 
   local ok, ranked = pcall(Decision.decide, gs, { sim = sim })
+  -- A full evaluation churns tens of thousands of short-lived scoring tables (see
+  -- HandEval.HAND_BUDGET). Balatro's own GC pacing is tuned for the base game, not for a mod
+  -- allocating this hard between frames, and the garbage accumulated until LuaJIT's heap ran
+  -- out ("decide failed: not enough memory"). An explicit incremental step after each pass
+  -- keeps the heap flat. Pure mitigation: it changes no decision, only when memory is reclaimed.
+  collectgarbage("step")
   if not ok then
     Log.error("decide failed:", ranked)
     if Overlay then Overlay.set({ best = nil, reason = "Eval error: " .. tostring(ranked) }) end

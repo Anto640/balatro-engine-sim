@@ -128,4 +128,72 @@ return function(t)
     local gsc = GS.new{}; gsc.boss_effect = BE.of("bl_club")
     t.eq(HandEval.score(gsc, cc).score, 20, "The Club debuffs Clubs -> only base 10*2 = 20")
   end
+
+  -- ---- WORK BUDGET (2026-08-12): subset enumeration is bounded above 8 cards ----
+  -- each_subset allocates a scoring table per subset (218 at hand 8, 2379 at 13) and
+  -- best_play runs ~80x per decision, which exhausted LuaJIT's heap in-game and soft-locked
+  -- a live run at hand size 10. The budget must NOT change anything at 8 or fewer.
+  do
+    t.eq(HandEval.HAND_BUDGET, 8, "the budget is 8 -- the base hand size, so normal play is untouched")
+
+    local function card(id, rank, suit, enh)
+      return GS.card{ id = id, rank_id = rank, suit = suit, enhancement = enh }
+    end
+    local bc = HandEval._budget_cards
+
+    -- at or below the budget the hand is passed through untouched
+    do
+      local hand = {}
+      for i = 1, 8 do hand[i] = card(i, 5 + i % 9, "Spades") end
+      local kept = bc(hand, 8)
+      t.eq(#kept, 8, "a hand at the budget keeps every card")
+    end
+
+    -- a live FLUSH survives truncation even when every OTHER card outranks it.
+    -- 6 low Hearts (the only flush) + 5 high cards spread across the other three suits.
+    do
+      local hand = {}
+      for i = 1, 6 do hand[i] = card(i, 2 + i, "Hearts") end           -- low ranks, the only flush
+      local others = { "Spades", "Clubs", "Diamonds", "Spades", "Clubs" }
+      for i = 7, 11 do hand[i] = card(i, 14 - (i - 7), others[i - 6]) end  -- high, no flush
+      local kept = bc(hand, 8)
+      local hearts = 0
+      for _, c in ipairs(kept) do if c.suit == "Hearts" then hearts = hearts + 1 end end
+      t.ok(hearts >= 5, "truncation preserves a live flush (kept " .. hearts .. " of the 6 Hearts)")
+    end
+
+    -- PAIRS survive truncation even when the paired rank is low
+    do
+      local hand = {}
+      hand[1] = card(1, 3, "Spades"); hand[2] = card(2, 3, "Hearts")   -- a low pair
+      hand[3] = card(3, 3, "Clubs")                                    -- ...actually trips
+      for i = 4, 12 do hand[i] = card(i, 14 - (i - 4), "Diamonds") end -- high singletons
+      local kept = bc(hand, 8)
+      local threes = 0
+      for _, c in ipairs(kept) do if c.rank_id == 3 then threes = threes + 1 end end
+      t.eq(threes, 3, "truncation keeps all three of a low trips (rank-pairing is weighted)")
+    end
+
+    -- deterministic: same input -> same output (no pairs()-order dependence)
+    do
+      local hand = {}
+      for i = 1, 12 do hand[i] = card(i, 2 + (i * 5) % 13, ({ "Spades", "Hearts", "Clubs", "Diamonds" })[i % 4 + 1]) end
+      local a, b = bc(hand, 8), bc(hand, 8)
+      for i = 1, 8 do t.eq(a[i].id, b[i].id, "budget selection is deterministic at slot " .. i) end
+    end
+
+    -- and the whole point: best_play still finds the flush in an oversized hand
+    do
+      local gs = GS.new{}
+      gs.hand = {}
+      for i = 1, 5 do gs.hand[i] = card(i, 9 + i, "Hearts") end        -- a strong flush
+      local junk = { "Spades", "Clubs", "Diamonds" }
+      for i = 6, 13 do gs.hand[i] = card(i, 2 + (i % 4), junk[(i % 3) + 1]) end
+      local ev = HandEval.best_play(gs, gs.hand)
+      t.ok(ev ~= nil, "best_play returns a play for a 13-card hand")
+      -- Hearts 10-14 is a ROYAL flush, so Straight Flush is the correct (better) answer here
+      t.ok(ev.hand_type == "Flush" or ev.hand_type == "Straight Flush",
+        "a flush-family hand is still found in an over-budget hand (got " .. tostring(ev.hand_type) .. ")")
+    end
+  end
 end
