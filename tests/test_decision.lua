@@ -696,4 +696,57 @@ return function(t)
     t.ok(decide_with({ { set = "Tarot", key = "c_strength", name = "Strength" } }) >= 2,
       "arbitration also runs with a held consumable (the E-5 gate is gone)")
   end
+
+  -- ---- SURPLUS DIG (DE.DIG_SURPLUS probe, 2026-08-12) ----
+  -- Baseline forfeits every remaining discard the moment a clear is locked (measured:
+  -- 1.92 unused per blind, 25% of blinds discard NOTHING). Human winners spend them all
+  -- at 4-12x margin. This probe spends the surplus on a free redraw.
+  do
+    -- a hand that trivially clears a tiny target, with discards still in hand
+    local function state(discards, hands)
+      return GS.new{
+        hand = {
+          card{ id = 1, rank = "Ace", suit = "Spades" }, card{ id = 2, rank = "Ace", suit = "Hearts" },
+          card{ id = 3, rank = "Ace", suit = "Clubs" }, card{ id = 4, rank = "Ace", suit = "Diamonds" },
+          card{ id = 5, rank = "2", suit = "Spades" }, card{ id = 6, rank = "3", suit = "Hearts" },
+          card{ id = 7, rank = "4", suit = "Clubs" }, card{ id = 8, rank = "5", suit = "Diamonds" },
+        },
+        deck = (function()
+          local d = {}
+          for i = 1, 40 do d[i] = card{ id = 100 + i, rank = "7", suit = "Spades" } end
+          return d
+        end)(),
+        run = { hand_levels = {}, hand_size = 8 },
+        blind = { target_chips = 30, chips_scored = 0, hands_left = hands or 4,
+                  discards_left = discards, base_hands = 4, base_discards = 4,
+                  played_hand_types = {} },
+      }
+    end
+
+    -- BASELINE: flag off -> plays immediately and banks nothing from the spare discards
+    DE.DIG_SURPLUS = false
+    local base = DE.decide(state(4)).best
+    t.eq(base.type, "PLAY", "baseline: a locked clear plays at once and forfeits the discards")
+
+    -- PROBE: flag on -> spends a surplus discard first
+    DE.DIG_SURPLUS = true
+    local dug = DE.decide(state(4)).best
+    t.eq(dug.type, "DISCARD", "probe: a locked clear digs with a spare discard")
+    t.ok(dug.surplus_dig, "...and it is tagged as a surplus dig")
+
+    -- the dig must NEVER pitch a card the guaranteed play needs
+    local play_ids = {}
+    for _, c in ipairs(base.cards or {}) do play_ids[c.id] = true end
+    local overlap = 0
+    for _, c in ipairs(dug.cards or {}) do if play_ids[c.id] then overlap = overlap + 1 end end
+    t.eq(overlap, 0, "the dig keeps every card of the clearing play -> the clear survives it")
+
+    -- with NO discards left there is nothing to spend, so it plays
+    t.eq(DE.decide(state(0)).best.type, "PLAY", "no discards left -> plays (nothing to dig with)")
+
+    -- restore the default so the flag never leaks into another suite
+    DE.DIG_SURPLUS = false
+    t.eq(DE.decide(state(4)).best.type, "PLAY", "flag restored -> baseline behaviour again")
+    t.eq(DE.DIG_SURPLUS, false, "DIG_SURPLUS is OFF by default (baseline stays byte-identical)")
+  end
 end

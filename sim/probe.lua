@@ -274,6 +274,13 @@ Probe.CONFIGS = {
   hoard10      = { min_bank = 10, hoard_until = 5 },
   hoard20      = { min_bank = 20, hoard_until = 5 },
   hoard25a4    = { min_bank = 25, hoard_until = 4 },
+  -- SURPLUS DIG. The engine forfeits every remaining discard the instant a clear is locked
+  -- (measured: 1.92 unused per blind; 25% of blinds discard NOTHING), while the human winners
+  -- in data/bes_runs_live_2026-08-12.jsonl spend all six at 4-12x margin. Unlike a joker or
+  -- voucher fix this fires in EVERY BLIND OF EVERY RUN -- the only class that can move an
+  -- n=160 verdict (CLAUDE.md, THE FREQUENCY CEILING) -- and it is not in the refuted set.
+  -- Unlike every other config here this one is an ENGINE flag, not a world lesion.
+  dig          = { dig_surplus = true },
   slots        = { joker_slots = 8 },
   -- +1 and +2 slots: unlike the 8-slot bound, these ARE reachable in a real run (the
   -- Antimatter voucher chain, negative-edition jokers), so they measure how much of the
@@ -291,6 +298,11 @@ Probe.CONFIGS = {
 function Probe.opts(name)
   local c = Probe.CONFIGS[name or "engine"]
   if not c then error("unknown probe config: " .. tostring(name)) end
+  -- ENGINE-flag probes (as opposed to world lesions) are applied to the engine module itself,
+  -- since the flag is read deep inside decide() where no per-run opts table reaches. Set
+  -- explicitly BOTH ways so a batch can never inherit a stale flag from a previous config.
+  local DE = require("engine.decision_engine")
+  DE.DIG_SURPLUS = c.dig_surplus and true or false
   if not next(c) then return nil end
   local o = { probe = {} }
   for k, v in pairs(c) do o.probe[k] = v end

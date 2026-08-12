@@ -134,6 +134,30 @@ DE.LEVEL_USE_CREDIT = 0.15   -- lasting-leveling credit, as a fraction of a boss
 DE.SURV_SAMPLES = 60
 DE.SURV_MARGIN  = 0.06
 
+-- ---- SURPLUS DIG (probe, 2026-08-12) ----------------------------------------------------
+-- The engine only ever CONSIDERS discarding when the play does not clear (`not clears`
+-- below), so the moment a clear is locked in it plays immediately and every remaining
+-- discard is thrown away. Measured over 3345 sim blinds: **1.92 discards left unused per
+-- blind, and 25% of blinds cleared without discarding at all.**
+--
+-- A human who wins does the opposite. Live capture (WINRATE_V3_PLAN.md §5p) shows all six
+-- discards spent on blinds cleared at 3.9x, 6.5x and 11.9x margin, described unprompted as
+-- "not instantly playing a winning hand but instead discarding and digging for lucky cards
+-- or something to use my tarots on to make more money".
+--
+-- The asymmetry is real: once the clear is GUARANTEED, a discard that keeps the clearing
+-- cards cannot cost the blind -- you still hold the winning hand -- while the redraw is a
+-- free roll on Lucky/Gold money, tarot targets and scaler fuel. The only true costs are
+-- draw-pile depth and the discard itself, both of which are worthless if this blind ends
+-- the round anyway.
+--
+-- Gated OFF by default so the baseline is byte-identical; the probe arm turns it on.
+-- This is the first candidate at 100% frequency (every blind of every run) that is not
+-- already in the refuted set -- see CLAUDE.md, THE FREQUENCY CEILING.
+DE.DIG_SURPLUS = false      -- probe flag: dig with surplus discards once the clear is locked
+DE.DIG_MIN_HANDS = 1        -- require at least this many hands left (a discard costs no hand)
+DE.DIG_KEEP_GUARANTEE = true -- only pitch cards OUTSIDE the guaranteed play, so it stays guaranteed
+
 local function planet_use(gs, base_ev, remaining, held, gs2)
   if not held or #held == 0 or not base_ev then return nil end
   local ev2, cards2 = HandEval.best_play_target(gs2, gs.hand or {}, remaining, boss_filter(gs))
@@ -374,6 +398,36 @@ function DE.decide(gs, opts)
   --      This is what holds a polychrome to build one big hand vs two average.
   --  (b) Heuristic draw/money discard (flush/straight/set draws, money tarots).
   local discard_action = nil
+
+  -- ---- SURPLUS DIG (probe; DE.DIG_SURPLUS, off by default) --------------------------
+  -- The clear is already GUARANTEED and discards remain: the overkill score is wasted, so
+  -- spend the surplus discards on a free redraw instead of banking them. Pitches only cards
+  -- OUTSIDE the guaranteed play, so the clear survives the discard by construction.
+  local dig_action = nil
+  if DE.DIG_SURPLUS and guaranteed and discards_left > 0
+     and hands_left >= DE.DIG_MIN_HANDS and #hand > 0 then
+    local keep = {}
+    if DE.DIG_KEEP_GUARANTEE then
+      for _, c in ipairs(play_cards or {}) do keep[c] = true end
+    end
+    local pitch = {}
+    for _, c in ipairs(hand) do
+      if not keep[c] and #pitch < 5 then pitch[#pitch + 1] = c end
+    end
+    if #pitch > 0 then
+      dig_action = {
+        type = "DISCARD", cards = pitch,
+        -- ranked ABOVE the play: while the clear is locked the play banks nothing extra,
+        -- and the dig is a free roll. It stops firing as soon as the surplus is spent.
+        value = (play_action and play_action.value or 0) + 1,
+        surplus_dig = true,
+        reason = string.format(
+          "Dig with a spare discard (%d) — the clear is already locked, so the extra score is wasted.",
+          discards_left),
+      }
+    end
+  end
+
   -- Allow a dig even on the LAST hand (hands_left==1): with discards still in hand you
   -- can improve the single hand you're about to play. This is the Needle boss (1 hand,
   -- discards intact) and any last hand with discards left -- the engine used to refuse
@@ -455,6 +509,7 @@ function DE.decide(gs, opts)
   -- ---- choose + rank ----
   local candidates = { play_action }
   if discard_action then candidates[#candidates + 1] = discard_action end
+  if dig_action then candidates[#candidates + 1] = dig_action end
 
   -- Selection rule (DESIGN.md Phase 4) + hand economy:
   --   clears OR last hand -> PLAY
@@ -473,7 +528,10 @@ function DE.decide(gs, opts)
 
   local best
   if clears then
-    best = play_action
+    -- The clear is in hand. Baseline plays immediately and forfeits every remaining
+    -- discard; with DE.DIG_SURPLUS on we first spend the surplus on a free redraw
+    -- (the dig keeps the guaranteed play's cards, so the clear cannot be lost).
+    best = dig_action or play_action
   elseif forced_play then
     -- last hand with discards left: E-6 (the corrected F3). The old mean-rule dug only
     -- when the expected dug hand ALSO beat the target in expectation -- refusing digs
