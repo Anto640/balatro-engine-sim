@@ -55,24 +55,34 @@ local function pick_value(gs, set, key, need, rng)
   return vfrac + money, gain, money
 end
 
--- A Hearts-leaning deck, as in the run whose log produced the Dusk finding.
-local function deck()
+-- Decks at three points along a Flush plan. The taper in BP.shape_credit means the credit is
+-- LARGEST on an unconverged deck, so screening only the half-converged deck understates it --
+-- an early draft did exactly that and made the credit look inert.
+--   fresh   25% Hearts -- a standard 52-card deck, the state a plan is adopted in
+--   partial 40% Hearts -- mid-conversion
+--   near    50% Hearts -- the state the Dusk run's log was taken in
+-- {hearts per rank, each off-suit per rank}; all FOUR suits are present, so `fresh` is a
+-- genuine 25% and not the 33% an earlier three-suit version of this builder produced.
+local DECKS = { fresh = { 1, 1 }, partial = { 2, 1 }, near = { 3, 1 } }
+
+local function deck(shape)
+  local mix = DECKS[shape] or DECKS.near
   local d, id = {}, 0
   local function add(suit, rank, n)
     for _ = 1, n do id = id + 1; d[#d + 1] = { id = id, suit = suit, rank = rank } end
   end
   for _, r in ipairs({ "2","3","4","5","6","7","8","9","10","J","Q","K","A" }) do
-    add("Hearts", r, 2)                       -- 26 hearts: the flush direction
-    add("Spades", r, 1); add("Clubs", r, 1)   -- 26 off-suit: the cards a shaper cuts
+    add("Hearts", r, mix[1])
+    for _, s in ipairs({ "Spades", "Clubs", "Diamonds" }) do add(s, r, mix[2]) end
   end
   return d
 end
 
-local function state(ante, dollars, committed)
+local function state(ante, dollars, committed, shape)
   local gs = GS.new{
     jokers = { { key = "j_dusk", sell_value = 2 }, { key = "j_photograph", sell_value = 3 },
                { key = "j_cavendish", sell_value = 4 } },
-    deck = deck(), hand = {}, consumables = {},
+    deck = deck(shape or "near"), hand = {}, consumables = {},
     economy = { dollars = dollars },
     meta = { ante = ante, round = ante * 3 },
     blind = { target_chips = Mech.blind_requirement(ante, "Big") },
@@ -139,6 +149,50 @@ for _, ante in ipairs({ 2, 4, 6 }) do
               (r.mf > 0) and ("   ($" .. r.d .. " -> " .. ("%.3f"):format(r.mf) .. ")") or ""))
   end
 end
+
+-- ---- THE SCREENING STATISTIC ------------------------------------------------
+-- A credit that never changes which card is TAKEN cannot move a batch, however
+-- principled it is. This simulates every 3-card and 5-card pack that can be drawn from
+-- the card set above and asks how often the committed ranking picks a different card
+-- than the uncommitted one. Screen-then-batch: only batch if this is materially > 0.
+print("")
+print("================================================================")
+print("SCREENING STATISTIC — how often does the commitment change the PICK?")
+print("================================================================")
+print(("  %-9s %-6s %8s %10s %12s %10s"):format(
+  "deck", "ante", "packs", "pick same", "pick CHANGED", "% changed"))
+local grand_n, grand_c = 0, 0
+for _, shape in ipairs({ "fresh", "partial", "near" }) do
+  for _, ante in ipairs({ 2, 4, 6 }) do
+    local gsC, gsU = state(ante, 20, true, shape), state(ante, 20, false, shape)
+    local need = Mech.boss_per_hand_need(gsC)
+    local vc, vu = {}, {}
+    for i, c in ipairs(CARDS) do
+      vc[i] = (pick_value(gsC, c[1], c[2], need, lcg(12345)))
+      vu[i] = (pick_value(gsU, c[1], c[2], need, lcg(12345)))
+    end
+    -- every 3-card subset = a small Arcana/Celestial pack
+    local n, changed = 0, 0
+    local N = #CARDS
+    for a = 1, N - 2 do for b = a + 1, N - 1 do for d = b + 1, N do
+      local function argmax(v)
+        local best = a
+        if v[b] > v[best] then best = b end
+        if v[d] > v[best] then best = d end
+        return best
+      end
+      n = n + 1
+      if argmax(vc) ~= argmax(vu) then changed = changed + 1 end
+    end end end
+    grand_n, grand_c = grand_n + n, grand_c + changed
+    print(("  %-9s a%-5d %8d %10d %12d %9.1f%%"):format(
+      shape, ante, n, n - changed, changed, 100 * changed / n))
+  end
+end
+print(("  %-9s %-6s %8d %10d %12d %9.1f%%"):format(
+  "ALL", "", grand_n, grand_n - grand_c, grand_c, 100 * grand_c / math.max(1, grand_n)))
+print("  A pack whose best option is unaffected by the plan is a pack the commitment cannot")
+print("  steer. If this is ~0 the credit is inert and a paired batch will only burn an hour.")
 
 print("")
 print("================================================================")

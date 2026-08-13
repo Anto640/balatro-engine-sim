@@ -1746,3 +1746,75 @@ The live mod advises a HUMAN, and this was wrong advice the user actually saw.
 **Diagnostic note for the next attempt:** the reason strings were decisive and the first hypothesis was
 wrong. "Dusk measures ~0 mid-blind so it reads as dead" was FALSE — the retrigger floor already
 prevents that. It was the UPGRADE-swap path. Read `advice.reason` before theorising about a mechanism.
+
+---
+
+## 5t. THE SHAPE CREDIT — ❌ REVERTED, and the diagnosis is worth more than the change
+
+§5s located the gap as "committing changes exactly one number". The obvious fix — a
+`BP.shape_credit` mirroring `planet_credit` — was built, screened, batched, and **reverted**.
+What it uncovered on the way is the real result.
+
+### Arm 1: the credit alone — INERT, and inert in a way a batch cannot diagnose
+
+Paired n=160 vs `sim_out/retrig_keep.jsonl`: **progress −0.001 (t −0.71, p 0.48), 157 of 160
+seeds TIED, death-ante unchanged on every seed, sd 0.019.**
+
+That reads like "too subtle to detect". It was not. The screen (`tools/pick_order.lua`) said
+**9.9% of packs change their pick**, and 9.9% cannot coexist with 157 tied seeds. Instrumenting
+the real driver (now `tools/commit_firing.lua`) settled it:
+
+| link in the chain | rate |
+|---|---|
+| a commitment is active when a consumable is priced | **25%** |
+| ...that commitment is to **Full House** | **100%** |
+| ...`DeckPlan.target` turns it into an actual DIRECTION | **0.3%** |
+| `shape_credit` therefore fires | 0.3% |
+
+**`DP.target` names ranks only when a rank beats the deck mean by 0.5.** A 52-card deck has four
+of every rank against a mean of exactly 4.0, so `4 > 4.5` is never true. You needed a skew to earn
+a target and a target to build a skew. Every direction-aware consumer — `card_quality`,
+`removal_value`, discard ranking — has been running on a **targetless plan for essentially the
+whole run**. (A second, smaller defect was mine: `on_target_frac` scored a full 52-card deck at
+0.77 — "nearly done thinning" for the most bloated deck possible — silently blocking 64 more.)
+
+### Arm 2: forcing the direction — NEGATIVE, and reverted on MECHANISM
+
+Removing the skew gate so a committed rank hand always names its ranks unblocked the chain
+exactly as intended (direction 0.3% → **23.7%**, matching the commitment rate; `shape_credit`
+0.3% → **9.1%**, matching the screen's 9.9%). Paired n=160:
+
+**progress −0.054 (t −1.77, p 0.076), sign 2 better / 8 worse / 150 tied, wins 4 → 3.**
+
+MDE at sd 0.386 is 0.085, so this is formally n.s. — but it is reverted on MECHANISM, not on the
+p-value, and the mechanism is the one the original code comment already named:
+
+> *"A fresh 52-card deck ties at four of every rank; arbitrarily declaring Aces there would be
+> fake commitment."*
+
+That comment was right. With four of each rank, the tie-break names Aces and Kings, and
+`card_quality` then charges **44 of 52 cards −3 as "off-target"** — reordering every discard and
+removal decision toward a concentration the run has no jokers or levels supporting. The tails
+agree: of 10 changed seeds the three largest movers are **a8→a5 (−3.07), a8→a5 (−3.04), and a
+WIN destroyed (a9→a6, −2.16)**.
+
+### What this actually establishes
+
+1. **The commitment layer is nearly inert as a DIRECTION source, and that is now measured.**
+   The planner commits, then has nowhere to aim. `planet_credit` works precisely because it needs
+   no direction — only the hand's identity.
+2. **The engine commits to Full House in 100% of observed valuations** (3 and 6 seed runs both).
+   Against eight human runs producing seven distinct winning archetypes, that is its own finding
+   and is untouched by this session.
+3. **A direction must be EARNED, not declared.** Forcing one from a tie-break is fake commitment
+   and measurably destroys runs. A legitimate source would be owned-joker suit/rank tags, real
+   accumulated skew, or the hand the player is actually making — not the sort order.
+4. **Screen firing rate before batching.** `tools/commit_firing.lua` exists for this. A 45-minute
+   arm cannot tell "small effect" from "not executing"; a 2-minute instrumented run can.
+
+### Status
+
+`BP.shape_credit`, `DP.on_target_frac` and the `DP.target` gate change are all **reverted**;
+`tools/pick_order.lua` and `tools/commit_firing.lua` are kept. The next lever is **not** pricing
+shape — it is giving the commitment a direction it has actually earned, and the Full House
+monoculture is probably the thing to look at first.

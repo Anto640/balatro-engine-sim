@@ -49,16 +49,39 @@
 > function where engine and winner agree exactly. That is the template, and its absence elsewhere is
 > the measured gap.
 >
-> ## DO THIS NEXT — `tools/pick_order.lua` reduces it to ONE number
-> 1. **Make deck SHAPE respond to the commitment, mirroring `BP.planet_credit`.** The screen shows
->    that committing to a Flush build changes **exactly one value** — the Flush planet (+0.200 at
->    ante 4) — while every deck-shape card is **byte-identical** committed vs uncommitted. The engine
->    can commit, and only leveling ever hears about it; that is why leveling was the one function with
->    0 discordant pairs against the human. Worse, **Death and Strength never reach the deck-shaping
->    model at all** (flat `CV.TAROT_BASE` prior) — the two cards that CONVERGE a deck are priced as
->    generic filler, and only Hanged Man reaches `DeckPlan.delete_value` (returning ~0.113 flat).
->    Co-calibrate with the planner constants — **never as an isolated magnitude lever**.
->    ⚠ **MONEY is NOT the gap — do not "fix" it.** `VU.dollars_to_frac` already puts Hermit at #5 by
+> ## ⛔ THE OBVIOUS NEXT FIX WAS TRIED AND REVERTED — read §5t before re-deriving it
+> Pricing deck shape by the commitment (`BP.shape_credit`, mirroring `planet_credit`) measured
+> **−0.001 with 157/160 seeds TIED**. That was not a small effect — the code was barely executing.
+> `tools/commit_firing.lua` (new) instruments the real driver and shows why:
+>
+> | link | rate |
+> |---|---|
+> | a commitment is active when a consumable is priced | **25%** |
+> | ...the commitment is to **Full House** | **100%** |
+> | ...`DeckPlan.target` yields an actual DIRECTION | **0.3%** |
+>
+> **`DP.target` names ranks only when a rank beats the deck mean by 0.5 — impossible on a 52-card
+> deck (four of each rank vs a mean of exactly 4.0).** You need a skew to earn a target and a target
+> to build a skew, so `card_quality`, `removal_value` and the discard ranking have been running on a
+> **targetless plan for essentially the whole run**.
+>
+> Removing that gate unblocked the chain (direction 0.3% → 23.7%) and measured **−0.054, sign 2/8,
+> and destroyed a win (a9→a6) plus two a8→a5 collapses**. Reverted on MECHANISM: with four of each
+> rank the tie-break names Aces and Kings, and `card_quality` then charges 44 of 52 cards −3 as
+> "off-target". The original code comment ("arbitrarily declaring Aces there would be fake
+> commitment") was right.
+>
+> ## DO THIS NEXT
+> 1. **The commitment needs a direction it has EARNED.** Not a tie-break. Legitimate sources:
+>    owned-joker suit/rank tags, real accumulated deck skew, or the hand actually being played.
+>    Until that exists, nothing hung off `DP.target` can pay.
+> 2. **The engine commits to Full House in 100% of observed valuations** (3- and 6-seed runs agree)
+>    — against eight human runs producing seven distinct archetypes. Look at `commitment_signals` /
+>    `HAND_ORDER` for the monoculture; this is untouched and may be upstream of everything above.
+> 3. **Screen the firing rate BEFORE batching** anything that hangs off the commitment
+>    (`luajit tools/commit_firing.lua 6`, ~2 min). A 45-minute paired arm cannot distinguish
+>    "small effect" from "not executing" — this session lost two arms to exactly that.
+>    ⚠ **MONEY is NOT a gap — do not "fix" it.** `VU.dollars_to_frac` already puts Hermit at #5 by
 >    ante 2 and #1 by ante 6. An earlier draft of the screen called `CV.card_value` directly, saw money
 >    return 0 on the value axis, and wrongly concluded it was unpriced. Mirror `pick_value` in
 >    `tools/pick_order.lua` (which follows `pack_open_advisor`), never `CV.card_value` alone.
