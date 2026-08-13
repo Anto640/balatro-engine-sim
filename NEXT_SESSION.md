@@ -1,6 +1,15 @@
 # NEXT_SESSION.md — fresh-session handoff (updated 2026-08-13)
 
-> 🔵 **START HERE. Authoritative status: `WINRATE_V3_PLAN.md` §5r + §5s. Working context: `CLAUDE.md`.**
+> 🛑 **READ `WINRATE_V3_PLAN.md` §5u FIRST — the tuning family is finished, by arithmetic.**
+> Pooled n=984: mean progress **3.742**, sd **1.720**, so a win (8.0) sits **+2.47 sd** out.
+> **Every lever ever shipped sums to +0.487 = 0.28 sd** — one ninth of the gap, after the whole
+> tuning history. A typical retained lever is +0.02 (0.012 sd); you would need ~200 of them.
+> Meanwhile paired n=160 has MDE 0.085–0.27, so the apparatus cannot even certify what it produces.
+> **The fixes are not wrong and not unlucky — they are the wrong SIZE by 1–2 orders of magnitude.**
+> Do not open another single-lever arm. Only a POLICY-CLASS change (search/lookahead, imitation
+> from the 928-decision human dataset, or a P(win) objective inside a search) matches the gap.
+>
+> 🔵 Authoritative status: `WINRATE_V3_PLAN.md` §5r + §5s + §5t + §5u. Working context: `CLAUDE.md`.
 >
 > ## The situation in one paragraph
 > The engine wins **~1.25%** of sim runs (12 in 960). The mod's own user, playing red deck / white

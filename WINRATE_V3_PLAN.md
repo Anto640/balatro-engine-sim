@@ -1818,3 +1818,81 @@ WIN destroyed (a9→a6, −2.16)**.
 `tools/pick_order.lua` and `tools/commit_firing.lua` are kept. The next lever is **not** pricing
 shape — it is giving the commitment a direction it has actually earned, and the Full House
 monoculture is probably the thing to look at first.
+
+---
+
+## 5u. WHY LOGICAL FIXES KEEP NOT WORKING — it is a SCALE mismatch, and it is arithmetic
+
+Prompted by the user (2026-08-13): *"it just seems very strange that after so many attempts at
+improvements which are logical it is not improving anything. should this be looked at differently?"*
+
+Pooled over n=984 completed sim runs (`dig_base_all` + `of_engine_tuned` + `retrig_keep`):
+
+| quantity | value |
+|---|---|
+| mean progress | **3.742** |
+| sd (per run) | **1.720** |
+| a WIN (progress 8.0) sits at | **+2.47 standard deviations** |
+| observed winrate | 21 / 984 = **2.1%** |
+| **every lever ever shipped, summed** | **+0.487 = 0.28 sd** |
+
+**The project has accumulated 0.28 sd of improvement against a 2.47 sd gap** — about one ninth of
+what a coin-flip winrate needs, after the entire tuning history. The modal run dies in ante 4
+(28.2% of runs); only 4.1% ever reach progress 7.
+
+That is the answer to the question. The individual fixes are not wrong and are not unlucky —
+they are **the wrong SIZE by one to two orders of magnitude**, and no quantity of them sums to
+the gap. A typical retained lever is +0.02 (0.012 sd); ~200 of them would be needed.
+
+### The measurement apparatus is calibrated to an irrelevant range
+
+Paired n=160 gives MDE ≈ 0.085–0.27 depending on cascade. Levers produce 0.01–0.07. So:
+
+* a change big enough to matter (+2.0) would be unmistakable and needs no batch;
+* a change the batch can certify (+0.1) is ~5% of the way to mattering;
+* everything actually produced falls BELOW the detection floor.
+
+Three sessions of 45-minute arms have certified nothing, and cannot. Meanwhile `wins` — the real
+objective — has Poisson sd ≈ 3.5 at 12/480, so distinguishing 2% from 4% needs n ≈ 1500+.
+**The project optimises a proxy it can measure for an objective it cannot, and the two come apart
+exactly in the tail where wins live.**
+
+### What is NOT the explanation (all checked, this session)
+
+* **Not a hidden tail effect the mean metric misses.** Both reverted changes were re-scored on
+  reach-5+/6+/7+: shape_dir −2/−3/−3, surplus dig −8/−6/−4. They were genuinely worse, not
+  tail-positive. The metric was not hiding value.
+* **Not joker mispricing.** The engine's rank order predicts which jokers a winning human keeps
+  (§5s: rank #1 → 47% kept, #2 → 31%, #3 → 0%).
+* **Not in-blind play** (regret 0.0076), **not resources** (§5n), **not archetype coverage** (§5m),
+  **not the world** (§5m).
+* **Not the near-miss cohort.** Runs reaching ~ante 7 and dying look like winners at ante 6
+  (hand-lv 4.61 vs 5.75, njokers 5.28 vs 5.56, $30 vs $34). At the top of the distribution the
+  difference is variance, not a saveable decision — confirming the earlier a3–5 counterfactual.
+
+### What follows
+
+A 2.47 sd shift is not a tuning result; it is a **policy-class** result. The greedy evaluator is
+good at what it does — a scripted tier list is −0.987 against it, in-blind play is near-optimal,
+and its joker ordering matches a winning human's retention. What is absent is a layer ABOVE it
+that chooses an END-STATE and steers toward it. Every fix this project has tried, including both
+of this session's, has been "make the greedy valuation slightly less greedy" (credits, floors,
+keep-biases). That family is exhausted, and now demonstrably so by arithmetic rather than by
+another null result.
+
+**Three candidate directions, in order of how well their size matches the gap:**
+
+1. **Search / lookahead over the shop stream** (the deferred MCTS, or a cheaper beam over "which
+   reachable ante-8 board does this run support"). The evaluator becomes the LEAF evaluation of a
+   search instead of the decision rule. This is the only class whose plausible effect size is
+   measured in whole antes.
+2. **Imitation from the human dataset.** `data/bes_runs_live_2026-08-12.jsonl` now contains ~928
+   decisions labelled by an 87.5%-winrate policy. That is a supervised target, not a constant to
+   hand-tune — a categorically different way of setting the policy.
+3. **A P(win) objective** replacing per-decision EV, so the engine takes variance when behind and
+   safety when ahead. Note the naive version was already refuted (Δprogress vs Δwins correlates
+   +0.58), so this is only worth doing as part of (1).
+
+**And change the verdict protocol:** stop certifying single levers at n=160. Only bundles or
+whole-policy swaps are large enough to be measurable, and `luajit tools/commit_firing.lua` should
+gate any change before an arm is spent on it.
