@@ -24,6 +24,7 @@ local ShopState = require("model.shop_state")
 local Tarot = require("engine.tarot")
 local Cards = require("util.cards")
 local BuildPlan = require("engine.build_plan")
+local VU = require("engine.value_units")
 
 local SA = {}
 
@@ -32,10 +33,17 @@ local SA = {}
 -- weighted heavily relative to raw money.
 SA.W_FV = 2.0
 SA.INTEREST_HORIZON = 3  -- rounds we expect to keep earning interest
-SA.COST_WEIGHT = 0.3     -- utility charged per dollar of PRICE (so cheaper wins,
-                         -- on top of the interest lost by spending)
-SA.DOLLAR_UTIL = 0.3     -- utility of a dollar GAINED (money tarots) -- symmetric
-                         -- with COST_WEIGHT
+SA.COST_WEIGHT = VU.DOLLAR_UTIL -- utility charged per dollar of PRICE (so cheaper wins,
+                         -- on top of the interest lost by spending). Same rate as
+                         -- DOLLAR_UTIL BY CONSTRUCTION now, not by coincidence: a
+                         -- dollar spent and a dollar gained must price identically
+                         -- or the engine arbitrages itself. (No-op today -- both
+                         -- were already 0.3 -- it just can't silently desync.)
+SA.DOLLAR_UTIL = VU.DOLLAR_UTIL -- utility of a dollar GAINED (money tarots) -- symmetric
+                         -- with COST_WEIGHT. Owned by value_units so the pack /
+                         -- consumable channels (which price money in boss-hand
+                         -- FRACTIONS) cannot drift away from it again -- they did,
+                         -- by 1.5-3.2x, and only the pack side was wrong.
 SA.TYPICAL_JOKER_COST = 5 -- $ you expect to pay for a joker once a reroll surfaces one
 SA.FREE_SPEND_DISCOUNT = 0.4 -- purchasing-power cost charged for INTEREST-FREE dollars
                           -- (overflow above the cap, or the partial bucket below a $5
@@ -45,8 +53,10 @@ SA.FREE_SPEND_DISCOUNT = 0.4 -- purchasing-power cost charged for INTEREST-FREE 
 SA.REROLL_DISCOUNT = 0.5  -- a reroll is speculative (one noisy roll) AND a fresh shop
                           -- comes FREE next round, so rerolling only buys the better
                           -- joker slightly earlier -- discount that marginal benefit
-SA.JOKER_SCORE_WEIGHT = 5 -- the ONE frac->utility bridge: jokers, packs, reroll AND (B1)
-                          -- standalone consumables all weight a boss-hand fraction by this.
+SA.JOKER_SCORE_WEIGHT = VU.FRAC_UTIL -- the ONE frac->utility bridge: jokers, packs, reroll
+                          -- AND (B1) standalone consumables all weight a boss-hand fraction
+                          -- by this. Defined in value_units beside DOLLAR_UTIL, because the
+                          -- RATIO of the two IS the engine's price of a dollar.
 -- Consumables that CREATE a joker -> measure the OUTPUT deck-aware (max with the flat prior)
 -- so e.g. Judgement is valued as the joker it makes, not the 0.5 tarot prior. (B1: the x5
 -- JOKER scale is now applied by the shared bridge on every consumable path, so this table no

@@ -2034,3 +2034,127 @@ intervention that ever moved the mean was `rich` (+3.09) — a resource, not a d
 is, and the income available (~$26 held, ~$80/run flow) is below the conversion threshold.** Any
 further single-axis decision probe is predicted to come back ~50/50, and three did in one session.
 Stop running them.
+
+---
+
+## 5x. THE ECONOMY MODEL — additive and probability-blind. Fixed; measured INERT (159/160 tied)
+
+Chasing §5w's "income is the binding constraint", the two money engines the human named in their own
+run notes were both **multiplicative** — run 6 *"gold seal 3 of clubs paired with hanging chad copied
+by brainstorm"*, run 8 *"oops all 6s synergising into reserved parking farming then business card"* —
+and `Eval.econ_power` is a **plain SUM** of static `JokerData.econ` values with three exceptions.
+
+Three defects, all real:
+
+1. **`j_oops` had `econ = 0, cat = "utility"`** — it contributed nothing and, worse, *multiplied*
+   nothing, though in-game it doubles every listed probability.
+2. **`j_reserved_parking` was a flat `econ = 3`** — no deck-awareness, though it pays per FACE card.
+3. **`jp_to_fv` read `JokerData.resolve(key).econ` directly**, bypassing `Eval.econ_value` entirely —
+   so the deck-aware econ model that already existed (Rough Gem, Business Card, Cloud 9) had **never
+   once reached the buy/sell decision**, only the spending-headroom calc. A Rough Gem was priced
+   identically on a 4-diamond and a 20-diamond deck.
+
+Fixed: `CONDITIONAL_ECON.j_reserved_parking` scales by face density; a `PROB_ECON` set doubles
+probability-gated **money** jokers under Oops (money-positive only — Oops also doubles Gros Michel's
+*extinction* roll, which must not be credited); `jp_to_fv` now calls `Eval.econ_value`.
+
+**Result (paired n=160 vs `retrig_keep`): Δ −0.002, p 0.317, sign 0 better / 1 worse, 159 TIED.**
+
+Predicted inert before running (Oops appears in 2.0% of runs, Oops + another probability joker in
+**0.0%**), but the measured inertness is stronger than the frequency argument, and the reason is
+mechanical: `clampf((face/n)/(12/52), …)` is **exactly 1.0 on an unmodified 52-card deck**. The
+deck-aware answer *equals* the flat prior until the deck actually diverges — which is correct, and
+is why it can never show up in a sim whose decks stay near-standard. **Shipped on the correctness
+rule** (provably wrong code, not significantly negative). Its justification is the live overlay,
+which advises a human who built exactly these engines — not winrate.
+
+⚠ Note the 159/160 tie doubles as *proof of non-contamination*: §5y's edits were made while this
+batch ran, and a 2× repricing of money would have cascaded every seed, not tied them.
+
+---
+
+## 5y. THE CURRENCY INCOHERENCE — the engine bought dollars at half the price it sold them
+
+**This is not a lever. It is a unit error**, and it is the first thing found that is *about income*
+(§5u/§5w's binding constraint) and is a *bug* rather than a weight.
+
+### The finding
+
+The engine mixes three currencies (`engine/value_units.lua` header): boss-hand **fractions**,
+**dollars**, and **FV points**. Two independent modules each owned a $→power rate, and they were
+never reconciled:
+
+| module | currency it ranks in | price of $1 gained |
+|---|---|---|
+| `shop_advisor` | "utility" (1 frac = `JOKER_SCORE_WEIGHT` = 5) | `DOLLAR_UTIL` = **0.30** → **0.060 frac** |
+| `pack_open_advisor`, `packs`, `consumable_value` | boss-hand **fractions** | `VU.dollar_frac` = **0.0185–0.0399** |
+
+| ante | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|---|---|---|---|
+| `dollar_frac` | .0399 | .0344 | .0300 | .0261 | .0232 | .0212 | .0195 | .0185 |
+| shop rate | .060 | .060 | .060 | .060 | .060 | .060 | .060 | .060 |
+| **shop / pack** | **1.5×** | 1.7× | 2.0× | 2.3× | 2.6× | 2.8× | 3.1× | **3.2×** |
+
+### It is provably the SAME card
+
+`CV.card_value(gs, "Tarot", "c_hermit")` returns one tuple — `(vfrac = 0, gain = $g)` — and both
+consumers read it:
+
+* `shop_advisor.lua:682` — `value = w_score*5*(vfrac+sbonus) + (gain - cost) * DOLLAR_UTIL` → **0.30·g**
+* `pack_open_advisor.lua:127` — `vfrac + VU.dollars_to_frac(gs, gain)` → ×5 into utility = **0.15·g**
+
+A Hermit paying $20 was worth **6.0 utility in the shop and 3.0 inside an Arcana pack**. The engine
+bought dollars at half the price it charged itself to spend them — and it did so *only in the pack
+channel*. `shop_advisor` never required `value_units` at all, which is how the two drifted.
+
+### Which side is wrong — decided, not guessed
+
+The **pack** side. Its own header says so: BASE_FRAC 0.03 was inherited verbatim from the
+pre-refactor "hardcoded DOLLAR_FRAC = 0.03 duplicated in packs.lua and consumable_value.lua". The
+centralisation made the rate **ante-aware** but never re-derived its **magnitude**. The shop rate is
+load-bearing across buy / sell / reroll / econ-floor / SELL_TO_BUY — all tuned around it, and the
+one the §5s kept-test validated as directionally right.
+
+So `BASE_FRAC` is now **derived, not chosen**: `VU.DOLLAR_UTIL / VU.FRAC_UTIL` = 0.3/5 = **0.06**.
+Both bridge constants moved *into* `value_units` and `shop_advisor` reads them from there;
+`COST_WEIGHT` too (a no-op today — it was already 0.3 — so a future tune cannot desync the price of
+a dollar spent from a dollar gained *inside the shop itself*). The clamps keep their original width
+relative to the base (0.5× .. 1.67×), so they stay non-binding exactly as before.
+
+Pinned by an invariant test (`tests/test_value_units.lua`): *"$20 of Hermit is worth the same in a
+pack as in the shop."* It fails on the old constant (3.0 vs 6.0).
+
+### Why this is the channel that was measured as broken
+
+§5s mined 8 expert human runs and found the pack-pick channel is where engine and winner disagree
+most — and the **money** function is the most lopsided single row in it: **human 20% vs engine 1%,
+discordant 1/15, p 0.0005.** That is precisely the channel this bug suppresses, and *only* that
+channel: money offered in the shop was priced correctly all along.
+
+### A market check (supporting, and it cuts both ways)
+
+`engine/tags.lua` uses the **inverse** (`frac_to_dollars`) to price skip tags, so the fix HALVES the
+dollar value of joker/orbital/pack tags. Sanity-checking against what the shop actually charges:
+
+| | measured frac | $ @ old 0.03 | $ @ new 0.06 | actual shop price |
+|---|---|---|---|---|
+| Common joker | 0.75 | **$25.0** | $12.5 | **$4.30** |
+| Uncommon | 1.15 | $38.3 | $19.2 | $6.20 |
+| Rare | 1.50 | **$50.0** | $25.0 | **$8.20** |
+
+The old rate valued a free Common skip-tag joker at **six times** what the shop sells the identical
+joker for. The new rate is materially closer to the market. It is still above it — partly legitimate
+(consumer surplus: you buy because value > price) and partly a *separate* defect worth recording:
+`Packs.expected_joker_of_rarity` floors each sample at `0.6 × tier prior`, and from ante 3 that floor
+BINDS on every sample, so the value goes flat (0.750 at ante 3 **and** ante 5) while `need` keeps
+growing — after `frac_to_dollars` the dollar value then *rises* with ante ($25 → $32). Not fixed
+here; noted. This also means the skip channel is co-calibrated with `SK.SHOP_VALUE`, so watch the
+skip mix in the verdict.
+
+### Frequency class — the reason this one is worth batching at all
+
+Per the §5-frequency-ceiling rule, only the "every shop of every run" class can move an n=160
+verdict. This qualifies: it repriced money inside **every pack EV** (`packs.lua`, so every BUY_PACK
+decision in every shop), **every pack pick** (~16/run), **every gold / lucky / gold-seal card**
+(`consumable_value`), and **every money tarot**. Contrast the same session's econ-model fix, which is
+correctness but sits at Oops 2.0% / broad 27.6% and is predicted inert.

@@ -36,6 +36,27 @@ return function(t)
   t.near(f3, VU.BASE_FRAC, "dollar_frac at the reference ante equals BASE_FRAC", 1e-9)
   t.ok(f1 <= VU.FRAC_MAX + 1e-9 and f8 >= VU.FRAC_MIN - 1e-9, "dollar_frac stays within bounds")
 
+  -- ---- THE BRIDGE INVARIANT: a dollar costs the same in both currencies ----
+  -- shop_advisor ranks in "utility" (1 boss-hand fraction = JOKER_SCORE_WEIGHT,
+  -- $1 gained = DOLLAR_UTIL). pack_open_advisor / packs / consumable_value rank in
+  -- boss-hand FRACTIONS and convert money with dollars_to_frac. If the two rates
+  -- disagree the engine prices the SAME card differently depending on where it is
+  -- offered -- which it did (0.30/$ in a shop vs 0.15/$ in a pack), suppressing the
+  -- money channel in packs only. Pin it so it cannot drift again.
+  do
+    local SA = require("engine.shop_advisor")
+    t.eq(SA.JOKER_SCORE_WEIGHT, VU.FRAC_UTIL, "shop frac->utility bridge comes from value_units")
+    t.eq(SA.DOLLAR_UTIL, VU.DOLLAR_UTIL, "shop dollar->utility rate comes from value_units")
+
+    local gs = gs_at_ante(VU.REF_ANTE)
+    -- one Hermit paying $20, priced the two ways, expressed in the SAME utility unit
+    local g = 20
+    local shop_utility = g * SA.DOLLAR_UTIL
+    local pack_utility = VU.dollars_to_frac(gs, g) * SA.JOKER_SCORE_WEIGHT
+    t.near(pack_utility, shop_utility,
+      "$20 of Hermit is worth the same in a pack as in the shop", 1e-9)
+  end
+
   -- ---- $ <-> fraction round-trips are inverses ----
   do
     local gs = gs_at_ante(4)
