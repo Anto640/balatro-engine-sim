@@ -2469,3 +2469,25 @@ baseline starves the policy of the means to act.
 * **The decisive test is queued**: a worktree at `e7c3a8c` run at BASELINE income on the same 80
   seeds, giving the identical code pair at both operating points. Until that lands, the
   operating-point reading is strongly suggested, not established.
+
+### Within-arm corroboration: the engine's OWN winners show the human's crossover
+
+`rich10_now` produced 12 wins vs 68 losses at a controlled income ($24.75 vs $23.93 at ante 3,
+1.03× — money is genuinely held constant), so this compares winning and losing runs of the SAME
+policy at the SAME operating point:
+
+| metric | WINS (n=12) | losers reaching a5+ (n=46) | ratio |
+|---|---|---|---|
+| packs / ante | 3.48 | 2.80 | 1.24× |
+| packs in antes 1–3 (fixed window) | 10.67 | 8.80 | 1.21× |
+| hand-lv sum at **ante 3** | 2.17 | 2.39 | **0.91×** |
+| hand-lv sum at **ante 4** | 4.42 | 3.37 | **1.31×** |
+
+**The engine's own winners level LESS at ante 3 and MORE at ante 4** — the same crossover the human
+shows (levels less at a2–a3, crosses at a4, then ramps to 18.6). That signature now appears in two
+independent datasets: the human's 7 wins, and the engine's own 12.
+
+⚠ Absolute totals (Celestial packs 5.08 vs 2.91, planets used 6.75 vs 3.87 — both 1.75×) are
+**confounded by run length**: winners play more antes and so accumulate more. Only the per-ante and
+fixed-window (a1–a3) figures above are clean, and those are a more modest ~1.2×. n=12 wins, and
+correlational within a fixed policy.
