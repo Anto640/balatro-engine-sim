@@ -222,15 +222,21 @@ problem, which is why every magnitude lever failed and the structural planner is
 first step: a retrospective oracle over each LOST run's recorded offer stream to measure how often a winning
 line existed. Full argument: `WINRATE_V3_PLAN.md` §5n.
 
-**➡ CHECK EXPRESSIBILITY BEFORE CONCLUDING "THE ENGINE CAN'T".** The level gap was NOT policy: the sim
-uses MORE planets/run than the human (1.67 vs 1.05) and concentrates like one. The real cause was that
-**the three deepest human runs each committed to a SECRET hand** (the WIN leveled Five of a Kind 9×,
-antes 3–8) and the project could not express that build in FOUR places — secret planets excluded from
-the pool outright, Black Hole leveling 9 hands not 12, **15 of 18 spectrals silent no-ops** (incl.
-Ouija/Sigil/Cryptid, the only rank/suit CONCENTRATING cards), and `build_plan.HAND_ORDER` listing 8 of
-12 hands so sunk secret-hand levels scored ZERO toward commitment. All four are fixed (`WINRATE_V3_PLAN.md`
-§5m). This is the SECOND time an "architectural" conclusion turned out to be an inexpressible-world
-artifact — **audit the FACTS layer for the archetype before blaming the OPINION layer.**
+**➡ CHECK EXPRESSIBILITY BEFORE CONCLUDING "THE ENGINE CAN'T"** — but check your MEASUREMENT first.
+This section used to open *"The level gap was NOT policy: the sim uses MORE planets/run than the human
+(1.67 vs 1.05)."* ❌ **THAT NUMBER IS WRONG** (corrected 2026-08-13, `WINRATE_V3_PLAN.md` §5z). Live
+`consumable_use` records carry `key`, **not** `set` — reading `set` returns nil, which is the likely
+origin. Counting keys in `CV.PLANET_KEY_HAND`: **ENGINE 1.77 planets/run (0.43/ante) vs HUMAN 8.38
+(0.99/ante)** — 4.7× per run, **the opposite sign**. The level gap IS policy. That erroneous figure is
+what redirected the project into the expressibility work below, which measured **exactly 0.000**.
+Still worth knowing (and still fixed): **the three deepest human runs each committed to a SECRET hand**
+(the WIN leveled Five of a Kind 9×, antes 3–8) and the project could not express that build in FOUR
+places — secret planets excluded from the pool outright, Black Hole leveling 9 hands not 12, **15 of 18
+spectrals silent no-ops** (incl. Ouija/Sigil/Cryptid, the only rank/suit CONCENTRATING cards), and
+`build_plan.HAND_ORDER` listing 8 of 12 hands so sunk secret-hand levels scored ZERO toward commitment
+(`WINRATE_V3_PLAN.md` §5m). **The lesson is now the reverse of the old one: re-derive the measurement
+that motivates an architectural conclusion BEFORE acting on it.** A single mis-read field sent this
+project down a path that cost a whole workstream and returned 0.000.
 
 **THE REMAINING WALL is BUILD-ASSEMBLY**, and the divergence mine (`tools/divergence.lua`,
 `WINRATE_V3_PLAN.md` §5s) has now MEASURED where it lives. Two results:
@@ -258,6 +264,33 @@ product is never assembled. This also explains the surplus dig's **−0.110 (p 0
 isolated magnitude lever**. Do NOT re-try the reverted valuation levers in isolation.
 ⚠ **Engine `value`s are comparable ONLY within one ranked list** ("fraction of a boss hand" units, so ~3 at
 ante 1 and ~300 at ante 7). Live re-sync is DONE (the install is current as of 2026-08-13).
+
+**➡ BUT THE PACK-PICK CHANNEL IS DOWNSTREAM OF A BIGGER GAP (2026-08-13, `WINRATE_V3_PLAN.md` §5z).**
+That analysis asks which card to pick *inside* a pack. **The engine mostly never opens the pack.**
+Packs/ante: **ENGINE 1.36 vs HUMAN 6.10** — and inside the human's own 8 runs pack throughput separates
+outcomes with **no overlap** (7 wins 4.33–7.44/ante; the 1 loss **2.80**, opening ZERO packs at antes 2
+AND 3). It is valuation, not poverty: of 2410 shops with an **affordable** pack it bought **23.7%**, and
+**1337 declines were packs it rated positive itself** — it rerolls instead 24.9% of the time. Worst
+exactly where the human is heaviest: **Celestial mean value −0.79 (buy rate 6.3%), Standard −1.35
+(6.8%)**, Celestial negative across the whole **a2–a6** window. Human hand-levels cross the engine's at
+a4 and end **18.6 vs 7.7**.
+**Treat this as an INTERACTION, not a lever.** "Just buy more packs" is already refuted (`levelbuy`
+−0.229). But money alone (`rich10`) reaches only 2.44 packs/ante and 7.5% winrate, and the human has
+BOTH: their dollar curve matches the `rich10` arm within ~15% at every ante *while* buying ~4.7 more
+packs/ante. Mechanically the axes are **not separable** — with a $10 reserve and no extra income the
+engine *cannot* buy packs (it holds $1.3 at ante 2, below the reserve): `packgreed10` moves 1.60→2.00
+packs/ante while `richpack` reaches **5.75** (human 6.10). `Probe.pack_greed` + configs
+`packgreed`/`packgreed10`/`richpack` test the 2×2.
+⚠ Unknown, and it matters: this dataset **cannot** tell bought packs from free skip-tag packs
+(`blind_select`/`blind_result` were added 2026-08-13; the dataset is 08-12).
+
+**➡ CHAOS IS THE MEASUREMENT PROBLEM, quantified (`tools/envelope.lua`, §5z).** Every batch on the
+shared seed pool is an expressible policy over the same seeds. Across 7 variants the per-seed MAX wins
+**11/160 (6.9%)** vs the best single arm's 5 (3.1%) — but that 2.2× is **NOT hidden upside**:
+envelope−best = **+0.690** and best−floor = **+0.773**. Near-symmetric dispersion is the signature of
+NOISE. **85% of seeds change outcome under tiny policy perturbations**, and the sim is deterministic, so
+this is chaotic policy sensitivity, not measurement error. **Never read max-over-k as an oracle**, and
+expect sd ~1.9 (MDE ~0.42 at n=160) for anything touching the shop loop.
 
 ## Conventions & gotchas (learned the hard way)
 
