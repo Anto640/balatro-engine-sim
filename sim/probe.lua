@@ -294,6 +294,18 @@ Probe.CONFIGS = {
   -- planning-to-an-archetype is not the gap and the search/lookahead direction (§5u item 1) is
   -- mis-aimed -- which would be the single most valuable thing to learn before building it.
   oracle_plan  = { oracle_plan = true },
+  -- SKIP DISCIPLINE (2026-08-13). Measured: the engine skips 2.16 blinds/run, 27-30% of all
+  -- offers at antes 2-4, always to chase a tag ("Investment tag (~$25) beats playing (~$12)").
+  -- The expert human plays 3.0 / 3.0 / 3.0 blinds through ante 3 across every fully-logged
+  -- winning run and only skips from ante 6 -- and states plainly that this was speedrunning an
+  -- already-decided run, and that "skipping is typically the wrong option". A skip forfeits the
+  -- blind reward, its interest, AND a shop visit, which is the likeliest mechanism behind the
+  -- human being 2-4x richer at every ante (p 0.009 at a2) on the one axis probes found BINDING.
+  -- Unlike the archetype probes this fires in every ante of every run -- the 100% frequency
+  -- class. noskip = never skip; noskip_early = play everything through ante 4, the window where
+  -- the human never skips and where the board is known to LOCK (acquisitions collapse by a4).
+  noskip       = { no_skip_until = 99 },
+  noskip_early = { no_skip_until = 4 },
   slots        = { joker_slots = 8 },
   -- +1 and +2 slots: unlike the 8-slot bound, these ARE reachable in a real run (the
   -- Antimatter voucher chain, negative-edition jokers), so they measure how much of the

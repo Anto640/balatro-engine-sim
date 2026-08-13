@@ -1,5 +1,17 @@
 # NEXT_SESSION.md — fresh-session handoff (updated 2026-08-13)
 
+> 🛑 **FOUR large probes, three dead-even coin flips. STOP running single-axis decision probes.**
+> `oracle_plan` (a perfect archetype target) **41/40** · `noskip` **68/67** · `noskip_early`
+> **71/61** · `shape_dir` 2/8. These are not small changes — `noskip` moves 135 of 160 seeds by
+> ~1.9 antes each — and they land on 50/50. **Large behavioural changes re-roll the outcome
+> without changing its expectation.** The only intervention that ever moved the mean is `rich`
+> (+3.09), a RESOURCE. See §5w.
+>
+> 💀 **The engine dies holding the interest cap.** From ante 5 the median death holds **$26**;
+> 28% of all deaths hold ≥$25. But forcing it to spend that on levels is **−0.229** — so $26
+> simply does not buy anything that saves a run, while $100/round wins 72.5%. **Income is below
+> the conversion threshold; that, not decision quality, is the wall.**
+>
 > 🛑 **READ `WINRATE_V3_PLAN.md` §5u FIRST — the tuning family is finished, by arithmetic.**
 > Pooled n=984: mean progress **3.742**, sd **1.720**, so a win (8.0) sits **+2.47 sd** out.
 > **Every lever ever shipped sums to +0.487 = 0.28 sd** — one ninth of the gap, after the whole

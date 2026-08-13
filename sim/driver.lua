@@ -229,6 +229,14 @@ function Driver.run(seed, opts)
                  recommend = sk.recommend, tag_value = sk.tag_value, play_value = sk.play_value,
                  reason = sk.reason })
         end
+        -- SKIP LESION (Probe.CONFIGS.noskip / noskip_early). The engine skips 2.16 blinds
+        -- per run, 27-30% of offers at antes 2-4; the expert human plays 3.0/3.0/3.0 through
+        -- ante 3 and only skips from ante 6 to speedrun an already-won run ("skipping is
+        -- typically the wrong option" -- user, 2026-08-13). Each skip forfeits the blind
+        -- reward, the interest on it, AND a shop visit, on the one axis probing found binding.
+        local no_skip = run.probe and run.probe.no_skip_until
+          and (run.ante <= run.probe.no_skip_until)
+        if no_skip then sk = nil end
         if ok and sk and sk.recommend == "SKIP" then
           if content.apply_tag then content.apply_tag(run, blind.skip_tag, run.rng) end
           World.skip_tick(run)   -- A1: Throwback +0.25x per skipped blind

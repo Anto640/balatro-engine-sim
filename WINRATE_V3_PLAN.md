@@ -1962,3 +1962,75 @@ validation compared the sim to MIXED real runs which were themselves not expert 
 compare the 8 expert runs' in-blind SCORE-vs-TARGET ratios against sim runs at the same ante and
 board size. If the same-sized board clears by 10x in the real game and 1.2x in the sim, the scoring
 model under-delivers and every verdict above is measured in the wrong world.
+
+---
+
+## 5w. THE SKIP PROBES — and the pattern across FOUR large interventions
+
+The user's own account (2026-08-13): *"i was skipping to save time cause i know i had a winning
+build — skipping is typically the wrong option."* The data agrees. Across the winning runs with
+complete `blind_result` telemetry the human plays **3.0 / 3.0 / 3.0** blinds through ante 3 and
+only drops off from ante 6 (the speedrun artifact, excluded). The engine skips **2.16 blinds/run**
+at a **27–30% skip rate through antes 2–4** — exactly the window the human never skips — always to
+chase a tag (*"Investment tag (~$25) beats playing (~$12)"*).
+
+⚠ **Telemetry caveat:** `blind_result` was added DURING the capture. `W9WKT1UE` has **zero** such
+records and `GU73QPLY` only 5. Any per-blind human statistic must be restricted to the five runs
+with real coverage or it is diluted by missing data (a first pass reported 14.25 blinds/run this way).
+
+### Results (paired n=160 vs `retrig_keep`)
+
+| probe | progress Δ | sign test | wins | sd |
+|---|---|---|---|---|
+| `noskip` (never skip) | −0.166 (p 0.28) | **68 / 67 / 25** | 4 → 4 | 1.936 |
+| `noskip_early` (play all through a4) | −0.107 (p 0.48) | **71 / 61 / 28** | 4 → 5 | 1.935 |
+
+### The mechanism did NOT fire, and why is the finding
+
+| | baseline | noskip |
+|---|---|---|
+| shops / run | 18.83 | **21.74** ✓ |
+| blinds played / run | 9.89 | **11.63** ✓ |
+| median $ at ante 5 / 6 | 26.0 / 26.0 | **26.0 / 26.3** ✗ |
+| `hand_level_sum` at a6 / a8 | 3.0 / 6.0 | **1.5 / 2.0** ✗✗ |
+
+1. **The engine is interest-CAP-bound, not money-starved.** It sits at $26 from ante 5, so extra
+   blind rewards overflow the cap and earn nothing. "Play more blinds → more money" cannot fire.
+2. **Skipping was BUYING LEVELS.** Tags (Orbital especially) are a leveling channel; forcing PLAY
+   forfeits the tag stream and hand levels roughly halve from ante 5. The skip pays for itself in
+   a currency the hypothesis did not account for. A genuine trade, not a null.
+
+### 💀 THE ENGINE DIES HOLDING THE INTEREST CAP
+
+| death ante | n | median $ held |
+|---|---|---|
+| 4 | 46 | $15 |
+| **5** | **27** | **$26** |
+| **6** | **17** | **$26** |
+| **7** | **7** | **$27** |
+
+**28% of all deaths hold ≥$25.** From ante 5 the engine banks the cap and dies on it. But
+`levelbuy` (force it to spend that money on levels) measured **−0.229**, so this is NOT a spending-
+policy failure: **$26 does not buy anything that saves the run**, while `rich`'s $100/round wins
+72.5%. The available money is below the threshold at which money converts into a build. This is
+the human's own loss run in miniature ($52 at ante 5, "couldn't find anything which gave it
+direction").
+
+### The pattern across four large probes — this is the real result
+
+| probe | what it changed | sign test | sd |
+|---|---|---|---|
+| `oracle_plan` | a perfect archetype target | 41 / 40 | 1.03 |
+| `noskip` | never skip a blind | 68 / 67 | 1.94 |
+| `noskip_early` | play everything to a4 | 71 / 61 | 1.94 |
+| `shape_dir` | commitment-priced deck shaping | 2 / 8 | 0.39 |
+
+**Three of four are dead-even coin flips with ENORMOUS per-seed variance.** These are not small
+interventions: `noskip` changes 135 of 160 seeds and moves the average one by ~1.9 antes. Large
+behavioural changes RE-ROLL the outcome without changing its expectation. Meanwhile the only
+intervention that ever moved the mean was `rich` (+3.09) — a resource, not a decision.
+
+**Read together with §5u: decisions are not the binding constraint at this engine's level; income
+is, and the income available (~$26 held, ~$80/run flow) is below the conversion threshold.** Any
+further single-axis decision probe is predicted to come back ~50/50, and three did in one session.
+Stop running them.
