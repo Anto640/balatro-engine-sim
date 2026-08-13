@@ -1896,3 +1896,69 @@ another null result.
 **And change the verdict protocol:** stop certifying single levers at n=160. Only bundles or
 whole-policy swaps are large enough to be measurable, and `luajit tools/commit_firing.lua` should
 gate any change before an arm is spent on it.
+
+---
+
+## 5v. THE ORACLE-PLAN PROBE — knowing WHAT TO BUILD is worth nothing (41/40)
+
+§5u ranked search/lookahead as the direction whose size matches the gap. Before building it,
+this tests its premise: search is an expensive way to produce a better PLAN, so what is a better
+plan worth? The probe series had measured resources (money, slots, levels) but never this.
+
+`BES_PROBE=oracle_plan` (`sim/probe.lua`) replaces the planner's commitment, every shop, with the
+hand the deck ACTUALLY makes most often weighted by its leveling gain — knowledge a human gets free
+by looking at their deck and the planner never uses (it derives commitments from joker tags and
+sunk levels only). Everything downstream then steers toward a real archetype: `planet_credit`,
+`BP.fit`, `keep_bias`, `DeckPlan.target`. Verified before spending the arm: the oracle produces
+Pair 12 / Straight 6 / Three of a Kind 5 / Two Pair 4, against the baseline's **Full House 100%**.
+It samples from a DERIVED rng stream so it cannot consume `run.rng` and change which shops appear —
+otherwise it would confound "a better plan" with "a different offer stream".
+
+### Result: paired n=160 vs `retrig_keep`
+
+| metric | baseline | oracle | Δ |
+|---|---|---|---|
+| progress | 3.793 | 3.722 | −0.071 (t −0.88, p 0.38) |
+| **sign test** | — | — | **41 better / 40 worse / 79 tied** |
+| reach 6+ | 14 | 10 | −4 |
+| wins | 4 | 2 | −2 |
+| seeds changed | — | **81 of 160**, mean \|Δ\| **1.05** | sd 1.028 |
+
+**This is not an underpowered null.** The probe is enormous — it changes half the seeds by a whole
+ante on average — and the outcome is 41 up, 40 down. That is the project's documented CHURN
+signature (high variance, balanced sign, flat mean) in its purest form yet.
+
+### ❌ Handing the engine a perfect archetype target is worth NOTHING
+
+Which retires the direction §5u had ranked first. Search over the shop stream is an expensive
+machine for choosing what to build, and choosing what to build has now been measured at zero.
+**Do not build the planner/lookahead to fix archetype selection.**
+
+Caveat, stated precisely: this refutes one strong notion of "the right plan" — commit to the hand
+your deck makes best. It does not refute a plan that knows the FUTURE OFFER STREAM. But
+deck-frequency commitment is exactly what the project's own governing frame described ("a strong
+player notices which of several viable lines *this* run offers and COMMITS"), and it is free here.
+
+### Where that leaves the axes — every internal one is now probed
+
+| axis | probe | verdict |
+|---|---|---|
+| resources | `rich` +$100/rd | **binding** (+3.09, 72.5%) but unreachable endogenously |
+| valuation quality | `expert` tier list | −0.987 — the measured valuation EARNS ITS KEEP |
+| **what to build** | **`oracle_plan`** | **41/40 — worth nothing** |
+| in-blind play | replay harness | near-optimal (regret 0.0076) |
+| archetype coverage | §5m | exactly 0.000 |
+| world fidelity | §5m, `real_vs_sim` | fair; deck/stake confirmed matching (white stake, red deck, 4 hands, 4 discards) |
+
+Every axis internal to decision quality has now been probed and found NOT binding, while the one
+that is binding (resources) is bounded at ~$80/run of reallocatable spend ≈ +0.4 progress — against
+a 2.47 sd (+4.26) gap. **The engine is close to the ceiling of its own architecture, and that
+ceiling is far below a win.** That is a coherent picture, and an uncomfortable one: it means the
+remaining explanations are (a) the winning policy differs in something none of these axes captures,
+or (b) the sim is harder than the real game in a way `real_vs_sim` did not catch — noting that
+validation compared the sim to MIXED real runs which were themselves not expert play.
+
+**Next, and it should be (b) first because it is cheap and everything else is conditioned on it:**
+compare the 8 expert runs' in-blind SCORE-vs-TARGET ratios against sim runs at the same ante and
+board size. If the same-sized board clears by 10x in the real game and 1.2x in the sim, the scoring
+model under-delivers and every verdict above is measured in the wrong world.

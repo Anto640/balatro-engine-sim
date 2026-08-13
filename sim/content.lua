@@ -859,6 +859,15 @@ function Content.shop_phase(run, opts)
     guard = guard + 1
     local gs = shop_gs(run, shop)
     run.build_plan = BuildPlan.advance(gs, run.build_plan)
+    -- Phase A oracle-plan lesion: replace the planner's own commitment with a deck-derived
+    -- one (see Probe.oracle_plan). Inert on every normal run -- run.probe is nil.
+    if run.probe and run.probe.oracle_plan then
+      -- a DERIVED stream, so sampling the deck does not consume run.rng and change which
+      -- shops appear -- otherwise the probe would confound "a better plan" with "a different
+      -- offer stream", and its whole point is to isolate the plan.
+      local orng = require("sim.world").lcg((run.ante or 1) * 7919 + guard * 104729 + 13)
+      run.build_plan = Probe.oracle_plan(gs, orng, run.build_plan) or run.build_plan
+    end
     gs.run.build_plan = run.build_plan
     -- Phase A1 policy lesion: a scripted static-priority expert replaces the measured
     -- engine valuation. `policy_for` returns nil on every normal run, so the pcall below

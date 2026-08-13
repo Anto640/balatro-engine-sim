@@ -281,6 +281,19 @@ Probe.CONFIGS = {
   -- n=160 verdict (CLAUDE.md, THE FREQUENCY CEILING) -- and it is not in the refuted set.
   -- Unlike every other config here this one is an ENGINE flag, not a world lesion.
   dig          = { dig_surplus = true },
+  -- ORACLE PLAN (2026-08-13). The probe series measured RESOURCES (money, slots, levels) but
+  -- never measured KNOWING WHAT TO BUILD -- and §5t showed the planner is nearly inert as a
+  -- direction source: it commits to Full House in 100% of observed valuations and yields an
+  -- actual deck DIRECTION in 0.3%. So it has never been established whether the commitment
+  -- layer would pay if it were RIGHT. This hands the engine a correct plan for free: each shop,
+  -- the commitment is set to the hand the deck actually makes most often (measured from the
+  -- deck, not from joker tags), so BP.planet_credit, BP.fit, BP.keep_bias and DeckPlan.target
+  -- all steer toward a real, deck-supported archetype.
+  --
+  -- READ IT AS A BOUND, exactly like `rich`. If a PERFECT commitment barely moves winrate, then
+  -- planning-to-an-archetype is not the gap and the search/lookahead direction (§5u item 1) is
+  -- mis-aimed -- which would be the single most valuable thing to learn before building it.
+  oracle_plan  = { oracle_plan = true },
   slots        = { joker_slots = 8 },
   -- +1 and +2 slots: unlike the 8-slot bound, these ARE reachable in a real run (the
   -- Antimatter voucher chain, negative-edition jokers), so they measure how much of the
@@ -308,6 +321,36 @@ function Probe.opts(name)
   for k, v in pairs(c) do o.probe[k] = v end
   if c.joker_slots then o.joker_slots = c.joker_slots end   -- World.new_run reads this directly
   return o
+end
+
+-- ORACLE COMMITMENT (see CONFIGS.oracle_plan). Returns a build_plan POD for `gs`, or nil when
+-- the probe is inactive / the deck cannot be sampled. The "oracle" is deliberately modest: the
+-- hand this deck ACTUALLY makes most often, weighted by what leveling it would gain. That is
+-- knowledge a human has for free by looking at their deck, and the planner currently does not
+-- use at all -- it derives its commitment from joker tags and sunk levels only.
+--
+-- Deterministic by construction: the frequency sample takes the caller's seeded rng, and ties
+-- break on hand name, so a probe batch stays byte-reproducible like every other config.
+function Probe.oracle_plan(gs, rng, current)
+  local ConsumableValue = require("engine.consumable_value")
+  local Mechanics = require("engine.mechanics")
+  local freq = ConsumableValue.hand_frequencies(gs, { samples = 8, rng = rng })
+  if not freq then return current end
+  local names = {}
+  for h in pairs(freq) do names[#names + 1] = h end
+  table.sort(names)
+  local best, best_v
+  for _, h in ipairs(names) do
+    if Mechanics.HAND_PLANET[h] then
+      -- how much this run gains by committing here: how often it lands x what a level is worth
+      local v = freq[h] * ConsumableValue.level_gain(gs, h, 1)
+      if not best_v or v > best_v then best, best_v = h, v end
+    end
+  end
+  if not best then return current end
+  local ante = (gs.meta and gs.meta.ante) or 1
+  return { kind = "hand", hand = best, committed_ante = (current and current.committed_ante) or ante,
+           strength = 99, anchors = {}, oracle = true }
 end
 
 -- The policy resolver used by sim/content.lua. Returns nil when no policy lesion is active.
