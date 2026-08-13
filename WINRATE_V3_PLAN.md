@@ -1451,12 +1451,51 @@ produce wins. That does not invalidate the earlier results (most were flat on bo
 > **A change that lowers mean progress while raising wins is not obviously bad. It may be exactly
 > right, and `progress` cannot see it.**
 
-### Status: NOT shipped, and the decisive test is running
+### ❌ VERDICT AT n=480: REFUTED. The dig is significantly harmful; the win signal was an artifact.
 
-`DE.DIG_SURPLUS` stays **off**. Shipping needs positive evidence and the win signal is p ≈ 0.25.
-Resolving 1.25% → 3.1% needs far more seeds, so both arms are running on a fresh 320-seed pool
-(`BES_SEED_OFF=7`) to pool to **n=480 paired**. At that size ~9 discordant win-pairs are expected,
-enough for a real verdict on the win metric rather than the progress proxy.
+A fresh, out-of-sample 320-seed pool (`BES_SEED_OFF=7`) plus the original 160:
+
+| pool | progress Δ | sign test | wins (base → dig) |
+|---|---|---|---|
+| n=160 (tuned pool) | −0.156 (p 0.067, n.s.) | 27/37, n.s. | 2 → **5** |
+| **n=320 (fresh, out-of-sample)** | −0.086 (p 0.083) | 58/84, **p 0.036** | 10 → **9** |
+| **n=480 pooled** | **−0.110, t −2.51, p 0.012** | 85/121, **p 0.015** | 12 → 14 |
+
+**Significantly negative on two independent statistics.** `DE.DIG_SURPLUS` stays OFF.
+
+**Two corrections to what I wrote at n=160, both of which I got wrong:**
+
+1. **The "strictly nested wins" pattern did not replicate.** Out of sample it went 10 → 9, and
+   pooled it is 12 → 14 — flat. Three discordant seeds at p≈0.25 was noise, and I leaned on it as
+   promising. This is precisely the trap the #1 tuning rule exists to prevent, committed in a
+   *different metric* than the one the rule names.
+2. **The metric critique was therefore NOT demonstrated.** The general point stands on its own
+   logic — a mean does penalise variance, and winning is variance-seeking — but I claimed this
+   probe demonstrated it, and it did not. The dig never actually raised wins.
+
+**Mechanism, checked rather than assumed.** The dig has real unmodelled joker interactions:
+Delayed Gratification pays $2/discard only if you use NONE (the code charges the normal discard
+path for this and my dig action bypassed it), and **Banner** gives +30 chips per REMAINING discard,
+which the dig destroys. But measured over the 480 baseline runs these are all *below the frequency
+ceiling and partly cancel*: Banner appears in **12 of 480 runs (2.5%)**, Delayed Gratification in
+6.1% of snapshots — while **Mystic Summit (10%) is HELPED** by the dig (+15 mult at zero discards).
+**So the implementation defects cannot explain −0.110.** The tactic itself is what lost.
+
+### The open tension worth keeping
+
+The human digs constantly and wins 5 of 6. The engine digs indiscriminately and measures −0.110.
+The most likely resolution is not that digging is bad but that **the human's digging is PURPOSEFUL** —
+they dig when there is a specific target (a tarot to apply, a build to feed, a gold-seal card to
+retrigger for $15), whereas the probe dug whenever surplus existed. That is the committed-archetype
+thesis once more: a surplus resource is only worth spending *in service of a plan*, and an engine
+with no plan cannot spend it well. It also means the sim's inability to model "draw a card worth
+applying a tarot to" is a live confound, not a settled question.
+
+### Status: REFUTED as implemented — do not retry indiscriminate digging
+
+`DE.DIG_SURPLUS` stays **off** and the flag is retained only so the experiment is reproducible.
+A v3 correcting the Banner / Delayed-Gratification interactions is NOT worth running: those are
+2.5% and 6.1% events and are offset by Mystic Summit at 10%, so they cannot move −0.110.
 
 **Caveat kept in view:** the sim may understate what digging is *for*. The user digs for tarot
 targets and Lucky-card money; Lucky and Gold are modelled, but "draw a card worth applying a tarot
