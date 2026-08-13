@@ -2278,6 +2278,46 @@ The human levels LESS at a2–a3 (confirming the recorded crossover) and ramps f
 the window where the engine still prices a Celestial pack negative. (Engine a7/a8 figures are from
 15 and 7 survivors, so survivorship inflates them; the true gap is wider.)
 
+### ⭐ THE PAIRED, SAME-STATE CONFIRMATION — the engine says SAVE while a winner buys
+
+Everything above compares AGGREGATES across two different worlds. This does not. The live mod
+logged its own recommendation beside the human's action **with the overlay hidden (F9)**, so the
+human's choice was independent of the advice. Aligning each pack the human opened to the engine's
+recommendation at that moment (non-shop advice states and tag/post-blind packs excluded):
+
+**n = 244 genuine shop decisions in the games of a player who won 7 of 8.**
+
+| the engine's recommendation | n | share |
+|---|---|---|
+| **AGREED — BUY_PACK** | 33 | **13.5%** |
+| **DISAGREED** | 211 | **86.5%** |
+
+| what it wanted instead | n | % of disagreements |
+|---|---|---|
+| **SAVE** (hold the cash) | 101 | **47.9%** |
+| **REROLL** | 63 | **29.9%** |
+| BUY_JOKER | 24 | 11.4% |
+| BUY_VOUCHER | 14 | 6.6% |
+| BUY_CONSUMABLE | 7 | 3.3% |
+| SELL_JOKER | 2 | 0.9% |
+
+**On 78% of the decisions where a winner bought a pack, the engine says "save your money" or
+"reroll".** Agreement by ante: a1 0%, a2 18%, a3 11%, **a4 4%**, a5 26%, a6 24%, a7 12%, a8 0% —
+the minimum is at **ante 4**, precisely where the human's hand-levels cross the engine's and begin
+to ramp.
+
+**This closes the loop with §5w's death data.** The engine's single most common alternative to a
+pack is SAVE — and **28% of its deaths hold ≥$25**, dying on the interest cap. §5w read that as
+*"$26 does not buy anything that saves the run"*. The paired data says the opposite: **$26 buys
+five packs, and the player who bought them won 7 of 8.** The `hoard` probes showed forcing MORE
+saving is catastrophic (−0.396/−1.194/−1.639); this shows the engine is already running a milder
+version of that policy relative to the winner — invisible until the comparison was made on paired
+states rather than on aggregates.
+
+⚠ Alignment is approximate (the most recent `shop` record; §5s notes `scene.ranked` can carry the
+previous evaluation), and "what the winner did" is a proxy for "what wins", not proof of
+per-decision optimality. But 13.5% vs a human at ~100% is far outside any alignment noise.
+
 ### 💡 THE HYPOTHESIS IS AN INTERACTION — and it is the project's first two-axis probe
 
 The naive reading ("buy more packs") is already REFUTED: `levelbuy` (§5g) bought the declined
@@ -2313,3 +2353,12 @@ Interaction = (richpack − rich10) − (packgreed10 − baseline).
   would not fully refute the interaction.
 * The win/loss separation is **n=1 on the loss side**. It is a strong correlation, not proof.
 * Pack decisions cascade the seeded RNG hard, so expect sd ≈ 1.0–1.9 and MDE ≈ 0.2–0.4 at n=80.
+* **The probe holds the PICK policy fixed.** `pack_greed` buys the pack; the engine's own
+  `PackOpenAdvisor` still chooses inside it — and §5s measured exactly that policy as the most
+  divergent thing in the project (41% agreement; enhance/money/shape all significant). So this
+  tests *"more packs, engine's picks"*, not *"more packs, human's picks"*. **A null would NOT
+  cleanly refute the throughput hypothesis**, because the extra picks are made by the policy we
+  already know is wrong. A POSITIVE result is therefore the strong outcome: it would mean
+  throughput pays even through a mis-calibrated picker.
+  (The world does not waste them: slots-full consumables are USED immediately (the A6 fix) and
+  Standard cards go straight into the deck, so nothing paid for is silently voided.)
