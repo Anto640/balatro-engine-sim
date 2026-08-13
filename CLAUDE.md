@@ -21,14 +21,14 @@ thing **headless-testable**. See the Layout section in `README.md` for the per-f
 ## Build / test / run
 
 - **Tests (do this after every change):** `lua tests/runner.lua` (run via the Bash
-  tool). Lua 5.1+/LuaJIT, no `love`/`G`/Steamodded needed. Currently **769 pass** (+ 195 sim).
+  tool). Lua 5.1+/LuaJIT, no `love`/`G`/Steamodded needed. Currently **932 pass** (+ 524 sim).
   Failures print `FAIL  <case>  (got X, want Y)`; exit code is non-zero on failure.
 - **Phase-1 simulator suites are SEPARATE** (they drive the real engine per hand and
-  take minutes): `luajit tests/runner_sim.lua` (`test_world`, `test_driver`). `luajit`
+  take minutes): `luajit tests/runner_sim.lua` (`test_world`, `test_driver`, `test_consumables`, `test_content_rates`, …). `luajit`
   is installed and ~2.5x faster — prefer it for anything that runs the `sim/` forward
   simulator (`World.play_blind` / `Driver.run`).
 - **Deploy to the live game (manual copy — the repo is NOT the install):** the running
-  mod lives at `%APPDATA%\Balatro\Mods\balatroenginesim\`. After editing, copy changed
+  mod lives at `%APPDATA%/Balatro/Mods/balatroenginesim/`. After editing, copy changed
   files there or the game won't see them. Green tests ≠ works in-game.
 - **In-game debug keys:** `F7` dump owned jokers' live `ability` tables (to the console
   and to `bes_joker_dump.txt` in the LÖVE save folder, each tagged
@@ -95,23 +95,42 @@ enhancement; **boardless first-shop** (`skip_advisor` shop value scales as the b
 (never sell your only board joker to fund a non-joker — it's lost); **skip-tag power valuation**
 (`engine/tags` — free Rare/Uncommon/Top-up jokers valued by the MEASURED joker, tier-floored + slot-
 gated; Orbital `×level_persist`), so the engine finally takes free jokers/leveling via skips.
-(NOTE: the 2026-07-01 determinism + skip-tag/orbital work is SIM-SIDE in the repo; re-deploy to the
-install when you want the live mod to match.)
+**2026-08-13 fixes:** a **game-breaking OOM** — `each_subset` allocated a scoring table per subset
+(218 at hand size 8, 2379 at 13) and `best_play` runs ~80×/decision, so a large hand exhausted LuaJIT's
+heap and soft-locked a live run (`decide failed: not enough memory`); `HandEval.HAND_BUDGET = 8` bounds
+enumeration ABOVE 8 only (sim byte-identical at ≤8) and `main.lua` steps the GC per evaluation.
+**The Fool** was valued at its flat 0.30 prior with nothing to copy, because `pack_open_advisor`'s
+copy-target search runs AFTER selection — `CV.fool_target` now zeroes it pre-sort (an in-pack target
+only counts when `picks_left >= 2`). Live telemetry gained `blind_select`, `blind_result`
+(hands/discards actually SPENT) and per-option `ranked` valuations.
+(The install at `%APPDATA%/Balatro/Mods/balatroenginesim/` is CURRENT as of 2026-08-13.)
 
-### CURRENT STATE (2026-07-10) — retained working mean death-ante **3.663** (n=160 paired), still 0 wins
-**➡ THE authoritative plan is `WINRATE_AUDIT.md` (audit + roadmap + implementation logs). Fresh-session
-handoff: `NEXT_SESSION.md`. Full running log: `selfplay-system-plan` memory. Superseded plans: `docs/archive/`.**
+### CURRENT STATE (2026-08-13) — **8 expert HUMAN runs captured, 7 wins**; engine still ~1.25%
+**➡ THE authoritative status is `WINRATE_V3_PLAN.md` §5r (read that first). Fresh-session handoff:
+`NEXT_SESSION.md`. Historical audit + roadmap: `WINRATE_AUDIT.md`. Superseded plans: `docs/archive/`.**
 
-Current retained working baseline: `sim_out/p5_commit.jsonl` **3.663 death-ante / 3.345 progress**
-(n=160); last committed baseline remains `p4_surv` (3.612 / 3.300) until explicitly committed. The
-**WINRATE_AUDIT** (2026-07-05) overturned the earlier "the ante-4 wall is ARCHITECTURAL" conclusion as
-**confounded by a sim world that couldn't express the winning archetypes**, and drove Phases 0–6:
-Phase 0 (paired tooling) → Phase 1 (world fidelity A1–A9) → Phase 2 (engine valuation B/C/K) → Phase 3
-(re-litigate the graveyard) → Phase 4 (low-risk pass complete) → Phase 5 (planner, IN PROGRESS).
-Faithful-world arc: scorer2 3.513 → a789 3.450 → k12 3.575 → **base160 3.550 →
-p3_levelneed 3.569 → p4_surv 3.612 → p4_f6f7 3.625 → p5_commit 3.663**.
-**Verdict standard is now PAIRED n≥160** (the sim is byte-deterministic per seed; a residual determinism
-bug was fixed 2026-07-07). Compare with `analyze_runs.lua <A> compare <B>` (sign test + progress Δ).
+**THE DATASET IS THE HEADLINE.** `data/bes_runs_live_2026-08-12.jsonl` — the mod's own user played 8
+runs (red deck / white stake) with the **overlay hidden (F9)** so their choices are independent of the
+engine, while every recommendation was logged beside them. **7 wins in 8 runs (87.5%) vs the engine's
+1.25%** (12 in 960 sim runs), across **seven distinct winning archetypes**, with winning hand-levels
+from **7 to 40**. There is no single winning shape. One joker appears in all seven wins: **Hanging
+Chad**; Photograph 5/7, Sock and Buskin 3/7 — retriggers and conditional xmult, not raw tier.
+Telemetry carries 1046 shop / 415 pack / 189 blind_select / 114 blind_result records and **928+
+entries pairing the engine's measured value for each option against what the human actually did**.
+
+**THE SEQUENCING INVERTS, SIGNIFICANTLY (`tools/real_vs_sim.lua`).** The human is 2–4× richer at every
+ante ($7.5 vs $1.0 at a2, p 0.009) **and levels LESS than the engine early** (a2–a3, p<0.01), then
+crosses over at a4 and finishes on 3–4× the levels (a8: 15 vs 4.5, p 0.009). Economy and base first,
+power second. ⚠ This does NOT reopen the world-fidelity verdict: that compared mixed-outcome real runs
+to mixed-outcome sim runs. This is near-all-wins vs mixed, so it measures **policy, not world**.
+
+**THE LOSS IS THE MOST INFORMATIVE RUN.** X3L32ZEA died at ante 5 holding **$52 — more than most of
+the wins had** — on a scattered board with hand-levels stuck at 0 through ante 4. The player: *"despite
+having so much econ i couldnt find anything which boosted my build or gave it direction."* Resources
+were not the constraint, **conversion** was — the engine's own failure mode, executed once by a human.
+
+Sim baseline (current code, paired n=480): **progress 3.744**, `sim_out/dig_base_all.jsonl`.
+Verdict standard remains **PAIRED n≥160**; compare with `analyze_runs.lua <A> compare <B>`.
 
 **THE #1 TUNING RULE — REVISED 2026-08-11. The old rule ("ship correctness freely; revert ANY lever
 that doesn't measure positive") was half right, and the wrong half has been quietly deciding most
@@ -213,13 +232,17 @@ Ouija/Sigil/Cryptid, the only rank/suit CONCENTRATING cards), and `build_plan.HA
 §5m). This is the SECOND time an "architectural" conclusion turned out to be an inexpressible-world
 artifact — **audit the FACTS layer for the archetype before blaming the OPINION layer.**
 
-**THE REMAINING WALL is BUILD-ASSEMBLY.** Phase-3 confirmed deck-shaping levers stay refuted on the faithful
-world because a greedy per-decision valuation can't *commit to and assemble* an archetype across many shops
-(offer-rate-limited + cascade-dominated). **The evidence-backed next big lever is the committed-archetype
-PLANNER (Phase 5)**. V1 is now retained (+0.033 progress, sign 17/11): sticky commitment co-moves
-joker fit/retention, planet concentration, and deck target, but still has 0 wins and needs refinement.
-F6/F7 are complete (+0.012, sign 13/8); live re-sync remains Phase 6. Do NOT
-re-try the reverted valuation levers in isolation — only as coupled, co-calibrated changes.
+**THE REMAINING WALL is BUILD-ASSEMBLY**, and three independent threads now converge on the same fix.
+A greedy per-decision valuation can't *commit to and assemble* an archetype across many shops. The
+committed-archetype PLANNER (Phase 5) V1 is retained (+0.033 progress, sign 17/11) but has 0 wins.
+**The located next lever is COMMITMENT→VALUATION FEEDBACK:** `BP.planet_credit` prices planets *by the
+commitment* and every leveling channel consumes it; deck-shaping cards and surplus-spending have no
+equivalent, so each is priced alone and the product is never assembled. The three threads:
+(1) the secret-hand fixes measured **exactly 0.000** — capability without intent changes nothing;
+(2) the surplus dig measured **−0.110 (p 0.012, n=480)** because it dug *indiscriminately*, while the
+human digs *toward a target*; (3) the human's own account of every build decision. Co-calibrate with
+the planner constants — **never as an isolated magnitude lever**. Do NOT re-try the reverted valuation
+levers in isolation. Live re-sync is DONE (the install is current as of 2026-08-13).
 
 ## Conventions & gotchas (learned the hard way)
 

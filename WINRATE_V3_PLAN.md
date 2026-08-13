@@ -1501,3 +1501,102 @@ A v3 correcting the Banner / Delayed-Gratification interactions is NOT worth run
 targets and Lucky-card money; Lucky and Gold are modelled, but "draw a card worth applying a tarot
 to" is only partly represented. A null here is evidence about the sim's fidelity as much as about
 the tactic.
+
+---
+
+# 5r. PROJECT STATUS — 2026-08-13 (supersedes all earlier status sections)
+
+## The dataset changed everything: 8 expert human runs, 7 wins
+
+`data/bes_runs_live_2026-08-12.jsonl` — red deck / white stake, overlay **hidden** (F9) so the
+human played their own game while the engine's advice was logged beside it.
+
+| # | seed | result | final board | hand-lv |
+|---|---|---|---|---|
+| 1 | W9WKT1UE | WIN a9 | Hanging Chad ×2 · Photograph · Blueprint · Sock and Buskin | 15 |
+| 2 | GU73QPLY | WIN a9 | Cavendish · Driver's License · Burnt · Lucky Cat · Hanging Chad | 32 |
+| 3 | 4NN97569 | WIN a9 | Photograph · Hanging Chad · Astronomer · Constellation · Cavendish · Family | 40 |
+| 4 | U8UE74EN | WIN a9 | Ancient ×2 · Hack · Hanging Chad | 7 |
+| 5 | X3L32ZEA | **DEATH a5** | Photograph · Gros Michel · Midas Mask · Rocket · Mime | 3 |
+| 6 | IET2K8M7 | WIN a9 | Photograph · Hanging Chad · Cartomancer · Brainstorm · Wily · Throwback | 12 |
+| 7 | 6W2JL21K | WIN a9 | Hanging Chad · Photograph · Bloodstone · Dusk · Sock and Buskin | — |
+| 8 | 67HVNBZB | WIN a9 | Swashbuckler · Photograph · Hologram · Card Sharp · Sock and Buskin · Acrobat | — |
+
+**7 wins in 8 runs (87.5%) against the engine's 1.25%** (12 wins in 960 sim runs). Seven distinct
+winning archetypes. Winning hand-levels range from **7 to 40** — there is no single winning shape,
+which is why "add the missing archetype" was always doomed (§5m measured exactly 0.000).
+
+Telemetry now carries **1046 shop / 415 pack / 189 blind_select / 114 blind_result** records and
+**928+ entries with the engine's own ranked valuations** beside the human's actual choice.
+
+## What the human does that the engine does not (p-values from `tools/real_vs_sim.lua`)
+
+| ante | dollars human / sim | hand-levels human / sim |
+|---|---|---|
+| 2 | **7.5 / 1.0** (p 0.009) | **0.0 / 0.5** (p<0.001) |
+| 3 | **24.5 / 6.0** (p 0.001) | **0.5 / 1.45** (p 0.005) |
+| 5 | **49.5 / 26.0** (p 0.003) | 4.5 / 2.0 (p 0.052) |
+| 7 | 39.0 / 27.0 | **13.0 / 4.0** (p 0.001) |
+| 8 | 52.0 / 27.8 | **15.0 / 4.5** (p 0.009) |
+
+**The sequencing inverts, significantly, in both directions.** The human is 2–4× richer throughout
+*and levels LESS than the engine early* (significantly less at antes 2–3), then crosses over at ante
+4 and ends on 3–4× the levels. This is §5o's inferred pattern — economy and base first, power
+second — now confirmed by a human at p<0.01 rather than inferred from sim survivors.
+
+⚠ **This does NOT reopen §5m's world-fidelity verdict.** That compared *mixed-outcome* real runs to
+*mixed-outcome* sim runs and found the world fair (median $1 at ante 2 in both). This table is
+*near-all-wins* against mixed, so it measures **policy, not world**. Winners are richer; the world
+is not.
+
+**One joker appears in all seven wins: Hanging Chad** (retrigger). Photograph 5/7, Sock and
+Buskin 3/7. Retriggers and conditional xmult, not raw tier.
+
+## The loss is the most informative run
+
+X3L32ZEA reached ante 5 holding **$52 — more than most of the wins had at that point** — on a
+scattered board (Photograph/Gros Michel/Midas Mask/Rocket/Mime) with hand-levels stuck at 0 through
+ante 4. The player's own account: *"despite having so much econ i couldnt find anything which
+boosted my build or gave it direction."*
+
+Resources were not the constraint; **conversion** was. Runs that opened on $2 and $14 with one joker
+won. **This is the engine's own failure mode, executed once by a human** — and it is §5n's thesis
+demonstrated rather than argued.
+
+## Shipped this session
+
+| fix | class | effect |
+|---|---|---|
+| Secret planets unlock on play; Black Hole levels 12 hands; 15 no-op spectrals implemented; `build_plan` all 12 hands (§5m) | correctness | −0.019 n.s. (136/160 seeds tied) |
+| **OOM soft-lock**: `HandEval.HAND_BUDGET` bounds subset enumeration above hand size 8, + a GC step per evaluation | **bug — game-breaking** | hand-13 cost 2.0× → 1.27×; sim byte-identical at ≤8 |
+| **The Fool** valued at its 0.30 prior with nothing to copy (`CV.fool_target`) | correctness | live advice only |
+| Live telemetry: `blind_select`, `blind_result`, per-option `ranked` valuations | instrumentation | made the above findings possible |
+
+## Refuted this session (do not retry)
+
+| thread | verdict |
+|---|---|
+| Secret-hand archetype as a lever | **exactly 0.000** at n=160 (§5m) — capability ≠ intent |
+| **Surplus dig** (spend discards once the clear is locked) | **−0.110, p 0.012 at n=480** (§5q). Banner/Delayed-Gratification/Mystic-Summit interactions are all below the frequency ceiling and partly cancel, so they cannot explain it |
+| The "dig raises wins" signal | **artifact** — 2→5 at n=160 did not replicate (10→9 out of sample, 12→14 pooled) |
+
+## What to do next — in order
+
+1. **MINE THE DIVERGENCE SET.** The data is finally sufficient and untouched: 928+ records pairing
+   the engine's measured value for every option against what a 7-of-8 human actually did. The
+   question is *where does a winning human take what the engine prices low, and what happens next?*
+   This needs no new runs and no new batches. **Do this first.**
+2. **Conditional-value jokers (the Dusk report).** `j_dusk` retriggers only on the final hand, so it
+   measures ~0 mid-blind and the engine repeatedly advised SELLING it — while it sat in a winning
+   board. `Eval.scaling_projection` already discounts condition-locked scalers by trigger frequency;
+   retrigger/conditional jokers get no equivalent. Correctness class, and the same shape as the two
+   bugs the human caught.
+3. **The commitment→valuation feedback** (§5o/§5q converge here). `BP.planet_credit` prices planets
+   *by the commitment* and every leveling channel consumes it; deck-shaping and surplus-spending have
+   no equivalent. Three independent threads now point at this: the secret-hand inertness, the
+   indiscriminate-dig failure, and the human's purposeful digging. Co-calibrate with the planner
+   constants — never as an isolated magnitude lever.
+
+**Do NOT:** collect more human runs (the bottleneck is analysis, not data), probe resources (axis
+exhausted, §5n), add archetypes (§5m), retry indiscriminate digging (§5q), or bump xmult weights
+(§5o — winners are xmult-POOR early).

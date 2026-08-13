@@ -1,98 +1,59 @@
-# NEXT_SESSION.md — fresh-session handoff (updated 2026-07-14, W6 win)
+# NEXT_SESSION.md — fresh-session handoff (updated 2026-08-13)
 
-> 🔵 **START HERE — 2026-08-11 (LATEST; supersedes the 🟢 block below). Detail: `WINRATE_V3_PLAN.md` §5m.**
-> The user supplied `data/bes_runs.jsonl`, so the flagged "DO THIS FIRST" test is **DONE**:
-> **`lua tools/real_vs_sim.lua data/bes_runs.jsonl sim_out/of_engine_tuned.jsonl`**
+> 🔵 **START HERE. Authoritative status: `WINRATE_V3_PLAN.md` §5r. Working context: `CLAUDE.md`.**
 >
-> ✅ **HYPOTHESIS 1 IS REFUTED — the sim world is FAIR.** Median dollars at ante 2 are **$1 in BOTH**
-> (the human's $1 median is the same as the engine's; the real MEAN is a fat right tail, not a shifted
-> centre). `njokers` matches exactly, `run_strength` to ±0.01 through ante 4, pack supply within ~1.5pp
-> of real AND of the wiki weights, progress ≈3.5 vs ≈3.55. **Stop conditioning conclusions on a
-> "too-poor world" — every §5a–§5k bound stands.**
+> ## The situation in one paragraph
+> The engine wins **~1.25%** of sim runs (12 in 960). The mod's own user, playing red deck / white
+> stake with the **overlay hidden**, won **7 of 8** — and every one of their decisions is logged
+> beside the engine's recommendation for it. The project is no longer short of ideas or data; it is
+> short of *analysis of the data it already has*.
 >
-> 🎯 **THE ONE DIVERGENCE, AND ITS REAL CAUSE.** Real survivors carry ~5× the hand levels at ante 5–6.
-> It is NOT policy: the sim uses MORE planets/run (1.67 vs 1.05) and concentrates like a human. The
-> cause: **the three deepest human runs each committed to a SECRET hand** — the WIN (`IRXRZRWV`)
-> leveled **Five of a Kind 9× across antes 3–8**; the engine did it **0 times in 344 runs**. Four
-> expressibility holes, ALL NOW FIXED: secret planets excluded from the pool outright; Black Hole
-> leveling 9 hands not 12; **15 of 18 spectrals silent no-ops** (incl. Ouija/Sigil/Cryptid — the only
-> rank/suit CONCENTRATING cards); and `build_plan.HAND_ORDER` listing 8 of 12 hands, so the winning
-> run's 9 sunk levels would have scored **ZERO** toward committing.
+> ## What is settled (do not re-litigate)
+> * **The world is fair.** Mixed real runs vs mixed sim runs match on money, board size, pace and
+>   pack supply (`tools/real_vs_sim.lua`, §5m). Stop conditioning conclusions on a "poor sim".
+> * **Resources are not the constraint.** +$100/round wins only 72.5%; every resource probe measures
+>   the greedy policy's *conversion rate* (§5n). Axis exhausted.
+> * **Archetype coverage is not the constraint.** Fixing four hard expressibility blocks (secret
+>   planets, Black Hole, 15 no-op spectrals, the planner's 8-of-12 hand list) moved the needle
+>   **exactly 0.000** (§5m). Capability ≠ intent.
+> * **Indiscriminate digging is refuted.** −0.110, p 0.012 at n=480 (§5q).
+> * **Do not bump xmult weights.** Winners are xmult-POOR early (§5o).
 >
-> ⚠️ **Expect NO batch movement from those four** — all measured below the frequency ceiling
-> (~0.06 no-op spectral uses/run). They are CORRECTNESS-class: shipped by mechanism, and they matter
-> for the live mod because this user plays these builds.
+> ## The one pattern everything points at
+> The human is **2–4× richer at every ante** and levels **LESS than the engine early** (p<0.01 at
+> antes 2–3), then crosses over at ante 4 and finishes on **3–4× the levels** (p 0.009 at ante 8).
+> Economy and base first, power second. Their single loss died at ante 5 holding **$52** — more than
+> most of their wins — on a board with no direction. **Conversion, not resources.**
 >
-> 📏 **MEASURED (paired n=160, both arms):** world fixes 1–3 = **−0.019, p=0.66, 136/160 TIED**.
-> Planet-fix 4 alone = **Δ 0.0000, sd 0.000, 160/160 TIED** — *exactly* inert. Chain verified live
-> though: Five of a Kind played 3×, Flush House 3×, `c_planet_x` reached a shop twice — content that
-> was structurally unreachable before.
+> ## DO THIS FIRST — mine the divergence set
+> `data/bes_runs_live_2026-08-12.jsonl` holds **928+ records pairing the engine's measured value for
+> every option against what a 7-of-8 human actually chose**, plus 189 `blind_select` and 114
+> `blind_result` records (hands and discards actually SPENT). Nobody has analysed it yet.
+> **Question: where does a winning human take what the engine prices low, and what happens next?**
+> Needs no new runs and no new batches. Everything else is speculation until this is done.
 >
-> 🔴 **READ THIS FIRST — THE GOVERNING FRAME (user, 2026-08-11; `WINRATE_V3_PLAN.md` §5n).**
-> **There is almost always a winning line in a run; the engine finds none.** Wins are not about holding
-> a particular card or archetype — you notice which of several viable lines *this* run offers and commit.
-> **The proof was already in our data, filed under the wrong heading:** the `rich` probe gave the engine
-> **+$100/round** (~20× the interest headroom) and it won **72.5%, not ~100%**. Unlimited resources ≠ wins.
-> **Every ceiling probe was measuring the greedy policy's CONVERSION RATE, not resource scarcity.**
-> → do **NOT** chase archetypes (adding the secret hands measured *exactly* 0.000)
-> → do **NOT** probe resources further (axis exhausted — even the absurd dose leaves 27.5%)
-> → the target is **LINE-FINDING**: is there a reachable winning end-state from here, and does this
->   action advance the best one? A planning/search problem — which is why every *magnitude* lever failed
->   and the structural planner is the only thing that ever measured positive.
-> ✅ **THE ORACLE IS BUILT AND RUN** (`tools/line_oracle.lua`, n=652; `WINRATE_V3_PLAN.md` §5o).
-> Verdict: **§5n partly holds, with a sharp qualification.** At the modal death antes (2–4) the doomed
-> runs were offered essentially the SAME material as the survivors (tier within 5%), and the engine
-> converts offered tier onto its board at an IDENTICAL rate (84% vs 84% at a4) — **it is not failing to
-> spend.** The discriminator is **XMULT DENSITY**: at ante 5 doomed runs hold **1.41** xmult, winning
-> boards carry **3**; it converts 85% of offered tier while keeping only ~55% of affordable xmult.
-> That is supermodularity measured, and it CLEARS THE FREQUENCY CEILING (xmult offers appear in
-> essentially every run) — the first thing all session that does.
-> ⚠️ **But the sequencing INVERTS at ante 2:** eventual winners are xmult-POOR early (0.38 vs 0.50 held)
-> and xmult-rich by a4–a5. Winners build base/economy first and stack xmult second — the human
-> "economy → Bull → xmult" archetype. **So "buy xmult earlier" is CONTRADICTED by the data; front-loading
-> xmult is what the LOSING runs do.** This also explains why the bare `xmult-floor` lever was refuted.
-> → **Do NOT retry a bare xmult weight bump.** The licensed shape is xmult density as a
->   **commitment-conditioned, ANTE-STAGED target** co-calibrated with the planner constants:
->   economy/base through ante 2, then drive toward 3 xmult by ante 5.
-> → Caveat: deep runs were also *offered* more xmult (2.67 vs 1.99 at a4), partly a money→reroll
->   feedback loop — i.e. partly a consequence of surviving, not a cause. Retention/sequencing findings
->   do not depend on it.
-> **Best telemetry to ask for:** not more runs in aggregate — **human WINS played with the overlay on.**
-> The mod logs `advice` at every shop next to what was actually taken, so a winning run is a labelled
-> record of DIVERGENCE POINTS (where the human took what the engine priced low, and it paid).
+> ## Then, in order
+> 2. **Conditional-value jokers.** `j_dusk` retriggers only on the final hand, so it measures ~0
+>    mid-blind and the engine repeatedly advised SELLING it out of a winning board.
+>    `Eval.scaling_projection` discounts condition-locked *scalers* by trigger frequency; retrigger
+>    and conditional jokers have no equivalent. Correctness class.
+> 3. **Commitment→valuation feedback.** `BP.planet_credit` prices planets *by the commitment* and
+>    every leveling channel consumes it; deck-shaping and surplus-spending have no equivalent.
+>    Co-calibrate with the planner constants, never as an isolated magnitude lever.
 >
-> 🎯 **NEXT — THE ONE LOCATED LEVER (subordinate to the frame above).** The fixes made the archetype POSSIBLE, not LIKELY (~4% of runs
-> touch a secret hand). Nothing in the engine WANTS it: `CV.SPECTRAL_BASE` prices Ouija **0.3** and
-> Cryptid **0.4** as flat generic priors, with no term for "this concentrates ranks toward the hand I
-> have already sunk levels into". Every link is priced alone, so the product is never assembled.
-> **The lever is NOT "value spectrals higher" (magnitude class, refuted in isolation). It is making
-> the planner's COMMITMENT feed back into card valuation** — `BP.planet_credit(gs, hand)` already does
-> this for planets and every leveling channel consumes it; the deck-shaping cards have no equivalent.
-> Build `BP.shape_credit`-style feedback and co-calibrate it with the commitment constants.
->
-> 🧠 **Two lessons worth keeping.** (1) Audit the FACTS layer for the archetype before blaming the
-> OPINION layer — this was the SECOND time an "architectural" conclusion was an inexpressible-world
-> artifact. (2) **Fidelity was necessary and is not sufficient:** four hard blocks removed, needle
-> moved 0.000. Capability ≠ intent.
->
-> _(Previous state below — hypothesis 1 there is now dead.)_
-> 🟢 **2026-08-11 (SUPERSEDED IN PART; full detail in `WINRATE_V3_PLAN.md` §5k).**
-> **No winrate gain; the value is diagnostic and it eliminates most cheap hypotheses by MEASUREMENT.**
-> The engine's economic policy is close to optimal for its budget: earning is ~maxed (~$28 headroom),
-> **HOARDING IS MONOTONICALLY HARMFUL** (−0.393 / −1.191 / −1.637 at $10/$20/$25 floors, n=160 each —
-> the "winners hold more cash" correlation was REVERSE-CAUSAL), reallocating toward leveling hurts
-> (−0.229), its joker selection beats a static tier list (+0.987), and **scoring coverage is complete
-> (84/84 scoring jokers implemented — no W6-style void left)**.
-> **ONLY TWO HYPOTHESES SURVIVE:**
-> 1. **The sim is harsher than real Balatro** — the engine needs ~$25/round extra to look human and
->    holds a median of $1 at ante 2. **Compare the dollar trajectory in `bes_runs.jsonl` vs the sim.**
->    Cheap, decisive, W6-class. The file is on another device; the user is providing it. **DO THIS FIRST.**
-> 2. **The architecture can't build multiplicative stacks** (supermodularity, §1.2) — the committed-
->    archetype planner. Large, high-variance, but the only engine-side hypothesis left above the
->    frequency ceiling.
-> **DO NOT SPEND EFFORT ON:** individual joker/voucher/tag fidelity (below the frequency ceiling),
-> economy tuning of any kind, leveling purchases, reroll policy. All measured; all dead.
->
+> ## Practical notes
+> * The install (`%APPDATA%/Balatro/Mods/balatroenginesim/`) is **current**.
+> * **Throttle sim batches to ~6 workers while the user plays** — 11–12 parallel LuaJIT processes
+>   starve the game and make the overlay lag badly.
+> * Sim baseline on current code: **progress 3.744**, paired n=480, `sim_out/dig_base_all.jsonl`.
+> * Tests: **932 unit** (`lua tests/runner.lua`) + **524 sim** (`luajit tests/runner_sim.lua`).
+> * `lua` / `luajit` need the PATH export — see the `lua-toolchain-path` memory.
+
+---
+
+<details>
+<summary>Earlier session banners (historical — superseded by the above)</summary>
+
 > _(Session detail below.)_
 > 🟡 **2026-08-11 SESSION SUMMARY — DIAGNOSTIC VALUE ONLY; NO WINRATE GAIN. Read `WINRATE_V3_PLAN.md`.**
 > Every resource axis was probed with the engine UNTOUCHED, and every one is a **BOUND, not a lever**:
@@ -415,3 +376,6 @@ Prefer WORLD-fidelity (A1-class) and free-channel valuation; treat any swap/marg
 - The engine is PURE (`core/state_extraction` is the only file that reads `G`; everything downstream consumes
   a POD GameState). Any advisor that samples must use a per-state seeded RNG or the live panel flickers.
 - Don't re-run the reverted list as isolated levers. Re-attempt them only as COUPLED, co-calibrated changes.
+
+
+</details>
