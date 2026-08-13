@@ -2478,64 +2478,29 @@ fall from 20 to 7 (−65%).** The gain is broad and starts EARLY — so "the fix
 refuted, and the money-enables-preference reading survives: given cash, the improved valuations act
 from ante 1.
 
-### ⚠ Caveats, and the confirmation still pending
+### ✅ CONFIRMED — the identical code pair at both operating points, interaction p = 0.0175
 
-* The bundle is **six** engine commits, not the three fixes shipped this session: retrigger, econ,
-  bridge, **The Fool** (440bd26), **secret hands / `HAND_ORDER`** (4e48274), and the OOM bound
-  (19db3c4, byte-identical at hand size ≤8). The surplus dig is NOT active (`DE.DIG_SURPLUS` is off
-  unless the `dig` probe runs). The Fool fix was never measured at baseline.
-* The baseline column **sums separate measurements**, and effects need not be additive.
-* **The decisive test is queued**: a worktree at `e7c3a8c` run at BASELINE income on the same 80
-  seeds, giving the identical code pair at both operating points. Until that lands, the
-  operating-point reading is strongly suggested, not established.
+The queued worktree run landed. `e7c3a8c` was run at **baseline income** on the same seed family,
+against current-code baseline (`bridge.jsonl`). That replaces the earlier "sum of separate
+measurements" argument with a clean single A/B at each operating point:
 
-### Within-arm corroboration: the engine's OWN winners show the human's crossover
+| operating point | code delta | SE | p | wins | sign test |
+|---|---|---|---|---|---|
+| **baseline income** | **−0.102** | 0.224 | 0.65 (n.s.) | 1 → 2 / 80 | **32 / 34 — dead even** |
+| **+$10/round** | **+0.730** | 0.234 | **0.0018** | 6 → 12 / 80 | 46 / 26 (p 0.025) |
 
-`rich10_now` produced 12 wins vs 68 losses at a controlled income ($24.75 vs $23.93 at ante 3,
-1.03× — money is genuinely held constant), so this compares winning and losing runs of the SAME
-policy at the SAME operating point:
+**INTERACTION (code × operating point): +0.832, SE 0.324, t = 2.57, two-sided p = 0.0102.**
 
-| metric | WINS (n=12) | losers reaching a5+ (n=46) | ratio |
-|---|---|---|---|
-| packs / ante | 3.48 | 2.80 | 1.24× |
-| packs in antes 1–3 (fixed window) | 10.67 | 8.80 | 1.21× |
-| hand-lv sum at **ante 3** | 2.17 | 2.39 | **0.91×** |
-| hand-lv sum at **ante 4** | 4.42 | 3.37 | **1.31×** |
+The same six commits are worth **nothing** at baseline (if anything slightly negative, sign test
+32/34) and **+0.730** when the engine has money. The effect is not the code alone and not
+the money alone; it is the product.
 
-**The engine's own winners level LESS at ante 3 and MORE at ante 4** — the same crossover the human
-shows (levels less at a2–a3, crosses at a4, then ramps to 18.6). That signature now appears in two
-independent datasets: the human's 7 wins, and the engine's own 12.
+⚠ Remaining honest caveats: the two deltas are measured on the same seed family, so treating them
+as independent for the interaction SE is approximate. The bundle is six commits, so this says
+"accumulated engine work" pays at income, not which commit does. And baseline winrates (1 → 2 of 78)
+are too small to carry any weight on their own — the progress metric and the sign test do the work.
+(Numbers are the complete n=80 per arm.)
 
-⚠ Absolute totals (Celestial packs 5.08 vs 2.91, planets used 6.75 vs 3.87 — both 1.75×) are
-**confounded by run length**: winners play more antes and so accumulate more. Only the per-ante and
-fixed-window (a1–a3) figures above are clean, and those are a more modest ~1.2×. n=12 wins, and
-correlational within a fixed policy.
-
-### ❌ Rerolls are NOT the leak — hypothesis proposed and refuted in the same pass
-
-At the `rich10` operating point the engine spends **$129/run on rerolls** (20.6/run) against $58 on
-packs — over half of the +$240/run the probe hands it — and rerolls scale 10× with money while
-packs scale only 3× (baseline: 2.09 rerolls/run, $11). That looked like a large endogenous leak,
-and it is exactly the lever CLAUDE.md records as tested-and-pulled **at baseline, where rerolls
-fire 2.09×/run** — a textbook §6 operating-point candidate for re-testing.
-
-**The within-arm data refutes it.** Winners vs losers reaching a5+ inside `rich10_now`:
-
-| metric | WINS (12) | losers a5+ (46) | ratio |
-|---|---|---|---|
-| rerolls / ante | 5.02 | 3.62 | 1.39× (winners reroll **more**) |
-| reroll $ / ante | 30.86 | 22.98 | 1.34× |
-| **rerolls in antes 1–3** (fixed window) | **9.25** | **8.72** | **1.06×** |
-| **packs in antes 1–3** (fixed window) | **10.67** | **8.80** | **1.21×** |
-
-In the run-length-controlled early window rerolls are indistinguishable (1.06×) while packs
-discriminate (1.21×). The engine's reroll *ordering* is also internally consistent: across 1295
-shops where it rerolled with an affordable pack on offer, there were **0** cases where the pack was
-valued higher. It genuinely prices a reroll at 5.07 against a pack's 0.88, and the win data does
-not contradict it.
-
-**Do not build a reroll gate.** Recorded so the next session does not re-derive this hypothesis
-from the $129/run figure, which is striking and misleading.
 
 ---
 
