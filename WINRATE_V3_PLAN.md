@@ -2318,6 +2318,35 @@ states rather than on aggregates.
 previous evaluation), and "what the winner did" is a proxy for "what wins", not proof of
 per-decision optimality. But 13.5% vs a human at ~100% is far outside any alignment noise.
 
+### The MECHANISM behind the SAVE preference, quantified — and it is ante-1..3 only
+
+`BUY_PACK` is scored `w_score*5*(pv*need + sbonus) - net_cost(cost) - econ_floor_penalty(gs, cost)`.
+The floor penalty charges `ECON_FLOOR_RATE` (0.5) per dollar a spend pushes below `ECON_FLOOR`
+($10). Recomputing it analytically over all 4470 AFFORDABLE pack offers in the n=160 baseline:
+
+| ante | n | mean logged value | **floor penalty** | value + penalty |
+|---|---|---|---|---|
+| 1 | 1093 | +1.88 | **2.13** | +4.01 |
+| 2 | 940 | −0.81 | **1.61** | +0.81 |
+| 3 | 901 | −0.93 | **0.55** | −0.38 |
+| 4 | 746 | −0.00 | 0.11 | +0.11 |
+| 5–8 | 790 | +0.44…+1.61 | ≈0.02 | — |
+
+Mean penalty **0.99** against a mean residual value of **0.21** — ~5×. **540 affordable packs
+(12.1%) are negative SOLELY because of the floor penalty**, and 481 of those 540 are at antes 1–2.
+
+**So the SAVE preference the paired data measured is an EARLY-GAME artifact of the econ floor.**
+From ante 4 the penalty is ~0 and packs are positive on average — they simply lose the ranked list
+to jokers and rerolls, and Celestial stays negative for its own (type-specific) reasons. Two
+different suppressors in two different windows; do not attempt one fix for both.
+
+⚠ The floor exists for a documented reason (it stopped the spend-to-$0 spiral on weak jokers) and
+`ECON_FLOOR`/`ECON_FLOOR_RATE` are MAGNITUDE constants — the class this project has repeatedly
+shown backfires in isolation. **Do not touch them until the `richpack` probe reports.** If
+throughput measures causal, this is the identified mechanism to fix and there would then be BOTH a
+causal probe and a mechanism — the strongest position available. If it does not, this is just a
+correct description of a policy that happens to be right.
+
 ### 💡 THE HYPOTHESIS IS AN INTERACTION — and it is the project's first two-axis probe
 
 The naive reading ("buy more packs") is already REFUTED: `levelbuy` (§5g) bought the declined
