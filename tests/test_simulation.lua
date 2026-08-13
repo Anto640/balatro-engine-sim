@@ -415,6 +415,36 @@ return function(t)
     t.eq(Eval.econ_value(dia, "j_golden"), Eval.econ_value(nod, "j_golden"),
       "Golden Joker econ is deck-independent (unconditional)")
 
+    -- MULTIPLICATIVE ECONOMY (2026-08-13). econ_power is a SUM of static per-joker figures,
+    -- so it could not represent a money ENGINE -- and both of the human's money-carried wins
+    -- were exactly that ("oops all 6s synergising into reserved parking farming"). Oops! All
+    -- 6s doubles every listed probability, so it doubles a probability-gated money joker.
+    do
+      local faces = {}
+      for i = 1, 20 do faces[i] = card{ id = i, rank_id = 12, suit = "Spades" } end  -- all Queens
+      local plain = GS.new{ deck = faces, jokers = { { key = "j_reserved_parking" } } }
+      local oops  = GS.new{ deck = faces, jokers = { { key = "j_reserved_parking" }, { key = "j_oops" } } }
+      t.ok(Eval.econ_value(oops, "j_reserved_parking") > Eval.econ_value(plain, "j_reserved_parking"),
+        "Oops! All 6s doubles a probability-gated money joker's income")
+      t.eq(Eval.econ_value(oops, "j_golden"), Eval.econ_value(plain, "j_golden"),
+        "...but NOT a flat, non-probability econ joker (Golden Joker is unaffected)")
+      -- Reserved Parking is face-density-aware, like Business Card
+      local nofaces = {}
+      for i = 1, 20 do nofaces[i] = card{ id = i, rank_id = 5, suit = "Spades" } end
+      local lowdeck = GS.new{ deck = nofaces, jokers = { { key = "j_reserved_parking" } } }
+      t.ok(Eval.econ_value(plain, "j_reserved_parking") > Eval.econ_value(lowdeck, "j_reserved_parking"),
+        "Reserved Parking earns more on a face-heavy deck (deck-aware, was a flat prior)")
+      -- and the deck-aware value must reach the BUY/SELL path, which read the raw catalogue
+      -- number: a Rough Gem was priced identically on a 4-diamond deck and a 20-diamond one.
+      local fv_dia = Eval.joker_marginal_fv(
+        GS.new{ deck = suit_deck("Diamonds", 20), jokers = { { key = "j_rough_gem" } } }, 1,
+        { measure = false })
+      local fv_nod = Eval.joker_marginal_fv(
+        GS.new{ deck = suit_deck("Spades", 20), jokers = { { key = "j_rough_gem" } } }, 1,
+        { measure = false })
+      t.ok(fv_dia > fv_nod, "deck-aware econ reaches the FV valuation (buy/sell), not just headroom")
+    end
+
     -- Cloud 9 ($1 per 9 in the deck) scales with the count of 9s.
     local many9, no9 = {}, {}
     for i = 1, 8 do many9[i] = card{ id = i, rank_id = 9, suit = "Spades" } end
