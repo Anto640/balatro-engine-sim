@@ -214,6 +214,53 @@ function Probe.level_first(run, shop, ranked)
 end
 
 -- ---------------------------------------------------------------------------
+-- PACK GREED override (WINRATE_V3_PLAN §5z). The single largest measured behavioural gap
+-- between the engine and the 7-win human dataset: the engine opens **1.36 packs/ante**, the
+-- human **6.10** -- and in the human's own 8 runs pack throughput separates the 7 wins
+-- (4.33-7.44/ante) from the 1 loss (2.80/ante) with NO OVERLAP. The engine buys only 23.7% of
+-- AFFORDABLE packs and declines 1337 that it rated positively itself, rerolling instead 24.9%
+-- of the time. By type it is worst exactly where the human is heaviest: it prices Celestial at
+-- mean -0.79 (buy rate 6.3%) and Standard at -1.35 (6.8%).
+--
+-- WHY THIS IS NOT `levelbuy` (which measured -0.229 and closed that thread). `levelbuy` bought
+-- the declined CELESTIAL offers only, and it did so out of a bankroll the engine did not have --
+-- the stated arithmetic was ~10 extra buys x ~$4.50 ~= $45 ~= -0.22 progress, i.e. the levels
+-- landed and paid for themselves and no more. This probe differs in two ways that matter:
+--   1. it takes EVERY pack type (the human's mix is Arcana 41% / Celestial 23% / Standard 18% /
+--      Buffoon 14%, so a Celestial-only lesion tests less than a quarter of the behaviour), and
+--   2. it is designed to be crossed with `income_bonus` -- see the `richpack` config.
+--
+-- THE HYPOTHESIS IS AN INTERACTION, and it is the first two-axis probe in this project.
+-- Neither axis works alone: money alone (+$10/rd) reaches 2.44 packs/ante and 7.5% winrate;
+-- packs alone (`levelbuy`) is net-negative because it cannibalises other buys. The human has
+-- BOTH -- their dollar trajectory matches the +$10/rd arm within ~15% at every ante, AND they
+-- open 6.10 packs/ante. §5w predicts any further SINGLE-axis probe returns ~50/50 (three did in
+-- one session); this tests whether the two are supermodular.
+--
+-- Like level_first it never overrides an actual joker acquisition (the board still has to clear
+-- the next boss, and the human's joker rate MATCHES the engine's at 1.69 vs 1.75/ante) -- so it
+-- reallocates the margin away from rerolls/saves, which is exactly the observed divergence.
+function Probe.pack_greed(run, shop, ranked)
+  local p = run.probe
+  if not (p and p.pack_greed) then return nil end
+  local best = ranked and ranked.best
+  if best and (best.type == "BUY_JOKER" or best.type == "SELL_TO_BUY") then return nil end
+  if best and best.type == "BUY_PACK" then return nil end     -- already doing it
+  local cash = run.economy.dollars
+  local keep = p.pack_reserve or 0
+  -- cheapest affordable pack first: maximise THROUGHPUT (the measured human behaviour) rather
+  -- than pick a favourite type -- choosing a type here would smuggle in a valuation.
+  local best_b, best_cost = nil, nil
+  for _, b in ipairs(shop.boosters or {}) do
+    local c = b.cost or 4
+    if cash - c >= keep and (not best_cost or c < best_cost) then best_b, best_cost = b, c end
+  end
+  if not best_b then return nil end
+  return { best = { type = "BUY_PACK", target = best_b, cost = best_cost, value = 0,
+                    reason = "probe: pack-greed" }, alternatives = {} }
+end
+
+-- ---------------------------------------------------------------------------
 -- HOARD override (WINRATE_V3_PLAN §5i). The causal test of the one replicated correlation
 -- this project has: at ante 3, runs that reach ante 6+ hold MORE cash (+2.85/+1.27 across two
 -- independent batches) and own FEWER econ jokers and vouchers. The engine holds a median of
@@ -269,6 +316,16 @@ Probe.CONFIGS = {
   levelbuy     = { level_first = true, level_reserve = 0 },
   levelbuy10   = { level_first = true, level_reserve = 10 },
   levelbuy20   = { level_first = true, level_reserve = 20 },
+  -- PACK GREED (§5z) + the 2x2 INTERACTION cell. `packgreed` is the packs-only arm;
+  -- `richpack` crosses it with the +$10/round income the human actually has. The 2x2 is
+  -- baseline / rich10 / packgreed / richpack, so the interaction is
+  --   (richpack - rich10) - (packgreed - baseline).
+  -- Reserve is held at $10 in BOTH pack cells so the 2x2 varies only MONEY. $10 is not
+  -- arbitrary: it is the engine's own SA.ECON_FLOOR, and the levelbuy series showed the
+  -- reserve is what did the damage there ($0 -> -0.229, $10 -> -0.002, $20 -> -0.084).
+  packgreed    = { pack_greed = true, pack_reserve = 0 },     -- the destructive-reserve control
+  packgreed10  = { pack_greed = true, pack_reserve = 10 },    -- packs-only arm
+  richpack     = { income_bonus = 10, pack_greed = true, pack_reserve = 10 },  -- INTERACTION cell
   -- HOARD: refuse purchases that drop the bankroll below the floor, before the given ante.
   -- Fires in EVERY shop of EVERY run (unlike a joker fix, capped at ~5% firing).
   hoard10      = { min_bank = 10, hoard_until = 5 },

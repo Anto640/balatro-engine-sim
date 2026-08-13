@@ -2158,3 +2158,158 @@ verdict. This qualifies: it repriced money inside **every pack EV** (`packs.lua`
 decision in every shop), **every pack pick** (~16/run), **every gold / lucky / gold-seal card**
 (`consumable_value`), and **every money tarot**. Contrast the same session's econ-model fix, which is
 correctness but sits at Oops 2.0% / broad 27.6% and is predicted inert.
+
+---
+
+### VERDICT on the bridge fix (paired n=154 vs `econ_fix`) — UNRESOLVABLE, kept on the rule
+
+| | |
+|---|---|
+| progress Δ | **−0.125** (t = −0.84, p 0.40, n.s.) |
+| sign test | 56 better / 53 worse / 45 tied (p 0.85) |
+| death-ante | 38 later / 38 earlier / 78 unchanged |
+| **sd** | **1.859** |
+| **MDE at n=154** | **0.42** |
+
+The measurement cannot resolve an effect a third the size of its own detection floor, which is
+exactly what CLAUDE.md's power table predicts for a broad re-weight (sd ~1.2 → MDE ~0.27; this
+cascaded harder still). **Kept**, per the replacement rule: it is a correctness-class change (the
+same card provably priced differently in two modules), it is not significantly negative, and no
+mechanism says it is wrong. Reverting a provable unit error on a p=0.40 reading would be
+optimising the measurement, not the game.
+
+⚠ Note the signature: **the fifth large intervention in a row that re-rolls without moving the
+mean** — oracle_plan 41/40, noskip 68/67, noskip_early 71/61, shape_dir 2/8, bridge 56/53.
+
+### The reachability envelope — and why the churn is NOT hidden upside (`tools/envelope.lua`)
+
+Every A/B batch on the shared 160-seed pool is an independent EXPRESSIBLE POLICY over the SAME
+seeds, so the per-seed MAX across them lower-bounds "was a winning line reachable?". Over 7
+variants (retrig_keep, retrig_base, shape_credit, shape_dir, pb_noskip, pb_noskip4, econ_fix):
+
+| | progress | wins | reach 6+ | reach 7+ |
+|---|---|---|---|---|
+| best single arm | 3.793 | 5 (3.1%) | 31 | 14 |
+| **envelope (per-seed max)** | **4.483** | **11 (6.9%)** | 50 | 28 |
+| floor (per-seed min) | 3.020 | — | — | — |
+
+A 2.2× win "lift" looks like a hidden reachable line — **it is not.** envelope − best = **+0.690**
+while best − floor = **+0.773**: near-symmetric dispersion about the mean is the signature of
+NOISE, not of reachability (a genuinely reachable line raises the max without lowering the floor
+equally). **85% of seeds change outcome under tiny policy perturbations.** The sim is deterministic,
+so this is not measurement error — it is chaotic sensitivity to policy through the seeded RNG
+cascade. This is the quantitative form of §5w's finding and the reason broad levers cannot be
+measured at n=160. Do not read max-over-k as an oracle.
+
+---
+
+## 5z. THE PACK-THROUGHPUT GAP — the largest measured behavioural divergence in the project
+
+Everything below is measured from `sim_out/econ_fix.jsonl` (n=160, current HEAD) against
+`data/bes_runs_live_2026-08-12.jsonl` (8 human runs, 7 wins). No new simulation was needed.
+
+### ⚠ FIRST: a recorded number that is WRONG, and it redirected the project
+
+CLAUDE.md and §5m state *"the sim uses MORE planets/run than the human (1.67 vs 1.05)"*, and that
+is the premise that produced the **"audit the FACTS layer, it is an expressibility artifact"**
+conclusion — which led to the secret-hand / Black Hole / spectral work that measured **exactly
+0.000**. Re-measured on the complete dataset, counting `consumable_use` records whose key is in
+`CV.PLANET_KEY_HAND` (the live records carry `key`, not `set` — reading `set` returns nil, which is
+the likely origin of the error):
+
+| | planets used / run | / ante |
+|---|---|---|
+| ENGINE (n=160) | **1.77** | 0.43 |
+| HUMAN (n=8) | **8.38** | 0.99 |
+
+**4.7× per run, 2.3× per ante — the opposite sign to the recorded figure.** The leveling gap was
+policy after all. Treat §5m's "inexpressible-world artifact" framing as unproven.
+
+### The gap itself
+
+| | packs opened / ante |
+|---|---|
+| ENGINE | **1.36** |
+| HUMAN | **6.10** |
+
+And within the human's own 8 runs, pack throughput separates the outcomes **with no overlap**:
+
+| run | 4NN97569 | W9WKT1UE | 6W2JL21K | 67HVNBZB | GU73QPLY | U8UE74EN | IET2K8M7 | **X3L32ZEA** |
+|---|---|---|---|---|---|---|---|---|
+| packs/ante | 7.33 | 7.44 | 6.89 | 6.44 | 6.22 | 5.89 | 4.33 | **2.80** |
+| Celestial packs | 24 | 7 | 14 | 14 | 15 | 13 | 6 | **2** |
+| outcome | WIN | WIN | WIN | WIN | WIN | WIN | WIN | **LOSS** |
+
+The loss opened **zero packs at antes 2 AND 3**. It is the run the player described as *"despite
+having so much econ i couldnt find anything which boosted my build or gave it direction."* The
+engine, at 1.36/ante, sits at **half the human's LOSING run and a fifth of their wins**.
+
+### It is a valuation choice, not poverty
+
+| | count | rate |
+|---|---|---|
+| shops with a pack offered | 2917 | — |
+| ...**affordable** | 2410 | — |
+| ...**bought** | 571 | **23.7%** |
+| affordable packs DECLINED that the engine itself rated POSITIVE | **1337** | 39.3% of declines |
+
+What it does instead of a positive, affordable pack: BUY_JOKER 38.7%, **REROLL 24.9%**,
+BUY_VOUCHER 11.8%, SELL_JOKER 11.6%, BUY_CONSUMABLE 10.3%.
+
+By type — it is worst exactly where the human is heaviest:
+
+| type | affordable | buy rate | mean value | % rated positive |
+|---|---|---|---|---|
+| Buffoon | 344 | 45.1% | +5.97 | 85% |
+| Arcana | 1133 | 22.8% | +1.61 | 69% |
+| **Celestial** | 1487 | **6.3%** | **−0.79** | 37% |
+| **Standard** | 1290 | **6.8%** | **−1.35** | 34% |
+
+Celestial mean value **by ante**: +1.57, **−2.16, −1.93, −0.84**, −0.22, −0.16, −0.03, +0.65. It is
+negative through the whole a2–a6 window and only recovers at a8. Against the hand-level
+trajectories:
+
+| ante | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|---|---|---|
+| ENGINE hand-lv | 0.4 | 1.3 | 1.8 | 2.5 | 2.8 | 5.2 | 7.7 |
+| HUMAN hand-lv | 0.0 | 0.5 | **2.8** | **5.8** | **10.6** | **14.6** | **18.6** |
+
+The human levels LESS at a2–a3 (confirming the recorded crossover) and ramps from a4 — precisely
+the window where the engine still prices a Celestial pack negative. (Engine a7/a8 figures are from
+15 and 7 survivors, so survivorship inflates them; the true gap is wider.)
+
+### 💡 THE HYPOTHESIS IS AN INTERACTION — and it is the project's first two-axis probe
+
+The naive reading ("buy more packs") is already REFUTED: `levelbuy` (§5g) bought the declined
+Celestial offers, more than doubled levels (2.52 → 5.51/run), and measured **−0.229**, with the
+arithmetic ~10 buys × $4.50 ≈ $45 ≈ −0.22 — the levels paid for themselves and no more. But note
+what the three known cells actually are:
+
+| cell | packs/ante | result |
+|---|---|---|
+| baseline | 1.36 | 2.5% win |
+| money alone (`rich10`, +$10/rd) | 2.44 | 7.5% win |
+| packs alone (`levelbuy`, no extra income) | ↑ Celestial only | **−0.229** |
+| **money + packs** | — | **NEVER TESTED** |
+
+The human has **both**. Their dollar trajectory matches the `rich10` arm within ~15% at every ante
+(a2: $9.2 vs $10.4 vs engine $1.3; a3: $21.5 vs $24.2 vs $6.6) *while also* buying ~4.7 more packs
+per ante — so their true income is roughly **rich10 + the extra pack spend ≈ +$16/round** over
+baseline, which the dose–response prices at only ~15% winrate. They win 87.5%. **Money alone cannot
+explain the gap; packs alone are refuted; the untested cell is the product.**
+
+`Probe.pack_greed` + configs `packgreed10` / `richpack` test the 2×2, with reserve held at $10 in
+BOTH pack cells (the engine's own `SA.ECON_FLOOR`; the levelbuy series showed the reserve is what
+did the damage: $0 → −0.229, $10 → −0.002, $20 → −0.084), so the cross varies only money.
+Interaction = (richpack − rich10) − (packgreed10 − baseline).
+
+### ⚠ Caveats, stated before the result
+
+* **Bought vs free is unknown.** This dataset cannot distinguish packs the human BOUGHT from free
+  MEGA packs granted by skip tags — `blind_select`/`blind_result` were added to telemetry on
+  2026-08-13 and this dataset is 08-12, so several runs log zero blinds. If much of the human's
+  volume is tag-sourced, "buy more packs" is the wrong prescription even if throughput is causal.
+* **`richpack` may be underfunded** at +$10/round against the human's ≈+$16/round, so a null there
+  would not fully refute the interaction.
+* The win/loss separation is **n=1 on the loss side**. It is a strong correlation, not proof.
+* Pack decisions cascade the seeded RNG hard, so expect sd ≈ 1.0–1.9 and MDE ≈ 0.2–0.4 at n=80.

@@ -35,6 +35,37 @@ return function(t)
     t.ok(plain < 100, "...and the un-probed run gets ordinary round income")
   end
 
+  -- ---- §5z PACK GREED: inert without a probe, and respects its guards -----
+  do
+    local shop = { boosters = { { key = "p_arcana_normal", cost = 4 },
+                                { key = "p_celestial_mega", cost = 8 } } }
+    local ranked = { best = { type = "REROLL", value = 1 } }
+    t.eq(Probe.pack_greed({ probe = {} }, shop, ranked), nil, "pack_greed is inert with no config")
+    t.eq(Probe.pack_greed({ probe = { pack_greed = true }, economy = { dollars = 3 } }, shop, ranked),
+      nil, "pack_greed takes nothing it cannot afford")
+
+    -- never displaces a joker acquisition (the board still has to clear the next boss)
+    local rich = { probe = { pack_greed = true }, economy = { dollars = 50 } }
+    t.eq(Probe.pack_greed(rich, shop, { best = { type = "BUY_JOKER" } }), nil,
+      "pack_greed never overrides a joker buy")
+    t.eq(Probe.pack_greed(rich, shop, { best = { type = "SELL_TO_BUY" } }), nil,
+      "pack_greed never overrides SELL_TO_BUY")
+    t.eq(Probe.pack_greed(rich, shop, { best = { type = "BUY_PACK" } }), nil,
+      "pack_greed leaves an existing pack buy alone")
+
+    -- overrides a reroll, taking the CHEAPEST pack (throughput, not a type preference)
+    local ov = Probe.pack_greed(rich, shop, ranked)
+    t.ok(ov and ov.best and ov.best.type == "BUY_PACK", "pack_greed overrides a reroll with a pack")
+    t.eq(ov.best.cost, 4, "pack_greed takes the CHEAPEST affordable pack (maximise throughput)")
+
+    -- the reserve is respected: $10 on hand, $10 reserve -> nothing is affordable
+    local tight = { probe = { pack_greed = true, pack_reserve = 10 }, economy = { dollars = 10 } }
+    t.eq(Probe.pack_greed(tight, shop, ranked), nil, "pack_greed honours its cash reserve")
+    local ok2 = Probe.pack_greed({ probe = { pack_greed = true, pack_reserve = 10 },
+                                   economy = { dollars = 14 } }, shop, ranked)
+    t.ok(ok2 ~= nil and ok2.best.cost == 4, "...and buys once the reserve is cleared")
+  end
+
   -- ---- A1 static priority: the supermodular knowledge, hardcoded ----------
   do
     t.ok(Probe.rank("j_blueprint") > Probe.rank("j_joker"),

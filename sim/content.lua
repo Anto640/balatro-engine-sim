@@ -883,6 +883,13 @@ function Content.shop_phase(run, opts)
       local ov = Probe.level_first(run, shop, ranked)
       if ov then ranked = ov end
     end
+    -- PACK GREED lesion (§5z): take an affordable pack the engine declined. Runs AFTER the
+    -- advisor (so it only overrides what the engine actually chose) and never displaces a
+    -- joker buy. Inert without a probe config.
+    if run.probe and run.probe.pack_greed then
+      local pv = Probe.pack_greed(run, shop, ranked)
+      if pv then ranked = pv end
+    end
     -- Phase A HOARD lesion: refuse a purchase that would drop the bankroll below the floor.
     -- Fires in every shop of every run (see Probe.hoard); inert without a probe config.
     if run.probe and run.probe.min_bank then
