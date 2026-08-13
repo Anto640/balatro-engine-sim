@@ -2391,3 +2391,73 @@ Interaction = (richpack − rich10) − (packgreed10 − baseline).
   throughput pays even through a mis-calibrated picker.
   (The world does not waste them: slots-full consumables are USED immediately (the A6 fix) and
   Standard cards go straight into the deck, so nothing paid for is silently voided.)
+
+---
+
+# 6. ⭐ THE OPERATING-POINT PROBLEM — why "logical fixes measure inert", and it is the measurement
+
+**This may be the most consequential result in the project, because it is about the METHOD every
+verdict here has used.**
+
+`rich10` (+$10/round) was re-run on current code to serve as the matched arm for the §5z
+interaction test. It was previously run at `e7c3a8c`. Same probe, same 80 seeds, so the pair is a
+clean paired A/B of the accumulated ENGINE work, **measured at a different operating point**:
+
+| | old (`e7c3a8c`) | new (`82f808f`) | Δ |
+|---|---|---|---|
+| progress | 4.608 | **5.338** | **+0.730** |
+| wins | 6 / 80 (7.5%) | **12 / 80 (15.0%)** | **2×** |
+
+**t = +3.11, p = 0.0018. Sign test 46 better / 26 worse, p = 0.025.** Two independent tests agree,
+and sd 2.096 → MDE 0.66 at n=80, so the effect clears its own detection floor.
+
+Now compare what those SAME changes measured **at baseline income**, each properly paired at
+n=160–480:
+
+| change | baseline verdict |
+|---|---|
+| retrigger core-keep | +0.012 (142/160 TIED, MDE 0.115) |
+| economy model | −0.002 (159/160 TIED) |
+| currency bridge | −0.125 (p 0.40, MDE 0.42) |
+| secret hands / `HAND_ORDER` | **exactly 0.000** |
+| **sum** | **≈ −0.115** |
+
+**The same engine work: ≈ −0.115 at baseline, +0.730 (p=0.0018) at +$10/round, doubling the
+winrate.**
+
+### The explanation, and it is not subtle
+
+**The baseline engine holds $1.3 at ante 2 and $6.6 at ante 3.** A valuation fix changes which
+option the engine *prefers* — but preference is only expressible if you can afford to act on it.
+Testing a valuation change at baseline income is testing a car's handling with an empty tank. The
+measurement apparatus has been operating at the one point on the resource axis where the quantity
+under test is least able to express itself.
+
+This retro-explains the project's central mystery — "after so many attempts at improvements which
+are logical it is not improving anything" — without needing the churn/chaos story to carry all of
+it. Both are true: §5z's envelope shows the outcome is chaotic in the policy (sd ~1.9), AND the
+baseline starves the policy of the means to act.
+
+### What this changes
+
+1. **Judge valuation changes at an operating point where they can fire.** A `rich10` arm costs the
+   same as a baseline arm and has ~8× the winrate headroom (15% vs 2.5%), so it discriminates far
+   better. Baseline remains the honest headline number; it is a poor *instrument*.
+2. **Re-examine the revert set.** The graveyard (C1, B3, F3, F4, F8, swap-damp, cost-discount,
+   xmult-floor, the reroll gate, W-ECON…) was populated almost entirely by baseline nulls. Those
+   verdicts are now suspect as a class — not necessarily wrong, but *untested where it counts*.
+3. It reframes §5w's "decisions are not the binding constraint; income is." Income is not just a
+   resource the engine lacks — **it is the precondition for any decision improvement to register at
+   all.** That is a supermodularity between the money axis and the policy axis, and it is the same
+   shape as §5z's pack/income interaction.
+
+### ⚠ Caveats, and the confirmation still pending
+
+* The bundle is **six** engine commits, not the three fixes shipped this session: retrigger, econ,
+  bridge, **The Fool** (440bd26), **secret hands / `HAND_ORDER`** (4e48274), and the OOM bound
+  (19db3c4, byte-identical at hand size ≤8). The surplus dig is NOT active (`DE.DIG_SURPLUS` is off
+  unless the `dig` probe runs). The Fool fix was never measured at baseline.
+* The baseline column **sums separate measurements**, and effects need not be additive.
+* **The decisive test is queued**: a worktree at `e7c3a8c` run at BASELINE income on the same 80
+  seeds, giving the identical code pair at both operating points. Until that lands, the
+  operating-point reading is strongly suggested, not established.
