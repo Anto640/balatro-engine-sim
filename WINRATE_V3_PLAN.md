@@ -1399,3 +1399,66 @@ Cavendish **16.79**, Sock and Buskin **13.07**, all recommended.
 **Consequence for data collection:** runs 4+ carry full `ranked` + `blind_result` logging from the
 first shop, so they are worth materially more per run than runs 1–3. The divergence question — *where
 does a winning human take what the engine prices low?* — needs them.
+
+---
+
+## 5q. THE SURPLUS-DIG PROBE — and the metric problem it exposed
+
+Built from §5p. `DE.DIG_SURPLUS` (off by default): once the clear is **guaranteed** and discards
+remain, pitch chaff outside the clearing play instead of playing immediately. It fires in every
+blind of every run — the only class the frequency ceiling says can move an n=160 verdict.
+
+### Paired n=160, both arms regenerated with current code
+
+| arm | progress | Δ vs base | sign (better/worse/tied) | wins |
+|---|---|---|---|---|
+| baseline | 3.759 | — | — | 2 |
+| dig v1 (naive pitch) | 3.610 | **−0.150** (p 0.065) | 27 / 38 / 95 | 4 |
+| dig v2 (chaff-first) | 3.604 | **−0.156** (p 0.067) | 27 / 37 / 96 | **5** |
+
+sd ≈ 1.03–1.08, so the MDE at n=160 is **~0.23**: both results sit inside the noise band. Neither
+is evidence of harm; neither is the positive evidence a policy change needs to ship.
+
+**A diagnosis that was half right.** v1 lost money at *every* ante (−0.2 to −1.2), which pointed at
+**held value**: a Gold card pays $3 at round end *if held*, Steel/Glass carry xmult while held, and
+v1 pitched the first non-clearing cards in hand order, blind to all of it —
+`DiscardValue.keep_value` already prices exactly this. v2 pitches chaff-first below
+`DE.DIG_MAX_KEEP = 20`. **The money leak duly closed** (a5 −1.2 → −0.8, a6 −1.1 → **+0.3**) — **and
+progress did not move at all** (−0.150 → −0.156). So the money leak was real, was fixed, and was
+*not* what drove the progress delta. Recorded because it is a clean refutation of my own hypothesis.
+
+### ⚠ The result that matters: PROGRESS DOWN, WINS UP — and the wins are STRICTLY NESTED
+
+| arm | winning seeds |
+|---|---|
+| baseline | 144003, 14003 |
+| dig v1 | 144003, 14003 **+ 125003, 51003** |
+| dig v2 | 144003, 14003 **+ 125003, 51003, 127003** |
+
+**The dig never lost a baseline win. It only added.** Paired: 3 discordant seeds, all favouring the
+dig, none against — replicated across two independent implementations. Exact two-sided p ≈ 0.25, so
+not significant alone; but the direction is unambiguous and the nesting is not what noise usually
+looks like. Death-ante shifted 18 later / 26 earlier / 116 unchanged: slightly more runs die sooner,
+and three more reach ante 8.
+
+**This is a variance-increasing change, and that exposes a problem with the metric itself.**
+`progress` (0–8, win = 8) was adopted because the sim had ~0 wins and a mean was the only usable
+signal. But **a mean penalises variance, and winning Balatro is variance-seeking** — you do not win
+by dying at ante 5 instead of 4, you win by reaching 8. Every verdict in this document was rendered
+by a statistic that is systematically biased against exactly the kind of change most likely to
+produce wins. That does not invalidate the earlier results (most were flat on both), but it means:
+
+> **A change that lowers mean progress while raising wins is not obviously bad. It may be exactly
+> right, and `progress` cannot see it.**
+
+### Status: NOT shipped, and the decisive test is running
+
+`DE.DIG_SURPLUS` stays **off**. Shipping needs positive evidence and the win signal is p ≈ 0.25.
+Resolving 1.25% → 3.1% needs far more seeds, so both arms are running on a fresh 320-seed pool
+(`BES_SEED_OFF=7`) to pool to **n=480 paired**. At that size ~9 discordant win-pairs are expected,
+enough for a real verdict on the win metric rather than the progress proxy.
+
+**Caveat kept in view:** the sim may understate what digging is *for*. The user digs for tarot
+targets and Lucky-card money; Lucky and Gold are modelled, but "draw a card worth applying a tarot
+to" is only partly represented. A null here is evidence about the sim's fidelity as much as about
+the tactic.
