@@ -2459,6 +2459,25 @@ baseline starves the policy of the means to act.
    all.** That is a supermodularity between the money axis and the policy axis, and it is the same
    shape as §5z's pack/income interaction.
 
+### WHERE the operating-point gain lands — broad, and it is not regression to the mean
+
+An obvious alternative explanation is that the fixes only help LATE, and baseline runs die before
+reaching where they matter. Bucketing seeds by where the OLD code died appears to answer this
+(+2.948 for old-early-deaths, +0.067 for old-late-deaths) — **but that is a regression-to-the-mean
+artifact** and must not be used: conditioning on A's outcome and measuring B−A guarantees that bad-in-A
+looks better in B, and severely so when the two arms correlate weakly (which §7 shows they do). The
+distribution shift has no such confound:
+
+| at the `rich10` operating point | a1 | a2 | a3 | a4 | a5 | a6 | a7 | a8 | WIN |
+|---|---|---|---|---|---|---|---|---|---|
+| OLD (`e7c3a8c`) | 7 | 2 | 11 | 12 | 21 | 9 | 6 | 6 | 6 |
+| NEW (`82f808f`) | 3 | 0 | 4 | 15 | 20 | 12 | 12 | 2 | **12** |
+
+Fraction reaching ≥a4: **0.75 → 0.91**; ≥a6: 0.34 → 0.47; ≥a7: 0.23 → 0.33. **Deaths in antes 1–3
+fall from 20 to 7 (−65%).** The gain is broad and starts EARLY — so "the fixes only matter late" is
+refuted, and the money-enables-preference reading survives: given cash, the improved valuations act
+from ante 1.
+
 ### ⚠ Caveats, and the confirmation still pending
 
 * The bundle is **six** engine commits, not the three fixes shipped this session: retrigger, econ,
