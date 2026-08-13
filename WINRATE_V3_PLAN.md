@@ -2083,6 +2083,35 @@ batch ran, and a 2× repricing of money would have cascaded every seed, not tied
 
 ## 5y. THE CURRENCY INCOHERENCE — the engine bought dollars at half the price it sold them
 
+> ## ❌ CORRECTION (2026-08-14): THIS IS NOT A NEW FINDING. IT IS **B3**, ALREADY TRIED AND REVERTED.
+> `WINRATE_AUDIT.md`, **2026-07-06 — Phase 2 item 6: "B3 unify the $↔fraction rate"** identifies the
+> *same* bug (`dollar_frac` 0.03 vs the shop's `0.3/5 = 0.06`), applies the *same* fix
+> (`BASE_FRAC 0.03 → 0.06 (= COST_WEIGHT/JOKER_SCORE_WEIGHT)`, clamps doubled), and notes the *same*
+> `tags.lua` side effect (tags ~2× over-valued, worsening with ante). It measured **−0.245** at
+> paired n=80 and was **REVERTED**. This section was written without finding that entry, and
+> presented the bug as newly discovered. It was not.
+>
+> The measurements agree: B3 −0.245 (n=80), this session −0.125 (n=154). Two consistent negatives.
+>
+> **And B3 was reverted on a MECHANISM, not a null** — which under this project's own rule is a
+> legitimate revert: *"`SK.SHOP_VALUE`, the 1.25 skip margin, keep_bias and the consumable-money
+> terms were all calibrated AGAINST the old 0.03 rate; doubling the rate alone mis-calibrates every
+> one of them at once."* This session independently rediscovered that same mechanism (see the market
+> check below, which flags exactly the `tags.lua` inverse and the `SK.SHOP_VALUE` co-calibration) —
+> and then shipped anyway on the correctness rule. **That was the wrong call under the project's own
+> standard.**
+>
+> ⚠ **Lesson, and it is the second of its kind this session:** SEARCH THE AUDIT before claiming a
+> finding. The wrong-planet-number correction in §5z came from re-deriving a recorded measurement;
+> this one came from *not* reading a recorded one. Both cost real work.
+>
+> **Status: under re-test, not settled.** §6 shows baseline verdicts on valuation changes are
+> uninformative, and BOTH B3 measurements were taken at baseline. An isolation arm
+> (`sim_out/rich_nobridge.jsonl`: current HEAD with `BASE_FRAC` alone reverted to 0.03, run at
+> `rich10`) is measuring the single-constant effect at an operating point where it can express.
+> **If it is negative there, revert the constant** — the B3 mechanism was right and two negatives
+> plus a mechanism is decisive. If positive, this is a genuine graveyard resurrection.
+
 **This is not a lever. It is a unit error**, and it is the first thing found that is *about income*
 (§5u/§5w's binding constraint) and is a *bug* rather than a weight.
 
