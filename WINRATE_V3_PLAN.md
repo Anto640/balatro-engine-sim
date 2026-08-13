@@ -146,6 +146,14 @@ failed because its partners didn't move. The correct response is not more carefu
 it is (a) a **cheap surrogate objective** so you can take thousands of samples, and (b) a
 **derivative-free joint optimizer** (CMA-ES/SPSA) over the constant vector. Both are Phase C.
 
+> ⭐ **UPDATE (§6, 2026-08-14): there is a SECOND explanation for that graveyard, and it is not
+> non-separability.** The same engine work measures ≈ −0.115 at baseline and **+0.730 (p=0.0018)**
+> at +$10/round. The baseline engine holds **$1.3 at ante 2**, so a change to what it *prefers*
+> cannot express itself — there is nothing to spend. Those reverts may have failed because the
+> measurement point is degenerate, not (only) because their partners didn't move. Re-test the
+> graveyard at an operating point where the constants can fire **before** reaching for a joint
+> optimizer; that is far cheaper than Phase C and tests a different hypothesis.
+
 ---
 
 ## 3. Finding 3 — the ceiling is unmeasured (run this first)
