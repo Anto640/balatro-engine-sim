@@ -140,6 +140,12 @@ local function build_gs(run, blind, hand, draw_pile, eff)
     jokers = run.jokers,
     consumables = run.consumables,
     economy = run.economy,
+    -- what The Fool would copy. The world has tracked this as run._last_consumable all along
+    -- (for its own c_fool branch) but never showed it to the ENGINE, so in-sim the Fool's
+    -- copy-target search could only ever see held/in-pack cards -- the mirror image of the
+    -- live bug where it was valued with no target at all.
+    last_tarot_planet = run._last_consumable and
+      { key = run._last_consumable.key, name = run._last_consumable.name } or nil,
     blind = {
       name = blind.name or blind.type, target_chips = blind.target, chips_scored = blind.scored,
       boss = (blind.type == "Boss"), blind_type = blind.type,

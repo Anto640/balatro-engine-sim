@@ -264,8 +264,27 @@ end
 -- `freq` (optional) = precomputed hand frequencies; `need` = boss per-hand need.
 -- `samples` (optional, default 6) = MC samples for the measured enhancement-tarot
 -- value; pool callers (packs) pass a lower count since they value many tarots.
+-- Does The Fool have anything to COPY right now? It recreates the last Tarot/Planet you
+-- USED, so with none used and none held it is a literal no-op. Reported from live play
+-- (run 8): the engine advised taking The Fool before any tarot had been used, and the game
+-- would not even allow it. The 0.30 prior in TAROT_BASE was being applied unconditionally.
+function CV.fool_target(gs)
+  if not gs then return nil end
+  local lt = gs.last_tarot_planet
+  if lt and lt.key then return lt.key end
+  for _, h in ipairs(gs.consumables or {}) do
+    if h.set == "Tarot" or h.set == "Planet" then return h.key end
+  end
+  return nil
+end
+
 function CV.card_value(gs, set, key, freq, need, rng, samples)
   need = need or 1
+  -- The Fool with nothing to copy is worth ZERO, not its prior (see CV.fool_target).
+  -- Only when NO pack is open: inside a pack the Fool may copy a card offered alongside it,
+  -- and pack_open_advisor does that richer search (and zeroes it there if it finds nothing).
+  -- Zeroing unconditionally here would delete the Fool before that search ever ran.
+  if key == "c_fool" and not gs.pack and not CV.fool_target(gs) then return 0, 0 end
   if set == "Planet" then
     local hand = CV.PLANET_KEY_HAND[key]
     if hand then

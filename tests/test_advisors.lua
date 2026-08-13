@@ -830,4 +830,35 @@ return function(t)
     t.ok(star <= 0.001 and moon <= 0.001 and world <= 0.001,
       "suit tarots fighting the flush value ~0, not the flat prior")
   end
+
+  -- ---- THE FOOL with nothing to copy is worth ZERO (live run 8, 2026-08-13) ----
+  -- The Fool recreates the last Tarot/Planet you USED, so before any has been used and with
+  -- none held it is a literal no-op -- the game will not even let you take it. The engine was
+  -- applying TAROT_BASE's flat 0.30 prior unconditionally and advising the pick.
+  do
+    local World = require("sim.world")
+    local function st(over)
+      local o = { deck = World.standard_deck(), consumables = {}, jokers = {},
+        economy = { dollars = 10 }, run = { hand_levels = {} },
+        blind = { target_chips = 300, chips_scored = 0, hands_left = 4, discards_left = 4 } }
+      for k, v in pairs(over or {}) do o[k] = v end
+      return GS.new(o)
+    end
+
+    t.eq(CV.fool_target(st{}), nil, "no tarot used and none held -> nothing for The Fool to copy")
+    t.eq(CV.fool_target(st{ last_tarot_planet = { key = "c_strength" } }), "c_strength",
+      "the last USED tarot is a copy target")
+    t.eq(CV.fool_target(st{ consumables = { { set = "Tarot", key = "c_death", name = "Death" } } }), "c_death",
+      "a HELD tarot is a copy target")
+    t.eq(CV.fool_target(st{ consumables = { { set = "Joker", key = "j_joker" } } }), nil,
+      "a held JOKER is not something The Fool can copy")
+
+    t.eq((CV.card_value(st{}, "Tarot", "c_fool", nil, 1)), 0,
+      "The Fool values ZERO with nothing to copy (was the 0.30 prior)")
+    t.ok((CV.card_value(st{ last_tarot_planet = { key = "c_strength" } }, "Tarot", "c_fool", nil, 1)) > 0,
+      "...and is worth something once a tarot has been used")
+    -- the bug was specific to The Fool: other tarots keep their prior
+    t.ok((CV.card_value(st{}, "Tarot", "c_strength", nil, 1)) > 0,
+      "an ordinary tarot still values off its prior on the same bare state")
+  end
 end

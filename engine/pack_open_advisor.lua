@@ -217,6 +217,26 @@ function PO.recommend(gs, opts)
     v = v * gen_factor(it.key)
     valued[#valued + 1] = { it = it, key = it.key, name = it.name or it.key or "item", v = v, meas = meas }
   end
+  -- THE FOOL is chosen on its value like anything else, but the copy-target search below only
+  -- ORDERS picks that are already selected -- so before this fix a Fool with nothing to copy
+  -- was selected on its flat 0.30 prior and could beat a genuinely useful tarot. Reported from
+  -- live run 8: "it said take fool when i hadnt even used a tarot so it didnt let me". Zero it
+  -- here, BEFORE the sort, unless something is copyable: a card used, a card held, or another
+  -- Tarot/Planet in this very pack (which the Fool can copy if used after it).
+  do
+    local target = ConsumableValue.fool_target(gs) ~= nil
+    -- An in-pack Tarot/Planet only counts when we can take BOTH -- the Fool copies the last
+    -- card USED, so you must pick the copyable, use it, then use the Fool. With a single pick
+    -- available there is nothing it can copy, however good the card next to it looks.
+    if not target and (p.picks_left or 1) >= 2 then
+      for _, e in ipairs(valued) do
+        if e.key ~= "c_fool" and (e.it.set == "Tarot" or e.it.set == "Planet") then target = true; break end
+      end
+    end
+    if not target then
+      for _, e in ipairs(valued) do if e.key == "c_fool" then e.v = 0 end end
+    end
+  end
   table.sort(valued, function(a, b2) return a.v > b2.v end)
 
   -- choose up to picks_left items with positive value (skip deck-bloating cards)
@@ -242,7 +262,15 @@ function PO.recommend(gs, opts)
     return a.v > b2.v
   end)
   if fool and cheap then
-    -- cheap pass: keep the Fool's prior value, skip the copy-target measurement.
+    -- cheap pass: skip the copy-target MEASUREMENT, but still check one exists -- a Fool with
+    -- nothing to copy is a no-op and must not keep its prior (reported from live run 8).
+    local any = ConsumableValue.fool_target(gs) ~= nil
+    if not any then
+      for _, pk in ipairs(others) do
+        if pk.it and (pk.it.set == "Tarot" or pk.it.set == "Planet") then any = true; break end
+      end
+    end
+    if not any then fool.v = 0; fool.copies = nil end
     table.insert(others, fool)
   elseif fool then
     -- value of any tarot/planet The Fool could copy
@@ -284,6 +312,8 @@ function PO.recommend(gs, opts)
         table.insert(others, 1, fool)              -- copies a prior/held card -> Fool first
       end
     else
+      -- nothing in the pack, nothing used, nothing held -> The Fool copies NOTHING
+      fool.v = 0; fool.copies = nil
       table.insert(others, fool)
     end
   end
