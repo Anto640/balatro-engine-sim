@@ -105,9 +105,35 @@ only counts when `picks_left >= 2`). Live telemetry gained `blind_select`, `blin
 (hands/discards actually SPENT) and per-option `ranked` valuations.
 (The install at `%APPDATA%/Balatro/Mods/balatroenginesim/` is CURRENT as of 2026-08-13.)
 
-### CURRENT STATE (2026-08-13) — **8 expert HUMAN runs captured, 7 wins**; engine still ~1.25%
+### CURRENT STATE (2026-08-14) — **8 expert HUMAN runs captured, 7 wins**; engine still ~1.25%
 **➡ THE authoritative status is `WINRATE_V3_PLAN.md` §5r (read that first). Fresh-session handoff:
 `NEXT_SESSION.md`. Historical audit + roadmap: `WINRATE_AUDIT.md`. Superseded plans: `docs/archive/`.**
+
+> ## ⭐⭐ READ THIS BEFORE RUNNING OR JUDGING ANY BATCH (2026-08-14, `WINRATE_V3_PLAN.md` §6)
+> **THE BASELINE IS A BROKEN INSTRUMENT.** The *identical* six-commit engine delta
+> (`e7c3a8c`→`82f808f`), on the *same* seeds, measured at two operating points:
+>
+> | operating point | code delta | p | wins | sign test |
+> |---|---|---|---|---|
+> | **baseline income** | **−0.102** | 0.65 (n.s.) | 1 → 2 / 80 | **32 / 34 — dead even** |
+> | **+$10/round** (`rich10`) | **+0.730** | **0.0018** | **6 → 12 / 80** | 46 / 26 (p 0.025) |
+>
+> **Interaction: +0.832, SE 0.324, t = 2.57, p = 0.0102.** Same code. Same seeds. The only
+> difference is whether the engine had money to act on its preferences — it holds **$1.3 at ante 2**
+> at baseline. A valuation fix changes what the engine *prefers*, and preference is unmeasurable
+> when it cannot afford to act. Testing valuation at baseline income is testing a car's handling
+> with an empty tank.
+>
+> **DO:** judge valuation changes with a `BES_PROBE=rich10` arm (same cost, ~8× the winrate
+> headroom: 15% vs 2.5%). Keep baseline as the honest headline number; it is a poor *instrument*.
+> **DO:** treat the revert graveyard (C1, B3, F3, F4, F8, swap-damp, cost-discount, xmult-floor, the
+> reroll gate, W-ECON…) as **untested where it counts**, not refuted — it was populated almost
+> entirely by baseline nulls.
+> **DON'T** conclude "logical fix, no effect" from a baseline null ever again. That verdict has been
+> the project's central mystery and it is substantially a measurement artifact.
+> ⚠ Caveats: the bundle is six commits (so this says *accumulated work* pays at income, not which
+> commit); the two deltas share a seed family so the interaction SE is approximate; the gain is
+> broad and EARLY (rich10 deaths in antes 1–3 fall 20→7), so it is not a tail artifact.
 
 **THE DATASET IS THE HEADLINE.** `data/bes_runs_live_2026-08-12.jsonl` — the mod's own user played 8
 runs (red deck / white stake) with the **overlay hidden (F9)** so their choices are independent of the

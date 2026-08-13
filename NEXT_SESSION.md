@@ -1,4 +1,21 @@
-# NEXT_SESSION.md — fresh-session handoff (updated 2026-08-13)
+# NEXT_SESSION.md — fresh-session handoff (updated 2026-08-14)
+
+> # ⭐⭐ THE BASELINE IS A BROKEN INSTRUMENT — read `WINRATE_V3_PLAN.md` §6 FIRST
+> The **identical** six-commit engine delta (`e7c3a8c`→`82f808f`), on the **same** seeds:
+>
+> | operating point | code delta | p | wins | sign test |
+> |---|---|---|---|---|
+> | **baseline income** | **−0.102** | 0.65 (n.s.) | 1 → 2 / 80 | **32 / 34 — dead even** |
+> | **+$10/round** (`rich10`) | **+0.730** | **0.0018** | **6 → 12 / 80** | 46 / 26 (p 0.025) |
+>
+> **Interaction +0.832, t = 2.57, p = 0.0102.** The engine holds **$1.3 at ante 2** at baseline, so a
+> change to what it PREFERS cannot express itself. **Judge valuation changes with a
+> `BES_PROBE=rich10` arm** (same cost, ~8× the winrate headroom). Treat the revert graveyard as
+> *untested where it counts*, not refuted. **The banners below were all written from baseline nulls
+> — re-read them in that light.**
+>
+> ⚠ The bundle is six commits, so this says accumulated work pays AT INCOME, not which commit does.
+
 
 > 🛑 **FOUR large probes, three dead-even coin flips. STOP running single-axis decision probes.**
 > `oracle_plan` (a perfect archetype target) **41/40** · `noskip` **68/67** · `noskip_early`
