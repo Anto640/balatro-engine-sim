@@ -1707,3 +1707,42 @@ This is §5r item 2, now evidenced rather than reported.
    measured gap. Co-calibrate with the planner constants; never ship as an isolated magnitude lever.
 2. **Conditional-value jokers** (the Dusk fix) — correctness class, ship on mechanism.
 3. **Do NOT re-tune relative joker valuation** — the kept test says it is already directionally right.
+
+### 5s-bis. VERDICT on the retrigger fix (paired n=160)
+
+`BP.is_core` now includes retriggers, so `BP.keep_bias` protects them at `CORE_KEEP` in all four
+sell/swap sites. Arms: `sim_out/retrig_base.jsonl` (HEAD, in a worktree) vs `sim_out/retrig_keep.jsonl`.
+
+⚠ The obvious baseline `sim_out/dig_base_all.jsonl` was NOT usable: it was generated at 02:30 and the
+Fool fix landed at 13:18, so pairing against it would have measured **retrigger + Fool combined** and
+attributed all of it to the retrigger change. A fresh baseline arm was built from a worktree at HEAD.
+
+| metric | baseline | candidate | Δ |
+|---|---|---|---|
+| progress | 3.782 | 3.793 | **+0.012** (t 0.28, p 0.78, n.s.) |
+| sign test | — | — | 12 better / 6 worse / **142 TIED** (p 0.24, n.s.) |
+| death-ante | 4.088 | 4.106 | +0.019 (7 later, 5 earlier, 148 unchanged) |
+| wins | 3 | 4 | not a usable metric — inside its own Poisson error bar |
+
+**MDE at n=160 with sd 0.520 is 0.115** — this batch could only have detected an effect ~10x the one
+observed. The number proves nothing in either direction, and **142 of 160 seeds tied** is the frequency
+ceiling behaving exactly as the rule predicts: six retrigger jokers, firing only when one is on a board
+that is also facing a swap. Do not read the wins 3→4 or the a4→a6 jumps in the top-5 swings; with 18
+seeds changed, both tails are cascade noise.
+
+**✅ SHIPPED on mechanism, per the burden-of-proof rule** (correctness ships unless significantly
+NEGATIVE; it is not). The justification is not the metric:
+* a retrigger multiplies what the rest of the board does — the compounding role `is_core` exists for —
+  but carries no handtype tag, so `BP.fit` gave it neither commitment credit nor penalty while a
+  suit-matching flat common got `+COMMIT_JOKER_FILL`;
+* the valuation layer ALREADY treats the class as under-measured (`jp_from_measure` and
+  `joker_pick_frac` both floor a retrigger at 0.9x prior instead of 0.6x) — `keep_bias` was simply
+  inconsistent with it;
+* the live log has the engine advising **"Sell Dusk — frees a slot for Scary Face"** 16 times in one
+  run, while Dusk sat on that run's WINNING final board;
+* Hanging Chad appears in **7 of 7** human wins, Sock and Buskin in 3.
+The live mod advises a HUMAN, and this was wrong advice the user actually saw.
+
+**Diagnostic note for the next attempt:** the reason strings were decisive and the first hypothesis was
+wrong. "Dusk measures ~0 mid-blind so it reads as dead" was FALSE — the retrigger floor already
+prevents that. It was the UPGRADE-swap path. Read `advice.reason` before theorising about a mechanism.

@@ -49,15 +49,26 @@
 > function where engine and winner agree exactly. That is the template, and its absence elsewhere is
 > the measured gap.
 >
-> ## DO THIS NEXT, in order
-> 1. **Price `shape` and `money` by the COMMITMENT, mirroring `BP.planet_credit`.** This is the located
->    lever and it now has a measurement behind it, not just an argument. Co-calibrate with the planner
->    constants — **never as an isolated magnitude lever** (that whole class is refuted).
-> 2. **Conditional-value jokers.** Confirmed with a number: the engine issued **16 SELL_JOKER advices
->    for Dusk in one run**, while Dusk sat on that run's winning final board (same shape: Cartomancer 5,
->    Astronomer 3). `worst_i` picks the lowest-measuring joker and a final-hand retrigger measures ~0
->    mid-blind. `Eval.scaling_projection` discounts condition-locked *scalers* by trigger frequency;
->    retrigger/conditional jokers have no equivalent. Correctness class — ship on mechanism.
+> ## DO THIS NEXT — `tools/pick_order.lua` reduces it to ONE number
+> 1. **Make deck SHAPE respond to the commitment, mirroring `BP.planet_credit`.** The screen shows
+>    that committing to a Flush build changes **exactly one value** — the Flush planet (+0.200 at
+>    ante 4) — while every deck-shape card is **byte-identical** committed vs uncommitted. The engine
+>    can commit, and only leveling ever hears about it; that is why leveling was the one function with
+>    0 discordant pairs against the human. Worse, **Death and Strength never reach the deck-shaping
+>    model at all** (flat `CV.TAROT_BASE` prior) — the two cards that CONVERGE a deck are priced as
+>    generic filler, and only Hanged Man reaches `DeckPlan.delete_value` (returning ~0.113 flat).
+>    Co-calibrate with the planner constants — **never as an isolated magnitude lever**.
+>    ⚠ **MONEY is NOT the gap — do not "fix" it.** `VU.dollars_to_frac` already puts Hermit at #5 by
+>    ante 2 and #1 by ante 6. An earlier draft of the screen called `CV.card_value` directly, saw money
+>    return 0 on the value axis, and wrongly concluded it was unpriced. Mirror `pick_value` in
+>    `tools/pick_order.lua` (which follows `pack_open_advisor`), never `CV.card_value` alone.
+> 2. ~~**Conditional-value jokers.**~~ ✅ **DONE (§5s-bis).** `BP.is_core` now includes retriggers, so
+>    `keep_bias` protects them at `CORE_KEEP`. Paired n=160: **+0.012, p 0.78, 142/160 tied** — shipped
+>    on MECHANISM, not on the metric (MDE was 0.115, ~10x the observed effect; the batch could not have
+>    seen this either way). The cause was NOT "Dusk measures 0 mid-blind" — that hypothesis was wrong,
+>    the retrigger floor already prevents it. It was the UPGRADE-SWAP path: `BP.fit` pays a suit-matching
+>    flat common `+COMMIT_JOKER_FILL`, a retrigger has no handtype tag so it gets nothing, and
+>    `keep_bias` returned 0 for the class. **Read `advice.reason` before theorising about a mechanism.**
 >
 > ## Practical notes
 > * The install (`%APPDATA%/Balatro/Mods/balatroenginesim/`) is **current**.

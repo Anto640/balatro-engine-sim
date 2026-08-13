@@ -78,6 +78,21 @@ return function(t)
     t.eq(BP.keep_bias("j_todo_list"), 0, "econ/utility filler gets no keep-bias (sold first)")
   end
 
+  -- ---- retriggers are core (live divergence mine, 2026-08-13) ----
+  -- A retrigger multiplies what the rest of the board does, but carries no handtype tag, so
+  -- BP.fit gave it no commitment credit while a suit-matching flat common got +COMMIT_JOKER_FILL.
+  -- Unprotected, that swapped a tier-6 retrigger out for tier-3 commons: the live log advised
+  -- "Sell Dusk -- frees a slot for Scary Face" 16 times in a run Dusk finished on the board.
+  do
+    for _, k in ipairs({ "j_dusk", "j_hanging_chad", "j_sock_and_buskin", "j_mime",
+                         "j_hack", "j_selzer" }) do
+      t.ok(BP.is_retrigger(k), k .. " is recognised as a retrigger")
+      t.eq(BP.keep_bias(k), BP.CORE_KEEP, k .. " is protected like a core piece")
+    end
+    t.ok(BP.keep_bias("j_dusk") > BP.keep_bias("j_scary_face"),
+      "a retrigger is protected MORE than the flat common the engine wanted to swap it for")
+  end
+
   -- ---- leveling axis (B1): leveling compounds through the board's xmult ----
   do
     t.eq(BP.level_amplifier(GS.new{ jokers = { { key = "j_joker" } } }), 1.0,

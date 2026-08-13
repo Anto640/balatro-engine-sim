@@ -274,7 +274,21 @@ end
 -- (keep_bias 0) is freely sold. So "sell the weakest" dumps money jokers, not your scorers.
 BP.CORE_KEEP   = 2.5
 BP.SCORER_KEEP = 1.2
-function BP.is_core(key) return JokerData.is_xmult(key) or JokerData.is_scaling(key) end
+-- RETRIGGERS ARE CORE (2026-08-13, from the live divergence mine). A retrigger multiplies
+-- what the REST of the board already does -- the same compounding role as an xmult, which is
+-- the whole reason is_core exists -- but it carries no handtype tag, so BP.fit gives it neither
+-- commitment credit nor penalty while a suit-matching flat common gets +COMMIT_JOKER_FILL.
+-- With keep_bias 0 it was also unprotected in the swap, and the two combined: the live log has
+-- the engine advising "Sell Dusk (+$2) -- frees a slot for Scary Face / Smiley Face / Lusty
+-- Joker" SIXTEEN times in one run, trading a tier-6 retrigger for tier-3 flat commons, while
+-- Dusk sat on that run's WINNING final board. The valuation layer already knows instantaneous
+-- measurement under-reads this class -- jp_from_measure and joker_pick_frac both floor a
+-- retrigger at 0.9 x prior instead of 0.6 -- so keep_bias was simply inconsistent with it.
+-- Evidence beyond the one run: Hanging Chad appears in 7 of 7 human wins, Sock and Buskin in 3.
+function BP.is_retrigger(key) return JokerData.has_tag(key, "retrigger") end
+function BP.is_core(key)
+  return JokerData.is_xmult(key) or JokerData.is_scaling(key) or BP.is_retrigger(key)
+end
 local function is_flat_scorer(key)
   local c = JokerData.resolve(key).cat
   return c == "flat_mult" or c == "flat_chips"
