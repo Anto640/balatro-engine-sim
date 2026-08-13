@@ -2517,3 +2517,44 @@ not contradict it.
 
 **Do not build a reroll gate.** Recorded so the next session does not re-derive this hypothesis
 from the $129/run figure, which is striking and misleading.
+
+---
+
+## 7. THE PACK×INCOME INTERACTION — suggestive, NOT demonstrated (and the metrics disagree)
+
+`richpack` (+$10/round **and** forced pack throughput) vs `rich10_now` (+$10/round alone). Same 80
+seeds, same code, same income — the ONLY difference is `Probe.pack_greed`. The probe fired as
+designed: **packs/ante 3.48 → 5.66**, against the human's 6.10.
+
+| metric | rich10_now | richpack | verdict |
+|---|---|---|---|
+| progress | 5.338 | 5.476 | **+0.137**, t=0.48, **p 0.63 (n.s.)** |
+| sign test | — | — | 38 better / 36 worse (p 0.91) — **dead even** |
+| **wins** | **12 / 80 (15.0%)** | **19 / 80 (23.8%)** | **+58% relative** |
+| McNemar (paired wins) | — | — | discordant **7 vs 14**, exact **p 0.189 (n.s.)** |
+
+**Neither metric is significant, and they disagree in direction of emphasis.** sd 2.550 → MDE 0.80
+at n=80, so the progress arm is hopelessly underpowered for a +0.137 effect.
+
+### ⚠ The win sets are nearly DISJOINT — churn, now visible in the outcome that matters
+
+Only **5 seeds won in BOTH arms** (of 12 and 19). Forcing pack throughput *lost* 7 wins and *gained*
+14. This is §5z's chaotic-policy-sensitivity finding reappearing in the win count itself: the
+intervention largely **re-rolls WHICH seeds win**. A raw "12 → 19" reads as a 58% improvement; the
+paired structure shows it is 7 lost + 14 gained at p 0.19.
+
+### 📐 A methodological point worth keeping: progress is a PROXY, wins are the GOAL
+
+The project optimises `progress` because it discriminates better than a censored death-ante. But
+here progress says **+0.137 (nothing)** while wins say **+7 net**. A change whose benefit is
+concentrated in the TAIL — turning near-wins into wins — is exactly the shape `progress` under-
+reports, because it averages the whole distribution. When the two disagree, note it rather than
+quoting whichever is more favourable. (Equally: with 5/12 overlap the win gain could simply be
+noise. That is the point — at n=80 neither metric can tell.)
+
+### Status: replication running, out of sample
+
+Extending to n=160 should roughly double the discordant pairs (~14 vs ~28), which lands McNemar
+near p≈0.04 — borderline. Both arms are being re-run on a **disjoint seed pool** (`BES_SEED_OFF=4`
+→ s*1000+4) so the extra 80 are out-of-sample rather than more of the same, and the combined
+verdict is n=160 per arm. **Do not act on the pack finding until that lands.**
