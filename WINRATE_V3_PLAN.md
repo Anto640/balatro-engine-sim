@@ -2491,3 +2491,29 @@ independent datasets: the human's 7 wins, and the engine's own 12.
 **confounded by run length**: winners play more antes and so accumulate more. Only the per-ante and
 fixed-window (a1–a3) figures above are clean, and those are a more modest ~1.2×. n=12 wins, and
 correlational within a fixed policy.
+
+### ❌ Rerolls are NOT the leak — hypothesis proposed and refuted in the same pass
+
+At the `rich10` operating point the engine spends **$129/run on rerolls** (20.6/run) against $58 on
+packs — over half of the +$240/run the probe hands it — and rerolls scale 10× with money while
+packs scale only 3× (baseline: 2.09 rerolls/run, $11). That looked like a large endogenous leak,
+and it is exactly the lever CLAUDE.md records as tested-and-pulled **at baseline, where rerolls
+fire 2.09×/run** — a textbook §6 operating-point candidate for re-testing.
+
+**The within-arm data refutes it.** Winners vs losers reaching a5+ inside `rich10_now`:
+
+| metric | WINS (12) | losers a5+ (46) | ratio |
+|---|---|---|---|
+| rerolls / ante | 5.02 | 3.62 | 1.39× (winners reroll **more**) |
+| reroll $ / ante | 30.86 | 22.98 | 1.34× |
+| **rerolls in antes 1–3** (fixed window) | **9.25** | **8.72** | **1.06×** |
+| **packs in antes 1–3** (fixed window) | **10.67** | **8.80** | **1.21×** |
+
+In the run-length-controlled early window rerolls are indistinguishable (1.06×) while packs
+discriminate (1.21×). The engine's reroll *ordering* is also internally consistent: across 1295
+shops where it rerolled with an affordable pack on offer, there were **0** cases where the pack was
+valued higher. It genuinely prices a reroll at 5.07 against a pack's 0.88, and the win data does
+not contradict it.
+
+**Do not build a reroll gate.** Recorded so the next session does not re-derive this hypothesis
+from the $129/run figure, which is striking and misleading.
