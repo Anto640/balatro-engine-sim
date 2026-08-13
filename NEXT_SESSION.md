@@ -1,6 +1,6 @@
 # NEXT_SESSION.md — fresh-session handoff (updated 2026-08-13)
 
-> 🔵 **START HERE. Authoritative status: `WINRATE_V3_PLAN.md` §5r. Working context: `CLAUDE.md`.**
+> 🔵 **START HERE. Authoritative status: `WINRATE_V3_PLAN.md` §5r + §5s. Working context: `CLAUDE.md`.**
 >
 > ## The situation in one paragraph
 > The engine wins **~1.25%** of sim runs (12 in 960). The mod's own user, playing red deck / white
@@ -25,21 +25,39 @@
 > Economy and base first, power second. Their single loss died at ante 5 holding **$52** — more than
 > most of their wins — on a board with no direction. **Conversion, not resources.**
 >
-> ## DO THIS FIRST — mine the divergence set
-> `data/bes_runs_live_2026-08-12.jsonl` holds **928+ records pairing the engine's measured value for
-> every option against what a 7-of-8 human actually chose**, plus 189 `blind_select` and 114
-> `blind_result` records (hands and discards actually SPENT). Nobody has analysed it yet.
-> **Question: where does a winning human take what the engine prices low, and what happens next?**
-> Needs no new runs and no new batches. Everything else is speculation until this is done.
+> ## ✅ THE DIVERGENCE SET IS MINED — `tools/divergence.lua`, full write-up in §5s
+> **The joker valuation is NOT the problem, and that is now measured.** 7 of 8 runs won, so a joker
+> still held at the end is part of a *winning* board — and the engine's rank at purchase predicts
+> exactly that: rank #1 → 47% kept, #2 → 31%, #3 → 0%, valued-negative → 22% (n=69).
+> **Relative joker pricing is directionally right. Do not re-tune it.**
 >
-> ## Then, in order
-> 2. **Conditional-value jokers.** `j_dusk` retriggers only on the final hand, so it measures ~0
->    mid-blind and the engine repeatedly advised SELLING it out of a winning board.
->    `Eval.scaling_projection` discounts condition-locked *scalers* by trigger frequency; retrigger
->    and conditional jokers have no equivalent. Correctness class.
-> 3. **Commitment→valuation feedback.** `BP.planet_credit` prices planets *by the commitment* and
->    every leveling channel consumes it; deck-shaping and surplus-spending have no equivalent.
->    Co-calibrate with the planner constants, never as an isolated magnitude lever.
+> **The gap is the PACK-PICK channel, and it is about what a pick is FOR.** Free, ~16 picks/run,
+> agreement only **41% (53/129)** — the lowest of any channel. Each disagreement is PAIRED (same
+> pack, same instant, so composition and board are controlled), so the sign test applies directly:
+>
+> | function | human | engine | eng-only | hum-only | sign p |
+> |---|---|---|---|---|---|
+> | **enhance** (per-card Bonus/Mult/Glass…) | 5% | 36% | 25 | 2 | **0.00000** |
+> | **money** (Hermit, Temperance) | 20% | 1% | 1 | 15 | **0.0005** |
+> | **shape** (thinning + rank/suit convergence) | 29% | 12% | 6 | 19 | **0.0146** |
+> | level (planets) — the CONTROL | 22% | 22% | **0** | **0** | 1.000 |
+>
+> The engine buys what a per-decision measurement can price TODAY (a Glass card's contribution to the
+> current deck). The human buys what pays LATER — cash compounding through interest, and deck shape
+> raising the odds of the hand the build aims at. **`level` having 0 discordant pairs is the tell:**
+> planets are the one function priced *by the commitment* (`BP.planet_credit`), and they are the one
+> function where engine and winner agree exactly. That is the template, and its absence elsewhere is
+> the measured gap.
+>
+> ## DO THIS NEXT, in order
+> 1. **Price `shape` and `money` by the COMMITMENT, mirroring `BP.planet_credit`.** This is the located
+>    lever and it now has a measurement behind it, not just an argument. Co-calibrate with the planner
+>    constants — **never as an isolated magnitude lever** (that whole class is refuted).
+> 2. **Conditional-value jokers.** Confirmed with a number: the engine issued **16 SELL_JOKER advices
+>    for Dusk in one run**, while Dusk sat on that run's winning final board (same shape: Cartomancer 5,
+>    Astronomer 3). `worst_i` picks the lowest-measuring joker and a final-hand retrigger measures ~0
+>    mid-blind. `Eval.scaling_projection` discounts condition-locked *scalers* by trigger frequency;
+>    retrigger/conditional jokers have no equivalent. Correctness class — ship on mechanism.
 >
 > ## Practical notes
 > * The install (`%APPDATA%/Balatro/Mods/balatroenginesim/`) is **current**.
@@ -47,6 +65,10 @@
 >   starve the game and make the overlay lag badly.
 > * Sim baseline on current code: **progress 3.744**, paired n=480, `sim_out/dig_base_all.jsonl`.
 > * Tests: **932 unit** (`lua tests/runner.lua`) + **524 sim** (`luajit tests/runner_sim.lua`).
+> * `lua tools/divergence.lua` re-runs the mine above (instant, no batch needed).
+> * ⚠ **Engine `value`s are comparable ONLY within one ranked list** — they are in "fraction of a boss
+>   hand" units and grow with the run (~3 at ante 1, ~300 at ante 7). Comparing across evaluations
+>   produced a mean gap of −416 against a median of 1.37 before this was caught.
 > * `lua` / `luajit` need the PATH export — see the `lua-toolchain-path` memory.
 
 ---

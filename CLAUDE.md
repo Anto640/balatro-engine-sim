@@ -232,17 +232,32 @@ Ouija/Sigil/Cryptid, the only rank/suit CONCENTRATING cards), and `build_plan.HA
 §5m). This is the SECOND time an "architectural" conclusion turned out to be an inexpressible-world
 artifact — **audit the FACTS layer for the archetype before blaming the OPINION layer.**
 
-**THE REMAINING WALL is BUILD-ASSEMBLY**, and three independent threads now converge on the same fix.
-A greedy per-decision valuation can't *commit to and assemble* an archetype across many shops. The
-committed-archetype PLANNER (Phase 5) V1 is retained (+0.033 progress, sign 17/11) but has 0 wins.
-**The located next lever is COMMITMENT→VALUATION FEEDBACK:** `BP.planet_credit` prices planets *by the
-commitment* and every leveling channel consumes it; deck-shaping cards and surplus-spending have no
-equivalent, so each is priced alone and the product is never assembled. The three threads:
-(1) the secret-hand fixes measured **exactly 0.000** — capability without intent changes nothing;
-(2) the surplus dig measured **−0.110 (p 0.012, n=480)** because it dug *indiscriminately*, while the
-human digs *toward a target*; (3) the human's own account of every build decision. Co-calibrate with
-the planner constants — **never as an isolated magnitude lever**. Do NOT re-try the reverted valuation
-levers in isolation. Live re-sync is DONE (the install is current as of 2026-08-13).
+**THE REMAINING WALL is BUILD-ASSEMBLY**, and the divergence mine (`tools/divergence.lua`,
+`WINRATE_V3_PLAN.md` §5s) has now MEASURED where it lives. Two results:
+
+**❌ It is NOT the joker valuation.** 7 of 8 human runs won, so a joker still held at the end is part of
+a *winning* board — and the engine's rank at purchase predicts that: rank #1 → 47% kept, #2 → 31%,
+#3 → 0%, valued-negative → 22% (n=69). **Relative joker pricing is directionally right; do not re-tune
+it.** (Shop-buy agreement 54%, n=85.)
+
+**✅ It IS the PACK-PICK channel, and the disagreement is about what a pick is FOR.** Free, ~16 picks/run,
+agreement only **41% (53/129)** — the lowest anywhere. Every disagreement is PAIRED (same pack, same
+instant → composition and board controlled), so the sign test applies: **enhance** (per-card Bonus/Mult/
+Glass) engine 36% vs human 5%, discordant 25/2, **p<0.00001**; **money** (Hermit/Temperance) human 20% vs
+engine 1%, 1/15, **p 0.0005**; **shape** (thinning + rank/suit convergence) human 29% vs engine 12%, 6/19,
+**p 0.0146**; **level** (planets) 22% vs 22%, **0 discordant pairs, the perfect control**. The engine buys
+what a per-decision measurement can price TODAY; the human buys what pays LATER (cash compounding through
+interest, deck shape raising the odds of the hand the build aims at).
+
+**The located next lever is COMMITMENT→VALUATION FEEDBACK, and `level` is the proof of the template:**
+planets are the one function priced *by the commitment* (`BP.planet_credit`) and the one function where
+engine and winner agree exactly. Deck-shaping and cash have no equivalent, so each is priced alone and the
+product is never assembled. This also explains the surplus dig's **−0.110 (p 0.012, n=480)** — it dug
+*indiscriminately*, while the human shapes toward a *target* — and the secret-hand fixes' **exactly 0.000**
+(capability without intent changes nothing). Co-calibrate with the planner constants — **never as an
+isolated magnitude lever**. Do NOT re-try the reverted valuation levers in isolation.
+⚠ **Engine `value`s are comparable ONLY within one ranked list** ("fraction of a boss hand" units, so ~3 at
+ante 1 and ~300 at ante 7). Live re-sync is DONE (the install is current as of 2026-08-13).
 
 ## Conventions & gotchas (learned the hard way)
 

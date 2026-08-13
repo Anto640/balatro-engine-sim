@@ -1600,3 +1600,110 @@ demonstrated rather than argued.
 **Do NOT:** collect more human runs (the bottleneck is analysis, not data), probe resources (axis
 exhausted, §5n), add archetypes (§5m), retry indiscriminate digging (§5q), or bump xmult weights
 (§5o — winners are xmult-POOR early).
+
+---
+
+## 5s. THE DIVERGENCE MINE — the engine and the winner disagree about what a PICK IS FOR
+
+`tools/divergence.lua`, run on `data/bes_runs_live_2026-08-12.jsonl` (8 runs, 7 wins). This is
+the analysis §5r listed as priority 1. It pairs the engine's own logged valuation of every option
+against what the 87.5%-winrate human actually chose, and it lands one strong positive result, one
+important NEGATIVE result, and a confirmation.
+
+### Method, and the two things that nearly broke it
+
+* **Values are comparable only WITHIN one ranked list.** An option's `value` is in "fraction of a
+  boss hand" units, so it grows with the run — the same joker prices ~3 at ante 1 and ~300 at ante 7.
+  A first pass compared values across evaluations and produced a mean gap of −416 against a median of
+  1.37. Every comparison here is therefore made *inside* a single ranked list (rank, and value as a
+  fraction of that list's best option); raw values are used only for their SIGN.
+* **Tick-exact pairing does not work.** `scene.ranked` carries the PREVIOUS evaluation, a shop's
+  ranking is often attached to a `pack` record, and a shop re-emits on every signature change. Runs
+  are segmented into SHOP SESSIONS (records between two `blind_select` markers) and paired within.
+* Excluded: 152 items that arrived via `other` (Judgement, skip tags, Hallucination…) — generated,
+  not chosen. Excluded: STANDARD packs, where a playing card logs as `c_base`/`m_lucky` with no rank
+  or suit, so it can never match the engine's card-name target (including them scored every such pick
+  as a disagreement and biased the rate down, 37% → 41%).
+* `c_heirophant` — the base game's own misspelling — is what the live log contains, 34 of 34. The
+  engine already aliases both; the tool did not, and dropped real picks into `unknown`. **Third time
+  this class of bug has surfaced; check it first in anything that keys on live data.**
+
+### ❌ THE NEGATIVE RESULT: the joker valuation is NOT mis-ordered — stop looking there
+
+7 of 8 runs won, so a joker still on the board at the end is part of a *winning* board. Cross-tabulating
+the engine's rank of each joker at purchase against whether it survived:
+
+| engine's rank of it | n | kept to the end |
+|---|---|---|
+| #1 (engine agreed) | 43 | **47%** |
+| #2 | 16 | 31% |
+| #3 | 4 | 0% |
+| #4 or worse | 6 | 33% |
+| (engine valued < 0) | 9 | 22% |
+
+**The engine's rank order predicts which jokers a winning human keeps.** The hypothesis this mine was
+built to test — "the engine under-prices the winning line" — is refuted for jokers. Relative joker
+pricing is directionally right. **Do not re-tune it.** (Shop-buy agreement is 54%, n=85; the human
+buys something the engine prices NEGATIVE 19% of the time, and those are the *least* kept, 22%.)
+
+### ✅ THE POSITIVE RESULT: the pack-pick channel, and it is about FUNCTION not price
+
+Pack picks are invisible to every valuation section above because `PICK` entries carry no `value` —
+but the channel is FREE, used **~16× per run**, and fully ordinal. Agreement is the lowest anywhere:
+
+**the human picked what the engine recommended in 53 of 129 picks (41%).**
+
+Each disagreement is a PAIRED observation — same pack, same instant — so pack composition, board and
+cash are controlled by construction, and the project's usual sign test applies directly:
+
+| function of the card | human took | engine wanted | eng-only | hum-only | sign p |
+|---|---|---|---|---|---|
+| **enhance** (Bonus/Mult/Glass/Steel/Gold/Stone on 1–2 cards) | 4 (5%) | 27 (36%) | 25 | 2 | **0.00000** |
+| **money** (Hermit, Temperance) | 15 (20%) | 1 (1%) | 1 | 15 | **0.0005** |
+| **shape** (thinning + rank/suit convergence) | 22 (29%) | 9 (12%) | 6 | 19 | **0.0146** |
+| level (planets, Black Hole) | 17 (22%) | 17 (22%) | **0** | **0** | 1.000 |
+| generate | 7 | 10 | 10 | 7 | 0.63 |
+| joker (editions/copies) | 4 | 5 | 5 | 4 | 1.00 |
+
+n = 76 disagreements. Top individual cards: the human took Hanged Man ×11, Hermit ×10, Death ×6,
+Temperance ×5; the engine wanted Hierophant ×7, Tower ×6, Empress ×5, Justice ×5.
+
+**`level` is a perfect control: 0 discordant pairs.** Whenever either side picked a planet, so did the
+other — they only differed on *which*. The disagreement is not about leveling, which is consistent
+with the already-established finding that the sim uses MORE planets per run than the human (1.67 vs
+1.05). It is about what the *rest* of the picks are for.
+
+### What this says
+
+The engine spends its free picks on **per-card enhancement** — the one class whose value a
+per-decision measurement can see cleanly, because a Glass card's contribution is computable *today*
+against the current deck. The human spends the same picks on **money** and **deck shape**, whose value
+is entirely in what they enable LATER: cash compounds through interest into every future shop, and
+thinning/convergence raises the probability of the hand the build is aiming at.
+
+This is the **commitment→valuation feedback** gap (§5r item 3) with a measurement attached, and it
+explains two previously unexplained results:
+
+* the surplus dig measured −0.110 because it dug *indiscriminately* (§5q) — the human's shaping picks
+  are a *target*, not a search;
+* the human is 2–4× richer at every ante (p 0.009 at a2) — this is the **mechanism**: 20% of their
+  contested picks are money cards, against the engine's 1%.
+
+It also fits the project's own frequency rule: this is a 100%-of-runs channel (~16 picks/run), and
+free-channel pack-pick valuation is where the biggest historical lever came from (+0.054).
+
+### Confirmed, with a number: the Dusk bug
+
+The engine issued **16 SELL_JOKER recommendations for Dusk in a single run**, while Dusk sat on that
+run's winning final board. Same shape for Cartomancer (5) and Astronomer (3). `worst_i` picks the
+lowest-measuring joker, and a joker that only fires on the final hand of a round measures ~0 mid-blind.
+This is §5r item 2, now evidenced rather than reported.
+
+### What to do next
+
+1. **Price the `shape` and `money` functions by the COMMITMENT, not in isolation.** `BP.planet_credit`
+   already does exactly this for planets, and planets are the one function where the engine and the
+   winner agree exactly. That is the template, and its absence for deck-shaping and cash is the
+   measured gap. Co-calibrate with the planner constants; never ship as an isolated magnitude lever.
+2. **Conditional-value jokers** (the Dusk fix) — correctness class, ship on mechanism.
+3. **Do NOT re-tune relative joker valuation** — the kept test says it is already directionally right.
