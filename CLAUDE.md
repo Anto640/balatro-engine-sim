@@ -254,9 +254,16 @@ roadmap: `WINRATE_AUDIT.md`. Superseded plans: `docs/archive/`.**
 > baseline vs **0.12/run** at rich10 — a funded engine never enters the sell-to-afford spiral).
 > **Measuring the refill charge only at `rich10` would have discarded it.** A fix whose subject is
 > scarcity must be measured under scarcity.
-> **DO:** treat the revert graveyard (C1, B3, F3, F4, F8, swap-damp, cost-discount, xmult-floor, the
-> reroll gate, W-ECON…) as **untested where it counts**, not refuted — it was populated almost
-> entirely by baseline nulls.
+> ❌ **"The revert graveyard was populated almost entirely by baseline nulls" — THAT IS FALSE, and it
+> was checked item by item (§19a).** swap-damp/cost-discount were **directly measured** (−0.004,
+> **145 tied**, and they broke two guardrail tests — they fight the world's real `joker_tick`);
+> xmult-floor is refuted on **mechanism** (§5o: winners are xmult-POOR early, front-loading xmult is
+> what LOSING runs do); C1 is obsolete, W-ECON hits the frequency ceiling, the reroll gate went on
+> mechanism, and F3/F4/F8 are **in-blind** — money does not help you play a hand.
+> **Exactly TWO items were ever reverted on an underpowered baseline null: B3 (retested, +0.518) and
+> E-12 (retested 2026-08-14, §19).** The graveyard is now empty; do not go shopping in it again.
+> ⚠ **And read the TIE COUNT before calling a null underpowered** — 145/153/127 ties mean a low sd
+> and therefore a LOW MDE. Those are the project's most trustworthy nulls, not its least.
 > **DON'T** conclude "logical fix, no effect" from a baseline null ever again. That verdict has been
 > the project's central mystery and it is substantially a measurement artifact.
 > ⚠ Caveats: the bundle is six commits; the two deltas share a seed family so the interaction SE is
@@ -338,8 +345,12 @@ empirically; the table above is why.
   significantly NEGATIVE. Justify by mechanism, not by the metric. Correctness compounds, and the live
   mod advises a HUMAN — wrong advice is bad even when sim-neutral.
 - **Magnitude / weight tuning** (a constant moved): still requires positive evidence, still backfires in
-  isolation, and should be calibrated JOINTLY with the constants tuned around it. The old revert set
-  (C1, B3, F3, F4, F8, swap-damp, cost-discount, xmult-floor…) is all this class and stays refuted.
+  isolation, and should be calibrated JOINTLY with the constants tuned around it.
+  ⚠ The old revert set was described here as "all this class and stays refuted" — **§19a checked it and
+  that is wrong twice over.** Most of it is refuted on MECHANISM (not magnitude), and **B3 and E-12 were
+  neither: both were correctness fixes misfiled as tuning, and both have now been retested.** Before
+  filing a change as "magnitude", ask whether the constant is *derived* — a constant that follows from
+  an argument (§19b's `X` cancelling, the SELL_TO_BUY refill charge) is correctness wearing a number.
 - **Revert on MECHANISM, not on a null result.** A change should be pulled when you can say *why* it is
   wrong. (Worked example: the 2026-08-11 reroll feasibility gate measured +0.024 n.s. — by itself that
   is no reason to pull it — but it was pulled because a concrete mechanism explained the harm: it damped
