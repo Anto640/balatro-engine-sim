@@ -3148,3 +3148,54 @@ history, and `hand_type_plays` was never populated by the live extractor at all 
 have been dead in the actual mod while working in every batch. This is a **correctness/feasibility**
 change and is judged on mechanism unless it measures significantly negative (CLAUDE.md, the
 replacement rule).
+
+### §11a — Why the engine dies holding $26: it parks on the stickiest dollar in the game
+
+Existing shop telemetry carries a per-offer `value` for every pack the engine declines; nobody had
+plotted it. Restricted to **affordable** Celestial packs (an unaffordable pack's value is never
+actionable — including those inverts the apparent trend, which is how a first pass at this misread
+it), the curve against the wallet is **not monotone**:
+
+| dollars held | mean Celestial value | % rated positive |
+|---|---|---|
+| cost–9 | −0.81 | 36% |
+| 10–14 | −0.62 | 37% |
+| 15–24 | −1.73 | 20% |
+| **25–29** | **−2.24** | **16%** |
+| 30+ | **+0.25** | 48% |
+
+The trough is **exactly at the interest cap**, and `SA.free_spend` says why:
+
+```
+d = 24 -> 24 % 5      = $4 free
+d = 25 -> not > cap   = $0 free      <-- discontinuous drop
+d = 26 -> 26 - 25     = $1 free
+d = 30 -> 30 - 25     = $5 free
+```
+
+**The arithmetic is correct** — at $24 spending $4 keeps `floor(d/5)` at 4, while at $25 spending
+even $1 gives up an interest dollar every remaining round. $25 is genuinely the stickiest wallet
+value in the game. But `SA.bankroll_plan` *targets* `min(d, cap*5)` = **exactly $25**, so the engine
+deliberately parks on the one dollar amount at which every purchase is maximally expensive.
+
+**This mechanically explains a fact the plan previously recorded as a puzzle** — *"the engine dies
+holding the interest cap; from ante 5 the median death holds $26; 28% of all deaths hold ≥$25… so
+$26 simply does not buy anything that saves a run."* It is not that $26 buys nothing. It is that at
+$26 the engine's own pricing charges the full forward interest stream against every purchase, so
+nothing clears the bar — and it holds the cash into the grave.
+
+⚠ **Not yet an action, and do not "fix" it by tuning.** Both directions are already refuted:
+forcing more hoarding measured −0.396 / −1.194 / −1.639 (`hoard10/20/25`), and forcing the declined
+leveling buys measured −0.229 (`levelbuy`, which already preferred Celestial *packs* over loose
+planets, so the "choice channel was never tested" idea is wrong). That bracket is the signature of
+either a genuine local optimum or a metric that cannot see the difference. What is new here is a
+**mechanism** for the parking behaviour, which is the thing a future test should target — the
+sticky point itself, not the spend rate.
+
+**Two more facts from the same scan, both new:**
+* **The engine is not pack-averse.** Buffoon prices at **+13.27** at ante 1 and +2.79 at ante 3;
+  Arcana is positive at every ante. It declines **Celestial and Standard specifically**. "Buy more
+  packs" was always the wrong framing of the §5z gap.
+* **Celestial collapses between ante 1 and ante 2** (+1.55 → −2.13 → −2.01) and recovers only by
+  ante 5 — and even in *rich* shops ($25+) it stays negative through antes 2–4 (−0.73 / −0.93 /
+  −0.48), so the collapse is not only the wallet.
