@@ -68,6 +68,34 @@
 >    discontinuously to $0 at exactly $25, and `bankroll_plan` *targets* $25. That mechanically
 >    explains "the median death from ante 5 holds $26".
 
+> # ⭐⭐ THE HEADLINE: THE SAME DELTA IS SIGNIFICANTLY POSITIVE AT `rich10` — §15
+>
+> `pd_base_r` vs `pd_play_r`, 160 paired seeds, integrity-clean. The **same** two-part delta
+> (play-derived commitment + level_gain correction):
+>
+> | | baseline income | **`rich10`** |
+> |---|---|---|
+> | progress Δ | −0.076 (p 0.585) | **+0.421 (t 2.35, p 0.019)** ✅ |
+> | sign test | 82 / 67 (p 0.25) | **84 / 57 (p 0.029)** ✅ |
+> | winrate | 1.9% → 0.6% | **18.8% → 26.2%** (30 → 42 wins) |
+>
+> **Interaction +0.497, SE 0.226, t 2.19, p ≈ 0.028.** BOTH metrics significant — rarer here than
+> any single effect size — and **the prediction was recorded before the batch ran** (§12: *"the fix
+> prices a thing that is mostly bought, so §6 predicts it should express better at `rich10`"*).
+> §6's original demonstration was a six-commit bundle read after the fact; this is a mechanism-designed
+> delta that **predicted**. ⚠ Shared seed family (approximate interaction SE), commitment+correction
+> together rather than the correction alone, win effect n.s. on its own with 13/30/42 overlap, and
+> **not replicated out-of-sample**.
+>
+> ⚠ **This reframes the readiness gate (§15a).** The gate fixes a cost measured at BASELINE income
+> (first dollars going to Celestial packs instead of first jokers). At `rich10` that cost does not
+> arise. So it is plausibly **right at baseline and wrong at `rich10`** — another exact operating-point
+> mirror. Arm D tests it at baseline, **arm E at `rich10`**; both are needed.
+>
+> ⚠ **And the LIVE MOD may sit at the `rich10` end.** It advises a *human*, and the human dataset has
+> them **2–4× richer than the engine at every ante**. If so the **ungated** correction may be right
+> for the overlay even if the gate wins in the sim. **Do not deploy either half on the sim verdict alone.**
+
 > ## ✅ THE VERDICTS (paired n=160 each, all arms integrity-clean) — §13
 >
 > | contrast | Δ progress | sd | p | wins | ties | call |
