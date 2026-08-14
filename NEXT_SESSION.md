@@ -16,6 +16,80 @@
 >
 > ⚠ The bundle is six commits, so this says accumulated work pays AT INCOME, not which commit does.
 
+> ## 📌 SESSION 2026-08-14 (LATE) — a unit error in the leveling channel
+
+> **⭐ THE HEADLINE: a hand level was priced against the bare hand, not the board that
+> multiplies it** (§12). `CV.level_gain` computed the delta in the hand's OWN base chips/mult and
+> every caller divided that by `boss_per_hand_need`, the TOTAL a hand must reach. Measured against
+> the real scorer over 11 board/hand combinations, the base-only figure understates a level by
+> **1.3–1.5× on a bare board, 4.5–9.4× on a typical ante-3 board, and 10.3–19.3× with one ×3 xmult** —
+> the error GROWS with board strength, exactly inverted from what a core-building engine needs.
+>
+> **It explains two findings that had looked contradictory.** The error is a near-uniform factor
+> across hands at any board, so it leaves the ARGMAX intact while destroying the MAGNITUDE:
+> §5s found planets to be the one channel where engine and winner agree *exactly* (which hand to
+> level — unaffected), while §5z found Celestial priced −0.79 and bought 6.3% (whether to buy at
+> all — destroyed). **One bug, both symptoms.** Celestial pool value on real ante-3 boards goes
+> **0.084 → 0.429**, i.e. from a tenth of a Buffoon pack to comparable with it.
+>
+> ⚠ **Not yet judged.** `levelbuy` measured −0.229 for buying more levels; this differs by buying
+> them *selectively* (when the board amplifies them), but that is a hypothesis. And `level_persist`
+> (×1–4) was itself a fudge for this very bug — see §12a, the two are coupled and must be
+> calibrated together, never one at a time.
+
+> ## 🧭 WHAT ELSE THIS SESSION ESTABLISHED
+>
+> 1. **The planner is inert in 2 runs of 3** (§11). 63% never commit; the gate sits in an EMPTY
+>    GAP (nothing scores 2.0–2.5 while 22% of never-committers peak at exactly 2.0); and when it
+>    does commit it points at the hand the run actually plays only 34% of the time (42.6% of
+>    commitments are to a hand taking under 20% of plays).
+> 2. **❌ There is no Full House monoculture.** Run-weighted it is Straight 30.6% / Full House
+>    19.4% / Two Pair 13.1%. The "100%" came from a **6-seed** run of `commit_firing.lua`. Third
+>    time a small-sample figure has set project direction. **Re-derive before acting.**
+> 3. **⭐ THE WINNERS' BOARDS ARE HAND-AGNOSTIC** (verified on the runs, not the summary). Across
+>    the 8 human runs, **108 jokers acquired, 10 (9.3%) carry a `handtype:` tag; two winning runs
+>    used ZERO.** The engine's own board is 12.7% tagged — *more* legible than a winning board.
+>    **So widening the tag set is a dead end; there is nothing to widen.** But the same winners
+>    concentrate LEVELING hard and on HUMBLE hands (Pair 18 of 32 levels in one win, Pair 7 of 41
+>    in another), and the single LOSS has 4 total levels against wins of 7/10/15/15/21/32/41.
+> 4. **`oracle_plan`'s 41/40 does NOT refute the commitment thread.** Re-read with `PLAN=first`, it
+>    committed **95% of runs at ante 1 to Straight/Two Pair** from an 8-sample estimate on the
+>    identical starting deck. Reading its FINAL plan instead shows a tidy "stronger hand → better
+>    outcome" gradient that is pure reverse causation.
+> 5. **✅ The richpack replication landed** (§7, it had been run and never analysed). Pooled n=160:
+>    progress **+0.082 (t 0.43, a settled null)**, wins **22 → 34**, discordant 15 vs 27, exact
+>    **p 0.0884**. The win effect replicated in direction out-of-sample. Only 2 of 80 seeds won in
+>    both arms — it re-rolls WHICH seeds win, and nets positive.
+> 6. **The progress metric is FINE** (§11b, 1002 batch pairs): correlation with wins **0.901**;
+>    inside the "n.s." band wins move by ≥5 in only **2% of pairs**. The convenient story that
+>    every verdict was called on a blind metric is **wrong**. But 3 of the 5 in-band exceptions are
+>    the pack channel — so judge **that channel** on wins.
+> 7. **The engine parks on the stickiest dollar in the game** (§11a). `SA.free_spend` drops
+>    discontinuously to $0 at exactly $25, and `bankroll_plan` *targets* $25. That mechanically
+>    explains "the median death from ante 5 holds $26".
+
+> ## 🔧 RUNNING / QUEUED WHEN THIS WAS WRITTEN
+> | arm | code | income | what it isolates |
+> |---|---|---|---|
+> | `pd_base_a` ✅ | `0e5596a` | baseline | reference (progress **3.789**, 3/160 wins) |
+> | `lg_play_b` | `db2814c` | baseline | **B−A = the play-derived commitment** |
+> | `lg_both_c` | `2e84735` | baseline | **C−B = the level_gain fix** |
+> | `pd_base_r` | `0e5596a` | `rich10` | rich10 reference |
+> | `pd_play_r` | `2e84735` | `rich10` | the pair at the operating point §6 prefers |
+
+> ## ⚠ TWO PROCESS FAILURES WORTH NOT REPEATING
+> 1. **Run every A/B arm from a git worktree, never from the tree you are editing.** An arm was
+>    silently contaminated: its workers started at 16:30:21 against engine files written 16:28:10,
+>    so it tested two changes against a baseline with neither. Module code is read at `require`
+>    time — i.e. at worker start — so an edit minutes earlier is inside the run.
+> 2. **Killing the wrapper does not kill the workers**, and `TaskStop` did not even kill the
+>    wrapper — the script resumed with its next arm 12 minutes later. This is the same failure
+>    that caused the `rich10_s4` corruption. Detect quiescence from the FILES.
+> 3. **A nil context fails silently.** `CV.level_gain` treats a missing board context as "no
+>    information" and returns the bare-base number — no error. The fix missed the FREE in-pack
+>    channel **twice** for exactly this reason (a nil global in one case, a caller-scoped upvalue
+>    in the other; Lua reports neither). Tests now pin every channel against the base-only figure.
+
 > ## 📌 SESSION 2026-08-14 — what was established, in priority order
 >
 > 1. **✅ B3 RESURRECTED** (§9). `VU.BASE_FRAC` 0.03→0.06, reverted in July on a baseline −0.245,
