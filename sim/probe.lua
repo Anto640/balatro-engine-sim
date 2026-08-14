@@ -417,6 +417,20 @@ Probe.CONFIGS = {
   ecap3        = { early_joker_cap = 3, early_cap_until = 2 },
   ecap3a3      = { early_joker_cap = 3, early_cap_until = 3 },
   ecap4        = { early_joker_cap = 4, early_cap_until = 2 },
+  -- EARLY BOARD CAP x INCOME (2026-08-14, WINRATE_V3_PLAN 22). `ecap3` measured -0.169 and its
+  -- recorded mechanism is specific: capping the board cut board power, and board power EARNS income
+  -- (the engine got POORER, $7.5 -> $3.4 at a3). That harm channel is exactly what `rich10` closes,
+  -- while leaving the hypothesis under test -- early slot DISCIPLINE -- untouched. Same shape as B3
+  -- (needs money to express: -0.102 -> +0.518) and the exact mirror of the SELL_TO_BUY refill charge
+  -- (only fires when poor, so it must be measured poor). 6, applied by asking what the change is ABOUT.
+  --
+  -- The gap it targets is the largest behavioural divergence left after 21 closed the income axis:
+  -- at ante 2 the human holds 1.38 jokers and the engine 4.43 (3.2x), 3.88 v 5.09 at a3, and they are
+  -- IDENTICAL from a4. rich10 WIDENS it while closing every other axis. It compounds with the board
+  -- LOCKING at ante 3-4 (5a): filling slots by a2 locks in a board built from the weakest pools of
+  -- the run. READ AS A BOUND, like `rich` and `oracle_plan` -- a lesion, not a shippable policy.
+  ecap3rich    = { early_joker_cap = 3, early_cap_until = 2, income_bonus = 10 },
+  ecap3a3rich  = { early_joker_cap = 3, early_cap_until = 3, income_bonus = 10 },
   -- BANK variant: the freed cash is actually held (forces SAVE) rather than redirected.
   ecap3bank    = { early_joker_cap = 3, early_cap_until = 2, early_cap_bank = true },
   -- NO EARLY CHURN: block selling a non-junk joker before `until` ante. Does not touch

@@ -27,8 +27,13 @@
 >
 > ## 📍 WHERE THE PLAN GOT TO (§19, §20 — read them before starting an arm)
 >
-> * **✅ Tier 0 DONE.** The install is deployed and verified **byte-identical across all 42 files**
+> * **✅ Tier 0 DONE.** The install was deployed and verified **byte-identical across all 42 files**
 >   (backup: `%APPDATA%/Balatro/bes_install_backup_20260814b`, outside `Mods/`).
+>   ⚠ **It is now deliberately 2 files behind again** — `engine/pacing.lua` (§19b) and
+>   `engine/consumable_value.lua` (§20) carry changes whose arms have not run. §19b is
+>   correctness-class and §21c shows its double-count is **30% larger on the human's boards than on
+>   the engine's**, so it is a strong live-deploy candidate *once its negative check clears*. §20 is
+>   magnitude-class and must not ship on mechanism. **Do not deploy either before the arms.**
 > * **❌ Tier 1 mostly EVAPORATED on inspection (§19a).** "The graveyard was populated almost entirely
 >   by baseline nulls" is **false** — checked item by item, most went on MECHANISM (swap-damp and
 >   cost-discount were *directly measured*, 145 tied, and they fight the world's real `joker_tick`;
@@ -43,9 +48,13 @@
 >
 >   | # | arm | probe | baseline | worktree |
 >   |---|---|---|---|---|
->   | 1 | `oracle_rich` (§18g Tier 4 bound) | `oracle_rich` | `pd_play_r` | `bes_oracle` |
+>   | 1 | `oracle_rich` (§18g Tier 4 bound) | `oracle_rich` | `pd_play_r` | `bes_oracle` @ `5d82d0e` |
 >   | 2 | `pacefix` (§19b alone) | `rich10` | `pd_play_r` | `bes_pacefix` @ `bb3e876` |
->   | 3 | `levelscale` (§20 on top) | `rich10` | **arm 2**, not `pd_play_r` | make one @ `e927a73` |
+>   | 3 | `levelscale` (§20 on top) | `rich10` | **arm 2**, not `pd_play_r` | `bes_levelscale` @ `ff818f5` |
+>   | 4 | `ecap3` / `ecap3a3` (§22 bound) | `ecap3`+`rich10` | `pd_play_r` | none — probe only |
+>
+>   All three worktrees exist and were **verified isolated** (arm 2 has the pacing fix and NOT the
+>   `level_scale` derivation; arm 1 has neither). Arm 4 needs a combined probe config.
 >
 >   §19d pre-registers arm 2's reading (a NEGATIVE CHECK, not positive evidence; also re-check the
 >   ante-6+ tail, which is what reverted E-12 in July). §20c states arm 3's risk plainly: it cuts
