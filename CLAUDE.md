@@ -126,6 +126,19 @@ only counts when `picks_left >= 2`). Live telemetry gained `blind_select`, `blin
 >
 > **DO:** judge valuation changes with a `BES_PROBE=rich10` arm (same cost, ~8× the winrate
 > headroom: 15% vs 2.5%). Keep baseline as the honest headline number; it is a poor *instrument*.
+> **⚠ BUT "measure at rich10" is NOT a universal upgrade — ASK WHAT THE CHANGE IS ABOUT FIRST.**
+> Pick the operating point that CONTAINS the mechanism. The two fixes shipped 2026-08-14 are exact
+> mirrors and prove the point:
+>
+> | fix | prices | baseline | `rich10` |
+> |---|---|---|---|
+> | **B3** (`BASE_FRAC` 0.03→0.06) | the value of MONEY | −0.102 (inert) | **+0.518** (p 0.0011) |
+> | **SELL_TO_BUY refill charge** | the cost of POVERTY-driven churn | **+0.096** | −0.034 (**95% of seeds tied**) |
+>
+> B3 needs money to EXPRESS; the refill charge only FIRES when poor (SELL_TO_BUY runs 1.25/run at
+> baseline vs **0.12/run** at rich10 — a funded engine never enters the sell-to-afford spiral).
+> **Measuring the refill charge only at `rich10` would have discarded it.** A fix whose subject is
+> scarcity must be measured under scarcity.
 > **DO:** treat the revert graveyard (C1, B3, F3, F4, F8, swap-damp, cost-discount, xmult-floor, the
 > reroll gate, W-ECON…) as **untested where it counts**, not refuted — it was populated almost
 > entirely by baseline nulls.
