@@ -2887,3 +2887,33 @@ acquisition. The engine's is the inverse spiral: spend early → poor → `SELL_
 **This is why `rich10` works (+1.538) and `ecap3bank` does not:** a continuous income STREAM the
 engine's policy converts fine; a one-time early STOCK it simply consumes. Any future economy work
 must target the flow (econ acquisition from ante 3 on), not the early stock.
+
+### ✅ `nochurn2` +0.114 (n.s.) — the FIRST early intervention to lean positive, and the only one that improves everything at once
+
+| | sells ≤a2 | shop buys ≤a2 | $ a2 | $ a3 | $ a4 | jokers a3 |
+|---|---|---|---|---|---|---|
+| baseline | 1.88 | 5.06 | $1.5 | $7.5 | $18.7 | 4.6 |
+| **nochurn2** | **0.46** | 4.13 | $2.3 | **$10.6** | **$20.1** | **4.8** |
+
+Verdict: **+0.114** (t 0.93, p 0.350, n.s.; MDE 0.342), sign 57/49/48 tied, death-ante **43 later /
+31 earlier**, wins 4→4.
+
+Not significant — but look at the ORDERING of every early-game intervention tried, against how
+precisely each is targeted:
+
+| probe | what it restricts | Δ |
+|---|---|---|
+| `hoard10` | ALL purchases below $10 from ante 1 | **−0.396** |
+| `ecap3` | board size; freed cash redirected | −0.169 |
+| `ecap3bank` | board size; freed cash banked | −0.073 |
+| **`nochurn2`** | **the SELL side only; no purchase, no board change** | **+0.114** |
+
+**Monotone in precision.** And `nochurn2` is the only one that moves all three quantities the right
+way *simultaneously* — fewer sells (−75%), MORE money ($7.5→$10.6 at a3) and a SLIGHTLY BIGGER board
+(4.6→4.8) — where every other probe traded one against another. That is the signature of removing a
+genuine loss rather than reallocating a budget.
+
+**Next: dose–response, not another p-value.** `nochurn3` (block through ante 3) is running. If
+Δ(nochurn3) > Δ(nochurn2) > 0 that is far stronger evidence than any single n.s. reading, and it is
+the standard this project already trusts (§5w's money dose–response). If the dose does NOT respond,
+treat +0.114 as noise and close the thread.
