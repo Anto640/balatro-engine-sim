@@ -2840,3 +2840,50 @@ as the Dusk finding in §5s: a compounding piece traded away early for immediate
 `nochurn2` blocks SELL_TO_BUY and non-junk SELL_JOKER before ante 3. If it measures positive, the
 fix is not a new valuation weight — it is a **feasibility gate on SELL_TO_BUY while poor**, which is
 a narrow, high-frequency, mechanism-justified change.
+
+### ❌ `ecap3bank` −0.073 (p 0.571) — the early-compounding thread is CLOSED
+
+The corrected lesion (cap the board AND bank the difference) worked exactly as designed:
+
+| | shop buys ≤a2 | sells ≤a2 | $ a2 | $ a3 | $ a4 | $ a5 |
+|---|---|---|---|---|---|---|
+| baseline | 5.06 | 1.88 | $1.5 | $7.5 | $18.7 | $27.9 |
+| **ecap3bank** | **2.94** | **0.66** | $4.0 | **$21.0** | $22.0 | **$27.5** |
+| *HUMAN* | *2.75* | *0.12* | *$9.2* | *$21.5* | *$25.5* | *$43.4* |
+
+**It reproduced the human's early economy almost exactly — $21.0 at ante 3 against their $21.5, and
+their joker-buy count — and measured NOTHING** (−0.073, t −0.57, p 0.571, sign 60/64, wins 4→5).
+
+**Two conclusions, both firm:**
+
+1. **The human's early money advantage is NOT causal.** Handed the same early bankroll and board,
+   the engine does not improve. Combined with `hoard` (−0.396/−1.194/−1.639) and `ecap3` (−0.169),
+   **stop trying to make the engine save early.** Thread closed.
+2. **Early savings do not persist.** `ecap3bank`'s $13.5 advantage at ante 3 is **gone by ante 5**
+   ($27.5 vs baseline $27.9). Another confirmation that the engine spends to zero regardless — a
+   one-time surplus is consumed, not compounded.
+
+### Where the human ACTUALLY separates: antes 4–6, and it is a FLOW not a STOCK
+
+| held | a2 | a3 | a4 | **a5** |
+|---|---|---|---|---|
+| ENGINE | $1.5 / 2.9 jok | $7.5 / 4.6 | $18.7 / 5.0 | **$27.9** / 5.2 |
+| HUMAN | **$9.2 / 1.4 jok** | $21.5 / 3.9 | $25.5 / 5.1 | **$43.4** / 5.4 |
+
+The human runs a nearly EMPTY board at ante 2 (1.4 jokers!) and is *behind* on board through a3 —
+then converges by a4 and pulls away on cash at a5 at the SAME board size. Both are above the $25
+interest cap, so interest does not explain it. What does:
+
+| by ante 5 | jokers gained | econ jokers | summed econ $ |
+|---|---|---|---|
+| ENGINE | 7.85 | 1.19 | $4.12 |
+| HUMAN | **12.12** | **2.00** | **$6.62** |
+
+**The human acquires 1.5× more jokers and 1.6× more ECONOMY — just later.** ~$2.50/round more econ
+over ~12 rounds ≈ $30, which covers the $15 cash gap plus the extra buying. So the sequencing is a
+compounding *flow*: hold early → acquire more and better from a3 → more econ → more cash → more
+acquisition. The engine's is the inverse spiral: spend early → poor → `SELL_TO_BUY` churn → poorer.
+
+**This is why `rich10` works (+1.538) and `ecap3bank` does not:** a continuous income STREAM the
+engine's policy converts fine; a one-time early STOCK it simply consumes. Any future economy work
+must target the flow (econ acquisition from ante 3 on), not the early stock.
