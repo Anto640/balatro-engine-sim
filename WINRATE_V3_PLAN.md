@@ -3568,3 +3568,39 @@ ever displayed is in the records. `tools/key_coverage.lua`:
 
 The risk stays worth re-checking after any catalogue change or new capture (hence a tool rather
 than a one-off), but as of this dataset there is no silent zero anywhere in the joker layer.
+
+### §12h — A pre-registered MECHANISM check the progress metric cannot see
+
+`tools/death_wallet.lua`. The documented pattern — *"the engine dies holding the interest cap; from
+ante 5 the median death holds $26; 28% of all deaths hold ≥$25"* — now has a mechanism (§11a: it
+parks on the one wallet value where every purchase is maximally expensive). The level_gain
+correction is supposed to give that banked cash something to convert into. Baselines:
+
+| batch | deaths | mean $ | median $ | ≥$25 at death | **ante 5+ ≥$25** |
+|---|---|---|---|---|---|
+| `pd_base_a` (arm A) | 157 | 20.1 | 15 | 32% | **68%** |
+| `dig_base_all` (n=480) | 468 | 17.0 | 13 | 28% | 57% |
+| `rich10_now` | 68 | 35.2 | 30 | 74% | 80% |
+| `richpack` | 61 | 46.0 | 41 | 84% | 91% |
+
+**PRE-REGISTERED:** if the correction works through the channel claimed, arm C's share of deaths
+holding ≥$25 should **fall** relative to arms A and B, most from ante 5 on. The reading rules,
+written before the data:
+
+* **progress up AND wallet down** → the mechanism story holds.
+* **progress up, wallet flat** → the gain came from somewhere else; the story is wrong even if the
+  number is good.
+* **wallet down, progress flat** → the conversion happened and did not pay, i.e. `levelbuy`'s
+  verdict generalising (§12c, explanation 3).
+
+⚠ Note `richpack` dies holding **more** than `rich10_now` (46.0 vs 35.2) while winning more (19 vs
+12) — forcing pack purchases did not drain the bank. So a falling wallet is not automatic even when
+buying rises, which is what makes it a real test rather than a restatement.
+
+### §12i — What arm C actually isolates
+
+Arm C sits on top of arm B, so **C − B is the level_gain correction *in the presence of* the
+play-derived commitment**, not in isolation. That matters: the commitment makes `planet_credit`
+non-zero for ~31% more runs, and the correction multiplies the base planet value ~5×. If they
+interact, C − B overstates what the correction would do alone. Read it as the *joint* leveling
+change, and if it pays, isolate before tuning either constant.
