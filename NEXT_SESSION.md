@@ -87,8 +87,29 @@
 > geometric**, yet `growth_factor` estimates ONE rate from the current board and raises it to the
 > power of the remaining antes. The cause is already measured: §5a's board saturation
 > (`slots_free` = 0.00 by ante 5), and **three of `growth_factor`'s five terms are acquisition-driven**
-> and unrealizable on a full board. §25c has the derived fix (gate them on `slots_free` — removes
-> constants, adds none) and deliberately does **not** implement it. **Best-evidenced open lead.**
+> and unrealizable on a full board.
+>
+> ## ⭐⭐⭐ THE BIGGEST OPEN FINDING — `growth_factor`'s TREND IS INVERTED (§26e)
+> Two screens (`slotgate_screen.lua`, `growth_truth.lua`) turned §25b into a measured model failure.
+> **Baseline income, monotone:**
+>
+> | | a2→a3 | a3→a4 | a4→a5 | a5→a6 | a6→a7 |
+> |---|---|---|---|---|---|
+> | **realized growth** | **5.60** | 1.83 | 1.52 | 1.19 | **1.03** |
+> | model `g` | 1.47 | 1.78 | 2.05 | 2.31 | **2.68** |
+> | required | 2.50 | 2.50 | 2.20 | 1.82 | 1.75 |
+>
+> **Realized growth decays 5.60 → 1.03; the model RISES 1.47 → 2.68.** The curves cross at ~ante 4,
+> which is where the deaths are. Same shape at `rich10` on an independent batch. The board is **FULL
+> in 96–99% of ante-states from ante 3**, so growth is acquisition-driven early (1 joker → 5, genuinely
+> 4–6×) and collapses once only scaling and leveling remain — while `growth_factor` reads the
+> *strength* of the board and treats it as a *rate*, climbing exactly as the real rate falls.
+> **⇒ The engine's whole "am I on pace" judgement runs on a backwards trend.** This subsumes §19b
+> (one term of it) and §25c (a level fix that leaves the trend rising — **do not implement as
+> drafted**, §26b/§26c). The replacement's target is *measured*, not chosen, and must satisfy two
+> things now in evidence: **decay with ante**, and **do not zero full-board growth** (a saturated
+> board still grows 1.0–1.5×/ante). ⚠ Screen it — `slotgate_screen.lua` shows the drafted version
+> flips **45.9%** of bands, a systems-class change.
 
 > # ⭐⭐ THE BASELINE IS A BROKEN INSTRUMENT — read `WINRATE_V3_PLAN.md` §6 FIRST
 > The **identical** six-commit engine delta (`e7c3a8c`→`82f808f`), on the **same** seeds:

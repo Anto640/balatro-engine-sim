@@ -43,6 +43,8 @@ Almost everything here reads **existing** telemetry and costs nothing to run. On
 |---|---|
 | `celestial_price.lua` | what is a Celestial pack worth, and what *should* it be? (found the level_gain unit error) |
 | **`pacing_screen.lua`** | how often would a change to `growth_factor` move a real pace VERDICT? Replays the bands off recorded telemetry (`g` is exactly recoverable from `pace_margin`). ⚠ Its first version measured only the binary `on_pace` and said 4% — "don't batch". The real figure, counting the four `pace.margin` bands the shop advisor actually reads, is **15–18%**. **Screen every consumer, not the obvious one** |
+| **`growth_truth.lua`** | what growth does the engine actually REALIZE, against what `Pacing.growth_factor` predicts? **Found the trend inversion** (realized 5.60 -> 1.03 while the model rises 1.47 -> 2.68). Ground truth was in `metrics.capacity` in every batch ever run and had never been looked at |
+| **`slotgate_screen.lua`** | model a proposed `growth_factor` change over recorded states without touching engine code. Caught a drafted fix over-correcting (46% band flips, but below realized growth at a3) |
 | **`level_scale_screen.lua`** | what does the derived leveling-persistence factor do to boards that really occurred? Reports the new/old RATIO by ante, not a firing rate — the factor is continuous, so there is no threshold to cross |
 | `pack_terms.lua` | the actual terms behind a pack's shop value, wallet by wallet |
 | `death_wallet.lua` | how much money is the engine holding when it dies? (a mechanism check `progress` cannot see) |
