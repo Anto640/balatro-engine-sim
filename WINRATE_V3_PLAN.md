@@ -3785,3 +3785,29 @@ direction, not a magnitude.**
 
 That cancellation is worth keeping in mind for the verdict: **C − A** bundles a skip-neutral net
 with the pack gain, while **C − B** isolates a change that both buys more packs *and* skips more.
+
+### §12p — The provisional plan behaves as designed (traced, arm B)
+
+Commitment per ante for eight arm-B runs (`*` = play-derived/provisional; no `*` = joker-anchored
+and sticky; `-` = uncommitted):
+
+```
+6003    a2:-           a3:Full House* a4:Full House* a5:Full House*(lv2) ... a7:Full House*
+16003   a2:Straight    a3:Straight    a4:Straight    a5:Straight              <- anchored, sticky
+41003   a2:-  a3:-  a4:-  a5:-  a6:-  a7:-  a8:-                              <- never concentrates
+47003   a2:-  a3:Two Pair*(lv2)  a4:Full House(lv5)  a5:Full House(lv6)       <- ANCHORED SUPERSEDES
+3003    a2:-  a3:Two Pair*(lv3)  a4:Two Pair*  a5:Two Pair*
+33003   a2:-  a3:-  a4:Full House*  a5:Full House*  a6:Full House*            <- commits, then frozen
+38003   a2:-  a3:Two Pair*  a4:High Card*  a5:High Card*                      <- tracked, then frozen
+```
+
+Every designed behaviour is visible: provisional commitment from play history; anchored plans
+unchanged and sticky (16003); an anchored plan **superseding** a provisional one mid-run and levels
+then climbing 2→3→5→6 (47003); a provisional plan **re-deriving** as the run changes (38003); the
+freeze after `COMMIT_MAX_ANTE`; and runs whose play never concentrates staying **uncommitted**
+(41003) rather than being forced into a plan.
+
+⚠ 38003 settles on **High Card**, the weakest possible target. That is the gate working as
+specified — it is the hand that run actually lands — but it is worth watching whether a High Card
+or Pair commitment is ever worth *leveling* toward, or whether such a run is simply already lost.
+Its hand levels stayed at 0, so nothing was spent on it either way.
