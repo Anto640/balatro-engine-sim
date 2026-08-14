@@ -2697,3 +2697,38 @@ in July.
   engine a real player runs is the baseline one. **If the goal is the live overlay, B3's value is
   still unproven; if the goal is winrate given a functioning economy, it is the biggest single
   lever found.**
+
+---
+
+# 10. HYPOTHESIS (not acted on): the early-interest compounding trap
+
+§9 shows every improvement found so far is **gated on the engine having money**. So the question
+that now matters most is where the human's early money comes from, since it is not exogenous for
+them. The arithmetic points at **compounding interest**, and it is self-reinforcing in both
+directions:
+
+| at ante 2 | $ held | interest earned (=$1 per $5, cap $5) |
+|---|---|---|
+| ENGINE (baseline) | **$1.3** | **$0 / round** |
+| HUMAN | **$9.2** | **$1–2 / round** |
+| by ante 3 | $6.6 vs $21.5 | $1 vs $4 / round |
+
+Over the ~6 rounds of antes 1–2 that is ≈**$6** of the ≈$8 gap — and it compounds from there. The
+engine's measured antes-1–2 behaviour: ~3.6 joker buys, 1.8 pack buys, 0.7 consumables, 0.2
+rerolls, 0.2 vouchers ≈ **$32 spent against ~$30 earned**, landing it at $1.3 with the interest
+channel switched off for the rest of the run. `SA.ECON_FLOOR` ($10) exists to prevent exactly this
+but is a SOFT penalty folded into the value, and it demonstrably fails to hold the line.
+
+### ⚠ Why this is NOT yet an action
+
+`hoard10` (min_bank $10 until ante 5) measured **−0.396**, `hoard20` −1.194, `hoard25a4` −1.639 —
+all strongly negative. That is a direct measurement and it must not be waved away. But note what
+that probe actually did: a **HARD refusal** of any purchase dropping below $10, from ante 1 — when
+the engine only *has* ~$4–10, so it blocks the first joker outright. That is a different
+intervention from "preserve one interest step".
+
+**Before touching this, the honest checks are:** (a) re-measure `hoard` at the `rich10` operating
+point (per §6 the baseline hoard verdicts are as suspect as any other), (b) test a *soft, scaled*
+floor (e.g. hold $5 = one interest step, scaling with ante) rather than a hard $10 from ante 1, and
+(c) confirm the human's early money is actually interest rather than econ jokers — the live data can
+answer that and has not been asked. **Do not ship a floor change on this arithmetic alone.**
