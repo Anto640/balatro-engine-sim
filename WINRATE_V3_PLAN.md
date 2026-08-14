@@ -2623,3 +2623,49 @@ Revert-on-mechanism stays valid. But **"reverted on a null"** and **"reverted on
 wins"** are now both suspect, and E-5 proves the upside is real. The screening order is:
 **frequency first** (Class C is unrecoverable), **then mechanism** (Class B needs the coupled
 retune the audit already specified), **then re-measure at an operating point where it can fire**.
+
+
+---
+
+# 9. ✅ B3 IS RESURRECTED — the "co-retune the guardrails" mechanism was itself a BASELINE ARTIFACT
+
+The Class-B family test (§8) landed. `rich_nobridge` is current HEAD with **one constant** reverted
+(`BASE_FRAC` 0.06 → 0.03, clamps with it), run at `rich10` against `rich10_now`. A `git log` over
+`engine/ model/ core/ util/` between the two arms returns **nothing** — the isolation is exact.
+
+| test | result |
+|---|---|
+| **progress Δ** | **+0.672**, sd 1.951, SE 0.218, **t = 3.08, p = 0.0021** ✅ |
+| wins | **6 → 12** (McNemar discordant 2 vs 8, p 0.109) |
+| death-ante | **31 later / 17 earlier**, 32 unchanged |
+| sign test | 38 / 28 / 14 tied (p 0.27, n.s.) |
+
+**The same single constant measured −0.245 (n=80, 2026-07) and −0.125 (n=154, this session) at
+BASELINE income.** At an operating point where a dollar can actually be spent it is **+0.672,
+p=0.0021**.
+
+### What this overturns
+
+1. **B3's July revert was a measurement artifact.** The recorded mechanism — *"`SK.SHOP_VALUE`, the
+   skip margin, keep_bias and the consumable-money terms were all calibrated against the old 0.03
+   rate, so doubling the rate alone mis-calibrates every one of them"* — is coherent, was
+   reproduced four times (C1/B3/F4/F8), and **does not survive contact with the operating point.**
+   The co-retune the audit deferred as a prerequisite is not needed for B3.
+2. **B3 alone (+0.672) is ~92% of the entire six-commit bundle (+0.730)** from §6. The
+   operating-point effect is not diffuse accumulated work — it is *this one constant*.
+3. **Class B of the graveyard is now open.** C1 (adaptive samples, −0.142), F4 and F8 all died to
+   the same mechanism and all were measured only at baseline. They deserve the identical treatment:
+   isolate, run at `rich10`, compare.
+
+### ⚠ Honest limits
+
+* Only the primary metric is significant. The sign test (38/28) and McNemar (2 vs 8) point the same
+  way but are n.s. — the mean is carried by large gains on a **subset** of seeds, not by moving most
+  of them. Given §5z's chaos (85% of seeds flip under tiny perturbations) that is a real caveat.
+* **Out-of-sample replication is running** (`nobridge_s4` vs `rich10_s4`, disjoint pool
+  `BES_SEED_OFF=4`). This result is strong but single-pool; do not treat Class B as settled until
+  the replication agrees.
+* This says nothing about whether B3 helps at BASELINE income, where it still measures ≈ −0.1. The
+  engine a real player runs is the baseline one. **If the goal is the live overlay, B3's value is
+  still unproven; if the goal is winrate given a functioning economy, it is the biggest single
+  lever found.**
