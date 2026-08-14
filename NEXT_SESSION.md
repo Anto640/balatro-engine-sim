@@ -68,33 +68,34 @@
 >    discontinuously to $0 at exactly $25, and `bankroll_plan` *targets* $25. That mechanically
 >    explains "the median death from ante 5 holds $26".
 
-> ## 🌳 READ THE VERDICT WITH THIS TREE (written before the data)
-> Arms: **A** = neither change, **B** = play-derived commitment, **C** = B + the level_gain
-> correction. So **B−A** is the commitment and **C−B** is the correction *in the presence of* the
-> commitment (§12i — both act on `planet_credit`, so C−B may overstate the correction alone).
+> ## ✅ THE VERDICTS (paired n=160 each, all arms integrity-clean) — §13
 >
-> | outcome | reading | do next |
-> |---|---|---|
-> | **C > B > A** | both pay | ship both; then test `COMMIT_MAX_ANTE` 4→6 (§12f) and the §12k shop-value fix, **separately** |
-> | **C ≈ B ≈ A** | inert at baseline income | check `pd_play_r` vs `pd_base_r` — §6 says a valuation change may need money to express |
-> | **C < B** | the correction over-shoots | `level_persist` is a fudge for this very bug (§12a) — remove it and re-measure, **jointly** |
-> | **B < A** | the commitment hurts | revert it, keep the correction; the commitment is the speculative half |
+> | contrast | Δ progress | sd | p | wins | ties | call |
+> |---|---|---|---|---|---|---|
+> | **B−A** play-derived commitment | **+0.049** | **0.372** | **0.092** | 3→3 | **131** | **KEEP** |
+> | C−B level_gain correction | −0.125 | 1.812 | 0.383 | 3→1 | 12 | **gate it, don't revert** |
 >
-> ⚠ Also check `tools/death_wallet.lua` (§12h) — a **mechanism** check the progress metric cannot
-> see, with its reading rules pre-registered. And note §12l: the sim says the **skip axis is flat**
-> (`noskip` −0.166, sign 68/67), so skip inflation is the *least* supported explanation for a
-> negative, not the first — that is a correction to my own earlier framing.
+> **B keeps.** The power prediction (§12r) held exactly: 131/160 tied → sd 0.372 → **MDE 0.082**,
+> so +0.049 at p 0.092 is a small *positive* on the most precise measurement class this apparatus
+> produces. Invisible through ante 4, then deeper: 31 runs reach a6 vs 27, 14 reach a7 vs 10.
+> Feasibility class (the planner was blind to play history; the live extractor didn't populate the
+> field at all) — ships unless significantly negative.
 >
-> ✅ Full suite green after all of it: **1017 unit + 524 sim, 0 failures.**
-
-> ## 🔧 RUNNING / QUEUED WHEN THIS WAS WRITTEN
-> | arm | code | income | what it isolates |
-> |---|---|---|---|
-> | `pd_base_a` ✅ | `0e5596a` | baseline | reference (progress **3.789**, 3/160 wins) |
-> | `lg_play_b` | `db2814c` | baseline | **B−A = the play-derived commitment** |
-> | `lg_both_c` | `2e84735` | baseline | **C−B = the level_gain fix** |
-> | `pd_base_r` | `0e5596a` | `rich10` | rich10 reference |
-> | `pd_play_r` | `2e84735` | `rich10` | the pair at the operating point §6 prefers |
+> **C's progress verdict is uninformative and was pre-registered as such**: sd 1.812 → MDE 0.401
+> against −0.125, and the mean and sign test **disagree** (−0.125 but **80 better / 68 worse**),
+> only 12 ties. Chaotic re-roll, not a result. **Both mechanism checks fired instead:**
+> * ✅ intended — death wallet **$20.1 → $15.6**, ≥$25 share 32% → 26% (a5+ 68% → 58%), hand levels
+>   **2.5× at ante 4**. It converts the cash it used to die holding.
+> * ❌ predicted cost — **ante-2 deaths 14 → 21 (+50%)**, survivorship to a3 142 → 131, ante-2 board
+>   **2.48 jokers vs 2.99**. It mortgages the early game, exactly as §12q predicted.
+>
+> ➡ **`BP.level_readiness` (§14) is the pre-registered fix, now implemented**: full leveling credit
+> only once the board has `BASE_MIN` scorers, tapering to 0.35 on an empty board. Self-releasing
+> (1.0 by ante 3, where C's gains were). **Arm D (`lg_ready_d`) tests it against arm B** — it must
+> keep the late leveling *and* restore ante-2 survival.
+>
+> ⚠ Also running: `pd_base_r` (done) vs `pd_play_r` — arm C at **`rich10`**, the §6 operating-point
+> check. If C is positive there, the correction needs money to express, exactly like B3.
 
 > ## 📦 THE DEPLOY SET IS ALREADY SPLIT BY VERDICT (9 files differ from the install)
 > The live install at `%APPDATA%/Balatro/Mods/balatroenginesim/` was current as of the earlier
