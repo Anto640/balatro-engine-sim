@@ -3758,3 +3758,30 @@ functions; `SA.pack_need = pack_need` only exports a second reference to the sam
 rebinding a table field cannot intercept a call that resolves through an upvalue. **In Lua,
 monkey-patching an exported alias never intercepts internal callers, and it fails by returning an
 empty result rather than an error.**
+
+### §12o — Interim readout at ~35% (supersedes §12j; the skip inflation is much smaller than it first looked)
+
+| arm | commit rate | skip rate | packs/shop | consumables/shop | jokers/shop |
+|---|---|---|---|---|---|
+| **A** baseline (n=160, complete) | 27.5% | 15.9% | 0.291 | 0.266 | 0.373 |
+| **B** play-derived commitment (n=55) | **70.9%** | **13.2%** | 0.311 | 0.282 | 0.367 |
+| **C** + level_gain (n=61) | **82.0%** | 17.1% | **0.384** | **0.383** | 0.407 |
+
+**⚠ Correction to §12j.** At ~20% completion arm C's skip rate read 20.1% against baseline's 15.9%
+— **+26%**, which I reported as the pre-registered Orbital risk materialising. At ~35% it is
+**17.1%, i.e. +8% over baseline**. The first figure was noise on ~30 runs. The lesson is the
+project's own and I walked into it anyway: **an interim readout on a third of an arm is a
+direction, not a magnitude.**
+
+**The structure that survives, and it is more interesting than the original claim:**
+
+* **Arm B *reduces* skipping** (13.2% vs 15.9%) — the opposite of a risk. A run with a live plan
+  finds playing-and-shopping-toward-it more attractive than chasing a tag.
+* **Arm C raises it back** (17.1%), so the Orbital inflation is real and attributable to the
+  level_gain correction (**B → C is +30% relative**), but the two changes **partially cancel** on
+  this axis and the net against baseline is small.
+* **Arm C buys more of everything**: packs +32%, consumables **+44%**, jokers +9% (all vs A).
+* Commit rate 27.5% → 71% → 82%, so the planner is live in most runs for the first time.
+
+That cancellation is worth keeping in mind for the verdict: **C − A** bundles a skip-neutral net
+with the pack gain, while **C − B** isolates a change that both buys more packs *and* skips more.
