@@ -3962,3 +3962,56 @@ survival. The fix named in §12q applies unchanged, and it mirrors logic the pla
 
 That is also the human's measured ordering (economy and base first, power second, crossing at
 ante 4), and it is the one axis on which arm C is currently *inverted* from them.
+
+---
+
+## §14 — THE FIX FOR §13's MEASURED COST: buy the base first, then level it
+
+`BP.level_readiness`. The pre-registered response to arm C, implemented unchanged from §12q.
+
+**The problem is not the arithmetic.** With board context, `level_gain` already returns far less on
+a bare board (69 vs 520 for a Pair level). What it cannot see is the **opportunity cost**: before
+the base exists, the same dollars buy a *first joker*, and a first joker is worth more than any
+level. And `persist × freq × level_gain / need` stays roughly **flat across antes**, because `need`
+shrinks about as fast as the gain does — so leveling competes for exactly the money that should be
+buying the board it is supposed to multiply.
+
+**The gate:** full credit once the board holds `BP.BASE_MIN` additive scorers, tapering to
+`LEVEL_READY_FLOOR = 0.35` on a board with none. Measured shape:
+
+| board | readiness | `level_scale` (ante 3) |
+|---|---|---|
+| empty | 0.35 | 1.14 |
+| 1 flat scorer | 0.68 | 2.19 |
+| **2 flat scorers** | **1.00** | **3.25** |
+| 1 xmult only (Cavendish) | 0.35 | 1.14 |
+| 1 xmult_scaling (Hologram) | 0.35 | 1.14 |
+| 2 econ only | 0.35 | 1.14 |
+| typical ante-3 board | **1.00** | **3.25** |
+
+It **releases itself** — the engine holds ~4.7 jokers by ante 3 — so it bites only in the window
+where the correction measurably hurt, and is **1.0 exactly where arm C's gains were**. Same
+reasoning the codebase already applies twice (`BP.invest_window` invests only once survival is
+assured; `SK.BOARDLESS_SHOP_MULT` values a shop higher the emptier the board), and the same ordering
+the human is measured to follow.
+
+### Two implementation choices, both bought with today's mistakes
+
+**1. `CV.level_persist` was RENAMED to `CV.level_scale`.** It now returns runway × readiness, so the
+old name lies — but the real reason is that a rename makes any missed caller a **loud error**
+instead of a silently dropped factor. Threading the `level_gain` context by hand missed a channel
+**twice in one afternoon** because a nil argument is not an error in Lua. The rename surfaced all
+six consumers immediately.
+
+**2. `base` comes from `BP.analyze`, not a parallel loop.** `analyze` classifies with an elseif
+chain that files an `xmult_scaling` joker under *xmult*; an independent loop using
+`is_scaling or is_flat` disagreed with it about exactly the jokers this gate is about. Verified in
+the table above — **Hologram reads 0.35, not full credit**.
+
+**3. Applied at the ONE hook every leveling channel already shares**, so loose planets, the
+Celestial pool, in-pack picks, Black Hole and Orbital tags all receive it by construction rather
+than by five correct edits.
+
+**Verdict pending: arm D (`lg_ready_d`) vs arm B.** The prediction to check is specific — arm D
+should keep arm C's late leveling (hand levels well above baseline at ante 4+) while restoring
+ante-2 survival (deaths back toward 14, not 21) and the ante-2 board (2.99 jokers, not 2.48).
