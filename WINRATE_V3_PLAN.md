@@ -2917,3 +2917,35 @@ genuine loss rather than reallocating a budget.
 Δ(nochurn3) > Δ(nochurn2) > 0 that is far stronger evidence than any single n.s. reading, and it is
 the standard this project already trusts (§5w's money dose–response). If the dose does NOT respond,
 treat +0.114 as noise and close the thread.
+
+### The shipped fix, if the dose–response confirms: a REPLACEMENT charge on joker-funded SELL_TO_BUY
+
+`shop_advisor.lua:~1084` scores the trade as
+
+```lua
+local funded = p.value + SA.DOLLAR_UTIL * f.cash - f.loss
+```
+
+crediting the cash raised (`f.cash` ≈ half the purchase price) and charging only the funder's
+FORWARD value (`f.loss`). Charging forward value is correct — the purchase price is sunk. But the
+formula omits a cost that is NOT sunk: **the slot gets refilled.** The engine's board goes
+2.9 → 4.6 → 5.0 jokers across antes 2–4 in every arm measured, so an early joker sale is
+*temporary*: the slot is re-bought within a shop or two at ~$5 while the sale raised ~$2.5.
+
+Two independent things make this fire far too often early:
+1. **The replacement cost is unpriced** — the model sees +$2.5 of cash, not −$2.5 net.
+2. **`f.loss` is noise-suppressed.** On a weak ante-1–2 board a joker's measured marginal reads ~0
+   and floors to the tier prior, so the thing being sold looks cheap. That is the same
+   measurement-noise family as C1/F4/F8 (§8), and it is *why* the guardrails exist.
+
+**The principled change** (derived, not tuned): when the funder is a JOKER and the board will be
+refilled, charge the expected refill against the cash raised —
+`SA.DOLLAR_UTIL * (f.cash - refill_p * SA.TYPICAL_JOKER_COST)` — using the constant the engine
+ALREADY has for this ($5, "what you expect to pay for a joker once a reroll surfaces one").
+Early, `refill_p ≈ 1`, so a ~$2.5 sale nets ≈ −$2.5 and joker-funded SELL_TO_BUY largely stops —
+which is exactly the `nochurn2` behaviour. It leaves consumable-funded SELL_TO_BUY untouched
+(no slot to refill) and needs no new constant.
+
+⚠ **Do not ship this on `nochurn2`'s +0.114 alone** (p 0.350). Ship only if `nochurn3` shows a
+dose–response; and because it is a valuation change, expect §6 to apply — its effect may be far
+larger at the `rich10` operating point than at baseline, so measure both.
