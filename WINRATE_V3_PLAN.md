@@ -5034,3 +5034,74 @@ the engine read *behind* far more often, which tilts `w_score` up and economy do
 power. That is a large behavioural change, and §18d's three demonstrations say a large behavioural
 change is not evidence of a large outcome change. **Screen it with `pacing_screen.lua` first** — and
 note the screen must be extended, because on a full board this moves `g` for *every* state, not 15%.
+
+---
+
+## §26 — SCREENING §25c BEFORE WRITING IT: the diagnosis holds, the drafted fix over-corrects
+
+`tools/slotgate_screen.lua` (new) models §25c's proposal over 773 recorded ante-states **without
+touching engine code**. Two results, and they point opposite ways.
+
+### 26a. ✅ The diagnosis is confirmed, and it is worse than stated
+
+| ante | **board FULL** | `g` now | `g` proposed | margin now | margin proposed | band flips |
+|---|---|---|---|---|---|---|
+| a2 | 63% | 1.62 | 1.38 | 1.7 | 0.7 | 49% |
+| a3 | **96%** | 1.90 | 1.48 | 4.8 | 1.6 | **68%** |
+| a4 | **99%** | 2.05 | 1.59 | 5.9 | 2.3 | 50% |
+| a5 | **99%** | 2.21 | 1.73 | 6.6 | 3.3 | 32% |
+| a6 | 98% | 2.31 | 1.84 | 5.4 | 3.4 | 25% |
+| a7 | 99% | 2.37 | 1.88 | 5.9 | 4.6 | 32% |
+
+**The board is full in 96–99% of ante-states from ante 3 on.** §5a measured saturation at ante 5; it is
+effectively total from ante 3. So `growth_factor`'s three acquisition-driven terms are unrealizable in
+almost every state the engine ever evaluates. **Band flips 45.9% overall** — 3× the `pacefix` screen's
+14.8%, far clear of the frequency ceiling. This is a systems-class change by the CLAUDE.md table.
+
+### 26b. ❌ But compare the proposal to REALIZED growth, and it over-shoots
+
+| ante | realized (§25b) | `g` now | `g` proposed |
+|---|---|---|---|
+| a2→a3 | **4.71** | 1.62 | 1.38 |
+| a3→a4 | **2.57** | 1.90 | **1.48** |
+| a4→a5 | **1.95** | 2.05 | 1.59 |
+| a5→a6 | **1.44** | 2.21 | 1.73 |
+
+**The current model is not uniformly too high — it has the TREND BACKWARDS.** Realized growth *falls*
+(4.71 → 1.44) as acquisition stops; `growth_factor` *rises* (1.62 → 2.31) as the board gets stronger.
+It under-estimates at a2–a3 and over-estimates by ~53% at a5. That inversion, not the level, is the
+structural error — and §25c's draft lowers the level while leaving the trend still rising (1.38 →
+1.88). It also drops a3 growth to 1.48 against a realized 2.57.
+
+**Why the draft over-shoots:** `f(0) = 0` says a full board cannot grow by acquisition, which is true
+of *additions* and false of everything else the engine actually does at full board — **upgrade swaps,
+buying levels, deck shaping, scaling accrual**. Those are real growth and the draft zeroes them along
+with the fictional part.
+
+### 26c. ⇒ Do NOT implement §25c as drafted. Calibrate instead.
+
+The honest form of the fix is not a new gate but a **validated** `growth_factor`: it has never been
+checked against realized growth, and realized growth is sitting in every batch already
+(`metrics.capacity` at consecutive antes). The target is measured, not chosen — the same standing that
+makes `blind_requirement` legitimate and a hand-fitted ramp not.
+
+Two things that must be true of any replacement, both now measured:
+1. **it must DECAY with ante** (realized 4.71 → 1.44), where the current one rises;
+2. **it must not zero full-board growth**, because a saturated board still grows ~1.4–2.0× per ante.
+
+⚠ **Survivorship bounds what can be claimed.** The realized figures condition on reaching ante *a+1*,
+so they are biased upward, and the bias grows with ante. A calibration fitted to them will be
+optimistic in exactly the late antes where the engine is dying. Any fit must be stated as an upper
+bound, or computed over a death-inclusive denominator.
+
+### 26d. The process point, recorded because it happened twice today
+
+**Two screens, two saved arms, in opposite directions.** `pacing_screen.lua`'s first version measured
+only the binary `on_pace`, reported 4%, and would have wrongly said "below the ceiling, don't batch" —
+the real figure counting the bands the advisor reads is 15–18%. `slotgate_screen.lua` reports 46% and
+would have said "batch it", and comparing against realized growth instead shows the drafted fix
+over-corrects and should not be batched *as drafted*.
+
+**A screen is not just a firing-rate gate. Screen against GROUND TRUTH where ground truth exists** —
+here, growth the engine actually realized, which was recorded in every batch this project has ever run
+and had never been looked at.
