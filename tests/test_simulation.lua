@@ -333,6 +333,18 @@ return function(t)
        > Pacing.growth_factor(GS.new{ jokers = { joker{ key = "j_joker" } } }),
       "xmult + money grows the engine faster than a flat joker")
 
+    -- A FLAT XMULT IS A STEP, NOT A RATE (see engine/pacing growth_factor). cap = base * X, so a
+    -- growth step gives cap'/cap = (base+d)/base with X cancelling -- and `cap` already MEASURES
+    -- the board's X. Only an xmult whose X itself grows is a rate.
+    local g_flat = Pacing.growth_factor(GS.new{ jokers = { joker{ key = "j_cavendish" } } })
+    local g_bare = Pacing.growth_factor(GS.new{ jokers = { joker{ key = "j_joker" } } })
+    local g_xsc  = Pacing.growth_factor(GS.new{ jokers = { joker{ key = "j_hologram" } } })
+    local g_sc   = Pacing.growth_factor(GS.new{ jokers = { joker{ key = "j_runner" } } })
+    t.eq(g_flat, g_bare, "an owned FLAT xmult adds no growth RATE (it is already in the measured cap)")
+    t.ok(g_xsc > g_sc, "an xmult that SCALES out-credits a plain scaler")
+    t.ok(g_xsc - g_bare > 2 * (g_sc - g_bare),
+      "a scaling xmult out-credits a plain scaler by >2x (0.45 vs 0.15)")
+
     local deck, id = {}, 0
     for _, s in ipairs({ "Spades", "Hearts", "Clubs", "Diamonds" }) do
       for r = 2, 14 do id = id + 1; deck[id] = card{ id = id, rank_id = r, suit = s } end

@@ -4460,3 +4460,106 @@ an 8-sample estimate, so read the *final*-plan gradient as reverse causation, no
 * Do not treat a confirmed mechanism as partial evidence (§18d).
 * Do not quote §5u's "wrong size by 1–2 orders of magnitude" without its operating point.
 * Do not re-tune `level_scale` as a constant; derive it or leave it.
+
+---
+
+## §19 — THE REVERT GRAVEYARD HAS TWO ITEMS IN IT, NOT TEN — and the second one is a units error
+
+§18g Tier 1 called re-measuring the revert graveyard at `rich10` the highest-EV work available,
+reasoning that it *"was populated almost entirely by baseline nulls"* and that B3 — the one item ever
+pulled out and retested — returned the largest lever in project history, so the rest were ~10 unopened
+lottery tickets. **That reasoning was checked item by item and it is wrong.** The claim it rests on
+(repeated in `CLAUDE.md` twice) does not survive reading the original verdicts.
+
+### 19a. Every item, and what actually reverted it
+
+| item | the ACTUAL reason it was reverted | re-testable at `rich10`? |
+|---|---|---|
+| **B3** (`VU.BASE_FRAC`) | baseline null (−0.245) | ✅ **already done — +0.518, p 0.0011** |
+| **E-12** (`growth_factor`) | baseline null (−0.038, **127/160 tied**) + a tail gate | ✅ **YES — the one remaining ticket** |
+| **swap-damp** (round-19 `opts.proj_damp`) / **cost-discount** (round-20 `condition_factor`) | **directly measured and refuted, not a null.** Forcing `SA.proj_damp` to 1.0 — the strongest form of the change — gave −0.004, sign **7/8/145 tied**, and BROKE two guardrail tests. The audit's conclusion is that they are *"DOUBLY wrong to re-add (they'd fight A1's real world)"*: the committed damps match the world's actual `joker_tick` growth | ❌ **No.** Refuted on world-fidelity mechanism, and 145 ties means a LOW MDE — a genuinely powered null, not an underpowered one |
+| **xmult-floor** | **refuted on mechanism** by §5o: the winners are xmult-POOR early and front-loading xmult is *what the losing runs do*. §5p records it as FORBIDDEN and says why | ❌ No — mechanism is operating-point independent |
+| **C1** | obsolete — solved analytically by `conditional_xmult_marginal` | ❌ No |
+| **W-ECON** | frequency ceiling, 153/160 tied | ❌ No |
+| **reroll gate** | mechanism — it damped rerolls that were earning through consumables | ❌ No |
+| **F3 / F4 / F8** | in-blind play; money does not help you play a hand | ❌ No |
+
+**⇒ Exactly two items were ever reverted on an underpowered baseline null: B3 and E-12.** B3 has been
+retested and paid. **E-12 is the whole of the remaining opportunity**, and the "1-for-1, ten tickets
+left" framing in §18g overstated it by an order of magnitude. Corrected here rather than in place,
+because the wrong version was published and the correction is the more useful record.
+
+⚠ Note the shape of the mistake: three of those items were reverted on nulls with **145, 153 and 127
+seeds TIED**. A high tie count means a LOW sd and therefore a LOW MDE — those are the project's *most*
+trustworthy nulls, not its least. "It measured null at baseline" is not one category. **Read the tie
+count before deciding a null was underpowered.**
+
+### 19b. ⭐ E-12's core is a units error, and it is still in the code
+
+`P.growth_factor` credits every xmult joker **0.30/ante of growth**, so owning Cavendish — a one-time
+×3 — is modelled as making capacity grow 30% faster *every ante, forever*. The arithmetic settles it
+exactly. Write capacity as `cap = base × X` (base = additive chips×mult, X = the product of xmults).
+An ante of acquisition adds `d` to base:
+
+```
+cap' / cap  =  (base + d)·X / (base·X)  =  (base + d) / base
+```
+
+**X cancels.** A flat xmult raises capacity ONCE — and `P.pace` already has that once, because `cap`
+comes from `JokerValue.avg_score` **measuring the real board**. Crediting it again as a rate is a
+double count, compounded over `(8 − ante)` antes.
+
+An `xmult_scaling` joker is genuinely different — its own X grows each round, so `(X+dX)/X > 1` is a
+real rate. It keeps the full 0.30 + 0.15 = 0.45 it has always had.
+
+**This is the same error class as §12's `CV.level_gain`:** a one-time quantity given a rate's
+time-behaviour. And E-12 measured the *consequence* in July before the cause was derived — the
+ante-6–8 death cohort reads *"comfortably ahead"* at antes 3–5 (median margin 2–3) and then dies. A
+false lead, bought with growth credit for multipliers that are not growing, which tells the shop
+advisor to stop buying power.
+
+**Shipped as the derivation dictates and nothing more:** flat xmult contributes 0 to the rate,
+`xmult_scaling` unchanged. E-12 also bundled a *tuned* leveling bump (0.05→0.06, cap 12→15) — **not
+reproduced**, so the result stays attributable. No constant is introduced; one is removed.
+
+### 19c. The screen — `tools/pacing_screen.lua` (new), and why the first version was wrong
+
+`growth_factor`'s only consumer is `P.pace`, so the firing rate is the rate at which the correction
+changes a *pace verdict*. Screened against 776 recorded ante-states at `rich10` and 484 at baseline —
+free, because `capacity`, `pace_margin` and the xmult counts are all already in the telemetry, and `g`
+is exactly recoverable from `pace_margin = cap·g^(8−ante)/req8`.
+
+⚠ **The first version measured only the binary `on_pace` and reported 4.0%** — which would have said
+"below the frequency ceiling, do not batch". That was wrong: `pace.margin` also drives four threshold
+bands (`shop_advisor` weights at ≥1.5, `pack_need` at ≥1.8/≥1.3, `proj_damp`, and `BP.HOPELESS_MARGIN`
+for the invest window), and a growth change is raised to the power `(8−ante)` before it reaches them.
+
+| | `rich10` (776 states) | baseline (484) |
+|---|---|---|
+| holds a flat xmult | **66.4%** | 39.0% |
+| mean growth over-credit | **0.319 /ante** | 0.158 /ante |
+| `on_pace` flips (the narrow read) | 4.0% | 5.4% |
+| **advisor BAND flips (the real one)** | **14.8%** | **18.0%** |
+| by ante (`rich10`) | a2 22% · a3 13% · a4 7% · a5 13% · a6 16% · a7 17% | |
+
+**Cross-validation the screen passes:** it predicts ~15–18% of states change regime, and E-12's actual
+July batch came back **127/160 seeds tied** — i.e. ~21% of seeds changed. A screen written today
+retrodicts a batch run five weeks ago. That is the first time this project has been able to check a
+firing-rate estimate against a known outcome, and it is the argument for running the screen first.
+
+### 19d. Pre-registered reading (recorded BEFORE the arm)
+
+**14.8% is marginal, and this is a NEGATIVE CHECK, not a positive-evidence test.** A pacing change
+re-weights the whole shop, so expect sd ~1.9 and MDE ~0.42 at n=160 — it cannot certify a small
+positive, and it is not being asked to. The classification is **derived correctness with no new
+constant** (the §5y/refill-charge shape), which under the standing burden-of-proof rule ships unless
+it measures *significantly negative*.
+
+* **Arm:** `pacefix` at `rich10`, paired n=160, against `sim_out/pd_play_r.jsonl` (§18f).
+* **`rich10` is the right operating point** because pacing decides *when to stop saving and start
+  buying power* — a spend decision, unmeasurable on an engine holding $1.3 at ante 2 (§6).
+* **Keep** unless significantly negative, or unless the ante-6+ tail sheds mass (E-12's original
+  revert trigger was reach-6+ 27→25, so that gate is checked again explicitly).
+* **Expected mechanism if it works:** fewer false "comfortably ahead" verdicts at antes 3–5 → the
+  engine keeps buying power through the window where §5s says the board LOCKS. Check `pace_margin`
+  and the a3–a5 death share, not just progress.

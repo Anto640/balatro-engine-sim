@@ -22,11 +22,39 @@ P.TARGET_ANTE = 8  -- the race: beat ante 8's boss
 -- Estimated multiplicative growth of your per-blind capacity per ante, from the
 -- build's scaling capacity (xmult compounds hardest), economy (more buys), and
 -- hand-level investment. Clamped to a sane band.
+--
+-- ⭐ A FLAT XMULT IS A STEP, NOT A RATE (2026-08-14, WINRATE_V3_PLAN 19). This function used to
+-- credit every xmult joker 0.30/ante of GROWTH, so owning Cavendish (a one-time x3) was modelled as
+-- making capacity grow 30% faster every ante, forever. That is a units error of the same class as
+-- the `CV.level_gain` one (a one-time quantity treated as if it had a rate's time-behaviour), and
+-- the arithmetic settles it exactly. Write capacity as
+--     cap = base * X          (base = the additive chips x mult, X = the product of xmults)
+-- An ante of acquisition adds `d` to base, so
+--     cap' / cap = (base + d) * X / (base * X) = (base + d) / base
+-- and **X cancels**. Owning a bigger flat multiplier raises capacity ONCE -- and `P.pace` already
+-- has that once, because `cap` comes from JokerValue.avg_score MEASURING the real board. Crediting
+-- it again as a rate is a double count that compounds over (8 - ante) antes.
+--
+-- An xmult_scaling joker is genuinely different: its own X grows each round, so
+--     cap' / cap = (X + dX) / X > 1
+-- is a real rate. It keeps the full 0.30 + 0.15 = 0.45 it has always had.
+--
+-- This is the E-12 diagnosis (2026-07-14), which measured the CONSEQUENCE before the cause was
+-- derived: the ante-6-8 DEATH cohort reads "comfortably ahead" at antes 3-5 (median margin 2-3) and
+-- then dies -- a false lead, bought with credit for multipliers that are not growing, which tells
+-- the shop advisor to stop buying power. E-12 was reverted at BASELINE income on a -0.038 null;
+-- pacing decides WHEN TO STOP SAVING AND START BUYING, which is unmeasurable on an engine holding
+-- $1.3 at ante 2 (6). E-12 also bundled a tuned leveling bump (0.05->0.06, cap 12->15) that is NOT
+-- reproduced here: this changes only what the derivation dictates, so the result is attributable.
 function P.growth_factor(gs)
-  local scaling, xmult, econ = 0, 0, 0
+  local scaling, xgrow, econ = 0, 0, 0
   for _, j in ipairs(gs.jokers or {}) do
-    if JokerData.is_xmult(j.key) then xmult = xmult + 1 end
-    if JokerData.is_scaling(j.key) then scaling = scaling + 1 end
+    if JokerData.is_scaling(j.key) then
+      scaling = scaling + 1
+      -- an xmult that is ALSO scaling (cat xmult_scaling: Hologram, Vampire, Obelisk, Campfire)
+      -- has a growing X, which is the only way an xmult contributes to the RATE
+      if JokerData.is_xmult(j.key) then xgrow = xgrow + 1 end
+    end
     econ = econ + (JokerData.resolve(j.key).econ or 0)
   end
   local money = math.max(0, (gs.economy and gs.economy.dollars) or 0)
@@ -35,7 +63,7 @@ function P.growth_factor(gs)
     hand_lv = hand_lv + math.max(0, (h.level or 1) - 1)
   end
   local g = 1.25                            -- baseline: ~1 acquisition per ante
-    + 0.30 * xmult                          -- xmult jokers compound
+    + 0.30 * xgrow                          -- xmult whose X ITSELF grows compounds
     + 0.15 * scaling                        -- scaling jokers grow each round
     + 0.05 * math.min(hand_lv, 12)          -- leveled hands
     + math.min(money, 40) / 160             -- cash -> more shop buys
