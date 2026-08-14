@@ -3689,3 +3689,28 @@ negative, the skip channel is now the *least* supported of the three explanation
 first. Revised order to test: **(1) `level_persist` double-count (§12a), (2) `levelbuy`'s verdict
 generalising, (3) skip inflation.** The §12k asymmetry is still a real inconsistency worth fixing on
 its own merits — it is just no longer the prime suspect.
+
+### §12m — The hand-agnostic claim, on a fair denominator (and a within-human contrast)
+
+§11 compared sim jokers **held at ante 3** (12.7% handtype-tagged) against human jokers **acquired
+across whole runs** (9.3%) — different denominators. Redone on *acquired* jokers throughout:
+
+| dataset | acquired | tagged | share | jokers/run |
+|---|---|---|---|---|
+| sim `pd_base_a` (n=160) | 1251 | 167 | **13.3%** | 7.8 |
+| sim `dig_base_all` (n=480) | 3231 | 416 | **12.9%** | 6.7 |
+| **human, 7-of-8 wins** (`bes_runs_live_2026-08-12`) | 115 | 10 | **8.7%** | **14.4** |
+| human, 22 mixed-outcome runs (`bes_runs`) | 182 | 34 | **18.7%** | 8.3 |
+
+**The claim survives the fix**: the winning human runs acquire a *lower* tagged share (8.7%) than
+the engine (13.3%), so the planner is reading a board type the winners are *less* invested in, not
+more.
+
+**And there is a within-human contrast that strengthens it.** The earlier, mixed-outcome human
+capture is **18.7%** tagged — *higher* than the engine. So "hand-agnostic boards" is not a property
+of humans in general; it tracks **winning**. ⚠ n is small (22 vs 8 runs) and the two captures differ
+in more than outcome, so treat this as suggestive support for the main claim, not an independent
+result.
+
+Also visible: the winning human acquires **14.4 jokers/run against the engine's 7.8** — the "1.5×
+more jokers, just later" flow finding, at nearly 2× on this measure.
