@@ -44,6 +44,17 @@ local function hand_level_sum(gs)
   return s
 end
 
+-- name -> level, LEVELED hands only (the base-1 entries are noise in a log line). Mirrors
+-- the sim driver's `hand_level_map` so live and sim ante records read the same.
+local function hand_level_map(gs)
+  local m, any = {}, false
+  for name, h in pairs((gs.run and gs.run.hand_levels) or {}) do
+    local lvl = h.level or 1
+    if lvl > 1 then m[name] = lvl; any = true end
+  end
+  return any and m or nil
+end
+
 -- A frame is everything the state machine needs from one snapshot, and nothing
 -- that holds a live object. `ctx` (the gs itself) is forwarded to enrich only.
 function Telemetry.frame_of(gs)
@@ -71,6 +82,14 @@ function Telemetry.frame_of(gs)
     hand_level_sum = hand_level_sum(gs),
     consumables = #(gs.consumables or {}),
     has_hand = #(gs.hand or {}) > 0,
+    -- WHICH HANDS THIS RUN ACTUALLY LANDS, and what it has leveled. The 2026-08-12 human
+    -- dataset cannot answer "does the winner level the hand they play?" -- the half of the
+    -- play-derived commitment that concerns the human is unverifiable without these, and it
+    -- is the central claim behind BP.play_direction. Both are already extracted; they were
+    -- simply never carried into a record.
+    hand_type_plays = (gs.run or {}).hand_type_plays,
+    hand_levels = hand_level_map(gs),
+    build_plan = (gs.run or {}).build_plan,
   }
 end
 
@@ -110,6 +129,9 @@ function Telemetry:_board_fields(frame)
     jokers = Json.array(frame.joker_keys),
     hand_level_sum = frame.hand_level_sum,
     consumables = frame.consumables,
+    hand_type_plays = frame.hand_type_plays,
+    hand_levels = frame.hand_levels,
+    build_plan = frame.build_plan,
   }
 end
 
