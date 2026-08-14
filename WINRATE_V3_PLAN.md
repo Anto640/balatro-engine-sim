@@ -3229,3 +3229,38 @@ sticky point itself, not the spend rate.
 * **Celestial collapses between ante 1 and ante 2** (+1.55 → −2.13 → −2.01) and recovers only by
   ante 5 — and even in *rich* shops ($25+) it stays negative through antes 2–4 (−0.73 / −0.93 /
   −0.48), so the collapse is not only the wallet.
+
+
+### §11b — Is `progress` blind to the thing we want? Mostly NO — and the exception is the pack channel
+
+§7 found `richpack` flat on progress (+0.082, t 0.43) while wins went 22 → 34 (p 0.088). That
+invites a large and destructive conclusion: *the project has called every verdict on a metric that
+cannot see the goal.* `tools/metric_agreement.lua` tests it over **1002 batch pairs sharing ≥40
+seeds, across 51 batches** — and the conclusion is wrong.
+
+* **correlation(progress Δ, win Δ) = 0.901.** The metrics track each other closely.
+* Sign disagreement is **16.9%** of pairs where both moved — and almost all of those are tiny.
+* **Inside the "n.s." band** (|progress Δ| < 0.15, i.e. everything historically read as no effect):
+  wins move by ≥5 in **2% of pairs (5 of 278)**. Mean win Δ **−0.27**, mean |win Δ| **1.38**.
+  There is no systematic tail the metric is discarding.
+
+**So `progress` is fit for purpose, and the revert history is not invalidated by a metric artifact.**
+That is worth knowing precisely because the opposite would have been a convenient story.
+
+**But look at WHICH pairs are the exception.** Of the five in-band pairs where wins moved by ≥5:
+
+| A | B | progress Δ | wins Δ |
+|---|---|---|---|
+| `rich10_now` | `richpack` | +0.137 | **+7** |
+| `rich10_s4` | `richpack_s4` | +0.036 | **+5** |
+| `lb_levelbuy20` | `packgreed` | −0.012 | **+5** |
+| `dose_rich25` | `lv_level2` | −0.112 | −9 |
+| `lv_level1` | `rich_nobridge` | −0.115 | −5 |
+
+**Three of the five are the pack channel, and they are the only ones that are genuine A/B pairs**
+(the other two contrast different resource probes). The pack intervention is the one place in the
+entire batch history where a progress null hides a real win movement, and it does so consistently,
+in both seed pools, in the same direction.
+
+That is not a reason to distrust the metric. It is a reason to judge **the pack channel specifically
+on wins**, and it makes the n=320 richpack extension (§7) the best-motivated experiment on the board.
