@@ -2657,6 +2657,34 @@ p=0.0021**.
    the same mechanism and all were measured only at baseline. They deserve the identical treatment:
    isolate, run at `rich10`, compare.
 
+### WHY it works — the behavioural diff, and it is what the human data predicts
+
+| per ante (unless noted) | B3 OFF (0.03) | B3 ON (0.06) | change |
+|---|---|---|---|
+| **SKIPs per run** | **3.11** | **2.34** | **−25%** |
+| packs | 3.09 | 3.48 | +13% |
+| Celestial packs | 0.60 | 0.69 | +15% |
+| planets used | 0.83 | 0.91 | +10% |
+| tarots used | 1.95 | 2.07 | +6% |
+| jokers gained | 2.16 | 2.19 | +1% |
+| $ held at a2 / a3 | 10.4 / 24.6 | 10.6 / 23.7 | — |
+
+The dominant change is the **`tags.lua` INVERSE**: doubling `dollar_frac` halves `frac_to_dollars`,
+which halves the dollar value of joker / orbital / pack skip tags — so **the engine skips 25% fewer
+blinds**. The audit's own B3 entry identified exactly this as the bug (*"tags ~2× over-valued in the
+skip decision, worsening with ante"*); it simply measured the fix at baseline. The user's stated
+view of correct play is the same: *"skipping is typically the wrong option."*
+
+The secondary changes — more packs (+13%), more Celestials (+15%), more planets (+10%), jokers flat
+— are precisely the direction §5z's human comparison says is right, and they cost no extra money
+($ held is unchanged): it is a REALLOCATION, not more spending.
+
+**This also explains the baseline failure.** At baseline the engine holds $1.3 at ante 2, so the
+"buy more packs" half cannot fire at all — leaving only the skip change, which the `noskip` probes
+(§5w, 68/67 and 71/61) showed is ~neutral there. At `rich10` both halves fire and compound. The
+result is not a bare number; it has a mechanism, and the mechanism is the one the audit wrote down
+in July.
+
 ### ⚠ Honest limits
 
 * Only the primary metric is significant. The sign test (38/28) and McNemar (2 vs 8) point the same
