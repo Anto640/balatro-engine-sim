@@ -2741,6 +2741,30 @@ rerolls, 0.2 vouchers ≈ **$32 spent against ~$30 earned**, landing it at $1.3 
 channel switched off for the rest of the run. `SA.ECON_FLOOR` ($10) exists to prevent exactly this
 but is a SOFT penalty folded into the value, and it demonstrably fails to hold the line.
 
+### Check (c) ANSWERED: it is NOT econ jokers — it is EARLY JOKER CHURN
+
+| by ante 2 | jokers gained / run | econ jokers / run | summed econ $ |
+|---|---|---|---|
+| ENGINE (baseline) | **5.93** | 0.76 (13% of jokers) | $2.59 |
+| HUMAN | **4.62** | 0.62 (14% of jokers) | $2.12 |
+| *(by ante 3)* | 6.96 vs **8.12** | 0.95 vs 1.25 | $3.28 vs $4.00 |
+
+**The human does not out-earn the engine through economy jokers** — the shares are nearly identical
+(13% vs 14%), and by ante 2 the human actually holds slightly LESS econ ($2.12 vs $2.59). So the
+$9.2-vs-$1.3 gap at ante 2 is not an income-source difference.
+
+**It is spending.** The engine acquires **1.3 more jokers by ante 2** (5.93 vs 4.62) at ~$5 each
+≈ **$6.5**, which is most of the ~$8 gap; the forfeited interest then compounds on top. Note that
+joker slots are **5**, so acquiring ~6 by ante 2 means the engine is *churning* — buying and
+selling — which the anti-churn work already targets but evidently not this early. By ante 3 the
+human has overtaken on joker count (8.12 vs 6.96), so this is a difference in **timing**, not in
+how many jokers each ends up with: **the engine front-loads board and the human front-loads cash**,
+which is exactly the "economy and base first, power second" sequencing already recorded in CLAUDE.md.
+
+**Refined hypothesis:** the engine converts cash into board during antes 1–2, the only window where
+cash still compounds. That is narrower and more testable than "raise the econ floor", and it does
+NOT contradict the `hoard` probes (which blocked ALL purchases below $10 from ante 1).
+
 ### ⚠ Why this is NOT yet an action
 
 `hoard10` (min_bank $10 until ante 5) measured **−0.396**, `hoard20` −1.194, `hoard25a4` −1.639 —
