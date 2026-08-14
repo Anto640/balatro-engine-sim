@@ -448,6 +448,19 @@ Probe.CONFIGS = {
   -- planning-to-an-archetype is not the gap and the search/lookahead direction (§5u item 1) is
   -- mis-aimed -- which would be the single most valuable thing to learn before building it.
   oracle_plan  = { oracle_plan = true },
+  -- ORACLE x INCOME (2026-08-14, WINRATE_V3_PLAN 18g Tier 4). `oracle_plan` measured 41/40 --
+  -- dead even -- but it ran at BASELINE income, i.e. under exactly the condition 6 proved makes a
+  -- PREFERENCE change unmeasurable: a perfect plan is worth nothing to an engine holding $1.3 at
+  -- ante 2, because it cannot act on it. A plan is the purest preference change there is, so this
+  -- cell is the one the operating-point rule most obviously demands. It is also the cheapest
+  -- possible bound on the entire search/planner direction (5u item 1, MCTS_PLAN):
+  --   still dead even -> planning is NOT the gap and the planner is mis-aimed; that verdict saves
+  --                      the largest single block of work on the roadmap.
+  --   clearly positive -> the strongest justification the project can produce for building it,
+  --                      plus a measured effect size to aim at.
+  -- Baseline to compare against is sim_out/pd_play_r.jsonl (rich10, current HEAD, verified
+  -- byte-identical on 8 shared seeds -- 18f), so this costs ONE arm, not two.
+  oracle_rich  = { oracle_plan = true, income_bonus = 10 },
   -- SKIP DISCIPLINE (2026-08-13). Measured: the engine skips 2.16 blinds/run, 27-30% of all
   -- offers at antes 2-4, always to chase a tag ("Investment tag (~$25) beats playing (~$12)").
   -- The expert human plays 3.0 / 3.0 / 3.0 blinds through ante 3 across every fully-logged
@@ -500,7 +513,13 @@ end
 function Probe.oracle_plan(gs, rng, current)
   local ConsumableValue = require("engine.consumable_value")
   local Mechanics = require("engine.mechanics")
-  local freq = ConsumableValue.hand_frequencies(gs, { samples = 8, rng = rng })
+  -- The BOARD CONTEXT is the second return and must be threaded: without it `level_gain` falls
+  -- back to the hand's bare base, which understates a level by 1.4-19x and by a factor that GROWS
+  -- with board strength (WINRATE_V3_PLAN 12). The argmax is only weakly affected -- the error is
+  -- near-uniform across hands, which is why planets agreed with the winner even while mispriced --
+  -- but an oracle that ranks on a known-wrong valuation is not the instrument this probe claims
+  -- to be. A nil ctx fails SILENTLY here, so this is threaded explicitly, never via an upvalue.
+  local freq, bctx = ConsumableValue.hand_frequencies(gs, { samples = 8, rng = rng })
   if not freq then return current end
   local names = {}
   for h in pairs(freq) do names[#names + 1] = h end
@@ -509,7 +528,7 @@ function Probe.oracle_plan(gs, rng, current)
   for _, h in ipairs(names) do
     if Mechanics.HAND_PLANET[h] then
       -- how much this run gains by committing here: how often it lands x what a level is worth
-      local v = freq[h] * ConsumableValue.level_gain(gs, h, 1)
+      local v = freq[h] * ConsumableValue.level_gain(gs, h, 1, bctx)
       if not best_v or v > best_v then best, best_v = h, v end
     end
   end
