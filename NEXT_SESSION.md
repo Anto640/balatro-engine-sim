@@ -24,6 +24,32 @@
 > `rich10` → `sim_out/pd_play_r.jsonl` (5.732, 42 wins) · baseline → `sim_out/lg_both_c.jsonl`
 > (3.714, 1 win). **The plan itself is §18g** (Tier 0 deploy · Tier 1 re-measure the revert graveyard
 > at `rich10` · Tier 2 derive `level_scale` · Tier 3 econ flow · Tier 4 one probe before any planner).
+>
+> ## 📍 WHERE THE PLAN GOT TO (§19, §20 — read them before starting an arm)
+>
+> * **✅ Tier 0 DONE.** The install is deployed and verified **byte-identical across all 42 files**
+>   (backup: `%APPDATA%/Balatro/bes_install_backup_20260814b`, outside `Mods/`).
+> * **❌ Tier 1 mostly EVAPORATED on inspection (§19a).** "The graveyard was populated almost entirely
+>   by baseline nulls" is **false** — checked item by item, most went on MECHANISM (swap-damp and
+>   cost-discount were *directly measured*, 145 tied, and they fight the world's real `joker_tick`;
+>   xmult-floor is refuted by §5o). **Exactly two were underpowered baseline nulls: B3 (done, +0.518)
+>   and E-12.** ⚠ And a high TIE COUNT means a LOW MDE — those nulls are the trustworthy ones.
+> * **⭐ Two derived fixes are IN THE TREE, tested, screened, and NOT yet batched:**
+>   **§19b** a flat xmult is a *step*, not a *rate* (`X` cancels in `cap'/cap`), so `growth_factor` no
+>   longer double-counts it — screened at **15–18%** band-flips; and **§20** the leveling persistence
+>   factor is now derived rather than fitted, which **lowers leveling at a2 and raises it from a4** —
+>   the human's measured sequencing, falling out of the units.
+> * **➡ THE ARM QUEUE, in this order — they are COUPLED (`g` feeds `level_scale`), so keep the chain:**
+>
+>   | # | arm | probe | baseline | worktree |
+>   |---|---|---|---|---|
+>   | 1 | `oracle_rich` (§18g Tier 4 bound) | `oracle_rich` | `pd_play_r` | `bes_oracle` |
+>   | 2 | `pacefix` (§19b alone) | `rich10` | `pd_play_r` | `bes_pacefix` @ `bb3e876` |
+>   | 3 | `levelscale` (§20 on top) | `rich10` | **arm 2**, not `pd_play_r` | make one @ `e927a73` |
+>
+>   §19d pre-registers arm 2's reading (a NEGATIVE CHECK, not positive evidence; also re-check the
+>   ante-6+ tail, which is what reverted E-12 in July). §20c states arm 3's risk plainly: it cuts
+>   ante-2 leveling 9–31%, at the operating point where the level_gain correction earned its +0.421.
 
 > # ⭐⭐ THE BASELINE IS A BROKEN INSTRUMENT — read `WINRATE_V3_PLAN.md` §6 FIRST
 > The **identical** six-commit engine delta (`e7c3a8c`→`82f808f`), on the **same** seeds:

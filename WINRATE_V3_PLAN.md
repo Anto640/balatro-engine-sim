@@ -4563,3 +4563,80 @@ it measures *significantly negative*.
 * **Expected mechanism if it works:** fewer false "comfortably ahead" verdicts at antes 3–5 → the
   engine keeps buying power through the window where §5s says the board LOCKS. Check `pace_margin`
   and the a3–a5 death share, not just progress.
+
+---
+
+## §20 — THE LEVELING FUDGE, DERIVED — and it reproduces the human's sequencing by itself
+
+§18g Tier 2.1 flagged `CV.level_scale` as the one piece of genuinely unfinished work: §12a said in
+advance that `level_persist` *"was itself a fudge for this very bug; the two are coupled and must be
+calibrated together, never one at a time"*, and §12 then fixed `level_gain` exactly and left the fudge
+untouched. The pair has been half-calibrated ever since. This closes it.
+
+### 20a. The derivation
+
+Every caller computes `level_scale(gs) * level_gain(...) / boss_per_hand_need(gs)`, so the units are
+**fraction of what ONE HAND must deliver, at the CURRENT ante**. A level bought now also applies at
+every later ante — where the gain has grown with the board, and the requirement has grown on its own
+curve. So the honest multiplier is that same fraction summed over the remaining antes:
+
+```
+level_scale = SUM over k = ante..8 of  min(1,  g^(k-ante) * need(ante) / need(k))
+```
+
+* **`g` = `Pacing.growth_factor(gs)`** — the engine's own capacity-growth model, not a new constant.
+* **`need(k)` = the REAL `blind_requirement` curve.** Its ante-to-ante ratios are
+  **2.67, 2.50, 2.50, 2.20, 1.82, 1.75, 1.43** — it *decelerates*, which is why a level bought late
+  keeps far more of its value than a linear taper allows. The old ramp assumed a flat curve.
+* **The per-ante cap at 1 is the unit, not a fudge.** The term is a fraction of what one hand must
+  deliver; a hand delivering more than 100% of that is surplus that buys no extra survival. It also
+  bounds the sum by the number of remaining antes.
+
+The replaced expression was `clamp(1 + (8 - ante) * 0.45, 1, 4)`: board-BLIND, at exactly the point
+where the correct answer is board-DEPENDENT.
+
+### 20b. ⭐ Screened on real boards — it reproduces the winning SEQUENCING from first principles
+
+`tools/level_scale_screen.lua` (new) replays both formulas over the boards the engine actually
+reached — 828 ante-states at `rich10`, 487 at baseline. Free: the per-ante telemetry already carries
+everything `growth_factor` reads.
+
+| ante | measured `g` | old | **derived** | new/old | share raised |
+|---|---|---|---|---|---|
+| a2 | 1.62 | 3.70 | 3.38 | **0.91** *(baseline 0.69)* | 25% |
+| a3 | 1.89 | 3.25 | 4.43 | 1.36 | 88% |
+| a4 | 2.04 | 2.80 | 4.65 | **1.66** | 100% |
+| a5 | 2.18 | 2.35 | 3.97 | 1.69 | 100% |
+| a6 | 2.28 | 1.90 | 3.00 | 1.58 | 100% |
+| a7 | 2.33 | 1.45 | 2.00 | 1.38 | 100% |
+| **pooled** | | | | **1.35** *(baseline 1.11)* | |
+
+**It LOWERS leveling at ante 2 and RAISES it from ante 4 on.** That is, precisely, the sequencing the
+human dataset measures and the engine has never had:
+
+> *"the human levels LESS than the engine early (a2–a3, p<0.01), then crosses over at a4 and finishes
+> on 3–4× the levels (a8: 15 vs 4.5, p 0.009)"*
+
+and the ante-2 cut lands exactly where §13 measured the level_gain correction's cost (ante-2 deaths
++50%, ante-2 board 2.48 vs 2.99). **This was not fitted to that finding — it falls out of the units.**
+The board-dependence does the work the readiness gate tried to impose by fiat and could not convert
+(§17): a weak early board has a low `g`, so its levels are worth less *automatically*, with no gate,
+no threshold and no new constant.
+
+### 20c. Ordering, and what is NOT claimed
+
+**Coupled to §19b by construction** — `g` feeds the sum, and §19b changed `g` — so the arms must run
+in a chain to stay attributable, and this is why they were not bundled:
+
+```
+pd_play_r  ->  pacefix (19b alone)  ->  pacefix + levelscale (20)
+```
+
+Not yet batched. And the honest statement of risk: this is a **magnitude/shape change**, the class
+that requires positive evidence, and it cuts leveling value at ante 2 by 9% (`rich10`) to 31%
+(baseline) — at the operating point where the shipped level_gain correction produced its +0.421. It
+could give part of that back. The screen says the change is real (pooled 1.35×, and it moves 100% of
+states from a4 on, so it is nowhere near the frequency ceiling); it does not say the change is good.
+
+⚠ **Mild positive feedback, bounded and noted rather than hidden:** `growth_factor` counts hand levels
+(0.05 each, capped at 12), so leveling raises `g` raises `level_scale`. Both ends are clamped.
