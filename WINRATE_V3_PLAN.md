@@ -4705,3 +4705,63 @@ through §19b's correction:
 against the sim's 66.4% and 0.319. **The double-count is ~30% larger on the boards of a 7-of-8-win
 policy than on the engine's own** — so the correction matters *more* for the live overlay than for the
 sim, which is the operating point that actually ships. Independent of the pending `pacefix` verdict.
+
+---
+
+## §22 — THE LARGEST REMAINING BEHAVIOURAL GAP IS EARLY BOARD SIZE, AND ITS REFUTATION IS A §6 CASE
+
+§21 closed the income axis at `rich10` — matched money, matched econ acquisition, matched board size
+*from ante 4* — and the winrate is still 26.2% against 87.5%. So: what is still different?
+
+The §21a scan answers it, and the answer is concentrated in two antes:
+
+| jokers held | a2 | a3 | a4 | a5 | a6 | a7 | a8 |
+|---|---|---|---|---|---|---|---|
+| human (7 of 8 won) | **1.38** | **3.88** | 5.12 | 5.38 | 5.43 | 5.43 | 5.43 |
+| engine (`rich10`) | **4.43** | **5.09** | 5.21 | 5.33 | 5.48 | 5.69 | 5.90 |
+| ratio | **3.2×** | 1.3× | 1.02× | 0.99× | 1.01× | 1.05× | 1.09× |
+
+**A 3.2× gap at ante 2 that is gone by ante 4.** It is the largest behavioural divergence left in this
+dataset, and it is bigger than recorded — the docs have it as "1.4 vs 2.9" because that engine figure
+is from *baseline* income; give the engine money and it fills the board harder (4.43), so `rich10`
+*widens* this gap while closing every other one.
+
+### 22a. Why this is not just "the human was unlucky early"
+
+It compounds with a finding already measured: **the board LOCKS at ante 3–4** (§5a's acquisition
+profile — acquisitions collapse 94→51→21→6, and from ante 4 gains ≈ losses exactly, a pure churn
+equilibrium). An engine that fills its slots by ante 2 is locking in a board assembled from **ante-1
+and ante-2 shop offers**, which are the weakest pools the run will ever show it. The human holds slots
+open through the window where the pools improve, then fills them.
+
+That is a *sequencing* story, and it matches the human's other sequencing inversions exactly: economy
+and base first, power second; level less than the engine early, 3–4× more late (§5m); and §20's
+derived leveling factor independently reproducing the same early-down/late-up shape.
+
+### 22b. ⚠ Its refutation was measured where its harm mechanism dominates
+
+`ecap3` (hold the board to 3 jokers through ante 2) measured **−0.169**, and the recorded mechanism is
+specific: *"capping the board cut board power, and board power EARNS income — the engine got POORER
+($7.5→$3.4 at a3). Surviving finding: the engine spends to zero regardless of what you block."*
+
+**That is a §6 case in its purest form.** The lesion's harm channel is *lost income*. At `rich10`
+income is exogenous, so the harm channel is closed while the hypothesis under test — early slot
+discipline — is untouched. This is the same shape as B3 (needs money to express, −0.102 → +0.518) and
+the exact mirror of the SELL_TO_BUY refill charge (only fires when poor, so it must be measured poor).
+
+**⇒ Queued: `ecap3` and `ecap3a3` at `rich10`.** Zero code — both `Probe.CONFIGS` entries already
+exist. Read as a **bound**, like `rich` and `oracle_plan`, not as a shippable change:
+
+* **still negative** → early board size is genuinely not the gap, the human's empty ante-2 board is a
+  consequence of their play rather than a cause, and the sequencing thread narrows to leveling alone
+  (where §20 already acts). That is a real closure.
+* **clearly positive** → the engine's ante-1/2 buying is destroying its own build by consuming the
+  slots that the ante-3/4 pools would fill better, and the fix is a slot-RESERVATION policy — which is
+  `MCTS_PLAN.md`'s INC-1, the narrowest slice of the deferred search work and the one piece of it that
+  needs no search at all.
+
+⚠ Honest caveat before anyone reads a verdict into the table above: the human n is **8 runs** (and 7
+of them won), so their curve is a near-all-wins sample against a mixed one. §5m's warning applies —
+this measures *policy*, not world, and a survivorship read ("winners naturally have fewer jokers at
+a2") cannot be excluded from the observational data alone. **That is precisely why it needs the
+lesion**, which is causal, rather than another cut of the correlational dataset.
