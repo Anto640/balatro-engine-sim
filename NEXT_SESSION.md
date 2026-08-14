@@ -32,8 +32,7 @@
 >   ✅ **`engine/pacing.lua` (§19b) deployed too** — its negative check cleared (§25: +0.034, tail
 >   gate passes, wins 42→45) and §21c shows its double-count is **30% larger on the human's boards
 >   than on the engine's**, so it matters more live than in the sim.
->   ⚠ **It is deliberately ONE file behind: `engine/consumable_value.lua` (§20).** That is
->   magnitude-class and must not ship on mechanism — **arm 3 is testing it now.**
+>   ✅ **The install is CURRENT again — all 42 files byte-identical**, re-verified after §27's revert.
 > * **❌ Tier 1 mostly EVAPORATED on inspection (§19a).** "The graveyard was populated almost entirely
 >   by baseline nulls" is **false** — checked item by item, most went on MECHANISM (swap-damp and
 >   cost-discount were *directly measured*, 145 tied, and they fight the world's real `joker_tick`;
@@ -50,11 +49,12 @@
 >   |---|---|---|---|---|
 >   | ~~1~~ | ~~`oracle_rich`~~ | — | — | **✅ DONE — see below** |
 >   | ~~2~~ | ~~`pacefix`~~ | — | — | **✅ DONE — KEPT + DEPLOYED (§25)** |
->   | 3 | `levelscale` (§20 on top) | `rich10` | **arm 2**, not `pd_play_r` | `bes_levelscale` @ `ff818f5` |
->   | 4 | `ecap3` / `ecap3a3` (§22 bound) | `ecap3`+`rich10` | `pd_play_r` | none — probe only |
+>   | ~~3~~ | ~~`levelscale`~~ | — | — | **✅ DONE — ❌ REVERTED (§27)** |
+>   | 4 | `ecap3rich` (§22 bound) | `ecap3rich` | **`pacefix`** | `bes_ecap` @ `2036a4b` |
 >
->   All three worktrees exist and were **verified isolated** (arm 2 has the pacing fix and NOT the
->   `level_scale` derivation; arm 1 has neither). Arm 4 needs a combined probe config.
+>   Arm 4's baseline is `sim_out/pacefix.jsonl`, not `pd_play_r` — HEAD's engine was verified
+>   **code-identical** to the `pacefix` arm's (the §20 revert restored it exactly; the only diff is
+>   two inert `Probe.CONFIGS` entries).
 >
 >   §19d pre-registers arm 2's reading (a NEGATIVE CHECK, not positive evidence; also re-check the
 >   ante-6+ tail, which is what reverted E-12 in July). §20c states arm 3's risk plainly: it cuts
