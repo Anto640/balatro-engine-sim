@@ -4015,3 +4015,27 @@ than by five correct edits.
 **Verdict pending: arm D (`lg_ready_d`) vs arm B.** The prediction to check is specific — arm D
 should keep arm C's late leveling (hand levels well above baseline at ante 4+) while restoring
 ante-2 survival (deaths back toward 14, not 21) and the ante-2 board (2.99 jokers, not 2.48).
+
+### §14a — The behaviour the gate targets, measured in arm C's own shops
+
+What the engine actually *chose*, by ante (share of shop decisions):
+
+| ante | | BUY_JOKER | BUY_PACK | of which **Celestial** | REROLL |
+|---|---|---|---|---|---|
+| a1 | A / B | 38% | 18% | **3%** | 1% |
+| a1 | **C** | **34%** | **24%** | **10%** | 0% |
+| a2 | A / B | 28% | 16% | **1%** | 4% |
+| a2 | **C** | 28% | 18% | **7%** | 1% |
+| a3 | A / B | 7% | 19% | 1% | 15% |
+| a3 | **C** | 14% | 23% | **10%** | 6% |
+| a4 | A / B | 3% | 21% | 1% | 26% |
+| a4 | **C** | 3% | **30%** | **9%** | 18% |
+
+**At ante 1 arm C buys a Celestial pack in 10% of shops against 3%** — 3.3× — and buys a joker 4pp
+less often. That is the 2.48-vs-2.99 ante-2 board and the +50% ante-2 deaths, in the decision that
+causes them. `BP.level_readiness` is aimed exactly here: on an ante-1 board of 0–1 scorers it damps
+the leveling credit to 0.35–0.68, while ante 3–4 boards read 1.0 and keep the gains untouched.
+
+**A side effect worth keeping either way:** arm C's rerolls collapse (a3 15% → 6%, a4 26% → 18%).
+The engine spends on packs instead of rerolling — and rerolls were measured at ~$129/run. The gate
+should not disturb that, since it only damps the *early* leveling credit.
