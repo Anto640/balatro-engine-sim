@@ -94,6 +94,31 @@ return function(t)
     t.ok(ov2 and ov2.best.type == "SAVE", "early_cap blocks SELL_TO_BUY, falling back to SAVE")
   end
 
+  -- ---- §10 NO EARLY CHURN: blocks the SELL side only, and lets junk go ----
+  do
+    local cfg = { no_churn_until = 2, churn_junk_tier = 3 }
+    local alts = { { type = "BUY_PACK" }, { type = "SAVE" } }
+    local sell_good = { best = { type = "SELL_JOKER", target = { key = "j_baron" } }, alternatives = alts }
+    t.eq(Probe.no_early_churn({ probe = {} }, {}, sell_good), nil, "no_early_churn is inert with no config")
+    t.eq(Probe.no_early_churn({ probe = cfg, ante = 3 }, {}, sell_good), nil,
+      "no_early_churn stops applying after its ante window")
+    -- purchases are never touched (this is the whole point vs ecap3/hoard)
+    t.eq(Probe.no_early_churn({ probe = cfg, ante = 1 }, {}, { best = { type = "BUY_JOKER" } }), nil,
+      "no_early_churn never blocks a BUY")
+    t.eq(Probe.no_early_churn({ probe = cfg, ante = 1 }, {}, { best = { type = "BUY_PACK" } }), nil,
+      "no_early_churn never blocks a pack")
+    -- junk may still be dumped (what the human actually does: sold tier 3.00)
+    local sell_junk = { best = { type = "SELL_JOKER", target = { key = "j_joker" } }, alternatives = alts }
+    t.eq(Probe.no_early_churn({ probe = cfg, ante = 1 }, {}, sell_junk), nil,
+      "no_early_churn still allows dumping a tier<=3 junk joker")
+    -- a real joker is protected, promoting a non-sell alternative
+    local ov = Probe.no_early_churn({ probe = cfg, ante = 2 }, {}, sell_good)
+    t.ok(ov and ov.best and ov.best.type == "BUY_PACK", "no_early_churn blocks selling a REAL joker")
+    local ov2 = Probe.no_early_churn({ probe = cfg, ante = 2 }, {},
+      { best = { type = "SELL_TO_BUY", target = { key = "j_baron" } }, alternatives = {} })
+    t.ok(ov2 and ov2.best.type == "SAVE", "no_early_churn blocks SELL_TO_BUY too")
+  end
+
   -- ---- A1 static priority: the supermodular knowledge, hardcoded ----------
   do
     t.ok(Probe.rank("j_blueprint") > Probe.rank("j_joker"),

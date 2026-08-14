@@ -334,6 +334,42 @@ function Probe.early_cap(run, shop, ranked)
 end
 
 -- ---------------------------------------------------------------------------
+-- NO EARLY CHURN (WINRATE_V3_PLAN §10). `ecap3` failed because capping the BOARD cut board
+-- power, and board power earns income (blind rewards) -- so the engine ended up poorer. The
+-- quality data says the board size was never the problem anyway:
+--
+--   by ante 2   acquired  mean tier  xmult%  tier>=7   SOLD   sold tier
+--   ENGINE        5.78      4.51      14%     14%      1.88     4.30
+--   HUMAN         4.62      4.43      14%     14%      0.12     3.00
+--
+-- The engine's early jokers are NOT lower quality -- identical mean tier, identical xmult and
+-- high-tier shares. The entire difference is that it SELLS 1.88 jokers of tier 4.30 by ante 2
+-- (the human: 0.12, and only tier-3.00 junk). It is cycling EQUIVALENT-quality jokers at a ~50%
+-- cash loss each time: buy ~$5, sell ~$2, ~$5.6/run destroyed before ante 3.
+--
+-- This lesion blocks the SELL side only, before `until` ante. Unlike `ecap3` it does NOT reduce
+-- board size or power -- the board still fills to five -- so it is free of the "weaker board
+-- earns less" confound that made ecap3 uninterpretable. Unlike `hoard` it blocks no purchase.
+-- It is exactly the anti-churn the shipped guardrails (SA.UPGRADE_MARGIN, the current-value
+-- gate, cash_matters=dead) are supposed to achieve and measurably do not, this early.
+function Probe.no_early_churn(run, shop, ranked)
+  local p = run.probe
+  if not (p and p.no_churn_until) then return nil end
+  if (run.ante or 1) > p.no_churn_until then return nil end
+  local best = ranked and ranked.best
+  if not best then return nil end
+  if best.type ~= "SELL_JOKER" and best.type ~= "SELL_TO_BUY" then return nil end
+  -- allow dumping genuine junk (what the human does): only block selling a REAL joker
+  local t = best.target
+  local tier = t and t.key and (JokerData.resolve(t.key) or {}).tier or 0
+  if tier <= (p.churn_junk_tier or 3) then return nil end
+  for _, a in ipairs((ranked and ranked.alternatives) or {}) do
+    if a.type ~= "SELL_JOKER" and a.type ~= "SELL_TO_BUY" then return { best = a, alternatives = {} } end
+  end
+  return { best = { type = "SAVE", value = 0, reason = "probe: no early churn" }, alternatives = {} }
+end
+
+-- ---------------------------------------------------------------------------
 -- Config plumbing
 -- ---------------------------------------------------------------------------
 
@@ -383,6 +419,10 @@ Probe.CONFIGS = {
   ecap4        = { early_joker_cap = 4, early_cap_until = 2 },
   -- BANK variant: the freed cash is actually held (forces SAVE) rather than redirected.
   ecap3bank    = { early_joker_cap = 3, early_cap_until = 2, early_cap_bank = true },
+  -- NO EARLY CHURN: block selling a non-junk joker before `until` ante. Does not touch
+  -- board size or any purchase, so it has no 'weaker board earns less' confound.
+  nochurn2     = { no_churn_until = 2, churn_junk_tier = 3 },
+  nochurn3     = { no_churn_until = 3, churn_junk_tier = 3 },
   -- HOARD: refuse purchases that drop the bankroll below the floor, before the given ante.
   -- Fires in EVERY shop of EVERY run (unlike a joker fix, capped at ~5% firing).
   hoard10      = { min_bank = 10, hoard_until = 5 },

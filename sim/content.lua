@@ -896,6 +896,12 @@ function Content.shop_phase(run, opts)
       local ec = Probe.early_cap(run, shop, ranked)
       if ec then ranked = ec end
     end
+    -- NO EARLY CHURN lesion (§10): block selling a non-junk joker early. Board size and
+    -- every purchase path are untouched, so there is no board-power confound.
+    if run.probe and run.probe.no_churn_until then
+      local nc = Probe.no_early_churn(run, shop, ranked)
+      if nc then ranked = nc end
+    end
     -- Phase A HOARD lesion: refuse a purchase that would drop the bankroll below the floor.
     -- Fires in every shop of every run (see Probe.hoard); inert without a probe config.
     if run.probe and run.probe.min_bank then
