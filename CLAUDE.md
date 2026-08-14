@@ -207,9 +207,22 @@ class this apparatus produces. 63% of runs never committed before; now 71%. Feas
    comparing card enhancements returned identical values because the added card never landed in the
    sampled hand — which reads exactly like "the engine can't tell them apart".
 
-### CURRENT STATE (2026-08-14) — **8 expert HUMAN runs captured, 7 wins**; engine still ~1.25%
-**➡ THE authoritative status is `WINRATE_V3_PLAN.md` §5r (read that first). Fresh-session handoff:
-`NEXT_SESSION.md`. Historical audit + roadmap: `WINRATE_AUDIT.md`. Superseded plans: `docs/archive/`.**
+### CURRENT STATE (2026-08-14) — **8 expert HUMAN runs captured, 7 wins**; engine ~1.25% at
+### baseline income and **26.2% at `rich10`**, the operating point the live mod actually serves
+**➡ THE authoritative status is `WINRATE_V3_PLAN.md` §18 — the current checkpoint AND the plan
+(§18g). Read it first, then §6. Fresh-session handoff: `NEXT_SESSION.md`. Historical audit +
+roadmap: `WINRATE_AUDIT.md`. Superseded plans: `docs/archive/`.**
+
+> ### 🧭 §18, in four lines
+> * **§5u is REVISED.** Its *"wrong SIZE by 1–2 orders of magnitude; do not open another single-lever
+>   arm"* was computed at baseline income. At `rich10` the gap is **1.36 sd, not 2.47**, and the two
+>   levers shipped since sum to **≈0.47 sd — twice the whole prior arc.** Tuning is not exhausted there.
+> * **The level_gain correction IS the pack-throughput fix** (§5z closed): packs/ante +18%/+22%,
+>   rerolls −16%, Orbital tags 23→59, Meteor 0→39 — behaviour three lesion configs were built to test.
+> * **⭐ Behaviour and payoff are SEPARABLE.** Identical behaviour change paid +0.421 at one operating
+>   point and −0.076 at the other. **"The mechanism fired" is a SCREEN, never evidence of value.**
+> * **Both baselines are on disk** and HEAD is verified identical to `pd_play_r` — every A/B costs
+>   **ONE** arm: `rich10` `sim_out/pd_play_r.jsonl` · baseline `sim_out/lg_both_c.jsonl`.
 
 > ## ⭐⭐ READ THIS BEFORE RUNNING OR JUDGING ANY BATCH (2026-08-14, `WINRATE_V3_PLAN.md` §6)
 > **THE BASELINE IS A BROKEN INSTRUMENT.** The *identical* six-commit engine delta

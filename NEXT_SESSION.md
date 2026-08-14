@@ -1,5 +1,30 @@
 # NEXT_SESSION.md — fresh-session handoff (updated 2026-08-14)
 
+> # 🧭 START HERE — `WINRATE_V3_PLAN.md` **§18** is the current checkpoint and the plan
+>
+> **§18 revises §5u**, the project's most-quoted strategic conclusion. §5u's *"the fixes are the
+> wrong SIZE by 1–2 orders of magnitude; do not open another single-lever arm"* was computed
+> entirely at **baseline income** — the operating point §6 proved cannot measure a valuation change.
+> Re-derived: the gap to a win is **1.36 sd at `rich10`, not 2.47 sd**, and the two levers shipped
+> since sum to **≈0.47 sd, about twice the entire prior tuning arc**. Winrate at `rich10` has gone
+> **6/80 → 42/160 (26.2%)** across this arc. **The tuning family is not exhausted where it counts.**
+>
+> **Three more results in §18:**
+> * **⭐ The level_gain correction IS the pack-throughput fix (§5z closed).** Packs/ante +18% at
+>   baseline and +22% at `rich10`, rerolls −16%, planet use 2–3×, Orbital tags 23→59, Meteor 0→39.
+>   Three lesion configs were built to test behaviour a single unit-error fix delivered.
+> * **⭐⭐ Behaviour and payoff are SEPARABLE.** The same ~20% behaviour change paid +0.421 at one
+>   operating point and −0.076 at the other; the readiness gate changed behaviour exactly as
+>   designed and paid nothing at either. **"The mechanism fired" is a SCREEN, never evidence.**
+> * **❌ Unused-hand income is not the income gap** (human $2.76/blind vs sim $2.60/$2.39, and it is
+>   downstream of board strength). Closed — do not re-derive.
+>
+> **✅ Practical:** both current baselines are already on disk and HEAD was verified byte-identical
+> to `pd_play_r` on 8 shared seeds — so **every next A/B costs ONE arm, not two**:
+> `rich10` → `sim_out/pd_play_r.jsonl` (5.732, 42 wins) · baseline → `sim_out/lg_both_c.jsonl`
+> (3.714, 1 win). **The plan itself is §18g** (Tier 0 deploy · Tier 1 re-measure the revert graveyard
+> at `rich10` · Tier 2 derive `level_scale` · Tier 3 econ flow · Tier 4 one probe before any planner).
+
 > # ⭐⭐ THE BASELINE IS A BROKEN INSTRUMENT — read `WINRATE_V3_PLAN.md` §6 FIRST
 > The **identical** six-commit engine delta (`e7c3a8c`→`82f808f`), on the **same** seeds:
 >
@@ -267,14 +292,17 @@
 > simply does not buy anything that saves a run, while $100/round wins 72.5%. **Income is below
 > the conversion threshold; that, not decision quality, is the wall.**
 >
-> 🛑 **READ `WINRATE_V3_PLAN.md` §5u FIRST — the tuning family is finished, by arithmetic.**
-> Pooled n=984: mean progress **3.742**, sd **1.720**, so a win (8.0) sits **+2.47 sd** out.
-> **Every lever ever shipped sums to +0.487 = 0.28 sd** — one ninth of the gap, after the whole
-> tuning history. A typical retained lever is +0.02 (0.012 sd); you would need ~200 of them.
+> 🛑 **§5u — "the tuning family is finished, by arithmetic". ⚠️ REVISED BY §18 — READ THAT TOO.**
+> Pooled n=984 at **baseline income**: mean progress **3.742**, sd **1.720**, so a win (8.0) sits
+> **+2.47 sd** out, and **every lever ever shipped sums to +0.487 = 0.28 sd** — one ninth of the gap.
 > Meanwhile paired n=160 has MDE 0.085–0.27, so the apparatus cannot even certify what it produces.
-> **The fixes are not wrong and not unlucky — they are the wrong SIZE by 1–2 orders of magnitude.**
-> Do not open another single-lever arm. Only a POLICY-CLASS change (search/lookahead, imitation
-> from the 928-decision human dataset, or a P(win) objective inside a search) matches the gap.
+> **⚠️ EVERY NUMBER THERE IS BASELINE-MEASURED, and §6 says baseline cannot measure a valuation
+> change.** Re-derived at `rich10` (§18a): the gap is **1.36 sd, not 2.47**, and the two levers
+> shipped since — B3 (+0.518) and the commitment+correction (+0.421) — sum to **≈0.47 sd, roughly
+> twice the entire prior arc, against half the gap.** So §5u's *measurement* diagnosis stands and its
+> *conclusion* does not: **the tuning family is NOT exhausted at the operating point that matters.**
+> The policy-class candidates (search/lookahead, imitation from the 928-decision human dataset, a
+> P(win) objective) are still worth their own bound — **§18g Tier 4 says how to get it for one arm.**
 >
 > 🔵 Authoritative status: `WINRATE_V3_PLAN.md` §5r + §5s + §5t + §5u. Working context: `CLAUDE.md`.
 >

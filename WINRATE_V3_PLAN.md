@@ -4233,3 +4233,230 @@ at the moment the factor was added — the property that caught two silently-mis
 scarce, which is the entire content of its justification. That would keep the baseline mechanism fix
 and be inert at `rich10` by construction. It needs its own two arms and has **no evidence yet** —
 recorded here so it is not re-derived, not so it is assumed to work.
+
+---
+
+## §18 — CHECKPOINT (2026-08-14, late): §5u's SCALE ARGUMENT IS AN OPERATING-POINT ARTIFACT
+
+A full re-read of the project state, and a re-derivation of the one claim that has been steering
+it hardest. **§5u is the project's central strategic conclusion** — *"the fixes are the wrong SIZE
+by one to two orders of magnitude; only a policy-class change (search / imitation / P(win)) matches
+the gap; do not open another single-lever arm."* Every number in it was measured at **baseline
+income**, which §6 subsequently established is a broken instrument for exactly this class of change.
+
+### 18a. The re-derivation
+
+Per-run mean and sd of the progress metric, computed directly from the arms on disk:
+
+| arm | n | mean | sd | wins | gap to a win |
+|---|---|---|---|---|---|
+| `pd_base_a` (baseline, pre-delta) | 160 | 3.789 | 1.592 | 3 (1.9%) | **2.64 sd** |
+| `lg_both_c` (baseline, current HEAD) | 160 | 3.714 | 1.554 | 1 (0.6%) | 2.76 sd |
+| `dig_base_all` (baseline, n=480 ref) | 480 | 3.744 | 1.777 | 12 (2.5%) | 2.39 sd |
+| `pd_base_r` (**rich10**, pre-delta) | 160 | 5.311 | 1.979 | 30 (18.8%) | **1.36 sd** |
+| `pd_play_r` (**rich10**, current HEAD) | 160 | 5.732 | 2.036 | 42 (26.2%) | **1.11 sd** |
+| `dose_rich25` | 80 | 5.843 | 2.295 | 24 (30.0%) | 0.94 sd |
+| `dose_rich50` | 80 | 6.710 | 2.063 | 41 (51.2%) | 0.63 sd |
+| `pa_rich` ($100/rd) | 40 | 7.334 | 1.290 | 29 (72.5%) | 0.52 sd |
+
+**The gap §5u calls unbridgeable is 2.64 sd at baseline and 1.36 sd at `rich10`.** And the two
+levers shipped since §6 was written, both measured at `rich10`, are:
+
+| lever | at baseline | at `rich10` |
+|---|---|---|
+| **B3** (`VU.BASE_FRAC` 0.03→0.06) | −0.102 | **+0.518** (pooled 2 pools, p 0.0011) |
+| **commitment + level_gain correction** | −0.076 | **+0.421** (p 0.019) |
+| **sum** | ≈ 0 | **+0.939 ≈ 0.47 sd** |
+
+§5u's headline is *"every lever ever shipped, summed = +0.487 = 0.28 sd"* — **two levers measured at
+`rich10` are worth roughly twice the entire prior arc, against half the gap.** 0.47 sd of 1.36 sd is
+**35% of the way to a win**, not one ninth. The winrate figures agree: at `rich10` the engine has
+gone from 6/80 (§6) to **42/160 (26.2%)** across this arc.
+
+### 18b. What is and is not established by that
+
+**Robust:** the *denominator*. At `rich10` a win is 1.36 sd out, at baseline 2.64 sd. That is
+arithmetic on files that already exist, and it halves the gap §5u called unbridgeable.
+
+**Approximate:** the *numerator*. B3 and the level_gain correction were measured against different
+arm baselines (`pd_base_r` already contains B3), so summing their progress deltas is sequential and
+approximate, not exact. And the historical +0.487 arc was **never re-measured at `rich10` either** —
+so 0.28 sd may understate the arc as much as it understates the two recent levers.
+
+**⚠ `rich10` is a lesion the engine cannot award itself.** But it is the operating point of the
+*product*: the live mod advises a human, and the human dataset has them 2–4× richer than the engine
+at every ante, matching the `rich10` dollar curve within ~15%. So it is simultaneously the better
+instrument and the more relevant operating point — the sim's baseline income is the outlier.
+
+**⇒ Revision, not reversal.** §5u's diagnosis of the *measurement* was right and stands. Its
+conclusion — *"the tuning family is exhausted; do not open another single-lever arm"* — was
+conditioned on baseline-measured lever sizes and does not survive at the operating point that
+matters. **The tuning family is not exhausted at `rich10`; it is producing the largest levers in
+project history there.**
+
+### 18c. ⭐ The level_gain correction IS the pack-throughput fix (§5z closed)
+
+§5z named pack throughput *"the largest measured behavioural divergence in the project"* (engine
+1.36 vs human 6.10 packs/ante) and prescribed treating it as an interaction to be probed with the
+`packgreed`/`richpack` lesions. It did not need a lesion. Packs and consumables per ante-visit,
+like-for-like on the same seeds:
+
+| arm | packs/ante | consumable uses/ante |
+|---|---|---|
+| `pd_base_a` baseline, pre-delta | 1.89 | 1.73 |
+| `lg_play_b` baseline, +commitment only | 1.97 | 1.75 |
+| **`lg_both_c` baseline, +correction** | **2.32** (+18%) | **2.17** (+24%) |
+| `pd_base_r` rich10, pre-delta | 3.38 | 2.90 |
+| **`pd_play_r` rich10, +delta** | **4.14** (+22%) | **3.67** (+27%) |
+| *(human)* | *6.10* | — |
+
+And at `rich10` the substitution §5z predicted shows up exactly: **rerolls 3396 → 2854 (−16%)**
+while packs rise 35%. Planet use follows — Uranus 116→362, Mercury 144→344, Saturn 90→228, Pluto
+→171 — and so do the leveling *tags*: **Orbital 23→59, Meteor 0→39**.
+
+**A single unit-error fix delivered the behaviour three lesion configs were built to test.** That is
+strong support for the "mis-priced, not mis-designed" reading of the whole pack channel.
+
+### 18d. ⭐⭐ BEHAVIOUR AND PAYOFF ARE SEPARABLE — the sharpest form of the operating-point rule
+
+Read 18c against §17. The correction changed behaviour by **the same ~20%** at *both* operating
+points (+18% packs at baseline, +22% at `rich10`) and paid **+0.421 at one and −0.076 at the
+other**. The readiness gate changed behaviour precisely as designed (ante-2 deaths 21→16, board
+2.48→2.77) and paid **nothing at either**.
+
+⇒ **"The mechanism fired" is a SCREEN, never evidence of value.** It is necessary — a change that
+does not fire cannot pay, which is what the frequency ceiling and `commit_firing.lua` are for — but
+it carries no information about the sign of the outcome. This project has repeatedly treated a
+confirmed mechanism as partial evidence (§16 explicitly: *"the gate does what it was designed to
+do"*). It is not. Behaviour is the thing you can measure cheaply; payoff is the thing you cannot.
+
+### 18e. ❌ NEW NEGATIVE — unused-hand income is not the income gap (do not re-derive)
+
+The engine banks $1 per unused hand and both the world and `decision_engine` model it, so it was a
+candidate for the endogenous income the human has and the engine does not. Measured over cleared
+blinds:
+
+| | $/cleared blind | by ante |
+|---|---|---|
+| **human** (114 blinds) | **2.76** | a1 2.94 → a6 3.42 → a8 2.75 |
+| sim `rich10` (2232) | 2.60 | a1 2.68 → a8 2.50 |
+| sim baseline (1578) | 2.39 | a1 2.52 → **a8 1.36** |
+
+Worth ~$9/run at baseline against an income gap of 2–4×, and the ante profile shows it is
+**downstream of board strength** (the sim's banking decays with ante as its board falls behind; the
+human's rises). Not an independent lever. **Closed.**
+
+### 18f. ✅ PRACTICAL: both current baselines already exist on disk
+
+Verified this session — HEAD reproduces `pd_play_r` **exactly on all 8 shared seeds** (8-seed
+`rich10` batch, identical progress including the win). The only diff between HEAD and the arm that
+produced `pd_play_r` is a comment block plus the `level_persist`→`level_scale` rename, i.e. no
+behavioural change.
+
+| operating point | ready-made baseline for current HEAD | n | mean | wins |
+|---|---|---|---|---|
+| baseline income | **`sim_out/lg_both_c.jsonl`** | 160 | 3.714 | 1 |
+| **`rich10`** | **`sim_out/pd_play_r.jsonl`** | 160 | 5.732 | 42 |
+
+**Every next A/B therefore costs ONE arm (~45 min), not two.** Re-verify with an 8-seed identity
+check whenever HEAD moves — it costs ~3 minutes and it is the cheapest guard against the
+contamination failure recorded in the process notes.
+
+---
+
+## §18g — THE PLAN, in priority order
+
+### Tier 0 — unblocked, cheap, do first
+
+**0.1 DEPLOY the 9 pending files.** Verified this session: exactly the 9 documented files differ from
+`%APPDATA%/Balatro/Mods/balatroenginesim/`, and **all 9 are now in the ship set** — the two
+unconditional live-correctness files plus the commitment (KEEP) and the correction (SHIP at the
+human's operating point). Two of them are *currently broken in the live game*: `state_extraction`
+populates neither `hand_type_plays` (so the play-derived commitment is dead in the actual mod) nor
+`hands_played` (so Loyalty Card reads 0). Diff the whole tree; keep the backup outside `Mods/`.
+
+**0.2 Fix the standing guidance that §18 invalidates** — `CLAUDE.md` and `NEXT_SESSION.md` both
+carry §5u's *"do not open another single-lever arm"* as a hard rule. Left as-is it will steer the
+next session away from the only class currently producing gains.
+
+### Tier 1 — highest EV: re-measure the revert graveyard at `rich10`
+
+The graveyard was populated almost entirely by **baseline nulls**. Exactly one item has been pulled
+out and re-measured at `rich10` — **B3 — and it returned +0.518, the largest lever in project
+history.** That is 1 for 1, and nothing else has been tried.
+
+**Split it by whether the operating-point mechanism actually applies** (§6's own rule: ask what the
+change is ABOUT, then pick the operating point that contains its mechanism):
+
+| item | what it prices | verdict |
+|---|---|---|
+| **cost-discount** | the value of MONEY | ✅ **re-test at `rich10`** — same family as B3, fires every shop |
+| **leveling-need** (Celestial undamp) | leveling | ✅ re-test — **but only after Tier 2.1**, it is a compensator for the fixed bug |
+| **xmult-floor** | power | ✅ re-test at `rich10` |
+| **E-12** (growth_factor flat/scaling split) | joker valuation | ✅ re-test at `rich10` |
+| **swap-damp** | the cost of churn | ⚠ re-test at **baseline** — a scarcity mechanism, like the refill charge |
+| C1 | conditional xmult sampling | ❌ obsolete — solved analytically by `conditional_xmult_marginal` |
+| W-ECON | two jokers | ❌ frequency ceiling (153/160 tied) |
+| reroll gate | a rare shop situation | ❌ reverted on mechanism, not on a null |
+| **F3 / F4 / F8** | **in-blind play** | ❌ **the mechanism does not apply — money does not help you play a hand.** These stay refuted. |
+
+That is **four `rich10` arms and one baseline arm**, one batch each (§18f), ordered by firing rate:
+cost-discount and leveling-need fire in every shop; E-12 and xmult-floor fire on every joker
+valuation. Recover each change from git history rather than re-deriving it.
+
+### Tier 2 — finish the leveling channel (the genuinely unfinished work)
+
+**2.1 `CV.level_scale` is an unretired fudge, and §12a said so in advance.** It is
+`clamp(1 + (8-ante)*0.45, 1, 4)` — a ×4 multiplier at ante 1 tapering to ×1 at ante 8 — and §12a
+recorded that `level_persist` *"was itself a fudge for this very bug; the two are coupled and must
+be calibrated together, never one at a time."* The bug is fixed. The fudge is untouched, and the
+engine may now be double-counting up to ×4 in exactly the early antes where §13 measured the
+correction's cost (ante-2 deaths +50%).
+
+**Do not re-tune the constant — DERIVE it,** the way the SELL_TO_BUY refill charge was derived (it
+introduced no new constant and that is why it was shippable). A level bought at ante `a` pays on
+every future hand, but blind targets grow ~1.6×/ante while a fixed +chips/+mult level grows only
+with the board's multipliers — so in *fraction-of-need* units the persistence factor is
+`sum over remaining antes k of level_gain(projected board at k) / boss_per_hand_need(k)`, both of
+which `Mechanics` and `BP.analyze` can already supply. That converts a tuned ×1–4 ramp into a
+measured quantity and is the direct completion of §12.
+
+**Screen before batching:** `tools/celestial_price.lua` is what found the unit error. If derived and
+current differ by <20% on real ante-3 boards, do not spend an arm.
+
+**2.2 Then, and only then, re-test leveling-need** on top of 2.1.
+
+### Tier 3 — the income question, correctly narrowed
+
+Everything works at `rich10`; the engine cannot award itself $10/round, but the human earns it.
+Closed axes: early **stock** (`ecap3bank` −0.073, `hoard*` all negative), skipping (`noskip` 68/67),
+rerolls (0 ordering inversions across 1295 shops), and now **unused hands (§18e)**. What remains is
+the one the docs named and never tested: **econ-joker acquisition FLOW from ante 3 on** — the human
+acquires 1.6× more economy than the engine, *later*. Screen with `tools/divergence.lua` restricted
+to the econ subset before spending an arm.
+
+### Tier 4 — before building any planner or search, run ONE probe
+
+§5u's three policy-class candidates (search/lookahead, imitation, P(win)) are expensive, and the
+project already has a bound on the first: **`oracle_plan` — a perfect archetype target, handed to
+the engine for free — measured 41/40, dead even.** That probe ran at **baseline income**, i.e. under
+exactly the condition §6 says makes a preference change unmeasurable.
+
+**⇒ Re-run `oracle_plan` at `rich10` before any planner work.** It is one arm against a baseline that
+already exists, and it is the most decision-relevant unrun probe in the project:
+
+* still dead even → **planning is not the gap**, and the MCTS/search direction is mis-aimed. That
+  saves the largest single block of work on the roadmap.
+* clearly positive → the strongest possible justification for building the planner, and a measured
+  size to aim at.
+
+Note §5v's caveat when reading it: with `PLAN=first` the oracle committed 95% of runs at ante 1 from
+an 8-sample estimate, so read the *final*-plan gradient as reverse causation, not effect.
+
+### What NOT to do
+
+* Do not re-open F3/F4/F8 or any in-blind lever on the operating-point argument — it does not apply,
+  and in-blind play is independently near-optimal (regret 0.0076).
+* Do not treat a confirmed mechanism as partial evidence (§18d).
+* Do not quote §5u's "wrong size by 1–2 orders of magnitude" without its operating point.
+* Do not re-tune `level_scale` as a constant; derive it or leave it.
