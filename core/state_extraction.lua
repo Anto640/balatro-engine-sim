@@ -104,9 +104,17 @@ function Extract.snapshot()
   end
 
   -- hand levels  ->  run.hand_levels[name] = { level, chips, mult }
-  local hand_levels = {}
+  -- and the run's PLAY COUNTS  ->  run.hand_type_plays[name] = n.  The sim world has tracked
+  -- these all along (for Supernova); the live extractor did not, so `BP.commitment_signals`
+  -- earned-direction credit would have been silently dead in the actual mod while working in
+  -- every batch. Same shape as sim/world.lua's `run.hand_type_plays`.  -- VERIFY field
+  local hand_levels, hand_type_plays, hands_played = {}, {}, 0
   for name, h in pairs(GAME.hands or {}) do
     hand_levels[name] = { level = h.level, chips = h.chips, mult = h.mult }
+    if (h.played or 0) > 0 then
+      hand_type_plays[name] = h.played
+      hands_played = hands_played + h.played
+    end
   end
 
   -- blind
@@ -225,6 +233,10 @@ function Extract.snapshot()
     last_tarot_planet = GAME.last_tarot_planet and { key = GAME.last_tarot_planet } or nil,
     run = {
       hand_levels = hand_levels,
+      hand_type_plays = hand_type_plays,
+      -- summed from the per-type counts rather than guessed at a GAME field: Loyalty Card
+      -- (engine/joker_effects) has been reading 0 live for want of this.
+      hands_played = hands_played,
       vouchers_owned = GAME.used_vouchers or {},
       tags = GAME.tags or {},
       deck_back = GAME.selected_back and GAME.selected_back.name,

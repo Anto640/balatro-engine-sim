@@ -51,6 +51,38 @@ BP.XMULT_CAP    = 2     -- diminishing returns past this many xmult
 -- maybe_upgrade guardrail already in place for weak commits that lock in early.
 BP.COMMIT_THRESHOLD = 2.5
 BP.ECON_COMMIT_THRESHOLD = 4.0
+
+-- EARNED DIRECTION -- credit the hands the run ACTUALLY PLAYS (2026-08-14).
+--
+-- The planner was blind to the single most informative fact about a run. Measured on the
+-- n=480 baseline (tools/commit_dist.lua, commit_gap.lua, played_hands.lua):
+--   * 63% of runs NEVER commit -- the whole planner is inert in two runs out of three;
+--   * of those, 75% peak at a signal of 0 or 1, i.e. at most ONE joker carrying a
+--     `handtype:` tag while holding ~4.5 jokers, so the board is mostly illegible;
+--   * the gate sits in an EMPTY GAP -- nothing scores between 2.0 and the 2.5 threshold,
+--     while 22% of never-committers peak at exactly 2.0 (two matching hand-commons);
+--   * and when it does commit it points at the hand the run actually plays only 34% of the
+--     time -- 42.6% of commitments are to a hand taking under 20% of plays, 16.7% under 10%.
+-- Board-matched and conditioned on reaching the same ante, committing is worth +0.28 (a3) /
+-- +0.40 (a4) progress, and committing to the hand actually played a further +0.39. Those are
+-- observational, but they size the prize; the defects above are not observational.
+--
+-- WHY THIS IS NOT `oracle_plan` (which measured a dead-even 41/40 and must not be re-run by
+-- accident): that probe committed 95% of runs at ante 1 to Straight/Two Pair, from an
+-- 8-sample estimate on the IDENTICAL starting deck -- it described the deck everyone starts
+-- with, not the run. Play history is the deck AND the jokers AND the engine's own scoring
+-- choices, measured over real hands.
+--
+-- WHY IT CANNOT COMMIT TO NOISE: the credit is capped BELOW COMMIT_THRESHOLD, so play share
+-- alone never commits anything. It can only carry a hand over the line that ALREADY has a
+-- real joker anchor -- which is exactly "a direction it has EARNED" rather than a tie-break
+-- (the failure mode that sank the DeckPlan.target work, see WINRATE_V3_PLAN.md 5t).
+-- Sized from the measured share distribution: the modal hand takes 0.2-0.5 of plays in 95%
+-- of runs, so FLOOR/FULL bracket the real range instead of saturating or never firing.
+BP.PLAY_CREDIT     = 1.5   -- max credit; deliberately < COMMIT_THRESHOLD
+BP.PLAY_FLOOR      = 0.20  -- below this share a hand is incidental, not a direction
+BP.PLAY_FULL       = 0.50  -- at/above this share the run is clearly landing this hand
+BP.PLAY_MIN_SAMPLE = 8     -- ~one ante of hands; don't read a direction off three plays
 BP.COMMIT_MAX_ANTE = 4
 BP.COMMIT_JOKER_FILL = 1.2
 BP.COMMIT_MISMATCH = 0.6
@@ -182,8 +214,35 @@ local function commitment_signals(gs)
       for _, key in ipairs(anchors[h] or {}) do anchors["Full House"][#anchors["Full House"] + 1] = key end
     end
   end
+  -- EARNED DIRECTION: the hands this run actually LANDS (BP.PLAY_* above). Everything
+  -- upstream of here is a statement of intent -- what the jokers point at, what has been
+  -- leveled. This is the one term that is feedback from reality, and it is nearly free:
+  -- the world already tracks `hand_type_plays` for Supernova.
+  local plays = gs.run and gs.run.hand_type_plays
+  if plays then
+    local total = 0
+    for _, n in pairs(plays) do total = total + (n or 0) end
+    if total >= BP.PLAY_MIN_SAMPLE then
+      local span = BP.PLAY_FULL - BP.PLAY_FLOOR
+      for hand, n in pairs(plays) do
+        if HAND_NAME[hand] then
+          local share = (n or 0) / total
+          local frac = span > 0 and (share - BP.PLAY_FLOOR) / span or 0
+          if frac > 0 then
+            score[hand] = (score[hand] or 0) + BP.PLAY_CREDIT * math.min(1, frac)
+          end
+        end
+      end
+    end
+  end
   return score, anchors, econ
 end
+
+-- Instrumentation hook. `commitment_signals` is the gate on the whole planner, and 67% of
+-- runs never pass it (tools/commit_dist.lua) -- so being able to ask "what WAS the signal in
+-- the runs that never committed?" from outside is the difference between tuning the threshold
+-- blind and knowing what it is rejecting. Pure, read-only, no behaviour of its own.
+function BP.signals(gs) return commitment_signals(gs) end
 
 -- One-shot upgrade of a WEAK commitment (see the UPGRADE_* guardrails above). "Weak" is judged
 -- LIVE: an economy commitment, or a hand commitment whose committed hand currently has NO joker
