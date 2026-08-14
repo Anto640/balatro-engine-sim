@@ -4039,3 +4039,55 @@ the leveling credit to 0.35–0.68, while ante 3–4 boards read 1.0 and keep th
 **A side effect worth keeping either way:** arm C's rerolls collapse (a3 15% → 6%, a4 26% → 18%).
 The engine spends on packs instead of rerolling — and rerolls were measured at ~$129/run. The gate
 should not disturb that, since it only damps the *early* leveling credit.
+
+---
+
+## §15 — ⭐ THE SAME DELTA IS SIGNIFICANTLY POSITIVE AT `rich10`, AND IT WAS PRE-REGISTERED
+
+`pd_base_r` (baseline code, `rich10`) vs `pd_play_r` (play-derived commitment **+** level_gain
+correction, `rich10`). Same 160 seeds, same income, integrity-clean, and **the same code delta that
+measured −0.076 at baseline income**:
+
+| | baseline income | **`rich10`** |
+|---|---|---|
+| progress Δ | −0.076 (t −0.55, p 0.585) | **+0.421 (t +2.35, p 0.019)** ✅ |
+| sign test | 82 / 67 (p 0.25) | **84 / 57 (p 0.029)** ✅ |
+| winrate | 1.9% → 0.6% | **18.8% → 26.2%** (30 → 42) |
+| McNemar (wins) | 3 vs 1, p 0.625 | 17 vs 29, **p 0.104** |
+| death-ante shift | 57 later / 53 earlier | **73 later / 49 earlier** |
+
+**Interaction: +0.497, SE 0.226, t 2.19, p ≈ 0.028.**
+
+**Both metrics are significant at `rich10`**, which is rarer in this project's history than any single
+effect size. And this was **written down in advance** (§12): *"the fix prices a thing that is mostly
+bought, so §6 predicts it should express better at `rich10`."*
+
+### Why this is stronger evidence than the earlier operating-point result
+
+§6's original demonstration was a **six-commit bundle** measured after the fact. This is a **two-part
+delta, designed from a mechanism, with the prediction recorded before the batch ran**, and it
+reproduces the same interaction sign and a similar magnitude (+0.497 here, +0.620 for B3). The
+operating-point framework is now a thing that has *predicted*, not only explained.
+
+⚠ **Caveats, stated plainly.** The two arms share the seed family, so the interaction SE is
+approximate (as with B3). The delta is play-derived commitment **+** level_gain, not the correction
+alone. The win effect (30 → 42) is not significant on its own and only **13 of 30/42 wins overlap** —
+the same churn signature as everywhere else. This has **not** been replicated out-of-sample.
+
+### ⚠ §15a — This changes what the readiness gate is FOR, and who it is for
+
+The gate (§14) exists to fix a cost measured **at baseline income**: the engine spending its first
+dollars on Celestial packs instead of its first jokers, and dying at ante 2 for it. **At `rich10` that
+cost does not arise** — with income, an early pack does not starve the first joker, and the
+uncorrected version is significantly positive.
+
+So the gate is plausibly **right at baseline and wrong at `rich10`** — another exact operating-point
+mirror, like B3 and the SELL_TO_BUY refill charge. Arm D measures it at baseline; **it must also be
+measured at `rich10` before shipping**, because a change that helps a poor engine can subtract from a
+funded one.
+
+**And which operating point the LIVE MOD serves is a real question, not a rhetorical one.** The mod
+advises a *human*, and the human dataset shows they are **2–4× richer than the engine at every
+ante** — much closer to `rich10` than to the engine's baseline. If that holds, the **ungated**
+correction may be the right thing to deploy for the live overlay even if the gate wins in the sim.
+Do not deploy either half on the sim verdict alone.
