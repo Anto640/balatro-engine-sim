@@ -4851,3 +4851,88 @@ and with E-13's own mechanism) is the well-supported direction; the *early* half
 **⇒ If this is tested, test the decay alone first** — clamp the factor at 1.0 so it can only reduce
 econ value from the current level, never raise it. That isolates the half the evidence supports and
 avoids re-running the hoarding experiment by accident.
+
+---
+
+## §24 — ⭐ ARM 1: A PERFECT PLAN IS WORTH NOTHING AT `rich10` EITHER. The archetype-planning direction is CLOSED.
+
+§18g Tier 4 argued that `oracle_plan`'s dead-even 41/40 — the result that has been quoted to close the
+planning direction — was measured at **baseline income**, i.e. under exactly the condition §6 proved
+makes a *preference* change unmeasurable, and that a plan is the purest preference change there is. So
+it was re-run at `rich10` as the cheapest available bound on the whole search/planner workstream, with
+the reading pre-registered before the batch.
+
+**`oracle_rich` vs `pd_play_r`, paired n=160, both arms integrity-clean (160 unique, 0 dup, 0 torn):**
+
+| | value |
+|---|---|
+| progress Δ | **−0.165** (sd 1.736, SE 0.137, t −1.20, **p 0.228**) |
+| sign test | **47 better / 52 worse / 61 tied** (p 0.688) |
+| wins | **42 → 40**; McNemar exact **p 0.860** (discordant 17 vs 15, both 25) |
+| death-ante | 34 later / 42 earlier / 84 unchanged |
+
+**Dead even, on every metric, at the operating point where the engine can afford to act on a plan.**
+And it *replicates*: 41/40 at baseline, 47/52 here. Two independent measurements at two operating
+points, both null.
+
+### 24a. It executed — this is not a §5t non-result
+
+The failure mode that has burned this project twice is a change that measures null because it is
+barely running. Checked before reading the verdict, from the arms' own `build_plan` records:
+
+| | baseline `pd_play_r` | `oracle_rich` |
+|---|---|---|
+| ante-states carrying a commitment | 622 / 828 = **75%** | **577 / 577 = 100%** |
+| commitment content | Pair / Straight / Two Pair / Full House spread | Two Pair 221 · Pair 157 · Straight 108 · High Card 30 · Full House 28 |
+| tag | — | `"oracle":true`, `strength 99`, `committed_ante 1` |
+
+The oracle set a commitment on **every** state, changed which hand was committed to, and moved the
+downstream behaviour it is supposed to move (planet use shifted toward the committed hands). The
+mechanism fired at 100% and the outcome did not move.
+
+### 24b. ⭐⭐ Third confirmation of §18d, and it is now the project's most reliable pattern
+
+| change | behaviour | outcome |
+|---|---|---|
+| readiness gate (§17) | did exactly what it was designed to do (ante-2 deaths 21→16, board 2.48→2.77) | null at BOTH operating points |
+| **oracle plan (§24)** | **commitment 75% → 100%, content changed, planet use followed** | **null at BOTH operating points** |
+| level_gain correction (§12) | +18% / +22% packs — *the same at both* | **+0.421 at `rich10`, −0.076 at baseline** |
+
+**"The mechanism fired" carries no information about the sign of the outcome.** It is a necessary
+screen and nothing more. Three independent demonstrations now.
+
+### 24c. What is actually closed, stated narrowly
+
+⚠ **Closed: ARCHETYPE planning.** Knowing which *hand* to build, for free, with perfect deck
+information, committed from ante 1 — worth zero at both operating points. Together with §5m's
+expressibility work measuring **exactly 0.000** and §5t's shape-credit revert, the "commit to a build
+and steer toward it" thread has now been tested four ways and has never produced anything.
+
+⚠ **NOT closed by this: search over the SHOP STREAM** (§5u item 1, `MCTS_PLAN.md`). That plans over
+*acquisitions* — which reachable ante-8 board this run's offers support — not over hand type. The
+oracle has no shop lookahead at all. But the honest update is that its prior should fall: the one
+component of the planning family that was cheap to test has now returned zero twice, and the cheapest
+remaining slice of the search idea is `MCTS_PLAN.md` INC-1 (supply-aware slot/cash **reservation**),
+which §22 can bound for free with `ecap3rich` before any search is written.
+
+⚠ **And the oracle is modest by construction** — its own comment says so: *"the hand this deck ACTUALLY
+makes most often"*, from an 8-sample estimate, committed at ante 1 (§5v's `PLAN=first` caveat is
+visible in the data: `committed_ante 1` on essentially every record). A *better* planner is not
+excluded by this. What is excluded is that the gap is explained by the engine not knowing what to
+build.
+
+### 24d. Calibrating the §6 heuristic itself
+
+Four changes have now been re-measured at `rich10` on the argument that baseline could not see them:
+
+| | result |
+|---|---|
+| **B3** | **+0.518**, p 0.0011 ✅ |
+| **level_gain + commitment** | **+0.421**, p 0.019 ✅ |
+| readiness gate | null at both ❌ |
+| **oracle plan** | null at both ❌ |
+
+**2 of 4.** §6 is a filter that finds real effects the baseline hides — it is not a wand that turns
+nulls positive, and the two that converted are both *valuation* fixes while the two that did not are
+both *policy/behaviour* changes. That split is worth watching: the operating-point argument is about
+whether the engine can AFFORD to express a preference, which bites hardest on what things are WORTH.
