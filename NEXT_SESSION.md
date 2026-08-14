@@ -51,7 +51,49 @@
 > `nochurn2` tests blocking exactly that — sell-side only, no purchase blocked, board size
 > unchanged, so no board-power confound.
 >
-> 🛡 **`tools/sim_par.sh` now guards against a REAL corruption** that nearly produced a false
+> ### ⭐ THE OPERATING-POINT RULE, in its FINAL form (this supersedes the banner above)
+> The two fixes shipped 2026-08-14 are **exact mirrors**, and together they give the rule:
+>
+> | fix | prices | baseline | `rich10` |
+> |---|---|---|---|
+> | **B3** (`BASE_FRAC` 0.03→0.06) | the value of MONEY | −0.102 (inert) | **+0.518** (p 0.0011) |
+> | **SELL_TO_BUY refill charge** | the cost of POVERTY churn | **+0.096** | −0.034 (**95% tied**) |
+>
+> B3 needs money to EXPRESS; the refill charge only FIRES when poor (SELL_TO_BUY runs 1.25/run at
+> baseline vs **0.12/run** at rich10). **⚠ "Measure at rich10" is NOT a universal upgrade — it would
+> have DISCARDED the refill charge.** Ask what the change is ABOUT, then pick the operating point
+> that contains its mechanism.
+>
+> ### 🔧 The third shipped fix, and the live thread it came from
+> **SELL_TO_BUY is 81% of the engine's ante-1..2 sell advice** (170 of 209) and disposes of
+> **tier-4.30** jokers — the same quality it buys — where the human sells 0.12/run of tier-3.00 junk.
+> Selling a joker to fund a NON-joker frees a slot the engine demonstrably refills (board
+> 2.9→4.6→5.0 across antes 2–4), so the sale is temporary: raises ~$2.5, refill costs ~$5. The
+> purchase price is sunk (correctly ignored); the **refill is not** and was unpriced.
+> Shipped as `net_cash = f.cash - SA.TYPICAL_JOKER_COST` (no new constant; joker-for-joker swaps and
+> the endgame exempt). **+0.096 at baseline, sd 0.928, 117/154 seeds TIED.**
+> Backed by a dose-responsive lesion: `nochurn2` +0.114, `nochurn3` +0.177, and the incremental step
+> **sign 36/19, p 0.031** on a very low-cascade comparison.
+> ⚠ **Do NOT raise the charge above `TYPICAL_JOKER_COST`** — that turns a derived quantity into a
+> tuned one.
+>
+> ### ❌ CLOSED this session (do not re-open)
+> * **Early-money / compounding.** `ecap3bank` reproduced the human's early economy almost exactly
+>   ($21.0 at ante 3 vs their $21.5) and measured **−0.073**. With `hoard` (−0.396/−1.194/−1.639)
+>   and `ecap3` (−0.169): **the human's early money advantage is NOT causal. Stop making the engine
+>   save early.** Early savings also do not persist — gone by ante 5.
+> * **C1** — obsolete, already solved analytically by `conditional_xmult_marginal`.
+> * **Rerolls** — not the leak (winners/losers identical in the fixed window; 0 ordering inversions).
+>
+> ### ➡ The live thread: the human's edge is a FLOW, not a STOCK
+> They run a nearly EMPTY board at ante 2 (**1.4 jokers** vs the engine's 2.9), are behind on board
+> through a3, converge by a4, then pull away on cash at a5 (**$43.4 vs $27.9**) at the SAME board
+> size — both above the $25 interest cap, so interest does not explain it. By ante 5 they have
+> acquired **1.5× more jokers (12.12 vs 7.85) and 1.6× more economy ($6.62 vs $4.12)** — just LATER.
+> **Target the flow (econ acquisition from ante 3 on), not the early stock.** That is why `rich10`
+> (a continuous stream) works and `ecap3bank` (a one-time stock) does not.
+>
+> > 🛡 **`tools/sim_par.sh` now guards against a REAL corruption** that nearly produced a false
 > verdict (orphaned luajit children from a killed wrapper wrote the same shards as a new run:
 > 69 unique seeds where 80 were expected, torn JSON). It refuses colliding batch names and
 > validates every merge. **If you see an INTEGRITY WARNING, do not compute a verdict.**
@@ -176,7 +218,7 @@
 > * **Throttle sim batches to ~6 workers while the user plays** — 11–12 parallel LuaJIT processes
 >   starve the game and make the overlay lag badly.
 > * Sim baseline on current code: **progress 3.744**, paired n=480, `sim_out/dig_base_all.jsonl`.
-> * Tests: **932 unit** (`lua tests/runner.lua`) + **524 sim** (`luajit tests/runner_sim.lua`).
+> * Tests: **977 unit** (`lua tests/runner.lua`) + **524 sim** (`luajit tests/runner_sim.lua`).
 > * `lua tools/divergence.lua` re-runs the mine above (instant, no batch needed).
 > * ⚠ **Engine `value`s are comparable ONLY within one ranked list** — they are in "fraction of a boss
 >   hand" units and grow with the run (~3 at ante 1, ~300 at ante 7). Comparing across evaluations

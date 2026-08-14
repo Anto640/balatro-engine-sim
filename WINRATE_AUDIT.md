@@ -1226,6 +1226,37 @@ the full committed stack vs the a789 world-baseline, and/or (b) the in-blind P(c
 
 ### 2026-07-06 — Phase 2, item 6: B3 unify the $↔fraction rate. ❌ TRIED & REVERTED (negative)
 
+> ## ✅✅ SUPERSEDED 2026-08-14 — **B3 IS RESURRECTED. The revert below was a MEASUREMENT ARTIFACT.**
+> The verdict here (−0.245 at paired n=80) and the mechanism it cites (*"SK.SHOP_VALUE, the 1.25
+> skip margin, keep_bias and the consumable-money terms were calibrated against the old 0.03 rate,
+> so doubling the rate alone mis-calibrates every one of them"*) were BOTH measured at BASELINE
+> income — where the engine holds **$1.3 at ante 2** and cannot act on any price at all.
+>
+> Re-measured with the identical one-constant change, isolated (a `git log` over
+> `engine/ model/ core/ util/` between the two arms returns NOTHING):
+>
+> | operating point | progress Δ | p |
+> |---|---|---|
+> | baseline (this revert, n=80) | −0.245 | n.s. |
+> | baseline (re-run 2026-08-14, n=154) | −0.125 | 0.40 |
+> | **`rich10` (+$10/round), POOLED over two DISJOINT seed pools, n=160** | **+0.518** (SE 0.159) | **0.0011** |
+>
+> Interaction **+0.620, t 2.26, p 0.0238**. The co-retune this entry deferred as a prerequisite is
+> **not needed**. Mechanism, measured: B3 makes the engine **skip 25% fewer blinds** (correcting the
+> ~2× tag over-valuation THIS ENTRY ITSELF identified) and reallocates toward packs / Celestials /
+> planets at **unchanged dollars held**. Full write-up: `WINRATE_V3_PLAN.md` §9; the general
+> principle is §6 (**the baseline is a broken instrument for valuation changes**).
+>
+> ⚠ Two caveats kept: the in-sample figure (+0.672) was inflated by **winner's curse**, and the
+> in-sample win-doubling (6→12) did **NOT** replicate (disjoint pool: 6 v 6 discordant). Do not
+> quote "B3 doubles the winrate."
+>
+> ⚠ **This entry's session-wide conclusion — "calibration-reconciliation changes that don't co-move
+> the constants tuned against the old value backfire" (C1 −0.175, B3 −0.225) — is now UNPROVEN for
+> the whole class.** C1, F4 and F8 died to the same mechanism and were also only ever measured at
+> baseline. See `WINRATE_V3_PLAN.md` §8 for the taxonomy. (C1 specifically is OBSOLETE for a
+> different reason: `conditional_xmult_marginal` already solves its premise analytically.)
+
 **The real bug (CONFIRMED):** `VU.dollar_frac` (0.03/$ at ante 3, decaying to 0.015 late) disagrees
 with the shop's implied rate — the shop values a buy at `w_score*JOKER_SCORE_WEIGHT*frac -
 COST_WEIGHT*cost`, so $1 buys `0.3/5 = 0.06` frac. So `tags.lua` (which converts a tag's

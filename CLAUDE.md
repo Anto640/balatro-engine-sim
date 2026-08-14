@@ -21,7 +21,7 @@ thing **headless-testable**. See the Layout section in `README.md` for the per-f
 ## Build / test / run
 
 - **Tests (do this after every change):** `lua tests/runner.lua` (run via the Bash
-  tool). Lua 5.1+/LuaJIT, no `love`/`G`/Steamodded needed. Currently **932 pass** (+ 524 sim).
+  tool). Lua 5.1+/LuaJIT, no `love`/`G`/Steamodded needed. Currently **977 pass** (+ 524 sim).
   Failures print `FAIL  <case>  (got X, want Y)`; exit code is non-zero on failure.
 - **Phase-1 simulator suites are SEPARATE** (they drive the real engine per hand and
   take minutes): `luajit tests/runner_sim.lua` (`test_world`, `test_driver`, `test_consumables`, `test_content_rates`, …). `luajit`
@@ -95,6 +95,14 @@ enhancement; **boardless first-shop** (`skip_advisor` shop value scales as the b
 (never sell your only board joker to fund a non-joker — it's lost); **skip-tag power valuation**
 (`engine/tags` — free Rare/Uncommon/Top-up jokers valued by the MEASURED joker, tier-floored + slot-
 gated; Orbital `×level_persist`), so the engine finally takes free jokers/leveling via skips.
+**2026-08-14 fixes:** the **currency bridge** (`VU.BASE_FRAC` 0.03→0.06 = `DOLLAR_UTIL/FRAC_UTIL`, so a
+dollar costs the same in the shop and inside a pack — this is **B3**, reverted in July on a baseline
+measurement and resurrected at the operating point, §9); the **economy model** (`Eval.econ_value` is now
+deck-aware and probability-aware, and `jp_to_fv` actually consults it — it never did, so deck-aware econ
+had never reached a buy/sell decision); and the **SELL_TO_BUY refill charge** (selling a joker to fund a
+NON-joker frees a slot the engine demonstrably refills, so charge `TYPICAL_JOKER_COST` against the cash
+raised — the purchase price is sunk, the refill is not).
+
 **2026-08-13 fixes:** a **game-breaking OOM** — `each_subset` allocated a scoring table per subset
 (218 at hand size 8, 2379 at 13) and `best_play` runs ~80×/decision, so a large hand exhausted LuaJIT's
 heap and soft-locked a live run (`decide failed: not enough memory`); `HandEval.HAND_BUDGET = 8` bounds
@@ -103,7 +111,11 @@ enumeration ABOVE 8 only (sim byte-identical at ≤8) and `main.lua` steps the G
 copy-target search runs AFTER selection — `CV.fool_target` now zeroes it pre-sort (an in-pack target
 only counts when `picks_left >= 2`). Live telemetry gained `blind_select`, `blind_result`
 (hands/discards actually SPENT) and per-option `ranked` valuations.
-(The install at `%APPDATA%/Balatro/Mods/balatroenginesim/` is CURRENT as of 2026-08-13.)
+⚠ **THE LIVE INSTALL IS STALE as of 2026-08-14.** `%APPDATA%/Balatro/Mods/balatroenginesim/` was
+current at 2026-08-13, but the three 2026-08-14 fixes above touch `engine/value_units.lua`,
+`engine/shop_advisor.lua` and `engine/eval_function.lua` and have **NOT** been copied there. The
+overlay a live player follows is therefore running the OLD advice. **Re-deploy before trusting the
+in-game recommendations** (the repo is not the install — see Build / test / run).
 
 ### CURRENT STATE (2026-08-14) — **8 expert HUMAN runs captured, 7 wins**; engine still ~1.25%
 **➡ THE authoritative status is `WINRATE_V3_PLAN.md` §5r (read that first). Fresh-session handoff:
