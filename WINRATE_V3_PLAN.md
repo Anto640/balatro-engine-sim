@@ -3604,3 +3604,32 @@ play-derived commitment**, not in isolation. That matters: the commitment makes 
 non-zero for ~31% more runs, and the correction multiplies the base planet value ~5×. If they
 interact, C − B overstates what the correction would do alone. Read it as the *joint* leveling
 change, and if it pays, isolate before tuning either constant.
+
+### §12j — Interim behavioural readout (arms ~20% complete, normalised by shop exposure)
+
+Per-run rates from partial batches are biased (short runs finish first), so these are normalised by
+**shops visited**, which is a proper exposure measure:
+
+| arm | shops | skip rate | packs opened / shop | consumable uses / shop |
+|---|---|---|---|---|
+| **A** baseline | 3350 | 15.9% | 0.291 | 0.266 |
+| **B** play-derived commitment | 640 | 15.0% | 0.291 | 0.280 |
+| **C** + level_gain correction | 633 | **20.1%** | **0.409** | **0.374** |
+
+**Two things fall out, and both were predicted.**
+
+1. **Arm B is behaviourally almost identical to A** — skip rate 15.0 vs 15.9, packs/shop *identical*
+   to three decimals. That is exactly what a leveling-only, provisional plan should look like: it
+   changes *which hand* is targeted, not how much is bought. Meanwhile the commitment rate itself
+   more than doubled (**27.5% → 71%**, and 79% in arm C) — far above the 55% the ante-snapshot
+   counterfactual predicted, because the engine advances the plan at every shop, not once per ante.
+2. **Arm C buys 41% more packs per shop** — the intended effect, and large. **But its skip rate is
+   also up 26% (15.9% → 20.1%)**, which is exactly the Orbital inflation pre-registered in §12c: the
+   same correction raises a +3-level *skip tag* by the same 5–20×.
+
+So the correction is doing both the thing it was meant to do and the thing that was flagged as its
+risk. Whether the pack gain outweighs the skip cost is what the verdict decides — and if C is
+negative, §12c's explanation 1 is now *measured*, not merely suspected, which makes the fix
+(exclude Orbital from the correction, or cap the tag's share) specific rather than speculative.
+
+⚠ Partial data (~20% of each arm). Directional, to be confirmed at completion.
