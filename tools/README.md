@@ -15,6 +15,7 @@ Almost everything here reads **existing** telemetry and costs nothing to run. On
 |---|---|
 | `sim_par.sh` **[sim]** | run a batch across all cores and merge the shards. **The way to run any batch.** Refuses to start on top of existing shards (a real corruption once produced a false verdict) and integrity-checks every merge. |
 | `sim_batch.lua` **[sim]** | single-core batch with live progress; `sim_par.sh` shards through it |
+| **`merge_shards.sh`** | **recover a batch whose wrapper died before the merge.** The workers reliably outlive whatever kills the wrapper, so completed runs can sit in shard files looking like a failure. Replicates the merge exactly and refuses to touch shards that are still being written |
 | `probe_sweep.sh` **[sim]** | run several `Probe.CONFIGS` as paired batches over the same seeds |
 | `analyze_runs.lua` | the dashboard: death-ante histogram, per-ante trajectory, action summary, and `compare` for a paired A/B on the progress metric |
 | **`verdict.sh`** | **run the whole verdict battery at once** — integrity, paired progress, paired wins, action summary — so a partial reading cannot be quoted as a result |
