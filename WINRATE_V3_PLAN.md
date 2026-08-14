@@ -2571,3 +2571,55 @@ Extending to n=160 should roughly double the discordant pairs (~14 vs ~28), whic
 near p≈0.04 — borderline. Both arms are being re-run on a **disjoint seed pool** (`BES_SEED_OFF=4`
 → s*1000+4) so the extra 80 are out-of-sample rather than more of the same, and the combined
 verdict is n=160 per arm. **Do not act on the pack finding until that lands.**
+
+---
+
+# 8. RE-LITIGATING THE GRAVEYARD — a taxonomy, because §6 does NOT resurrect all of it
+
+Prompted by the user (2026-08-14): *"consider reconsidering older reverted changes which were
+reverted due to the rule to revert negative results."* §6 shows baseline verdicts on valuation
+changes are uninformative, so that is the right instinct. But sorting the graveyard by **why** each
+entry died shows only one class is actually freed.
+
+### Class A — killed by a NULL or an underpowered/incomplete batch ✅ genuine candidates
+
+| lever | measurement | why it is a candidate |
+|---|---|---|
+| **F8** two-stage discard sampling | **n=106 PARTIAL** (batch interrupted 3× by laptop sleep), Δ −0.054, **p 0.70**, sign 44/58 | a null, not a negative; fires on every discard decision; its mechanism was **inherited by analogy** from C1, not demonstrated for F8 |
+| **F4** discard-set generators | "high-variance churn"; depends on F8 | churn signature = the §5z chaos, not evidence of harm |
+
+### Class B — killed by a MECHANISM, and the mechanism is ONE mechanism, confirmed 4× ⚠ needs a COUPLED test, not a re-run
+
+**C1** (adaptive samples, −0.142) · **B3** (the $↔frac rate, −0.245) · **F4/F8** (above) all failed
+for the *same* stated reason, and the audit states it explicitly: **"you cannot change the
+measurement's noise / the rate / the candidate set without co-retuning the guardrails built around
+the old value."** `keep_bias`, the prior floors, `UPGRADE_MARGIN`, `SK.SHOP_VALUE`, the skip margin
+and the consumable-money weights are all COMPENSATORS fitted to the old regime.
+
+That is a real mechanism, independently reproduced four times — **it is not a null-revert, and §6
+does not automatically clear it.** A change can be genuinely mis-calibrating *and* unmeasurable at
+baseline; both are true at once. The open question is whether the mechanism itself was ever
+verified at an operating point where it could be seen. **`sim_out/rich_nobridge.jsonl` is that test**
+(B3 isolated, at `rich10`), and B3 is the family representative.
+
+### Class C — killed by FREQUENCY ❌ still dead, and §6 is irrelevant to them
+
+E-2, E-2b, SECOND_XMULT_BONUS ("wash, offer-limited"), TAG/Judgement/Soul sell-to-make-room,
+committed-hand play-freq, E-14 Mouth, reroll-to-dig. All "near-inert / channel too rare". **The
+frequency ceiling applies at every operating point** — a lever that fires in 2% of runs cannot move
+a verdict whether the engine is rich or poor. Do not re-test these.
+
+### Class D — already resurrected ✅ no action
+
+**E-5** was reverted 2026-07-12 on the tail gate (sign **57/33, p 0.015** — the strongest sign
+result in the project — but wins 4→2, which is two events and statistically meaningless). It was
+**already re-applied on 2026-07-13** after replay-screening and is now the project's LARGEST shipped
+lever (**+0.146**). `decision_engine.lua:586` carries the note. *This is the precedent for the whole
+exercise: the resurrection worked, and it produced the single biggest gain in the project.*
+
+### The rule this suggests
+
+Revert-on-mechanism stays valid. But **"reverted on a null"** and **"reverted on a handful of
+wins"** are now both suspect, and E-5 proves the upside is real. The screening order is:
+**frequency first** (Class C is unrecoverable), **then mechanism** (Class B needs the coupled
+retune the audit already specified), **then re-measure at an operating point where it can fire**.
