@@ -2651,8 +2651,9 @@ p=0.0021**.
    rate, so doubling the rate alone mis-calibrates every one of them"* — is coherent, was
    reproduced four times (C1/B3/F4/F8), and **does not survive contact with the operating point.**
    The co-retune the audit deferred as a prerequisite is not needed for B3.
-2. **B3 alone (+0.672) is ~92% of the entire six-commit bundle (+0.730)** from §6. The
-   operating-point effect is not diffuse accumulated work — it is *this one constant*.
+2. **B3 alone is most of the six-commit bundle** from §6 (+0.518 pooled vs the bundle's +0.730;
+   in-sample it was +0.672 vs +0.730). The operating-point effect is not diffuse accumulated work —
+   it is substantially *this one constant*.
 3. **Class B of the graveyard is now open.** C1 (adaptive samples, −0.142), F4 and F8 all died to
    the same mechanism and all were measured only at baseline. They deserve the identical treatment:
    isolate, run at `rich10`, compare.
@@ -2684,6 +2685,27 @@ The secondary changes — more packs (+13%), more Celestials (+15%), more planet
 (§5w, 68/67 and 71/61) showed is ~neutral there. At `rich10` both halves fire and compound. The
 result is not a bare number; it has a mechanism, and the mechanism is the one the audit wrote down
 in July.
+
+### ⚠ REPLICATION (disjoint pool `BES_SEED_OFF=4`) — direction HOLDS, magnitude HALVES, wins DO NOT
+
+| | progress Δ | p | wins |
+|---|---|---|---|
+| in-sample (s·1000+3) | **+0.671** (SE 0.218) | **0.0021** | 6 → 12 (discordant 2 v 8) |
+| **out-of-sample (+4)** | **+0.345** (SE 0.232) | 0.136 (n.s.) | **10 → 10** (discordant **6 v 6**) |
+| **POOLED n=160** | **+0.518** (SE 0.159) | **t 3.26, p 0.0011** | McNemar 8 v 14, **p 0.286** |
+
+1. **The progress effect is real but SMALLER than first measured.** +0.518 pooled, not +0.672. The
+   in-sample figure was inflated by **winner's curse**: B3 was selected for testing partly because
+   the bundle containing it looked good *on that same pool*. The out-of-sample +0.345 is the less
+   biased single estimate; the pooled +0.518 is the best overall.
+2. **The win-doubling does NOT replicate.** The disjoint pool is exactly **6 vs 6** discordant —
+   dead null. The in-sample 6→12 was noise, exactly as §7's near-disjoint win sets warned. **Do not
+   quote "B3 doubles the winrate."**
+
+**The interaction survives on the conservative estimate:** baseline −0.102 (SE 0.224) vs rich
+pooled +0.518 (SE 0.159) → **+0.620, SE 0.274, t = 2.26, p = 0.0238.** So §6's operating-point
+claim stands, and B3 is worth roughly the size of the project's **entire historical retained arc
+(+0.487)** — but at `rich10`, and with no measurable winrate effect.
 
 ### ⚠ Honest limits
 
