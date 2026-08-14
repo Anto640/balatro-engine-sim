@@ -900,6 +900,17 @@ return function(t)
       "readiness rises monotonically with the base it has")
     t.ok(Packs.level_scale(ready(3)) > Packs.level_scale(GS.new{ meta = { ante = 3 }, jokers = {} }),
       "the gate reaches the shared hook, so every leveling channel gets it")
+
+    -- ANTE-BOUNDED: the opportunity-cost argument only holds while the money has a first joker
+    -- to buy instead. Past LEVEL_READY_MAX_ANTE it does not, and damping there would undo the
+    -- one thing the level_gain correction demonstrably achieves -- converting the banked cash
+    -- the engine otherwise dies holding. Firing-rate measurement caught this: un-bounded the
+    -- gate fired on 26-36% of ante 6-7 boards, which was never the intent.
+    local late = GS.new{ meta = { ante = BP.LEVEL_READY_MAX_ANTE + 1 }, jokers = {} }
+    t.eq(BP.level_readiness(late), 1,
+      "past LEVEL_READY_MAX_ANTE an empty board is NOT damped (cash has nothing better to buy)")
+    local inwindow = GS.new{ meta = { ante = BP.LEVEL_READY_MAX_ANTE }, jokers = {} }
+    t.ok(BP.level_readiness(inwindow) < 1, "...but inside the window it still is")
   end
 
   -- 31e. SELL GUARDS (B1/B2): a rich (above-cap) full board with ONE real scorer must

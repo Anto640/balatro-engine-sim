@@ -521,11 +521,25 @@ end
 -- Shape: full credit once the board has BASE_MIN additive scorers to multiply, tapering to
 -- LEVEL_READY_FLOOR on a board with none. It releases itself -- by ante 3 the engine holds ~4.7
 -- jokers, so this bites only in the window where it measurably hurt.
+--
+-- ⚠ ANTE-BOUNDED, and the bound was found by measuring the firing rate BEFORE batching it.
+-- Un-bounded, this gate fires on 22-27% of recorded boards -- but the distribution is not what it
+-- was designed for: 38-46% at ante 2 (intended) and **26-36% at antes 6-7** (not). A board with
+-- base < 2 at ante 6 is a real thing (two xmults plus econ), and damping ITS leveling credit would
+-- undo the one effect the correction demonstrably achieves: converting the banked cash the engine
+-- otherwise dies holding ($20.1 -> $15.6, 13). The OPPORTUNITY-COST argument this gate rests on
+-- only holds while the money has something better to buy -- a first joker. Late it does not; that
+-- is the whole "dies holding $26" finding. The pure arithmetic ("no base, less value") is already
+-- handled by level_gain's board context, so applying it again late double-counts.
+-- Bound at ante 4: both the measured harm window and the human's measured crossover.
+BP.LEVEL_READY_MAX_ANTE = 4   -- past this, cash has nothing better to buy -- do not damp leveling
 BP.LEVEL_READY_FLOOR = 0.35   -- credit retained on a board with NO base to multiply
 -- `base` comes from BP.analyze, NOT a parallel loop: analyze classifies with an elseif chain
 -- that files an xmult_scaling joker under xmult, and a second implementation would quietly
 -- disagree with it about exactly the jokers this gate is about.
 function BP.level_readiness(gs)
+  local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
+  if ante > BP.LEVEL_READY_MAX_ANTE then return 1 end
   local base = BP.analyze(gs).base
   if base >= BP.BASE_MIN then return 1 end
   local f = BP.LEVEL_READY_FLOOR
