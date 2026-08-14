@@ -4091,3 +4091,43 @@ advises a *human*, and the human dataset shows they are **2–4× richer than th
 ante** — much closer to `rich10` than to the engine's baseline. If that holds, the **ungated**
 correction may be the right thing to deploy for the live overlay even if the gate wins in the sim.
 Do not deploy either half on the sim verdict alone.
+
+### §15b — Why it inverts: at `rich10` the correction gets the leveling WITHOUT the early cost
+
+Per-ante means, `rich10` arms:
+
+| ante | njokers base / **fix** | hand levels base / **fix** | deaths base / **fix** |
+|---|---|---|---|
+| a2 | 4.52 / **4.43** | 1.37 / **1.97** | 3 / 5 |
+| a3 | 5.04 / **5.09** | 2.49 / **4.40** | 8 / 8 |
+| a4 | 5.18 / **5.21** | 3.55 / **6.50** | 32 / **18** |
+| a5 | 5.24 / **5.33** | 4.42 / **8.66** | 39 / **31** |
+| a6 | 5.33 / **5.48** | 5.93 / **10.72** | 16 / 21 |
+| a8 | 5.51 / **5.90** | 8.82 / **15.67** | 9 / 8 |
+
+**The early-board cost is simply not there.** At `rich10` the ante-2 board is **4.43 vs 4.52** — a
+2% difference — against baseline income's **2.48 vs 2.99**, a 17% collapse. With an income stream, an
+early Celestial pack does not starve the first jokers, because the first jokers get bought anyway.
+
+**And the leveling gain is bigger, not smaller**: 1.8× at ante 4 *and* at ante 8, reaching **15.67
+hand levels by ante 8 against the human's measured 18.6** — the level gap that motivated this whole
+line is very nearly closed.
+
+**The wall moves.** Deaths at ante 4 fall **32 → 18**; more runs reach ante 6 (76 → 95) and ante 7
+(58 → 75). The documented ante-4 mode is where the gain lands.
+
+### The complete mechanistic story, end to end
+
+1. `level_gain` under-priced a hand level by 1.4–19× (§12). Corrected exactly.
+2. Corrected, the engine converts **money → levels** (2.5× levels at ante 4; death wallet
+   $20.1 → $15.6 at baseline).
+3. **At baseline income the engine has no spare money**, so what it converts is its *first-joker*
+   money — ante-2 board 2.48 vs 2.99, ante-2 deaths +50%, and the gain is cancelled (−0.076).
+4. **At `rich10` it has spare money**, converts that instead, keeps its board, and gains
+   **+0.421 (p 0.019)** with winrate 18.8% → 26.2%.
+5. `BP.level_readiness` (§14) exists to make step 3 behave like step 4 *without* the income — buy
+   the base first. Arm D tests whether that works; **arm E tests that it does not subtract at
+   `rich10`, where there is nothing to fix.**
+
+**The human plays at the step-4 operating point** (2–4× richer than the engine at every ante), which
+is the strongest argument yet that the ungated correction is the right thing for the live overlay.
