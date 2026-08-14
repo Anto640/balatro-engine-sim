@@ -1,113 +1,90 @@
 -- tools/pack_terms.lua
--- WHY IS A CELESTIAL PACK WORTH −2.90?
+-- WHAT ARE THE ACTUAL TERMS BEHIND A PACK'S SHOP VALUE?
 --
--- The pack channel is the project's #1 measured gap (WINRATE_V3_PLAN 5z: engine 1.36 packs/ante
--- vs human 6.10) and Celestial is its worst cell. Reading existing telemetry got as far as the
--- SHAPE of the problem but no further, because the record stores only the final `value`:
---
---   Celestial pack value by ante   : a1 +1.55 | a2 −2.13 | a3 −2.01 | a4 −0.89 | a5 −0.14 | a7 +0.13
---   ...by dollars held (antes 2-4) : $0-3 +1.46 | $4-7 −2.79 | $8-14 −2.90 | $15-24 −2.00 | $25+ −0.66
---
--- Two things stand out and neither can be settled from the aggregate. The value is MOST negative
--- exactly where the pack is affordable, and POSITIVE when the engine is too broke to buy -- which
--- is the signature of `econ_floor_penalty`, whose shape is a band-stop: it is 0 below the floor
--- (no NEW shortfall), peaks at ~2.4 for $5-10, and returns to 0 at $15+. And the engine is not
--- pack-averse in general -- Buffoon is +13.27 at ante 1 and +2.79 at ante 3, Arcana is positive
--- throughout. It is Celestial and Standard specifically.
---
--- So this logs the ACTUAL terms of
+-- A pack's value in the shop is
 --     value = w_score * 5 * (pv * need + sbonus) - net_cost(cost) - econ_floor_penalty(gs, cost)
--- for every pack the engine prices in a real run, instead of inferring them from the total.
--- Guessing which term is wrong from aggregates is precisely what this project keeps getting
--- burned by; this measures it.
+-- and the telemetry records only the TOTAL. Reading the shape from aggregates got as far as
+-- WINRATE_V3_PLAN 11a (the trough sits exactly on the interest cap, because `SA.free_spend` drops
+-- discontinuously to $0 there while `bankroll_plan` targets it) but no further.
 --
--- Usage:  luajit tools/pack_terms.lua [n_seeds]        (~95s per seed -- run it on 2-4)
+-- ⚠ HOW NOT TO WRITE THIS TOOL. The first version wrapped `SA.pack_need` and
+-- `SA.econ_floor_penalty` and drove real runs through the driver, expecting to observe the terms
+-- as the advisor computed them. It recorded **zero** priced packs, silently: shop_advisor calls
+-- the LOCAL `pack_need` / `econ_floor_penalty`, and `SA.pack_need = pack_need` merely exports a
+-- second reference to the same function. Rebinding the table field cannot intercept a call that
+-- resolves through the upvalue. **In Lua, monkey-patching an exported alias never intercepts
+-- internal callers** -- and it fails by producing an empty result, not an error.
+--
+-- So this evaluates the exported helpers DIRECTLY over reconstructed states instead: no
+-- simulation, no interception, and every number is one the advisor would compute for that state.
+--
+-- Usage:  lua tools/pack_terms.lua [ante]
 
 local here = arg and arg[0] and arg[0]:gsub("[^/\\]*$", "") or ""
 package.path = table.concat({ here .. "../?.lua", here .. "../?/init.lua", package.path }, ";")
 
-local Driver  = require("sim.driver")
-local Content = require("sim.content")
-local SA      = require("engine.shop_advisor")
-local Packs   = require("engine.packs")
+local GS    = require("model.game_state")
+local SA    = require("engine.shop_advisor")
+local Packs = require("engine.packs")
 
-local NSEEDS = tonumber(arg[1]) or 3
+local ANTE = tonumber(arg[1]) or 3
+local COST = 5     -- a normal booster
 
--- Wrap the two pure helpers the formula uses. Both are exported on SA, so this observes the
--- real values the advisor computes rather than recomputing them from a reconstructed state.
-local rows = {}
-local real_need = SA.pack_need
-SA.pack_need = function(gs, kind, secure, pace, slots_free)
-  local f, why = real_need(gs, kind, secure, pace, slots_free)
-  rows[#rows + 1] = { stage = "need", kind = kind, need = f,
-                      ante = (gs.meta or {}).ante or 0,
-                      dollars = (gs.economy or {}).dollars or 0,
-                      urgent = pace and pace.urgent or false,
-                      on_pace = pace and pace.on_pace or false,
-                      margin = pace and pace.margin or nil }
-  return f, why
-end
-
-local real_floor = SA.econ_floor_penalty
-SA.econ_floor_penalty = function(gs, cost)
-  local p = real_floor(gs, cost)
-  local last = rows[#rows]
-  if last and last.stage == "need" then last.floor_pen = p; last.cost = cost end
-  return p
-end
-
-for i = 1, NSEEDS do
-  local seed = i * 1000 + 3
-  Driver.run(seed, { content = Content })
-  io.write(("seed %d done (%d priced packs)\n"):format(seed, #rows))
-  io.flush()
-end
-
--- ---- report -----------------------------------------------------------------
-local by = {}
-for _, r in ipairs(rows) do
-  if r.cost then                                   -- only rows that reached the floor charge
-    local b = by[r.kind]
-    if not b then b = { n = 0, need = 0, floor = 0, cost = 0, urgent = 0, ahead = 0 }; by[r.kind] = b end
-    b.n = b.n + 1
-    b.need = b.need + r.need
-    b.floor = b.floor + r.floor_pen
-    b.cost = b.cost + r.cost
-    if r.urgent then b.urgent = b.urgent + 1 end
-    if (r.margin or 0) >= 1.8 then b.ahead = b.ahead + 1 end
+local function deck52()
+  local d = {}
+  for _, su in ipairs({ "S", "H", "D", "C" }) do
+    for _, r in ipairs({ "2","3","4","5","6","7","8","9","T","J","Q","K","A" }) do
+      d[#d + 1] = { id = #d + 1, rank = r, suit = su }
+    end
   end
+  return d
+end
+local function lcg(x)
+  local s = x % 2147483647; if s <= 0 then s = s + 2147483646 end
+  return function() s = (s * 16807) % 2147483647; return s / 2147483647 end
+end
+
+local JOKERS = { { key = "j_jolly" }, { key = "j_sly" }, { key = "j_blue_joker" },
+                 { key = "j_misprint" }, { key = "j_walkie_talkie" } }
+
+local function state(dollars)
+  return GS.new{ deck = deck52(), jokers = JOKERS, meta = { ante = ANTE },
+    economy = { dollars = dollars, interest_cap = 5 },
+    run = { hand_levels = {}, joker_slots = 5, consumable_slots = 2 } }
+end
+
+print(("ante %d, board of %d jokers, $%d pack   (SA.ECON_FLOOR=%s rate=%s, JOKER_SCORE_WEIGHT=%s)")
+  :format(ANTE, #JOKERS, COST, tostring(SA.ECON_FLOOR), tostring(SA.ECON_FLOOR_RATE),
+          tostring(SA.JOKER_SCORE_WEIGHT)))
+print("")
+
+-- the pool value is wallet-independent; measure it once per pack kind
+local pv = {}
+for _, key in ipairs({ "p_celestial_normal", "p_buffoon_normal", "p_arcana_normal" }) do
+  pv[key] = ({ Packs.value(state(20), { key = key }, { rng = lcg(11), samples = 8 }) })[1] or 0
+end
+
+print("POOL VALUE (wallet-independent)")
+for _, key in ipairs({ "p_celestial_normal", "p_buffoon_normal", "p_arcana_normal" }) do
+  print(("  %-22s pv = %.4f   ->  x5 = %.3f"):format(key, pv[key], 5 * pv[key]))
 end
 
 print("")
-print(("PACK TERMS over %d seeds  (SA.ECON_FLOOR=%s rate=%s)")
-  :format(NSEEDS, tostring(SA.ECON_FLOOR), tostring(SA.ECON_FLOOR_RATE)))
-print(("  %-10s %6s %8s %10s %8s %8s %8s"):format(
-  "kind", "n", "avg need", "avg floor", "avg cost", "%urgent", "%ahead"))
-local ks = {}
-for k in pairs(by) do ks[#ks + 1] = k end
-table.sort(ks)
-for _, k in ipairs(ks) do
-  local b = by[k]
-  print(("  %-10s %6d %8.3f %10.3f %8.2f %7.0f%% %7.0f%%"):format(
-    k, b.n, b.need / b.n, b.floor / b.n, b.cost / b.n,
-    100 * b.urgent / b.n, 100 * b.ahead / b.n))
+print("COST TERMS BY WALLET  (what a $5 pack is charged before the pool value is weighed)")
+print(("  %-8s %10s %12s %14s %16s"):format("dollars", "free_spend", "floor charge", "Celestial net", "Buffoon net"))
+for _, d in ipairs({ 0, 3, 5, 8, 10, 14, 15, 20, 24, 25, 26, 29, 30, 40 }) do
+  local gs = state(d)
+  local floor_pen = SA.econ_floor_penalty(gs, COST)
+  local free = SA.free_spend(gs)
+  -- net_cost is not exported; the interest-free portion is `free_spend`, and everything beyond it
+  -- crosses a $5 boundary. Report the floor charge exactly and the free portion alongside it.
+  local cel = 5 * pv["p_celestial_normal"] - floor_pen
+  local buf = 5 * pv["p_buffoon_normal"] - floor_pen
+  print(("  %-8d %10d %12.2f %14.2f %16.2f"):format(d, free, floor_pen, cel, buf))
 end
 
--- the floor charge as a function of the wallet, which is the band-stop hypothesis
 print("")
-print("econ_floor_penalty by DOLLARS HELD (all pack kinds)")
-local w = {}
-for _, r in ipairs(rows) do
-  if r.cost then
-    local d = r.dollars
-    local b = d >= 25 and "25+" or (d >= 15 and "15-24" or (d >= 8 and "8-14"
-              or (d >= 4 and "4-7" or "0-3")))
-    w[b] = w[b] or { n = 0, s = 0, need = 0 }
-    w[b].n = w[b].n + 1; w[b].s = w[b].s + r.floor_pen; w[b].need = w[b].need + r.need
-  end
-end
-print(("  %-8s %6s %12s %10s"):format("dollars", "n", "avg penalty", "avg need"))
-for _, k in ipairs({ "0-3", "4-7", "8-14", "15-24", "25+" }) do
-  local b = w[k]
-  if b then print(("  %-8s %6d %12.3f %10.3f"):format(k, b.n, b.s / b.n, b.need / b.n)) end
-end
+print("Reading: the floor charge is a BAND-STOP -- 0 below the floor (no NEW shortfall), peaking")
+print("at cost*ECON_FLOOR_RATE while the buy would cross it, 0 again once the wallet clears it.")
+print("`free_spend` is the other half: it drops to $0 at EXACTLY the interest cap, which is the")
+print("wallet value `bankroll_plan` deliberately targets (WINRATE_V3_PLAN 11a).")

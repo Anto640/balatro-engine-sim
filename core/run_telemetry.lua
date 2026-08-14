@@ -57,6 +57,11 @@ end
 
 -- A frame is everything the state machine needs from one snapshot, and nothing
 -- that holds a live object. `ctx` (the gs itself) is forwarded to enrich only.
+-- NOTE on the three fields added 2026-08-14: `hand_type_plays` and `build_plan` are stored by
+-- REFERENCE, and `self.prev` keeps a frame across ticks. That is safe here only because both are
+-- plain PODs -- state_extraction rebuilds `hand_type_plays` on every read, and `build_plan` is a
+-- small commitment table -- never a LOVE/Steamodded object. Keep it that way: the invariant above
+-- is what stops telemetry from pinning game objects alive.
 function Telemetry.frame_of(gs)
   local meta = gs.meta or {}
   local b = gs.blind or {}

@@ -3720,3 +3720,41 @@ result.
 
 Also visible: the winning human acquires **14.4 jokers/run against the engine's 7.8** — the "1.5×
 more jokers, just later" flow finding, at nearly 2× on this measure.
+
+### §12n — The cost terms, decomposed (and a precision fix to §11a)
+
+`tools/pack_terms.lua`, rewritten to evaluate the exported helpers directly (ante 3, five-joker
+board, $5 pack). Pool values are post-correction:
+
+| pack | pool value | ×5 |
+|---|---|---|
+| Celestial normal | 0.334 | **1.671** |
+| Arcana normal | 0.413 | 2.065 |
+| Buffoon normal | 1.187 | 5.933 |
+
+| dollars | `free_spend` | floor charge | Celestial net | Buffoon net |
+|---|---|---|---|---|
+| 0 | 0 | 0.00 | **+1.67** | +5.93 |
+| 3 | 3 | 1.50 | +0.17 | +4.43 |
+| **5 / 8 / 10** | 0 / 3 / 0 | **2.50** | **−0.83** | +3.43 |
+| 14 | 4 | 0.50 | +1.17 | +5.43 |
+| 15 – 40 | 0…15 | 0.00 | **+1.67** | +5.93 |
+
+**Post-correction, Celestial is net-positive at every wallet except the $5–10 band**, where the
+floor charge peaks at `cost × ECON_FLOOR_RATE` = 2.50. Before the correction the ×5 pool term was
+~0.42 and Celestial was negative essentially everywhere. That is the whole change, in one table.
+
+⚠ **Precision fix to §11a.** I described `free_spend` dropping to $0 "at exactly $25" as if $25 were
+uniquely sticky. It is not: below the cap `free_spend = d mod 5`, so it is **0 at every $5 boundary**
+— $5, $10, $15, $20, $25 — and only above the cap does it become `d − 25` and grow monotonically.
+What is special about $25 is not the sawtooth but that **`bankroll_plan` deliberately targets it**,
+so it is the multiple of five the engine actually sits on. The mechanism claim stands; the phrasing
+overstated the discontinuity.
+
+⚠ **And a tooling lesson worth more than the table.** The first version of this tool wrapped
+`SA.pack_need` / `SA.econ_floor_penalty` and drove real runs, expecting to observe the terms as the
+advisor computed them. It recorded **zero** priced packs — silently. `shop_advisor` calls the LOCAL
+functions; `SA.pack_need = pack_need` only exports a second reference to the same closure, and
+rebinding a table field cannot intercept a call that resolves through an upvalue. **In Lua,
+monkey-patching an exported alias never intercepts internal callers, and it fails by returning an
+empty result rather than an error.**
