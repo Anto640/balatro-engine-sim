@@ -3675,8 +3675,14 @@ arrives rather than after it.
 | `noskip` (never skip a blind) | **−0.166 (p 0.28)** | 68 / 67 |
 | `noskip_early` (play everything through a4) | −0.107 (p 0.48) | 71 / 61 |
 
-Driving the skip rate to **zero** measures dead even — if anything slightly negative. So the axis is
-flat at baseline income, and an *increase* in skipping is unlikely to be strongly harmful there.
+Driving the skip rate to **zero** measures dead even — if anything slightly negative, i.e. baseline
+skipping is no worse than none.
+
+⚠ **But be precise about what that does and does not license.** `noskip` tests **less** skipping.
+Arm C does **more**. Nothing on record tests more, so arm C's direction is **untested**, not
+demonstrated flat. And a slightly-negative `noskip` is consistent with the baseline sitting near a
+peak — in which case moving either way costs something. The honest statement is: the *reduce*
+direction is measured and worthless; the *increase* direction is unknown.
 
 **Where the anti-skip evidence actually comes from**, and why it is weaker than it reads:
 * the human's stated preference (*"skipping is typically the wrong option"*) — a policy claim about
