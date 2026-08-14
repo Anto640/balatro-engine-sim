@@ -4131,3 +4131,46 @@ line is very nearly closed.
 
 **The human plays at the step-4 operating point** (2–4× richer than the engine at every ante), which
 is the strongest argument yet that the ungated correction is the right thing for the live overlay.
+
+---
+
+## §16 — ARM D: the gate does what it was designed to do, and that leaves it NEUTRAL at baseline
+
+`lg_ready_d` = arm C **+** `BP.level_readiness`, paired n=160, integrity-clean.
+
+| contrast | Δ progress | t | p | sign | ties |
+|---|---|---|---|---|---|
+| **D − C** — did the gate fix the cost? | **+0.116** | +1.07 | 0.286 | 39 / 43 | 78 |
+| **D − B** — is the gated correction worth anything at baseline? | **−0.009** | −0.06 | 0.949 | 73 / 69 | 18 |
+
+**Both halves of the pre-registered pass condition (§14) are met.** Death-ante and per-ante:
+
+| | ante-2 deaths | ante-2 njokers | hand lv a4 | hand lv a7 | reach a6 |
+|---|---|---|---|---|---|
+| A / B baseline | 14 | 2.99 | 1.46 | 7.00 | 27 |
+| **C** ungated | **21** | **2.48** | **3.72** | 8.73 | **21** |
+| **D** gated | **16** | **2.77** | **3.51** | **10.67** | **27** |
+
+Ante-2 deaths **21 → 16**, the ante-2 board **2.48 → 2.77**, deep survivorship restored (a6 back to
+27) — while the leveling is essentially preserved (a4 3.72 → 3.51) and is *higher* late
+(a7 8.73 → **10.67**). The arithmetic is consistent too: C − B was −0.125, D − C is +0.116, and
+D − B lands at −0.009.
+
+### ⚠ But "fixed the cost" is not "gained anything"
+
+**D − B = −0.009 means the gated correction is worth exactly nothing at baseline income.** That is
+the honest reading, and §15b already explains it: at baseline the engine has no *spare* money, so a
+better price for levels cannot buy more of them — it can only redirect money already committed
+elsewhere. The gate stops that redirection from being harmful; it cannot conjure the money.
+
+So at baseline income the whole level_gain line nets to zero, and everything positive it does is at
+`rich10` (+0.421, p 0.019). **The correction is not a baseline lever and should stop being tested as
+one.**
+
+### 📌 PRE-REGISTERED for arm E (the gate at `rich10`)
+
+The gate's firing rate on the `rich10` boards is **19% at ante 2, 8% at a3, 16% at a4, 0% from a5** —
+roughly half its baseline rate (46% / 16% / 14%), because a funded engine already has its base by
+ante 2. **So arm E should land close to `pd_play_r`**, i.e. the gate should cost little or nothing at
+`rich10`. If E ≈ +0.42 the gate is safe to ship at both operating points; if E is materially below
+it, the gate is an operating-point mirror and must be income-conditioned rather than shipped flat.
