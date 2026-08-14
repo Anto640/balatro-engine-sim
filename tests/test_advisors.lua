@@ -899,7 +899,7 @@ return function(t)
       run = { hand_levels = {}, hand_size = 8, joker_slots = 5, consumable_slots = 2 } }
 
     local need = M.boss_per_hand_need(built)
-    local persist = CV.level_persist(built)
+    local persist = CV.level_scale(built)
     -- the base-only value a channel would report if the context failed to reach it
     local freq, hctx = CV.hand_frequencies(built, { samples = 12, rng = lcg(5) })
     local hand = "Pair"

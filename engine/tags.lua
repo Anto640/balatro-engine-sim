@@ -33,7 +33,7 @@ local function orbital_dollars(gs, opts)
   -- so project over the remaining runway like the standalone-planet value does -- WITHOUT
   -- this, Orbital was valued at only its one-shot gain and declined 12/14 times, so the
   -- engine (which never levels, hand-lv~0) skipped free leveling that costs no $ and no slot.
-  local persist = ConsumableValue.level_persist(gs)
+  local persist = ConsumableValue.level_scale(gs)
   -- board context, so +3 levels are priced against the board that multiplies them rather
   -- than against the hand's bare base (CV.level_gain: understates by 1.4-19x without it)
   local _, bctx = ConsumableValue.hand_frequencies(gs, opts)

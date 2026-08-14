@@ -497,6 +497,41 @@ local function is_econ(key)
   return (e.cat == "economy") or (e.cat == "utility" and (e.econ or 0) > 0)
 end
 
+-- LEVEL READINESS -- how much of a level's value the board is ready to collect (2026-08-14).
+--
+-- Measured: correcting CV.level_gain (12) made the engine convert its banked cash into levels
+-- exactly as intended -- hand levels 2.5x at ante 4, and the death wallet fell from $20.1 to
+-- $15.6 -- but it paid for that by mortgaging the early game. It reached ante 2 with 2.48 jokers
+-- against 2.99, and **ante-2 deaths rose 14 -> 21 (+50%)** with survivorship to ante 3 falling
+-- 142 -> 131 (13).
+--
+-- THE PROBLEM IS NOT THE ARITHMETIC. With board context, `level_gain` already returns far less on
+-- a bare board (69 vs 520 for a Pair level). What it cannot see is the OPPORTUNITY COST: before
+-- the base exists, the same dollars buy a first joker, and a first joker is worth more than any
+-- level. `frac = persist * freq * level_gain / need` stays roughly flat across antes because
+-- `need` shrinks as fast as the gain does -- so leveling competes for the money that should be
+-- buying the board it is supposed to multiply.
+--
+-- This is the same reasoning the codebase already applies twice: `BP.invest_window` invests in
+-- the future core only once survival is assured, and `SK.BOARDLESS_SHOP_MULT` values a shop far
+-- higher the emptier your board. It is also the human's measured ordering -- economy and base
+-- first, power second, hand levels crossing the engine's only at ante 4 -- and the one axis on
+-- which the corrected engine was INVERTED from them.
+--
+-- Shape: full credit once the board has BASE_MIN additive scorers to multiply, tapering to
+-- LEVEL_READY_FLOOR on a board with none. It releases itself -- by ante 3 the engine holds ~4.7
+-- jokers, so this bites only in the window where it measurably hurt.
+BP.LEVEL_READY_FLOOR = 0.35   -- credit retained on a board with NO base to multiply
+-- `base` comes from BP.analyze, NOT a parallel loop: analyze classifies with an elseif chain
+-- that files an xmult_scaling joker under xmult, and a second implementation would quietly
+-- disagree with it about exactly the jokers this gate is about.
+function BP.level_readiness(gs)
+  local base = BP.analyze(gs).base
+  if base >= BP.BASE_MIN then return 1 end
+  local f = BP.LEVEL_READY_FLOOR
+  return f + (1 - f) * (base / BP.BASE_MIN)
+end
+
 -- Analyse the board's COMPOUNDING structure: how many of each axis, and the additive "base"
 -- an xmult would multiply (flat scorers + scaling jokers count as base; econ/utility don't).
 function BP.analyze(gs)

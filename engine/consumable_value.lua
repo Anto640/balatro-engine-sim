@@ -24,9 +24,17 @@ local function mc(n) local c = rawget(_G, "BES_MC_CAP"); if c and n > c then ret
 -- 3 planets bought in 16 runs, hand-lv=0). Project the gain over the remaining runway,
 -- bounded and tapering to 1 by the ante-8 race. SHARED by the standalone-planet value
 -- (below) and the Celestial-pack value (engine/packs) so both paths agree.
-function CV.level_persist(gs)
+--
+-- BOARD READINESS (2026-08-14). Multiplied in here rather than at the four call sites, because
+-- this is THE shared hook every leveling channel already consumes -- loose planets, the Celestial
+-- pool, in-pack picks, Black Hole and Orbital tags -- so a single multiplication reaches all of
+-- them by construction. That property matters: threading the level_gain context by hand missed a
+-- channel twice in one afternoon, silently, because a nil argument is not an error in Lua.
+-- Rationale and the measurement behind it are in BP.level_readiness.
+function CV.level_scale(gs)
   local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
-  return math.max(1, math.min(4, 1 + (8 - ante) * 0.45))
+  local runway = math.max(1, math.min(4, 1 + (8 - ante) * 0.45))
+  return runway * BuildPlan.level_readiness(gs)
 end
 
 CV.MIN_DECK = 5
@@ -364,7 +372,7 @@ function CV.card_value(gs, set, key, freq, need, rng, samples, hand_ctx)
         local hf; hf, bctx = CV.hand_frequencies(gs, { samples = 8, rng = rng })
         f = hf and (hf[hand] or 0) or 0.4
       end
-      return CV.level_persist(gs) * (f * CV.level_gain(gs, hand, 1, bctx)) / need, 0, "level " .. hand
+      return CV.level_scale(gs) * (f * CV.level_gain(gs, hand, 1, bctx)) / need, 0, "level " .. hand
     end
     return 0.3, 0, "planet"
   elseif set == "Tarot" then

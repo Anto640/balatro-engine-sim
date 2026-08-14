@@ -98,10 +98,10 @@ local function dollars(gs) return (gs.economy and gs.economy.dollars) or 0 end
 local function per_hand_need(gs) return Mechanics.boss_per_hand_need(gs) end
 
 -- Leveling persistence -- SHARED with the standalone-planet value so both paths agree
--- (see engine/consumable_value CV.level_persist). A hand level raises every future play
+-- (see engine/consumable_value CV.level_scale). A hand level raises every future play
 -- of that hand for the rest of the run; project the per-level gain over the remaining
 -- runway, bounded and tapering to 1 by the ante-8 race.
-function P.level_persist(gs) return ConsumableValue.level_persist(gs) end
+function P.level_scale(gs) return ConsumableValue.level_scale(gs) end
 
 -- Planets: each planet levels a specific hand; value = freq(you make it) x real
 -- level gain x persistence, normalised. Secret-hand planets down-weighted (rarely usable).
@@ -111,7 +111,7 @@ local function planet_pool(gs, opts)
   local freq, bctx = ConsumableValue.hand_frequencies(gs, opts)
   freq = freq or {}
   local need = per_hand_need(gs)
-  local persist = P.level_persist(gs)
+  local persist = P.level_scale(gs)
   local items = {}
   -- Mechanics.PLANETS is STRING-KEYED; iterate it in SORTED order (not pairs(), whose
   -- order is per-process-random) so the pool -> pack value is deterministic across
@@ -223,7 +223,7 @@ function P.black_hole_value(gs, opts)
   if not freq then return nil end
   local total = 0
   for hand, f in pairs(freq) do total = total + f * ConsumableValue.level_gain(gs, hand, 1, bctx) end
-  return P.level_persist(gs) * total / per_hand_need(gs)  -- leveling persists (see planet_pool)
+  return P.level_scale(gs) * total / per_hand_need(gs)  -- leveling persists (see planet_pool)
 end
 
 -- Spectrals: value each the SAME measured way a LOOSE spectral is valued in the shop

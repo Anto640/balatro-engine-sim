@@ -874,10 +874,32 @@ return function(t)
   -- levelled (hand-lv=0/12) because one level was valued at its single-hand gain.
   do
     local Packs = require("engine.packs")
-    t.ok(Packs.level_persist(GS.new{ meta = { ante = 1 } }) > Packs.level_persist(GS.new{ meta = { ante = 7 } }),
+    local BP = require("engine.build_plan")
+    -- `level_scale` = runway x BOARD READINESS. Give it a board with a base so readiness is 1
+    -- and the runway property is what is being asserted (it was `level_persist` until readiness
+    -- was folded in; the rename is deliberate, so a missed caller errors instead of silently
+    -- losing the factor).
+    local function ready(ante)
+      return GS.new{ meta = { ante = ante },
+        jokers = { joker{ key = "j_jolly" }, joker{ key = "j_sly" } } }
+    end
+    t.ok(Packs.level_scale(ready(1)) > Packs.level_scale(ready(7)),
       "leveling persistence is higher early (more runway) than late")
-    t.eq(Packs.level_persist(GS.new{ meta = { ante = 8 } }), 1, "no persistence boost at the ante-8 race")
-    t.ok(Packs.level_persist(GS.new{ meta = { ante = 3 } }) > 1, "leveling is projected up while runway remains")
+    t.eq(Packs.level_scale(ready(8)), 1, "no persistence boost at the ante-8 race")
+    t.ok(Packs.level_scale(ready(3)) > 1, "leveling is projected up while runway remains")
+
+    -- BOARD READINESS: a level multiplies a base, so before the base exists the same dollars
+    -- should be buying the base instead. Measured cost of NOT gating this: ante-2 deaths +50%.
+    t.eq(BP.level_readiness(ready(3)), 1, "a board with BASE_MIN scorers collects the full credit")
+    t.ok(BP.level_readiness(GS.new{ meta = { ante = 3 }, jokers = {} }) < 1,
+      "an empty board collects less -- buy the base first, then level it")
+    t.eq(BP.level_readiness(GS.new{ meta = { ante = 3 }, jokers = {} }), BP.LEVEL_READY_FLOOR,
+      "...bottoming at LEVEL_READY_FLOOR, never zero")
+    local one = GS.new{ meta = { ante = 3 }, jokers = { joker{ key = "j_jolly" } } }
+    t.ok(BP.level_readiness(one) > BP.LEVEL_READY_FLOOR and BP.level_readiness(one) < 1,
+      "readiness rises monotonically with the base it has")
+    t.ok(Packs.level_scale(ready(3)) > Packs.level_scale(GS.new{ meta = { ante = 3 }, jokers = {} }),
+      "the gate reaches the shared hook, so every leveling channel gets it")
   end
 
   -- 31e. SELL GUARDS (B1/B2): a rich (above-cap) full board with ONE real scorer must

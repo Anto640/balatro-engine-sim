@@ -49,7 +49,7 @@ local function engine_meta()
            cost_weight = ShopAdvisor.COST_WEIGHT },
     de = { level_use_credit = Decision.LEVEL_USE_CREDIT },
     cv = { wraith_joker = ConsumableV.WRAITH_JOKER, wraith_per_dollar = ConsumableV.WRAITH_PER_DOLLAR,
-           level_persist_a1 = ConsumableV.level_persist({ meta = { ante = 1 } }) },
+           level_persist_a1 = ConsumableV.level_scale({ meta = { ante = 1 } }) },
   }
   return ENGINE_META
 end
