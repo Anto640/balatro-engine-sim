@@ -3848,3 +3848,43 @@ the same trade from the other direction: capping the early board cut board power
 If (1) is the mechanism, the fix is narrow and already suggested by `BP.invest_window`'s existing
 logic: **damp the leveling credit while the board is still below `BP.BASE_MIN`** — buy the base
 first, then level it. That is also exactly the human's measured ordering.
+
+### §12r — ⚠ The two arms have very different POWER, and that must be settled before the verdict
+
+Early paired read on the **71 seeds completed in all three arms** (~45%). ⚠ That subset is selected
+for finishing fast in *every* arm, so it is biased toward short runs — read the **structure**, not
+the sizes:
+
+| contrast | Δ | SE | t | better / worse / **tied** |
+|---|---|---|---|---|
+| **B − A** (the commitment) | +0.032 | 0.052 | +0.61 | 7 / 9 / **55** |
+| **C − A** (both changes) | +0.148 | 0.202 | +0.73 | 39 / 28 / 4 |
+| **C − B** (the correction) | +0.116 | 0.205 | +0.57 | 39 / 27 / 5 |
+
+Both lean positive; neither is close to significant yet.
+
+**The structural point is the tie counts, and it decides how each verdict may be read.**
+
+* **Arm B ties on 55 of 71 seeds (77%)** despite more than doubling the commitment rate
+  (27.5% → 71%). It is a genuine **low-cascade** change — the "E-13 shape" this project has found
+  produces its only trustworthy verdicts. Implied per-seed sd ≈ **0.44**, so **MDE at n=160 ≈ 0.10**.
+  A null from arm B will be *informative*.
+* **Arm C ties on 4.** It re-rolls almost every seed. Implied sd ≈ **1.70**, so
+  **MDE at n=160 ≈ 0.38** — and the effect it is showing is ~0.15. **Arm C will almost certainly
+  report "n.s." no matter what is true.**
+
+**So write the reading rule now, before the number arrives:** a null from arm C is a **power
+failure, not evidence of no effect** — precisely the error CLAUDE.md's #1 tuning rule says has been
+deciding most keep/revert calls by coin flip. Judging the level_gain correction on an n=160 paired
+progress verdict is not possible. It must be judged on:
+
+1. **mechanism** — it is a measured 1.4–19× unit error with an exact fix (correctness class: ship
+   unless significantly *negative*);
+2. **the behavioural readouts** — hand levels 2.5× at a4 (§12q), packs +32%, and whether the early
+   board cost (2.49 vs 2.99 jokers at a2) shows up as earlier deaths;
+3. **wins**, via McNemar, where a tail-concentrated change is visible when progress averages it away
+   (§11b) — and, if it needs settling, a larger n or a lower-cascade variant.
+
+⚠ The tie rate is itself biased upward by the fast-finishing subset (short runs have less room to
+diverge), so the true sds are somewhat higher than these — which only strengthens the conclusion
+about arm C.
