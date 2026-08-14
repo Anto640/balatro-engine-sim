@@ -878,4 +878,56 @@ return function(t)
     t.ok((CV.card_value(st{}, "Tarot", "c_strength", nil, 1)) > 0,
       "an ordinary tarot still values off its prior on the same bare state")
   end
+
+  -- ---- the board context must REACH every leveling channel ----
+  -- CV.level_gain silently falls back to the hand's bare base when it gets no context, and a
+  -- nil context is not an error -- so a channel can lose 1.4-19x of a level's value with no
+  -- symptom. That happened for real: the first cut of the fix threaded the context into the
+  -- shop and pack-POOL paths but not into the in-pack PICK, which is the FREE leveling channel
+  -- and the one that matters most. These pin each channel against the base-only figure.
+  do
+    local M = require("engine.mechanics")
+    local deck = {}
+    for _, su in ipairs({ "Spades", "Hearts", "Clubs", "Diamonds" }) do
+      for r = 2, 14 do deck[#deck + 1] = card{ id = #deck + 1, rank_id = r, suit = su } end
+    end
+    -- a board with real chips AND an xmult, so a level is worth clearly more than its base
+    local built = GS.new{ deck = deck, economy = { dollars = 20, interest_cap = 5 },
+      meta = { ante = 3 },
+      jokers = { joker{ key = "j_jolly" }, joker{ key = "j_sly" }, joker{ key = "j_blue_joker" },
+                 joker{ key = "j_cavendish", ability = { x_mult = 3 } }, joker{ key = "j_walkie_talkie" } },
+      run = { hand_levels = {}, hand_size = 8, joker_slots = 5, consumable_slots = 2 } }
+
+    local need = M.boss_per_hand_need(built)
+    local persist = CV.level_persist(built)
+    -- the base-only value a channel would report if the context failed to reach it
+    local freq, hctx = CV.hand_frequencies(built, { samples = 12, rng = lcg(5) })
+    local hand = "Pair"
+    local base_only = persist * ((freq[hand] or 0) * CV.level_gain(built, hand, 1)) / need
+    local with_ctx  = persist * ((freq[hand] or 0) * CV.level_gain(built, hand, 1, hctx)) / need
+    t.ok(with_ctx > 2 * base_only, "board context materially raises a planet's value on a built board")
+
+    -- CHANNEL 1: the Celestial pack POOL
+    local pv = ({ Packs.value(built, { key = "p_celestial_normal" }, { rng = lcg(5), samples = 8 }) })[1]
+    t.ok(pv > 0.2, "Celestial pack pool value uses the board context (not the base-only ~0.08)")
+
+    -- CHANNEL 2: the in-pack PICK -- the free channel, and the one the first cut missed
+    local packgs = GS.new{ deck = deck, economy = { dollars = 20, interest_cap = 5 },
+      meta = { ante = 3 }, jokers = built.jokers,
+      run = { hand_levels = {}, hand_size = 8, joker_slots = 5, consumable_slots = 2 },
+      pack = { key = "p_celestial_normal", items = {
+        { set = "Planet", key = "c_mercury" },   -- Pair
+        { set = "Planet", key = "c_uranus" },    -- Two Pair
+        { set = "Planet", key = "c_neptune" },   -- Straight Flush (never made)
+      } } }
+    local rec = PackOpen.recommend(packgs)
+    t.ok(rec and rec.best and rec.ranked and #rec.ranked == 3, "pack advisor ranks a Celestial pack")
+    -- the base-only value of the SAME pick was 0.089; with the context it is ~1.87 on this
+    -- board. Assert well above the base-only figure, not a tuned number.
+    t.ok(rec.ranked[1].v > 0.5,
+      "the in-pack planet PICK uses the board context too (the channel the first cut missed)")
+    -- ...and the ordering is untouched: still the hand the deck actually makes
+    t.eq(rec.best.key, "c_mercury", "...and still prefers a hand the deck makes")
+    t.eq(rec.ranked[3].key, "c_neptune", "...ranking Straight Flush (never made) last")
+  end
 end

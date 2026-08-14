@@ -342,7 +342,7 @@ function CV.fool_target(gs)
   return nil
 end
 
-function CV.card_value(gs, set, key, freq, need, rng, samples)
+function CV.card_value(gs, set, key, freq, need, rng, samples, hand_ctx)
   need = need or 1
   -- The Fool with nothing to copy is worth ZERO, not its prior (see CV.fool_target).
   -- Only when NO pack is open: inside a pack the Fool may copy a card offered alongside it,
@@ -359,7 +359,7 @@ function CV.card_value(gs, set, key, freq, need, rng, samples)
       local f, bctx
       if freq then
         f = freq[hand] or 0
-        bctx = opts and opts.hand_ctx           -- caller-supplied context, when it has one
+        bctx = hand_ctx    -- supplied alongside `freq`; both come from hand_frequencies
       else
         local hf; hf, bctx = CV.hand_frequencies(gs, { samples = 8, rng = rng })
         f = hf and (hf[hand] or 0) or 0.4

@@ -96,7 +96,10 @@ end
 -- cheap=true skips ALL Monte-Carlo measurement and uses the documented priors
 -- instead. It's the instant first-pass ranking the overlay shows the moment a
 -- pack opens; the measured pass then refines it in the background (see main.lua).
-local function value_item(gs, it, need, freq, base, rng, cheap)
+-- `hctx` is the per-hand board context from the same sampling pass that produced `freq`.
+-- Without it CV.level_gain falls back to the hand's bare base and understates a level by
+-- 1.4-19x -- and this is the FREE leveling channel, where that matters most.
+local function value_item(gs, it, need, freq, base, rng, cheap, hctx)
   if it.set == "Joker" and it.joker then
     if not cheap then
       -- SAME basis as the shop buy: max(measured, analytic conditional-xmult, tier-prior floor)/need,
@@ -109,7 +112,7 @@ local function value_item(gs, it, need, freq, base, rng, cheap)
   elseif it.set == "Planet" then
     local hand = ConsumableValue.PLANET_KEY_HAND[it.key]
     if cheap then return 0.3 + BuildPlan.planet_credit(gs, hand), false end
-    local v = ({ ConsumableValue.card_value(gs, "Planet", it.key, freq, need, rng) })[1]
+    local v = ({ ConsumableValue.card_value(gs, "Planet", it.key, freq, need, rng, nil, hctx) })[1]
     return v + BuildPlan.planet_credit(gs, hand), true
   elseif it.set == "Tarot" or it.set == "Spectral" then
     if cheap then
@@ -123,7 +126,7 @@ local function value_item(gs, it, need, freq, base, rng, cheap)
       end
       return base_v + VU.dollars_to_frac(gs, gain), false
     end
-    local vfrac, gain = ConsumableValue.card_value(gs, it.set, it.key, freq, need, rng)
+    local vfrac, gain = ConsumableValue.card_value(gs, it.set, it.key, freq, need, rng, nil, hctx)
     return vfrac + VU.dollars_to_frac(gs, gain or 0), false   -- money tarots: $ -> fraction (ante-aware)
   elseif it.card then
     if cheap then return 0.05, false end
@@ -179,8 +182,11 @@ function PO.recommend(gs, opts)
   local mopts = cheap and { measure = false } or { rng = rng, cache = JokerValue.new_cache(), samples = 6 }
   -- shared work computed lazily (only if a planet / standard card is present, and
   -- never in cheap mode -- those use priors).
-  local freq, base
-  local function get_freq() if freq == nil then freq = ConsumableValue.hand_frequencies(gs, { samples = 8, rng = rng }) or false end return freq or nil end
+  local freq, base, hctx
+  -- `hctx` is the per-hand board context measured by the same sampling pass. Without it
+  -- CV.level_gain falls back to the hand's bare base and understates a level by 1.4-19x --
+  -- and the in-pack planet pick is the FREE leveling channel, where that matters most.
+  local function get_freq() if freq == nil then freq, hctx = ConsumableValue.hand_frequencies(gs, { samples = 8, rng = rng }); freq = freq or false end return freq or nil end
   local function get_base() if base == nil then base = ConsumableValue.deck_baseline(gs, { samples = 12, rng = rng }) or false end return base or nil end
 
   -- free slots for created jokers / consumables, and how many could be FREED (use a
@@ -212,7 +218,7 @@ function PO.recommend(gs, opts)
     if it.card then it.name = Cards.describe(it.card) end
     local f = (not cheap and it.set == "Planet") and get_freq() or nil
     local b = (not cheap and it.card) and get_base() or nil
-    local v, meas = value_item(gs, it, need, f, b, rng, cheap)
+    local v, meas = value_item(gs, it, need, f, b, rng, cheap, hctx)
     -- a generator whose creation can't fit your slots is worth less (it overflows)
     v = v * gen_factor(it.key)
     valued[#valued + 1] = { it = it, key = it.key, name = it.name or it.key or "item", v = v, meas = meas }
@@ -277,8 +283,9 @@ function PO.recommend(gs, opts)
     local function copyable_value(set, key)
       if not key then return 0 end
       set = set or (ConsumableValue.PLANET_KEY_HAND[key] and "Planet" or "Tarot")
-      local f = (set == "Planet") and ConsumableValue.hand_frequencies(gs, { samples = 8, rng = rng }) or nil
-      local vfrac, gain = ConsumableValue.card_value(gs, set, key, f, need, rng)
+      local f, fctx
+      if set == "Planet" then f, fctx = ConsumableValue.hand_frequencies(gs, { samples = 8, rng = rng }) end
+      local vfrac, gain = ConsumableValue.card_value(gs, set, key, f, need, rng, nil, fctx)
       if set == "Planet" then
         vfrac = (vfrac or 0) + BuildPlan.planet_credit(gs, ConsumableValue.PLANET_KEY_HAND[key])
       end

@@ -659,11 +659,13 @@ function SA.recommend(gs, opts)
   -- long as you have a slot (planets/tarots are timing-independent in value).
   local free_cslots = ((gs.run and gs.run.consumable_slots) or 2) - #(gs.consumables or {})
   -- only sample hand-frequencies (for planet value) if there are planets to value
-  local cfreq = nil
-  try(function() for _, it in ipairs(shop.consumables or {}) do if it.set == "Planet" then cfreq = ConsumableValue.hand_frequencies(gs, { samples = 8, rng = rng }); break end end end)
+  -- `cctx` is the per-hand board context from the same sampling pass. Without it a loose
+  -- planet is priced against the hand's bare base and understates 1.4-19x (CV.level_gain).
+  local cfreq, cctx = nil, nil
+  try(function() for _, it in ipairs(shop.consumables or {}) do if it.set == "Planet" then cfreq, cctx = ConsumableValue.hand_frequencies(gs, { samples = 8, rng = rng }); break end end end)
   for _, it in ipairs(shop.consumables or {}) do try(function()
     local cost = OwnedSynergy.consumable_free(gs, it.set) and 0 or (it.cost or 3) -- Astronomer: planets free
-    local vfrac, gain, note = ConsumableValue.card_value(gs, it.set, it.key, cfreq, cneed, rng)
+    local vfrac, gain, note = ConsumableValue.card_value(gs, it.set, it.key, cfreq, cneed, rng, nil, cctx)
     -- B1 leveling axis: a hand level raises the base the board's xmult multiply, so amplify a
     -- Planet's value by the board's core (1.0 with no xmult -> no early over-buy).
     if it.set == "Planet" then
@@ -1035,14 +1037,14 @@ function SA.recommend(gs, opts)
       end
     end
     if #(gs.consumables or {}) > 0 then
-      local hfreq = cfreq
+      local hfreq, hctx = cfreq, cctx
       if not hfreq then
         for _, c in ipairs(gs.consumables) do
-          if c.set == "Planet" then hfreq = ConsumableValue.hand_frequencies(gs, { samples = 8, rng = rng }); break end
+          if c.set == "Planet" then hfreq, hctx = ConsumableValue.hand_frequencies(gs, { samples = 8, rng = rng }); break end
         end
       end
       for _, c in ipairs(gs.consumables) do
-        local vfrac, gain = ConsumableValue.card_value(gs, c.set, c.key, hfreq, cneed, rng)
+        local vfrac, gain = ConsumableValue.card_value(gs, c.set, c.key, hfreq, cneed, rng, nil, hctx)
         if c.set == "Planet" then
           vfrac = (vfrac or 0) + BuildPlan.planet_credit(gs, ConsumableValue.PLANET_KEY_HAND[c.key])
         end
