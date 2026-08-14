@@ -13,6 +13,7 @@
 
 local Cards = require("util.cards")
 local JokerData = require("engine.joker_data")
+local BuildPlan = require("engine.build_plan")   -- requires joker_data only; no cycle
 
 local DP = {}
 
@@ -81,7 +82,10 @@ function DP.target(gs)
 
   local domfrac = (n > 0) and (domn / n) or 0
   local t = { size = n, ideal_size = DP.IDEAL_SIZE }
-  local commit = gs.run and gs.run.build_plan
+  -- Play-derived plans are leveling-only and never reach here (BP.anchored_commitment):
+  -- DP.target would thin toward a "dominant" suit that is an arbitrary tie-break on a
+  -- near-flat deck, the exact path that measured -0.054 in WINRATE_V3_PLAN 5t.
+  local commit = BuildPlan.anchored_commitment(gs)
   if commit and commit.kind then
     t.committed, t.hand = true, commit.hand
     if commit.kind == "economy" then

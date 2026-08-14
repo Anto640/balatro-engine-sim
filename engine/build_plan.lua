@@ -83,6 +83,36 @@ BP.PLAY_CREDIT     = 1.5   -- max credit; deliberately < COMMIT_THRESHOLD
 BP.PLAY_FLOOR      = 0.20  -- below this share a hand is incidental, not a direction
 BP.PLAY_FULL       = 0.50  -- at/above this share the run is clearly landing this hand
 BP.PLAY_MIN_SAMPLE = 8     -- ~one ante of hands; don't read a direction off three plays
+
+-- ...AND A PLAY-DERIVED COMMITMENT WHEN THERE IS NO JOKER ANCHOR AT ALL.
+--
+-- The credit above only helps a board the planner can already partly read, which measured at
+-- just 8.5% of runs (tools/commit_counterfactual.lua) -- because a credit capped below the
+-- threshold cannot rescue a board with NO anchor, and that is most boards. The planner can
+-- read 12.7% of a real board (0.57 of 4.53 jokers, tools/board_legibility.lua), and the
+-- untagged remainder is not mis-tagged: Cavendish, Hanging Chad and Blue Joker genuinely do
+-- not point at a poker hand. **The winners' boards are hand-AGNOSTIC** -- Hanging Chad appears
+-- in 7 of 7 human wins, Photograph in 5, Sock and Buskin in 3, and not one carries a handtype
+-- tag. So "which hand do my jokers point at" is simply the wrong question for most runs.
+--
+-- But those same winners concentrated LEVELING hard (hand levels 7-40 vs the engine's 4.5),
+-- and leveling is the one channel where engine and winner agree EXACTLY (WINRATE_V3_PLAN 5s:
+-- 0 discordant pairs). Levelling the hand you demonstrably land is not a speculative build
+-- commitment, it is arithmetic, and it needs no joker anchor.
+--
+-- Hence a SPLIT commitment. A play-derived plan drives the LEVELING channel (planet_credit)
+-- like any other, but is NEUTRAL in BP.fit -- play history says which hand to level, and
+-- nothing whatever about which jokers to buy. That also keeps it clear of the one thing the
+-- divergence mine told us not to disturb: relative joker pricing is directionally right.
+--
+-- It is PROVISIONAL: re-derived every shop until either a real tag-anchored commitment
+-- reaches the threshold (which locks it) or the commit window closes (which freezes it). So
+-- an early weak-hand reading self-corrects as the deck develops, and the plan that survives
+-- into the ante 4-8 leveling push is the one the run has actually been landing -- which is
+-- also the human's measured shape (economy and base first, power second, crossing at a4).
+BP.PLAY_COMMIT_SHARE  = 0.30  -- measured: the modal hand takes >=0.30 of plays in ~64% of runs
+BP.PLAY_COMMIT_MARGIN = 0.10  -- ...and clearly beats the runner-up in ~48%. Both, so a
+                              -- near-tie between two hands commits to NEITHER.
 BP.COMMIT_MAX_ANTE = 4
 BP.COMMIT_JOKER_FILL = 1.2
 BP.COMMIT_MISMATCH = 0.6
@@ -238,6 +268,28 @@ local function commitment_signals(gs)
   return score, anchors, econ
 end
 
+-- The hand this run demonstrably LANDS, or nil when it is not landing one clearly enough.
+-- Deterministic: hands are visited in HAND_ORDER, never in `pairs` order, so a tie can never
+-- depend on table layout (a flickering commitment would re-rank the live overlay every tick).
+-- See the BP.PLAY_COMMIT_* block for why this is allowed to commit with no joker anchor.
+function BP.play_direction(gs)
+  local plays = gs.run and gs.run.hand_type_plays
+  if not plays then return nil end
+  local total = 0
+  for _, n in pairs(plays) do total = total + (n or 0) end
+  if total < BP.PLAY_MIN_SAMPLE then return nil end
+  local best, best_s, second_s = nil, 0, 0
+  for _, hand in ipairs(HAND_ORDER) do
+    local s = (plays[hand] or 0) / total
+    if s > best_s then best, second_s, best_s = hand, best_s, s
+    elseif s > second_s then second_s = s end
+  end
+  if not best then return nil end
+  if best_s < BP.PLAY_COMMIT_SHARE then return nil end
+  if best_s - second_s < BP.PLAY_COMMIT_MARGIN then return nil end
+  return best, best_s, best_s - second_s
+end
+
 -- Instrumentation hook. `commitment_signals` is the gate on the whole planner, and 67% of
 -- runs never pass it (tools/commit_dist.lua) -- so being able to ask "what WAS the signal in
 -- the runs that never committed?" from outside is the difference between tuning the threshold
@@ -279,8 +331,11 @@ end
 
 function BP.advance(gs, current)
   local ante = (gs.meta and gs.meta.ante) or 1
-  if current and current.kind then return maybe_upgrade(gs, current, ante) end
-  if ante > BP.COMMIT_MAX_ANTE then return current end
+  -- A PROVISIONAL (play-derived) plan does not block re-derivation -- that is what makes it
+  -- self-correcting. An anchored plan is sticky and only ever moves via maybe_upgrade.
+  local provisional = current and current.via == "played"
+  if current and current.kind and not provisional then return maybe_upgrade(gs, current, ante) end
+  if ante > BP.COMMIT_MAX_ANTE then return current end   -- window closed: freeze whatever stands
   local scores, anchors, econ = commitment_signals(gs)
   local best_hand, best_score
   for _, hand in ipairs(HAND_ORDER) do
@@ -294,11 +349,40 @@ function BP.advance(gs, current)
     return { kind = "hand", hand = best_hand, committed_ante = ante,
       strength = best_score, anchors = anchors[best_hand] or {} }
   end
+  -- No anchor reached the bar. Fall back to the direction the run has EARNED by playing it.
+  -- Provisional and leveling-only (see BP.PLAY_COMMIT_*), so this cannot lock a run into a
+  -- weak archetype: it re-derives until an anchored plan supersedes it.
+  local ph = BP.play_direction(gs)
+  if ph then
+    return { kind = "hand", hand = ph, committed_ante = ante, strength = 0,
+      anchors = {}, via = "played" }
+  end
   return current
 end
 
 function BP.commitment(gs)
   return gs.run and gs.run.build_plan or nil
+end
+
+-- The commitment as every channel EXCEPT leveling should see it. A play-derived plan
+-- (BP.PLAY_COMMIT_*) knows one thing -- which hand this run lands -- and that is exactly
+-- what planet_credit needs and the limit of what it is entitled to say. Anywhere else it
+-- reads as "uncommitted":
+--   * BP.fit    -- play history says nothing about which jokers to BUY, and the winners'
+--                  boards are hand-agnostic (Hanging Chad 7/7, no handtype tag).
+--   * keep_bias -- CORE_KEEP is a strategic override on the SELL side; a thin play reading
+--                  should not promote a matching common to untouchable core.
+--   * DeckPlan  -- and this one is load-bearing: DP.target on a Flush commitment thins
+--                  toward the "dominant" suit, which on a near-flat deck is an arbitrary
+--                  tie-break. Removing that gate measured -0.054 and destroyed a win
+--                  (WINRATE_V3_PLAN 5t). Feeding it MORE commitments would amplify a
+--                  refuted path, so it does not get to see this one.
+-- Keeping the blast radius to a single mechanism is also what makes the result readable:
+-- a broad re-weight lands inside the noise floor (CLAUDE.md, THE #1 TUNING RULE).
+function BP.anchored_commitment(gs)
+  local c = BP.commitment(gs)
+  if c and c.via == "played" then return nil end
+  return c
 end
 
 function BP.planet_credit(gs, hand)
@@ -353,7 +437,7 @@ local function is_flat_scorer(key)
   return c == "flat_mult" or c == "flat_chips"
 end
 function BP.keep_bias(key, gs)
-  local c = gs and BP.commitment(gs)
+  local c = gs and BP.anchored_commitment(gs)
   if c and c.kind == "hand" then
     for _, hand in ipairs(hand_tags(key)) do
       if BP.hand_matches(c.hand, hand) then return BP.CORE_KEEP end
@@ -467,6 +551,7 @@ function BP.fit(gs, sj, plan, invest)
   -- pieces are mildly diluted. This stays inactive on a hopeless board (the same
   -- viability gate as other future investment), so immediate survival still wins.
   local commit = plan.commitment
+  if commit and commit.via == "played" then commit = nil end   -- see BP.anchored_commitment
   if commit and plan.commit_active then
     if commit.kind == "hand" then
       local tags = hand_tags(key)

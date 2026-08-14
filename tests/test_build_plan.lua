@@ -326,13 +326,16 @@ return function(t)
       return gs
     end
 
-    -- capped below the threshold: a run that plays ONE hand exclusively, with no joker
-    -- anchor at all, must still not commit. This is the `oracle_plan` failure mode
-    -- (committing to whatever the starting deck happens to make) and it is fenced off here.
+    -- The credit is capped below the threshold, so play share can never manufacture an
+    -- ANCHORED commitment -- the kind that steers joker buying and deck shaping. A run that
+    -- plays one hand exclusively still gets only the leveling-only play-derived plan below.
     t.ok(BP.PLAY_CREDIT < BP.COMMIT_THRESHOLD,
       "the play credit is capped BELOW the commit threshold by construction")
     local pure = played({ "j_joker" }, { ["Two Pair"] = 20 })
-    t.eq(BP.advance(pure, nil), nil, "play share alone never commits (no joker anchor)")
+    t.eq(BP.advance(pure, nil).via, "played",
+      "play share alone yields a play-derived plan, never an anchored one")
+    t.eq(BP.anchored_commitment({ run = { build_plan = BP.advance(pure, nil) } }), nil,
+      "...which reads as uncommitted in every non-leveling channel")
 
     -- the target band: TWO matching hand-commons score exactly 2.0 against a 2.5 gate --
     -- nothing in the measured distribution falls between them -- so a run that also LANDS
@@ -370,5 +373,63 @@ return function(t)
     local a = BP.signals(played(pair_jokers, { Pair = 10, Flush = 4 }))
     local b = BP.signals(played(pair_jokers, { Pair = 10, Flush = 4 }))
     t.eq(a.Pair, b.Pair, "the play credit is deterministic")
+  end
+
+  -- ---- PLAY-DERIVED COMMITMENT: provisional, and LEVELING-ONLY ----
+  -- The credit above cannot rescue a board with no anchor at all, and that is most boards --
+  -- the planner can read 12.7% of a real board, and the winners' boards are hand-agnostic
+  -- (Hanging Chad appears in 7 of 7 human wins and carries no handtype tag). So a run that
+  -- clearly LANDS one hand may commit to it with no anchor -- but only for the leveling
+  -- channel, and only provisionally.
+  do
+    local function played(keys, plays)
+      local gs = board(keys)
+      gs.run.hand_type_plays = plays
+      return gs
+    end
+
+    -- commits with NO joker anchor whatever, on play history alone
+    local gs = played({ "j_joker" }, { Flush = 8, Pair = 4, ["High Card"] = 3 })
+    local plan = BP.advance(gs, nil)
+    t.ok(plan and plan.hand == "Flush" and plan.via == "played",
+      "a run that clearly lands one hand commits to it with no anchor")
+
+    -- ...but only when it is CLEAR: a near-tie commits to neither
+    local tie = played({ "j_joker" }, { Flush = 8, Pair = 7 })
+    t.eq(BP.advance(tie, nil), nil, "a near-tie between two hands commits to neither")
+    local thin = played({ "j_joker" }, { Flush = 4, Pair = 3, Straight = 3, ["High Card"] = 5 })
+    t.eq(BP.advance(thin, nil), nil, "a hand under PLAY_COMMIT_SHARE does not commit")
+    t.eq(BP.advance(played({ "j_joker" }, { Flush = 5 }), nil), nil,
+      "under PLAY_MIN_SAMPLE there is no play-derived commitment either")
+
+    -- LEVELING-ONLY: it drives planet_credit but is invisible to every other channel
+    gs.run.build_plan = plan
+    t.ok(BP.planet_credit(gs, "Flush") > 0, "a play-derived plan DOES drive the leveling credit")
+    t.eq(BP.anchored_commitment(gs), nil, "...and reads as uncommitted everywhere else")
+    t.eq(BP.keep_bias("j_droll", gs), BP.keep_bias("j_droll", board({ "j_joker" })),
+      "keep_bias is unchanged by a play-derived plan (no new sell-side override)")
+    local bare = board({ "j_joker" })
+    t.eq(BP.fit(gs, { key = "j_droll" }, BP.analyze(gs), true),
+         BP.fit(bare, { key = "j_droll" }, BP.analyze(bare), true),
+      "BP.fit is unchanged by a play-derived plan")
+
+    -- PROVISIONAL: re-derives as the run develops, instead of locking in an early reading
+    local moved = played({ "j_joker" }, { Flush = 8, ["Two Pair"] = 20 })
+    local plan2 = BP.advance(moved, plan)
+    t.ok(plan2 and plan2.hand == "Two Pair",
+      "a provisional plan follows the run when the hand it actually lands changes")
+
+    -- ...and a real joker anchor supersedes it, after which the plan is sticky
+    local anchored = played({ "j_tribe", "j_droll" }, { ["Two Pair"] = 20, Flush = 8 })
+    local plan3 = BP.advance(anchored, plan)
+    t.ok(plan3 and plan3.hand == "Flush" and plan3.via == nil,
+      "a real joker anchor supersedes the provisional plan")
+    local later = played({ "j_tribe", "j_droll" }, { ["Two Pair"] = 99 })
+    t.eq(BP.advance(later, plan3).hand, "Flush", "...and the anchored plan is then sticky")
+
+    -- the commit window still closes: past COMMIT_MAX_ANTE nothing new is committed
+    local late = played({ "j_joker" }, { Flush = 20 })
+    late.meta.ante = BP.COMMIT_MAX_ANTE + 1
+    t.eq(BP.advance(late, nil), nil, "the commit window still closes on the play-derived path")
   end
 end
