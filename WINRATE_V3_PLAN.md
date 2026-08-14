@@ -5105,3 +5105,49 @@ over-corrects and should not be batched *as drafted*.
 **A screen is not just a firing-rate gate. Screen against GROUND TRUTH where ground truth exists** —
 here, growth the engine actually realized, which was recorded in every batch this project has ever run
 and had never been looked at.
+
+### 26e. ⭐⭐ MEASURED: `growth_factor`'s TREND IS INVERTED, on both operating points
+
+`tools/growth_truth.lua` (new) compares realized growth against the model's own `g` (recovered exactly
+from `pace_margin`) and against the requirement curve it is racing.
+
+**`pacefix` (`rich10`, n=160):**
+
+| | a2→a3 | a3→a4 | a4→a5 | a5→a6 | a6→a7 | a7→a8 |
+|---|---|---|---|---|---|---|
+| **realized** | **4.53** | 2.32 | 1.97 | **1.45** | 4.60 ⚠ | 1.86 |
+| model `g` | 1.62 | 1.88 | 2.06 | 2.21 | 2.33 | 2.38 |
+| required | 2.50 | 2.50 | 2.20 | 1.82 | 1.75 | 1.43 |
+
+**`lg_both_c` (baseline income, n=160) — the cleaner read, monotone throughout:**
+
+| | a2→a3 | a3→a4 | a4→a5 | a5→a6 | a6→a7 |
+|---|---|---|---|---|---|
+| **realized** | **5.60** | 1.83 | 1.52 | 1.19 | **1.03** |
+| model `g` | 1.47 | 1.78 | 2.05 | 2.31 | **2.68** |
+| required | 2.50 | 2.50 | 2.20 | 1.82 | 1.75 |
+
+**Realized growth decays monotonically from 5.60 to 1.03. The model rises monotonically from 1.47 to
+2.68.** At a6→a7 the engine projects **2.6× the growth it actually achieves**, and the two curves cross
+around ante 4 — which is exactly where the deaths are.
+
+The same inverted shape appears at both operating points, on independent batches. It is not noise.
+(⚠ The `rich10` a6→a7 4.60 is an n=70 outlier driven by late cascades; the baseline column, where
+n falls to 11, is monotone and is the shape to trust for direction, not for magnitude.)
+
+**Mechanism, and it is the one already diagnosed:** growth is acquisition-driven early — the board
+fills from ~1 joker to ~5, which is genuinely 4–6× — and then collapses to ~1.0–1.5× once the board is
+full and only scaling and leveling continue. `growth_factor` reads the *strength* of the current board
+and treats it as a *rate*, so it climbs precisely as the real rate falls.
+
+**⇒ The engine's entire "am I on pace" judgement — which gates when it stops saving and starts buying
+power — runs on a model whose trend is backwards.** That subsumes §19b (one term of it) and §25c (a
+level correction that leaves the trend rising, §26b). The fix is a `growth_factor` whose shape is
+calibrated to this table, and the target is measured, not chosen.
+
+**⚠ Correction to §26c's caveat, which was overstated.** I warned that these figures condition on
+reaching ante *a+1* and are therefore biased up. Checking rather than assuming: the death-inclusive
+column is **identical** to the survivor-only column, because the driver emits the `ante` record at ante
+*start*, so a run that dies **during** ante *a+1* is already counted in the a→a+1 ratio. The only
+censoring is runs dying within ante *a* itself — 151 → 142 → 124 → 93 samples per step at `rich10`.
+Real, but far smaller than stated, and it does not touch the trend inversion, which is a factor of 2–5.
