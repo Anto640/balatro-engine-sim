@@ -3811,3 +3811,40 @@ freeze after `COMMIT_MAX_ANTE`; and runs whose play never concentrates staying *
 specified — it is the hand that run actually lands — but it is worth watching whether a High Card
 or Pair commitment is ever worth *leveling* toward, or whether such a run is simply already lost.
 Its hand levels stayed at 0, so nothing was spent on it either way.
+
+### §12q — What arm C actually trades: early money and early board for 2.5× the hand levels
+
+Per-ante snapshot means (arm A complete n=160; B/C at ~45%):
+
+| ante | hand levels A / B / **C** | dollars A / B / **C** | njokers A / B / **C** |
+|---|---|---|---|
+| a2 | 0.46 / 0.50 / **0.81** | 1.6 / 2.0 / **0.8** | 2.99 / 3.06 / **2.49** |
+| a3 | 1.22 / 1.17 / **2.01** | 8.0 / 9.9 / **4.9** | 4.68 / 4.66 / **4.23** |
+| a4 | 1.46 / 1.47 / **3.70** | 19.0 / 20.3 / **13.8** | 4.97 / 4.98 / **4.82** |
+| a5 | 2.34 / 1.96 / **6.10** | 26.9 / 27.3 / 25.0 | 5.18 / 5.12 / 5.07 |
+| a6 | 4.67 / 2.82 / **8.33** | 29.3 / 29.5 / 29.8 | 5.37 / 5.18 / 5.17 |
+
+**The correction does exactly what it was supposed to do: 2.5× the hand levels at a4, 2.6× at a5**,
+closing a real part of the gap to the human's 18.6 by ante 8. And the money cost is **temporary** —
+arm C is poorer at antes 2–4 ($13.8 vs $19.0 at a4) but has caught up by a5–a6.
+
+**⚠ But the shape is INVERTED from the human's, on both axes.** The measured human profile is
+*2–4× richer at every ante while leveling LESS than the engine early* (p<0.01 at a2–a3), crossing
+over only at a4. Arm C is **poorer early and levels MORE early** — the mirror image.
+
+That gives a concrete harm mechanism to check, and it is not the Orbital skip after all: **arm C
+arrives at ante 2 with 2.49 jokers against baseline's 2.99**, having spent its first dollars on
+Celestial packs rather than its first jokers. A boardless early engine is a documented cause of
+early death (it is why `skip_advisor` carries `BOARDLESS_SHOP_MULT` at all), and `ecap3` measured
+the same trade from the other direction: capping the early board cut board power, and board power
+*earns* the income.
+
+**So the revised list of things to check when the verdict lands, in order:**
+1. **early board weakness** — does arm C's death-ante mass move *earlier*? (a2–a3 deaths)
+2. `level_persist` double-count (§12a)
+3. `levelbuy`'s verdict generalising
+4. Orbital skip inflation (§12l — least supported; the axis' measured direction is flat)
+
+If (1) is the mechanism, the fix is narrow and already suggested by `BP.invest_window`'s existing
+logic: **damp the leveling credit while the board is still below `BP.BASE_MIN`** — buy the base
+first, then level it. That is also exactly the human's measured ordering.
