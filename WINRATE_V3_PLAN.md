@@ -3406,3 +3406,46 @@ lever someone tunes later.
 So the coupling left to calibrate is just the two: **`level_persist` and the corrected
 `level_gain`** — and jointly, never one at a time, which is the standing rule for magnitude
 constants and the reason the old revert set is full of them.
+
+### §12b — How big is the behavioural change? 36% → 65% of affordable Celestial offers
+
+The pool-value shift is measured (§12), so its effect on the shop's *decision* can be estimated
+from existing telemetry with no new simulation. Shop value adds `w_score * 5 * pv * need`, so with
+`w≈1` and `need≈0.9` the measured pool shift moves a pack's value by **+1.55** (normal), **+1.90**
+(jumbo), **+2.85** (mega). Applying that to every **affordable** Celestial offer in the n=480 batch:
+
+| ante | n | rated positive BEFORE | AFTER | change |
+|---|---|---|---|---|
+| a1 | 904 | 63% | 89% | +25pp |
+| a2 | 819 | 17% | 35% | +18pp |
+| a3 | 832 | 23% | 46% | +24pp |
+| a4 | 741 | 30% | **70%** | **+40pp** |
+| a5 | 415 | 48% | 81% | +33pp |
+| a6 | 218 | 33% | 80% | +47pp |
+| a7 | 114 | 42% | 90% | +48pp |
+| **all** | **4101** | **36%** | **65%** | **+29pp** |
+
+It fires in essentially every shop — the 100% frequency class, the only one that can move an n=160
+verdict — and it is **largest in antes 4–8**, exactly the window where the human's hand levels cross
+the engine's and pull away to 18.6 vs 7.7.
+
+⚠ "Rated positive" is not "bought": a pack still has to beat the jokers and the reroll. Treat this
+as the *magnitude* of the change, not its outcome.
+
+### ⚠ §12c — The correction also hits ORBITAL TAGS, and that is the risk to watch
+
+`engine/tags.lua` values an Orbital tag as `persist * freq * level_gain(hand, 3) / need`. The same
+fix raises it by the same 5–20×, because it is **three** levels. Orbital is a **skip** tag, so a
+large rise pushes the engine toward skipping blinds to chase it — and skipping is one of the few
+behaviours this project has evidence against: the expert human plays 3/3/3 through ante 3 and calls
+skipping "typically the wrong option", while B3's measured mechanism was making the engine **skip
+25% fewer** blinds.
+
+So the fix could be right about the *value of a level* and still lose by over-buying the *skip*.
+**If the arms come back negative, check the skip rate first** (`ENGINE ACTION SUMMARY` in
+`analyze_runs`), before touching `level_persist` or the gain itself. The three candidate
+explanations, in the order to test them:
+
+1. **skip inflation** — Orbital chasing costs a blind reward, its interest, and a shop visit;
+2. **`level_persist` double-count** — it was a fudge for this very bug (§12a);
+3. **`levelbuy`'s verdict generalising** — purchased levels really do net ~zero even when chosen well.
