@@ -3387,10 +3387,22 @@ Even *with* the persistence multiplier a Celestial pack is worth **half** a Buff
 one sixth — which is roughly the aversion the fix just removed. So the fix moved the ratio toward
 sanity and did not obviously overshoot.
 
-**The real asymmetry to look at next is neither of these.** A level *stacks without limit*; a joker
-needs a *slot*, and the engine's board is 4.53 of 5 slots by ante 3. On a full board a Buffoon pack
-is worth `(best joker − worst owned)`, not `best joker` — but `pack_need` damps a full board by only
-0.85, calling it "minor friction". If Buffoon packs are over-valued on a full board, that inflates
-the very denominator this comparison rests on. **Calibrate those three together (`level_persist`,
-the full-board joker discount, and the corrected `level_gain`) — never one at a time**, which is the
-standing rule for magnitude constants and the reason the old revert set is full of them.
+**A third asymmetry was suspected and then MEASURED AWAY.** A level stacks without limit while a
+joker needs a slot, and the board is 4.53 of 5 by ante 3, yet `pack_need` damps a full board by only
+0.85 ("minor friction") — which suggested Buffoon packs might be an inflated denominator for this
+whole comparison. They are not. Buffoon pack value against board size at the ante snapshot
+(935 offers, `sim_out/dig_base_all.jsonl`):
+
+| njokers | 0 | 2 | 4 | 5 | 6 |
+|---|---|---|---|---|---|
+| mean value | 13.19 | 5.14 | 4.05 | **2.95** | **2.13** |
+| bought | 54% | 47% | 39% | 42% | 41% |
+
+The value falls **4.5×** from an empty to a full board on its own, because the joker's *measured
+marginal* already collapses as the board fills. `pack_need`'s 0.85 is a rounding error on top of a
+correction that is already happening. **Suspicion withdrawn** — recorded so it does not become a
+lever someone tunes later.
+
+So the coupling left to calibrate is just the two: **`level_persist` and the corrected
+`level_gain`** — and jointly, never one at a time, which is the standing rule for magnitude
+constants and the reason the old revert set is full of them.
