@@ -3513,3 +3513,39 @@ voucher valuations.
 voucher and Blue-seal valuations sit up to 4× below the loose-planet scale. It is real, but
 vouchers are in the ~5–10% firing band that the frequency ceiling says cannot move a verdict, and
 fixing it would be a magnitude change entangled with §12a. **Noted, not touched.**
+
+### §12f — WHEN the winners level, and a caution about freezing the plan at ante 4
+
+The play-derived commitment (§11) is provisional until `COMMIT_MAX_ANTE` (4) and frozen after. That
+is only right if the eventual target is identifiable by then. Measured over the 8 human runs
+(`level_up` records carry `hand` and `ante`):
+
+| run | won | levels | final top hand | first level on it | by a4 | after a4 |
+|---|---|---|---|---|---|---|
+| GU73QPLY | yes | 32 | Pair (18) | a3 | 10 | **22** |
+| 4NN97569 | yes | 41 | Pair (7) | a4 | 8 | **33** |
+| 6W2JL21K | yes | 21 | Flush (12) | a3 | 5 | **16** |
+| W9WKT1UE | yes | 15 | Three of a Kind (6) | a4 | 4 | 11 |
+| 67HVNBZB | yes | 15 | Three of a Kind (8) | a2 | 11 | 4 |
+| IET2K8M7 | yes | 10 | Full House (4) | a4 | 1 | 9 |
+| U8UE74EN | yes | 7 | Full House (3) | a3 | 4 | 3 |
+| **X3L32ZEA** | **NO** | **4** | Full House (2) | a4 | 3 | **1** |
+
+**Two facts, pulling in opposite directions:**
+
+1. **70% of all leveling happens AFTER ante 4** (43 levels by a4 across the seven wins, 98 after).
+   So the frozen plan is exactly what drives the window that matters — which is the design working
+   as intended, and matches the human's measured shape (economy and base first, power second).
+   The loss is the exception that confirms it: 3 levels by a4 and **1 after** — it simply stopped.
+2. ⚠ **But the eventual top-levelled hand is already the top one by ante 4 in only 4 of 8 runs.**
+   Half the time the winners' direction is not yet settled at the point the plan freezes.
+
+Fact 2 is a *caution*, not a refutation: it measures their LEVELING history, which by ante 4 is only
+~30% complete and therefore a noisy read of intent. The play-derived plan is built from PLAY history
+instead — ~30–40 hands by ante 4, a far larger and more stable sample. But it is not validated, and
+it names a specific cheap variant worth testing after the current arms report:
+
+> **extend the provisional window from `COMMIT_MAX_ANTE` 4 to 6** (matching `UPGRADE_MAX_ANTE`), so a
+> play-derived plan keeps tracking through the window where 70% of leveling happens, and only then
+> freezes. Test it as a single constant, against the arm that establishes the mechanism — not
+> bundled with it.
