@@ -68,6 +68,25 @@
 >    discontinuously to $0 at exactly $25, and `bankroll_plan` *targets* $25. That mechanically
 >    explains "the median death from ante 5 holds $26".
 
+> ## 🌳 READ THE VERDICT WITH THIS TREE (written before the data)
+> Arms: **A** = neither change, **B** = play-derived commitment, **C** = B + the level_gain
+> correction. So **B−A** is the commitment and **C−B** is the correction *in the presence of* the
+> commitment (§12i — both act on `planet_credit`, so C−B may overstate the correction alone).
+>
+> | outcome | reading | do next |
+> |---|---|---|
+> | **C > B > A** | both pay | ship both; then test `COMMIT_MAX_ANTE` 4→6 (§12f) and the §12k shop-value fix, **separately** |
+> | **C ≈ B ≈ A** | inert at baseline income | check `pd_play_r` vs `pd_base_r` — §6 says a valuation change may need money to express |
+> | **C < B** | the correction over-shoots | `level_persist` is a fudge for this very bug (§12a) — remove it and re-measure, **jointly** |
+> | **B < A** | the commitment hurts | revert it, keep the correction; the commitment is the speculative half |
+>
+> ⚠ Also check `tools/death_wallet.lua` (§12h) — a **mechanism** check the progress metric cannot
+> see, with its reading rules pre-registered. And note §12l: the sim says the **skip axis is flat**
+> (`noskip` −0.166, sign 68/67), so skip inflation is the *least* supported explanation for a
+> negative, not the first — that is a correction to my own earlier framing.
+>
+> ✅ Full suite green after all of it: **1017 unit + 524 sim, 0 failures.**
+
 > ## 🔧 RUNNING / QUEUED WHEN THIS WAS WRITTEN
 > | arm | code | income | what it isolates |
 > |---|---|---|---|
