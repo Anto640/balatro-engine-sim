@@ -34,7 +34,10 @@ local function orbital_dollars(gs, opts)
   -- this, Orbital was valued at only its one-shot gain and declined 12/14 times, so the
   -- engine (which never levels, hand-lv~0) skipped free leveling that costs no $ and no slot.
   local persist = ConsumableValue.level_persist(gs)
-  local frac = persist * (bp.freq * ConsumableValue.level_gain(gs, bp.hand, 3)) / need(gs)
+  -- board context, so +3 levels are priced against the board that multiplies them rather
+  -- than against the hand's bare base (CV.level_gain: understates by 1.4-19x without it)
+  local _, bctx = ConsumableValue.hand_frequencies(gs, opts)
+  local frac = persist * (bp.freq * ConsumableValue.level_gain(gs, bp.hand, 3, bctx)) / need(gs)
   -- V2c finishing move (BuildPlan.LEVEL_PUSH): Orbital is a +3-level delivery channel for
   -- the committed hand, but its MAGNITUDE never consumed the commitment's planet_credit
   -- (only its hand CHOICE did, via best_planet) -- so under the leveling push the tag

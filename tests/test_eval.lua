@@ -5,6 +5,7 @@
 
 local Eval = require("engine.eval_function")
 local GS = require("model.game_state")
+local CV = require("engine.consumable_value")
 
 -- deterministic LCG (matches the engine's per-state seeding style)
 local function lcg(seed)
@@ -100,5 +101,104 @@ return function(t)
     t.eq(table.concat(after, ","), table.concat(before, ","), "W3: reorder is idempotent")
     local tiny = { jokers = { { key = "j_joker" } } }; World.optimize_joker_order(tiny)
     t.eq(#tiny.jokers, 1, "W3: no-op on a single-joker board")
+  end
+
+
+  -- ---- CV.level_gain must price a level against the BOARD, not the bare hand ----
+  -- The base-only figure understates by 1.4x on an empty board and up to 19x with one x3
+  -- xmult, and the error GROWS with board strength -- inverted from what an engine building a
+  -- multiplicative core needs. These pin the corrected value against the REAL scorer, so a
+  -- regression to base-only fails here rather than silently halving the leveling channel.
+  do
+    local HE = require("engine.hand_eval")
+    local M  = require("engine.mechanics")
+
+    local function deck52()
+      local d = {}
+      for _, su in ipairs({ "S", "H", "D", "C" }) do
+        for _, r in ipairs({ "2","3","4","5","6","7","8","9","T","J","Q","K","A" }) do
+          d[#d + 1] = { id = #d + 1, rank = r, suit = su }
+        end
+      end
+      return d
+    end
+    local function state(jokers, levels)
+      return GS.new{ deck = deck52(), jokers = jokers or {},
+        economy = { dollars = 20, interest_cap = 5 }, meta = { ante = 3 },
+        run = { hand_levels = levels or {}, joker_slots = 5, consumable_slots = 2 } }
+    end
+
+    -- no context -> the old base-only arithmetic, unchanged (callers without a sampled board)
+    local bare = state({})
+    local p = M.HAND_PLANET["Two Pair"]
+    t.eq(CV.level_gain(bare, "Two Pair", 1),
+         (p.base_chips + p.dchips) * (p.base_mult + p.dmult) - p.base_chips * p.base_mult,
+      "level_gain without context is byte-identical to the base-only formula")
+
+    -- with context -> matches what the REAL scorer says the level is worth
+    for _, case in ipairs({
+      { name = "typical board", jk = { { key = "j_jolly" }, { key = "j_sly" },
+          { key = "j_blue_joker" }, { key = "j_misprint" }, { key = "j_walkie_talkie" } } },
+      { name = "x3 xmult board", jk = { { key = "j_jolly" }, { key = "j_sly" },
+          { key = "j_blue_joker" }, { key = "j_cavendish" }, { key = "j_walkie_talkie" } } },
+    }) do
+      for _, hand in ipairs({ "Pair", "Two Pair" }) do
+        local hp = M.HAND_PLANET[hand]
+        local g0 = state(case.jk)
+        local g1 = state(case.jk, { [hand] = { level = 2,
+          chips = hp.base_chips + hp.dchips, mult = hp.base_mult + hp.dmult } })
+        -- score the same sampled hands both ways, counting only draws that land this hand
+        local rng = lcg(4242)
+        local s0, s1, n, ctx = 0, 0, 0, {}
+        for _ = 1, 40 do
+          local h = {}
+          do
+            local pool = {}
+            for i2 = 1, #g0.deck do pool[i2] = g0.deck[i2] end
+            for i2 = #pool, 2, -1 do
+              local j2 = math.floor(rng() * i2) + 1
+              if j2 < 1 then j2 = 1 elseif j2 > i2 then j2 = i2 end
+              pool[i2], pool[j2] = pool[j2], pool[i2]
+            end
+            for k = 1, 8 do h[k] = pool[k] end
+          end
+          local e0 = HE.best_play(g0, h)
+          if e0 and e0.hand_type == hand then
+            local e1 = HE.best_play(g1, h)
+            if e1 then
+              s0 = s0 + e0.score; s1 = s1 + e1.score; n = n + 1
+              local x = 1
+              for _, tr in ipairs(e0.triggers or {}) do if tr.xmult then x = x * tr.xmult end end
+              local c = ctx[hand]
+              if not c then c = { n = 0, chips = 0, mult = 0, xmult = 0 }; ctx[hand] = c end
+              c.n = c.n + 1; c.chips = c.chips + e0.chips
+              c.mult = c.mult + e0.mult; c.xmult = c.xmult + x
+            end
+          end
+        end
+        if n >= 5 then
+          local c = ctx[hand]
+          c.chips = c.chips / c.n; c.mult = c.mult / c.n; c.xmult = c.xmult / c.n
+          local measured = (s1 - s0) / n
+          local claimed = CV.level_gain(g0, hand, 1, ctx)
+          local err = math.abs(claimed - measured) / measured
+          t.ok(err < 0.10, ("level_gain with context matches the real scorer on a %s (%s): %.0f vs %.0f")
+            :format(case.name, hand, claimed, measured))
+          t.ok(claimed > 2 * CV.level_gain(g0, hand, 1),
+            ("...and is far above the base-only figure on a %s (%s)"):format(case.name, hand))
+        end
+      end
+    end
+
+    -- monotone in board strength: the same level is worth MORE with an xmult on board
+    local weak = state({ { key = "j_jolly" } })
+    local strong = state({ { key = "j_jolly" }, { key = "j_cavendish" } })
+    local function ctx_of(gs, hand)
+      local _, c = CV.hand_frequencies(gs, { samples = 12, rng = lcg(7) })
+      return c
+    end
+    local gw = CV.level_gain(weak, "Pair", 1, ctx_of(weak, "Pair"))
+    local gsx = CV.level_gain(strong, "Pair", 1, ctx_of(strong, "Pair"))
+    t.ok(gsx > gw, "a hand level is worth MORE on a board with an xmult to multiply it")
   end
 end

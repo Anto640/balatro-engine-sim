@@ -106,7 +106,10 @@ function P.level_persist(gs) return ConsumableValue.level_persist(gs) end
 -- Planets: each planet levels a specific hand; value = freq(you make it) x real
 -- level gain x persistence, normalised. Secret-hand planets down-weighted (rarely usable).
 local function planet_pool(gs, opts)
-  local freq = ConsumableValue.hand_frequencies(gs, opts) or {}
+  -- `bctx` is the measured board context per hand; without it level_gain is base-only and
+  -- understates a level by 1.4-19x depending on board strength (see CV.level_gain).
+  local freq, bctx = ConsumableValue.hand_frequencies(gs, opts)
+  freq = freq or {}
   local need = per_hand_need(gs)
   local persist = P.level_persist(gs)
   local items = {}
@@ -120,7 +123,7 @@ local function planet_pool(gs, opts)
   for _, k in ipairs(pkeys) do
     local p = Mechanics.PLANETS[k]
     local f = freq[p.hand] or 0
-    items[#items + 1] = { v = persist * (f * ConsumableValue.level_gain(gs, p.hand, 1)) / need
+    items[#items + 1] = { v = persist * (f * ConsumableValue.level_gain(gs, p.hand, 1, bctx)) / need
                             + BuildPlan.planet_credit(gs, p.hand),
                           w = p.secret and 0.25 or 1 }
   end
@@ -216,10 +219,10 @@ end
 -- you actually make of freq x one level's gain (deck-aware), normalised. Returns
 -- nil when there's no deck to sample.
 function P.black_hole_value(gs, opts)
-  local freq = ConsumableValue.hand_frequencies(gs, opts)
+  local freq, bctx = ConsumableValue.hand_frequencies(gs, opts)
   if not freq then return nil end
   local total = 0
-  for hand, f in pairs(freq) do total = total + f * ConsumableValue.level_gain(gs, hand, 1) end
+  for hand, f in pairs(freq) do total = total + f * ConsumableValue.level_gain(gs, hand, 1, bctx) end
   return P.level_persist(gs) * total / per_hand_need(gs)  -- leveling persists (see planet_pool)
 end
 
@@ -277,7 +280,7 @@ local function card_pool(gs)
   local target = DeckPlan.target(gs)
   local function qv(card)
     return math.max(0, DeckPlan.card_quality(gs, card, target)) * QUALITY_FRAC
-      + ConsumableValue.card_econ_value(gs, card)
+      + ConsumableValue.card_econ_value(gs, card, opts and opts.rng)
   end
   -- dominant suit (premium cards that match the build fit best)
   local cnt = {}

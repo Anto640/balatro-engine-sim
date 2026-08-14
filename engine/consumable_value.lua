@@ -52,6 +52,12 @@ end
 
 -- Frequency each hand type is the BEST play over sampled hands (deck-aware).
 -- Returns { [hand_name] = freq 0..1 } or nil if not measurable.
+--
+-- SECOND RETURN (2026-08-14): the BOARD CONTEXT for each hand -- the mean final `chips`,
+-- `mult` and xmult PRODUCT of the plays that landed it. This costs nothing: the loop already
+-- scores every sampled hand and throws these away. `CV.level_gain` needs them to price a hand
+-- level against the board that multiplies it (see the unit error documented there). Extra
+-- return values are dropped by every existing caller, so this is source-compatible.
 -- NOTE: a per-state memo was tried (deterministic key) and REVERTED -- the key
 -- computation (sorting ~52 card strings/call) cost more than it saved, because the
 -- per-CALL caches (eval cache._hand_freq) already capture within-call repeats and the
@@ -64,28 +70,81 @@ function CV.hand_frequencies(gs, opts)
   local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
   if not deck or #deck < CV.MIN_DECK then return nil end
   local hs = math.min((gs.run and gs.run.hand_size) or 8, #deck)
-  local counts = {}
+  local counts, ctx = {}, {}
   for _ = 1, samples do
     local s = shuffled(deck, rng)
     local hand = {}
     for i = 1, hs do hand[i] = s[i] end
     local ev = HandEval.best_play(gs, hand)
-    if ev then counts[ev.hand_type] = (counts[ev.hand_type] or 0) + 1 end
+    if ev then
+      counts[ev.hand_type] = (counts[ev.hand_type] or 0) + 1
+      -- the xmult PRODUCT is not returned directly, but every multiplicative step is in
+      -- the trigger log, and `mult` already has it folded in. Both are needed: a level's
+      -- +chips rides the final mult, its +mult rides the xmult product.
+      local x = 1
+      for _, t in ipairs(ev.triggers or {}) do if t.xmult then x = x * t.xmult end end
+      local c = ctx[ev.hand_type]
+      if not c then c = { n = 0, chips = 0, mult = 0, xmult = 0 }; ctx[ev.hand_type] = c end
+      c.n = c.n + 1
+      c.chips = c.chips + (ev.chips or 0)
+      c.mult = c.mult + (ev.mult or 0)
+      c.xmult = c.xmult + x
+    end
   end
   local freq = {}
   for name, c in pairs(counts) do freq[name] = c / samples end
-  return freq
+  for _, c in pairs(ctx) do
+    c.chips = c.chips / c.n; c.mult = c.mult / c.n; c.xmult = c.xmult / c.n
+  end
+  return freq, ctx
 end
 
--- Score gained from leveling a hand by `levels`, using its current level chips/
--- mult (from run.hand_levels) and the real per-level increments (Mechanics).
-function CV.level_gain(gs, hand_name, levels)
+-- Score gained from leveling a hand by `levels`.
+--
+-- ⚠ THE UNIT ERROR THIS FIXES (2026-08-14). Without `ctx` this computes the delta in the
+-- hand's OWN base score -- (chips+dchips)*(mult+dmult) - chips*mult -- and every caller then
+-- divides it by `Mechanics.boss_per_hand_need`, the TOTAL score a hand must reach. Numerator
+-- base-only, denominator total: a level read as ~8% of a boss hand when it is worth far more,
+-- because +dchips is multiplied by the whole board's mult and +dmult multiplies the whole
+-- board's chips. Measured against the real scorer (tools/celestial_price.lua and the
+-- HandEval A/B behind it), the base-only figure understates by:
+--
+--     bare board 1.3-1.5x | two flat commons 4.0-4.4x | typical ante-3 board 4.5-9.4x
+--     | with one x3 xmult 10.3-19.3x
+--
+-- The error GROWS with board strength, which is exactly inverted from what an engine trying
+-- to build a multiplicative core needs. It is the same class as the dollar unit error fixed in
+-- 82f808f, and it explains two findings that had looked contradictory: the mistake is a nearly
+-- uniform factor ACROSS hands at a given board, so it leaves the ARGMAX intact (WINRATE_V3_PLAN
+-- 5s: planets are the one channel where engine and winner agree exactly, 0 discordant pairs)
+-- while destroying every BUY/SKIP decision (5z: Celestial priced at -0.79, bought 6.3%, against
+-- a human who buys 6.10 packs/ante and finishes on 7-41 hand levels to the engine's ~4).
+--
+-- With `ctx` = { chips, mult, xmult } for this hand (from CV.hand_frequencies' second return,
+-- which measures them from plays that actually landed the hand) the marginal is exact:
+--
+--     delta = dchips*M + dmult*X*C + dchips*dmult*X
+--
+-- because +dchips joins the chip total and rides the final mult M, while +dmult joins the
+-- ADDITIVE mult pool before the multiplicative jokers and so rides the xmult product X against
+-- the whole chip total C. Verified to <1% on all 11 board/hand combinations measured.
+--
+-- `ctx` is optional and the no-ctx path is byte-identical to the old behaviour, so callers that
+-- have no sampled board (and the hands a deck never lands, which carry freq ~0 anyway) are
+-- unaffected.
+function CV.level_gain(gs, hand_name, levels, ctx)
   local p = Mechanics.HAND_PLANET[hand_name]
   if not p then return 0 end
   levels = levels or 1
   local lvl = gs.run and gs.run.hand_levels and gs.run.hand_levels[hand_name]
   local chips = (lvl and lvl.chips) or p.base_chips
   local mult = (lvl and lvl.mult) or p.base_mult
+  local c = ctx and ctx[hand_name]
+  if c and (c.chips or 0) > 0 then
+    local dc, dm = p.dchips * levels, p.dmult * levels
+    local X = (c.xmult and c.xmult > 0) and c.xmult or 1
+    return dc * c.mult + dm * X * c.chips + dc * dm * X
+  end
   local cur = chips * mult
   local new = (chips + p.dchips * levels) * (mult + p.dmult * levels)
   return new - cur
@@ -128,7 +187,12 @@ local function dollars(gs) return (gs.economy and gs.economy.dollars) or 0 end
 -- (Red seal is a retrigger -> scoring, already in the measured delta; Steel/
 -- Glass/Bonus/Mult/Lucky scoring is also measured. Lucky's MONEY is added here.)
 -- The $->fraction conversion is ante-aware (see engine/value_units).
-function CV.card_econ_value(gs, card)
+-- `rng` is OPTIONAL but should be passed: the Blue-seal branch samples the deck via
+-- best_planet, and sampling with the global math.random makes the value differ between two
+-- evaluations of the SAME state -- which is the documented cause of the live panel flickering
+-- (CLAUDE.md, Determinism). Callers that have a seeded stream hand it in; the fallback keeps
+-- old behaviour for callers that do not.
+function CV.card_econ_value(gs, card, rng)
   local v, enh, seal = 0, card.enhancement, card.seal
   if enh == "m_gold" then v = v + VU.dollars_to_frac(gs, 3 * 0.6) end    -- $3 if held at round end
   if enh == "m_lucky" then v = v + VU.dollars_to_frac(gs, 20 / 15) end   -- expected $ (1 in 15 -> $20)
@@ -138,7 +202,7 @@ function CV.card_econ_value(gs, card)
     -- is a RAW score (freq x level_gain, ~10-150), but card_econ_value is a BOSS-HAND FRACTION
     -- sum (~0.02) -- so adding it raw made ANY Blue-seal card ~100x over-valued and auto-dominate
     -- a Standard-pack pick. Normalise to the fraction scale by dividing by boss_per_hand_need.
-    local bp = CV.best_planet(gs, { samples = 6 })
+    local bp = CV.best_planet(gs, { samples = 6, rng = rng })
     local frac = bp and (bp.value / Mechanics.boss_per_hand_need(gs)) or 0.2
     v = v + frac * 0.5                                            -- x0.5: only if held at round end
   elseif seal == "Purple" then
@@ -171,7 +235,7 @@ function CV.card_add_value(gs, card, opts)
   gs_with.deck = with
   local withv = JokerValue.avg_score(gs_with, { samples = samples, rng = opts.rng }) or 0
 
-  return (withv - base) / need + CV.card_econ_value(gs, card)
+  return (withv - base) / need + CV.card_econ_value(gs, card, opts.rng)
 end
 
 -- The deck's measured baseline (for reuse when valuing several cards).
@@ -292,14 +356,15 @@ function CV.card_value(gs, set, key, freq, need, rng, samples)
       -- ABSENT hand means you never make it (0), not "unknown" -- so don't apply the
       -- 0.4 prior there. If no freq was provided, compute it from the deck; only a
       -- deckless state falls back to the 0.4 prior.
-      local f
+      local f, bctx
       if freq then
         f = freq[hand] or 0
+        bctx = opts and opts.hand_ctx           -- caller-supplied context, when it has one
       else
-        local hf = CV.hand_frequencies(gs, { samples = 8, rng = rng })
+        local hf; hf, bctx = CV.hand_frequencies(gs, { samples = 8, rng = rng })
         f = hf and (hf[hand] or 0) or 0.4
       end
-      return CV.level_persist(gs) * (f * CV.level_gain(gs, hand, 1)) / need, 0, "level " .. hand
+      return CV.level_persist(gs) * (f * CV.level_gain(gs, hand, 1, bctx)) / need, 0, "level " .. hand
     end
     return 0.3, 0, "planet"
   elseif set == "Tarot" then
@@ -375,7 +440,7 @@ end
 -- Best hand to level given the deck: maximises freq(make it) * level_gain.
 -- Returns { hand, freq, value } or nil.
 function CV.best_planet(gs, opts)
-  local freq = CV.hand_frequencies(gs, opts)
+  local freq, bctx = CV.hand_frequencies(gs, opts)
   if not freq then return nil end
   -- iterate hand names in SORTED order with a name tie-break, so two hands of equal
   -- value resolve the same way every process (pairs() order is per-process-random).
@@ -386,7 +451,7 @@ function CV.best_planet(gs, opts)
   for _, hand in ipairs(names) do
     local f = freq[hand]
     if f > 0 and Mechanics.HAND_PLANET[hand] then
-      local v = f * CV.level_gain(gs, hand, 1)
+      local v = f * CV.level_gain(gs, hand, 1, bctx)
         + BuildPlan.planet_credit(gs, hand) * Mechanics.boss_per_hand_need(gs)
       if not best or v > best.value then best = { hand = hand, freq = f, value = v } end
     end

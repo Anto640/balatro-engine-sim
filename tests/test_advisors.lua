@@ -302,12 +302,29 @@ return function(t)
     t.ok(ev1 > 0, "B5: expected joker EV is positive (rare tail intact)")
     t.ok(ev4 >= ev1, "B5: seeing more slots never lowers the best-joker EV")
 
-    -- B2: a Blue seal spawns a Planet if held -> its econ value must be on the boss-hand FRACTION
-    -- scale (like a Gold seal), not the RAW best_planet() score (~100x) that auto-dominated picks.
-    local blue = CV.card_econ_value(built, { rank_id = 13, suit = "Spades", seal = "Blue" })
+    -- B2: a Blue seal spawns a Planet if held -> its econ value must be the NORMALISED planet
+    -- value (a boss-hand fraction), not the RAW best_planet() score that auto-dominated picks.
+    --
+    -- This asserts the NORMALISATION, not a magnitude. The original bound (blue < 0.5) was
+    -- calibrated against `CV.level_gain`'s base-only figure, which understated a hand level by
+    -- 1.4-19x depending on board strength; `built` carries Duo x2 AND Cavendish x3, so on that
+    -- board a level really is worth a large fraction of a boss hand and the old ceiling now
+    -- fails for the right reason. Pinning the ratio to best_planet keeps the regression this
+    -- test exists for (a ~100x scale error) while staying correct under the fixed valuation.
+    local rng = lcg(11)
+    local blue = CV.card_econ_value(built, { rank_id = 13, suit = "Spades", seal = "Blue" }, rng)
     local gold = CV.card_econ_value(built, { rank_id = 13, suit = "Spades", seal = "Gold" })
-    t.ok(blue > 0 and blue < 0.5, "B2: Blue-seal econ value is a small boss-hand fraction (not a raw ~100x score)")
-    t.ok(blue < 5 * gold, "B2: Blue seal is on the same scale as Gold seal (was ~100x larger)")
+    local bp = CV.best_planet(built, { samples = 6, rng = lcg(11) })
+    local raw = bp and bp.value or 0
+    t.ok(blue > 0, "B2: a Blue seal is worth something (it spawns a Planet)")
+    t.ok(raw > 10 * blue, "B2: Blue-seal value is NORMALISED, not the raw best_planet score")
+    t.ok(blue > gold, "B2: a spawned Planet beats a Gold seal's $3 on a built board")
+
+    -- and the seal's value must be DETERMINISTIC for a given state: the Blue branch samples
+    -- the deck, and sampling on the global RNG is what makes the live panel flicker.
+    t.eq(CV.card_econ_value(built, { rank_id = 13, suit = "Spades", seal = "Blue" }, lcg(11)),
+         CV.card_econ_value(built, { rank_id = 13, suit = "Spades", seal = "Blue" }, lcg(11)),
+      "B2: Blue-seal value is deterministic under a seeded rng")
   end
 
   -- ---- Phase 4: pack content pools are CALCULATED (deck-aware), not static ----
