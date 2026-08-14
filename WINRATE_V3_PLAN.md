@@ -3048,3 +3048,103 @@ correctly, for opposite reasons.
    can fire — but a fix whose subject is scarcity must be measured under scarcity. **Ask what the
    change is ABOUT, then pick the operating point that contains its mechanism.** Measuring this fix
    only at `rich10` would have discarded it as inert.
+
+---
+
+## §11 — THE PLANNER IS BLIND IN TWO RUNS OF THREE, AND POINTS AT THE WRONG HAND IN TWO OF THE REMAINING THREE (2026-08-14)
+
+`NEXT_SESSION.md`'s "DO THIS NEXT" ended on two items: *the commitment needs a direction it has
+EARNED*, and *the engine commits to Full House in 100% of observed valuations — look at the
+monoculture, it may be upstream of everything above.* Both turned out to be measurable **without a
+single new simulation**: the driver has always emitted `build_plan` inside every ante snapshot, and
+nobody had ever read it. Four new read-only tools mine existing batches.
+
+### The measurements (n=480, `sim_out/dig_base_all.jsonl`)
+
+| tool | finding |
+|---|---|
+| `tools/commit_dist.lua` | **63% of runs NEVER commit.** Board-matched and conditioned on reaching the same ante, the runs that do commit run **+0.284 (a3) / +0.402 (a4)** progress ahead — at *identical* njokers (4.52 v 4.53). |
+| `tools/commit_gap.lua` | **The gate sits in an empty gap.** Nothing scores between 2.0 and the 2.5 threshold. 22% of never-committers peak at exactly **2.0** (two matching hand-commons); 75% peak at **0 or 1**. |
+| `tools/played_hands.lua` | **When it commits, it points at the hand the run actually plays only 34% of the time.** 42.6% of commitments are to a hand taking **under 20% of plays**; 16.7% under 10%. |
+| `tools/board_legibility.lua` | **The planner can read 12.7% of a real board** — 0.57 handtype-tagged jokers out of 4.53 held. |
+
+**❌ There is no Full House monoculture.** Run-weighted, the engine commits Straight 30.6% / Full
+House 19.4% / Two Pair 13.1% / Flush 10.6%. The "100%" came from a **6-seed** run of
+`commit_firing.lua`, i.e. about two committed runs. *Third* time a small-sample or mis-read figure
+has set project direction — after the 1.67-vs-1.05 planets number and the reading of `oracle_plan`
+below. **Re-derive before acting.** Full House *is* the worst-aimed commitment (12% agreement with
+actual play), which is what the synthetic Duo+Trio `+2` rule buys.
+
+### ⚠ `oracle_plan`'s dead-even 41/40 does NOT refute this, and reading it as though it did is easy
+
+Re-read its own telemetry with `PLAN=first`: it committed **95% of runs at ante 1 to
+Straight/Two Pair**, from an 8-sample MC on the *identical starting deck every run shares*. It
+described the deck everyone starts with, not the run. (Reading its FINAL plan instead shows a
+tidy monotone "stronger hand → better outcome" gradient — which is pure **reverse causation**: it
+re-derives the plan every shop, so its final hand is downstream of how the run developed.)
+
+### ✅ THE BIGGER FINDING: THE WINNERS' BOARDS ARE HAND-AGNOSTIC
+
+Verified against the runs, not the summary (`tools/winner_legibility.lua`): across the 8 human
+runs, **108 jokers acquired, 10 (9.3%) carry a `handtype:` tag. Two winning runs used ZERO.**
+Hanging Chad (6/8), Photograph (6/8), Sock and Buskin (4/8) — all untagged. The engine's own board
+is **12.7%** tagged, so it is *more* legible to the planner than a winning board is.
+
+**So widening the tag set — the obvious next move — is a dead end. There is nothing to widen.**
+"Which hand do my jokers point at" is simply the wrong question for most runs.
+
+But the same winners concentrate **leveling** hard, and on *humble* hands:
+
+| run | won | total levels | top-levelled hand |
+|---|---|---|---|
+| GU73QPLY | yes | 32 | **Pair, 18** |
+| 4NN97569 | yes | 41 | **Pair, 7** |
+| 6W2JL21K | yes | 21 | Flush, 12 |
+| 67HVNBZB | yes | 15 | Three of a Kind, 8 |
+| W9WKT1UE | yes | 15 | Three of a Kind, 6 |
+| IET2K8M7 | yes | 10 | Full House, 4 |
+| U8UE74EN | yes | 7 | Full House, 3 |
+| **X3L32ZEA** | **NO** | **4** | Full House, 2 |
+
+The loss has **half the levels of the lowest win**. And a tag-anchored planner can *never* commit
+to Pair — two Pair commons score 2.0 against a 2.5 gate.
+
+### The change: a SPLIT commitment (`BP.play_direction`, `BP.anchored_commitment`)
+
+A run that clearly **lands** one hand (≥30% of plays, ≥10pp clear of the runner-up, ≥8 plays) may
+commit to it **with no joker anchor at all** — but that plan drives **only** `planet_credit`. In
+`BP.fit`, `keep_bias` and `DeckPlan` it reads as uncommitted. The DeckPlan exclusion is
+load-bearing: `DP.target` on a Flush commitment thins toward a "dominant" suit that is an arbitrary
+tie-break on a near-flat deck, and removing that gate measured **−0.054 and destroyed a win** (§5t).
+Feeding it *more* commitments would amplify a refuted path.
+
+It is **provisional** — re-derived every shop until an anchored plan supersedes it or the commit
+window closes — so an early weak-hand reading self-corrects, and the plan that survives into the
+ante 4–8 leveling push is the one the run has actually been landing. That is also the human's
+measured shape: economy and base first, power second, crossing at a4.
+
+Reach (`tools/commit_counterfactual.lua`, replaying the real `BP.advance` over every recorded ante):
+**31.2% of runs touched**, never-commits 66.9% → 44.6%, conversions growing with ante
+(2% / 18% / 27%). The first cut — a credit capped below the threshold, needing an existing anchor —
+reached only **8.5%**, which is why it was replaced.
+
+### ⚠ PRE-REGISTERED PREDICTION (written before the batch landed)
+
+**Expect small, and do not be surprised by a negative.** Three pieces of prior evidence bound it:
+
+1. **`levelbuy` doubled total levels (2.52 → 5.51) and measured −0.229** (§ above). Purchased
+   levels contribute ≈ zero net; free ones are worth ~0.176 each. `planet_credit` raises the value
+   of a planet for the committed hand in *both* free channels (pack picks, held planets, Orbital)
+   and *purchase* channels (shop planets, Celestial packs). Only the free half can pay.
+2. **That same analysis already tested concentration and rejected it** — `levelbuy` reached similar
+   concentration to baseline and still lost.
+3. Re-measured here directly: at *equal total levels*, concentrating them measures **−0.040 (a4),
+   −0.135 (a5), +0.688 (a6, n=6)** — no consistent gain **in the sim's shallow 2–6 level regime**.
+   The human regime is 7–41 levels, where concentration plausibly behaves differently, but that is
+   an extrapolation and is not evidence.
+
+So the prize is **not** established, while the defects are: the planner was blind to its own play
+history, and `hand_type_plays` was never populated by the live extractor at all — the credit would
+have been dead in the actual mod while working in every batch. This is a **correctness/feasibility**
+change and is judged on mechanism unless it measures significantly negative (CLAUDE.md, the
+replacement rule).
