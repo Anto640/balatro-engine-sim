@@ -3362,3 +3362,35 @@ Two lessons, both now acted on:
    `rich10_s4` corruption. `TaskStop` ended the script; its 11 luajit children kept writing for
    another 13 minutes. The replacement runner waits for shard-file *quiescence* before touching
    anything, rather than assuming a stopped wrapper means stopped work.
+
+### ⚠ §12a — `level_persist` was a fudge for THIS bug, so the two are now coupled
+
+`CV.level_persist` multiplies a planet's value by 1–4 (3.25 at ante 3), and its own comment says
+why it exists: *"Valuing a planet at its ONE-level gain made the engine never level (sim: 3 planets
+bought in 16 runs, hand-lv=0)."* That is a description of the symptom of the unit error above. It
+was a compensating constant, not a modelled quantity.
+
+**On units it breaks parity.** A joker's `scoring_gain` is `measured / boss_per_hand_need` — extra
+chips per hand over one hand's quota, projected ×1 (only *scalers* get a projection). A planet's is
+`persist × (f × level_gain) / boss_per_hand_need` — the same units, times up to 4. Both a joker and
+a level are permanent and apply to every future hand, so the honest multiplier for both is the same
+one, and today it is 1 for jokers and 3.25 for levels.
+
+**But removing it now would over-shoot in the other direction**, so it stays for the moment:
+
+| ante-3 pool value | with `persist` | without |
+|---|---|---|
+| Celestial normal | 0.429 | 0.132 |
+| Buffoon normal | 0.862 | 0.862 |
+
+Even *with* the persistence multiplier a Celestial pack is worth **half** a Buffoon pack; without it,
+one sixth — which is roughly the aversion the fix just removed. So the fix moved the ratio toward
+sanity and did not obviously overshoot.
+
+**The real asymmetry to look at next is neither of these.** A level *stacks without limit*; a joker
+needs a *slot*, and the engine's board is 4.53 of 5 slots by ante 3. On a full board a Buffoon pack
+is worth `(best joker − worst owned)`, not `best joker` — but `pack_need` damps a full board by only
+0.85, calling it "minor friction". If Buffoon packs are over-valued on a full board, that inflates
+the very denominator this comparison rests on. **Calibrate those three together (`level_persist`,
+the full-board joker discount, and the corrected `level_gain`) — never one at a time**, which is the
+standing rule for magnitude constants and the reason the old revert set is full of them.
