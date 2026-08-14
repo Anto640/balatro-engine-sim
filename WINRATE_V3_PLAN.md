@@ -3485,3 +3485,31 @@ foil Kings — the added card simply never landed in the first 8 of any sample (
 chance). That reads exactly like "the engine can't tell enhancements apart", which would have been
 a dramatic and completely false conclusion. **A measured value near zero can mean the measurement
 never fired.** Check the sample count before believing it.
+
+### §12e — The formula survives the boards most likely to break it
+
+The correction `delta = dchips*M + dmult*X*C + dchips*dmult*X` uses the **mean** chips, mult and
+xmult product over sampled hands, so it should drift wherever `X` and `C` are correlated — which is
+exactly the multiplicative boards that matter most. Stress-tested at 150 samples per cell against
+the real scorer:
+
+| board | Pair | Two Pair |
+|---|---|---|
+| two stacked xmults (Cavendish + Duo) | 0% | 0% |
+| polychrome joker edition | 0% | 0% |
+| deck with 13 **Glass cards** (card-level xmult) | −0% | 0% |
+| Glass deck **+** xmult joker | 0% | 0% |
+
+Exact in every case. Empirically `X` is near-constant within a hand type, so `E[X·C] = E[X]·E[C]`
+holds and the mean-based context is not an approximation in practice. Together with the 11
+board/hand cases behind §12 that is 19 independent checks, none off by more than 1%.
+
+Coverage of the correction is complete: shop planets, the Celestial pool, in-pack picks, the Fool's
+copy-target search, Black Hole, Orbital tags, and — via `CV.best_planet` — the Telescope/Observatory
+voucher valuations.
+
+⚠ One **pre-existing** inconsistency, left alone deliberately: `best_planet` returns
+`f × level_gain` with **no** `level_persist`, while `planet_pool` and `card_value` apply it. So
+voucher and Blue-seal valuations sit up to 4× below the loose-planet scale. It is real, but
+vouchers are in the ~5–10% firing band that the frequency ceiling says cannot move a verdict, and
+fixing it would be a magnitude change entangled with §12a. **Noted, not touched.**
