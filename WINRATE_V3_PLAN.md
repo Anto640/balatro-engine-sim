@@ -5233,3 +5233,74 @@ the work the arms used to do badly: `pacing_screen` corrected a "don't batch" to
 `slotgate_screen` corrected a "batch" to "don't", and `level_scale_screen` correctly said the §20
 change was real and large — which it was, and it was also harmful. **A screen sizes a change; only an
 arm signs it.**
+
+---
+
+## §28 — ARM 4: EARLY BOARD DISCIPLINE IS REFUTED, HARDER AT `rich10` — and my §22 reasoning was wrong
+
+`ecap3rich` (board held to 3 jokers through ante 2, **plus** +$10/round) vs `pacefix`, paired n=160,
+both integrity-clean.
+
+| | value |
+|---|---|
+| progress Δ | **−0.945** (sd 2.463, SE 0.195, **t −4.85, p < 0.0001**) ⭐ |
+| sign test | **51 better / 96 worse / 13 tied** (**p 0.0003**) |
+| wins | **45 → 24**; McNemar exact **p 0.0065** (discordant 38 vs 17) |
+| tail | reach5 124→**96** · reach6 93→**59** · reach7 70→**43** · reach8 53→**33** |
+
+One of the most decisively significant results the project has produced — and it is **5.6× more
+negative at `rich10` (−0.945) than at baseline (−0.169)**, which is the exact opposite of what §22
+predicted.
+
+### 28a. ❌ Where my §22 argument was wrong
+
+§22 reasoned: `ecap3`'s recorded harm was *"capping the board cut board power, and board power EARNS
+income — the engine got POORER"*; at `rich10` income is exogenous, therefore the harm channel is
+closed while the hypothesis (early slot discipline) stays testable. **That inference is false, and the
+mechanism data says exactly why:**
+
+| | a2 board | a2 $ | a3 $ | a4 $ |
+|---|---|---|---|---|
+| `pacefix` | 4.49 | **9.9** | **23.4** | 31.0 |
+| `ecap3rich` | 2.99 ✅ *(the cap worked)* | **4.8** | **10.7** | 26.4 |
+
+**With +$10/round handed to it, the capped engine still ends ante 2 with HALF the money.** Exogenous
+per-round income does not substitute for board-driven income: unused-hand banking alone is
+$2.4–2.6/blind (§18e) ≈ $7/ante, and a weaker board banks less of it *and* survives less often to
+collect anything at all. The harm channel was never "the income faucet" — it was **board power
+itself**, which produces money and survival jointly.
+
+**⇒ Refinement to §6, learned by getting it wrong:** the operating-point argument only applies when
+the operating point actually SUPPLIES the thing the lesion removes. *"Income"* is not one thing. I
+treated `rich10` as a generic harm-canceller; it is a specific, per-round, exogenous cash stream, and
+it cannot stand in for income that is earned by having a board.
+
+### 28b. ✅ What this closes, and it is a real closure
+
+§22 pre-registered the negative branch: *"still negative → early board size is genuinely not the gap,
+the human's empty ante-2 board is a consequence of their play rather than a cause."* That branch is
+taken, at p < 0.0001.
+
+* **The human's 1.38 jokers at ante 2 is a CONSEQUENCE, not a cause.** They hold few jokers because of
+  *what* they are willing to buy, not because empty slots are themselves valuable. §22's own
+  survivorship caveat (n=8, 7 of which won) was the correct read of the observational data.
+* **`MCTS_PLAN.md` INC-1 — supply-aware slot/cash RESERVATION — is refuted before being built.** §22
+  named it as the positive branch's payoff. Forcing the engine to reserve early slots is catastrophic
+  (wins 45 → 24), so the narrowest and most attractive slice of the deferred search work is dead. That
+  is the second search-adjacent direction closed this session, after §24.
+* Together with §21 (income axis closed at `rich10`) and §24 (archetype planning closed), **the last
+  large observational gap between engine and human has been tested causally and is not a lever.**
+
+### 28c. The `rich10` scorecard, updated
+
+| change re-measured at `rich10` | result |
+|---|---|
+| **B3** | **+0.518** (p 0.0011) ✅ |
+| **level_gain + commitment** | **+0.421** (p 0.019) ✅ |
+| readiness gate | null at both ❌ |
+| oracle plan | null at both ❌ |
+| **`ecap3` early board cap** | **−0.945 (p < 0.0001), worse than at baseline** ❌❌ |
+
+**2 of 5.** Both converts are *valuation* fixes; the three failures are a *policy gate*, a *plan*, and
+a *board lesion*. The pattern from §24d holds and strengthens: `rich10` reveals what things are
+WORTH; it does not rescue changes to what the engine DOES.
