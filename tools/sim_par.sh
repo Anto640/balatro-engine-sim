@@ -68,7 +68,7 @@ runs=$(grep -c '"kind":"run_start"' "sim_out/${name}.jsonl" 2>/dev/null || echo 
 # anyone trusts one. Cheap (a single pass) and it catches the failure above.
 uniq_seeds=$(grep -o '"kind":"run_start"' "sim_out/${name}.jsonl" | wc -l)
 dups=$(grep '"kind":"run_start"' "sim_out/${name}.jsonl" | grep -o '"seed":"[0-9]*"' | sort | uniq -d | wc -l)
-torn=$(grep -c -v '^{.*}$' "sim_out/${name}.jsonl" 2>/dev/null || echo 0)
+torn=$(grep -c -v '^{.*}$' "sim_out/${name}.jsonl" 2>/dev/null); torn=${torn:-0}
 if [ "$dups" -gt 0 ] || [ "$torn" -gt 0 ] || [ "$runs" -ne "$n" ]; then
   echo "*** INTEGRITY WARNING for sim_out/${name}.jsonl:" >&2
   echo "    run_start records $runs (expected $n) | DUPLICATED seeds $dups | torn lines $torn" >&2

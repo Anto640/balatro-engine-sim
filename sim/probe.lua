@@ -317,10 +317,17 @@ function Probe.early_cap(run, shop, ranked)
   if not best then return nil end
   if best.type ~= "BUY_JOKER" and best.type ~= "SELL_TO_BUY" then return nil end
   if #(run.jokers or {}) < p.early_joker_cap then return nil end       -- under the cap: allow
-  -- promote the best alternative that is not another joker acquisition
-  for _, a in ipairs((ranked and ranked.alternatives) or {}) do
-    if a.type ~= "BUY_JOKER" and a.type ~= "SELL_TO_BUY" and a.type ~= "SAVE" then
-      return { best = a, alternatives = {} }
+  -- `early_cap_bank`: force SAVE, so the freed cash is actually BANKED. Without it the
+  -- probe promotes the best non-joker alternative -- and the measured result of that
+  -- (ecap3, -0.169) was that the cash simply flowed into packs/rerolls/vouchers and the
+  -- engine ended up POORER at every ante ($7.5 -> $3.4 at a3). The engine spends to zero
+  -- regardless of WHAT you block, so testing "hold the cash" requires blocking the spend
+  -- itself, not redirecting it.
+  if not p.early_cap_bank then
+    for _, a in ipairs((ranked and ranked.alternatives) or {}) do
+      if a.type ~= "BUY_JOKER" and a.type ~= "SELL_TO_BUY" and a.type ~= "SAVE" then
+        return { best = a, alternatives = {} }
+      end
     end
   end
   return { best = { type = "SAVE", value = 0, reason = "probe: early board cap" }, alternatives = {} }
@@ -374,6 +381,8 @@ Probe.CONFIGS = {
   ecap3        = { early_joker_cap = 3, early_cap_until = 2 },
   ecap3a3      = { early_joker_cap = 3, early_cap_until = 3 },
   ecap4        = { early_joker_cap = 4, early_cap_until = 2 },
+  -- BANK variant: the freed cash is actually held (forces SAVE) rather than redirected.
+  ecap3bank    = { early_joker_cap = 3, early_cap_until = 2, early_cap_bank = true },
   -- HOARD: refuse purchases that drop the bankroll below the floor, before the given ante.
   -- Fires in EVERY shop of EVERY run (unlike a joker fix, capped at ~5% firing).
   hoard10      = { min_bank = 10, hoard_until = 5 },
