@@ -3888,3 +3888,77 @@ progress verdict is not possible. It must be judged on:
 ⚠ The tie rate is itself biased upward by the fast-finishing subset (short runs have less room to
 diverge), so the true sds are somewhat higher than these — which only strengthens the conclusion
 about arm C.
+
+---
+
+## §13 — THE VERDICTS (paired n=160 each, all three arms integrity-clean)
+
+| contrast | Δ progress | sd | t | p | sign | wins | ties |
+|---|---|---|---|---|---|---|---|
+| **B − A** — the play-derived commitment | **+0.049** | **0.372** | **+1.68** | **0.092** | 16 / 13 | 3 → 3 (same seeds) | **131** |
+| **C − B** — the level_gain correction | −0.125 | 1.812 | −0.87 | 0.383 | **80 / 68** | 3 → 1 | 12 |
+| C − A — both together | −0.076 | 1.746 | −0.55 | 0.585 | **82 / 67** | 3 → 1 | 11 |
+
+### ✅ B: KEEP. The power prediction held exactly, and it is a marginal positive
+
+sd **0.372** — even lower than §12r projected — because **131 of 160 seeds are TIED** despite the
+commitment rate going 27.5% → 71%. MDE at n=160 is **0.082**, and the measurement is **+0.049 at
+p 0.092**. That is not a null; it is a small positive on the most precise measurement class this
+apparatus produces, and it is in the middle of the retained arc's range (shipped levers run +0.006
+to +0.146).
+
+Per-ante it is *invisible* through ante 4 (dollars, jokers and levels identical to baseline to two
+decimals) and then pushes slightly deeper: **31 runs reach ante 6 vs 27, 14 reach ante 7 vs 10**,
+hand levels at a6 5.29 vs 4.67. A leveling-only, provisional plan doing nothing until the leveling
+window opens is precisely the designed behaviour.
+
+**Classification: feasibility.** The planner was structurally blind to the run's own play history,
+and the live extractor did not populate the field at all. Ships unless significantly negative; it is
+significantly nothing-of-the-sort.
+
+### ⚖ C: the correction WORKS, and its cost is now measured. Do not ship as-is; do not revert
+
+The progress verdict is **uninformative and was pre-registered as such** (§12r): sd 1.812 gives
+MDE **0.401** against a measurement of −0.125, and the mean and the sign test **disagree** (−0.125
+but 80 seeds better vs 68 worse). Only 12 seeds tie. This is the chaotic-re-roll signature, not a
+result.
+
+**But both pre-registered mechanism checks fired, and they point the same way.**
+
+**✅ The intended mechanism is confirmed.** Death-wallet (§12h) — the check the progress metric
+cannot see:
+
+| arm | mean $ at death | median | ≥$25 | ante 5+ ≥$25 |
+|---|---|---|---|---|
+| A | 20.1 | 15 | 32% | 68% |
+| B | 19.9 | 15 | 32% | 67% |
+| **C** | **15.6** | **10** | **26%** | **58%** |
+
+The engine finally **converts the cash it used to die holding** — the documented pattern §11a gave a
+mechanism to. Hand levels 2.5× at ante 4 (3.72 vs 1.46), 2.4× at ante 5.
+
+**❌ And the predicted cost is confirmed.** §12q predicted that if the correction hurt, it would be
+through **early board weakness** — arm C reaching ante 2 with 2.48 jokers against 2.99, having spent
+its first dollars on Celestial packs rather than its first jokers. The death histogram says exactly
+that:
+
+| deaths at ante | 1 | **2** | 3 | 4 | 5 | **6** |
+|---|---|---|---|---|---|---|
+| A | 10 | **14** | 29 | 47 | 33 | **17** |
+| C | 9 | **21** | 24 | 50 | 36 | **9** |
+
+**Ante-2 deaths +50%**, and survivorship to ante 3 falls 142 → 131, to ante 6 27 → 21. It buys the
+late game by mortgaging the early one.
+
+### ➡ The action, which was pre-registered before the data
+
+**Not a revert** — the correction is a measured 1.4–19× unit error with an exact fix, and it
+demonstrably does the thing it was built to do. **Not a ship either** — it measurably costs early
+survival. The fix named in §12q applies unchanged, and it mirrors logic the planner already has in
+`BP.invest_window`:
+
+> **damp the leveling credit while the board is still below `BP.BASE_MIN`** — buy the base first,
+> then level it.
+
+That is also the human's measured ordering (economy and base first, power second, crossing at
+ante 4), and it is the one axis on which arm C is currently *inverted* from them.
