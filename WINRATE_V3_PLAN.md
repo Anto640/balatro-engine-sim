@@ -5151,3 +5151,85 @@ column is **identical** to the survivor-only column, because the driver emits th
 *start*, so a run that dies **during** ante *a+1* is already counted in the a→a+1 ratio. The only
 censoring is runs dying within ante *a* itself — 151 → 142 → 124 → 93 samples per step at `rich10`.
 Real, but far smaller than stated, and it does not touch the trend inversion, which is a factor of 2–5.
+
+---
+
+## §27 — ARM 3: `levelscale` REVERTED, and the reason is §26e
+
+`levelscale` vs `pacefix` (its correct baseline — the two are coupled, §20c), paired n=160, both
+integrity-clean.
+
+| | value |
+|---|---|
+| progress Δ | **−0.272** (sd 2.172, SE 0.172, t −1.58, p 0.113) |
+| sign test | **51 better / 70 worse / 39 tied** (p 0.102) |
+| wins | **45 → 40**; McNemar exact p 0.583 |
+| death-ante | 45 later / 61 earlier / 54 unchanged |
+| **tail** | reach5 **124 → 117** · reach6 **93 → 83** · reach7 **70 → 61** · reach8 **53 → 46** |
+
+**❌ REVERTED.** Negative on every metric, the sign test leans against at 51/70, and the tail sheds
+mass at *every* level — the criterion that reverted E-12 in July. §20c pre-registered this as
+magnitude class requiring positive evidence; there is none.
+
+### 27a. And the behaviour did not move at all
+
+| | `pacefix` | `levelscale` |
+|---|---|---|
+| packs / ante | 4.20 | 4.16 |
+| consumable uses / ante | 3.68 | 3.68 |
+| mean `hand_level_sum` | 7.70 | 7.69 |
+
+The screen said the factor moved by a pooled **1.35×** and changed 100% of states from ante 4 — and
+the engine bought **the same number of levels**. It re-ordered *relative* prices without changing
+aggregate leveling, and that re-ordering was net harmful. ⚠ Note this is the inverse of the §18d
+pattern rather than another instance of it: there, behaviour moved and outcome did not; here,
+*valuation* moved, behaviour did not, and the outcome got worse anyway.
+
+### 27b. ⭐ The derivation was fine. Its INPUT is broken — and that is §26e.
+
+```
+level_scale = SUM over k = ante..8 of  min(1, g^(k-ante) * need(ante)/need(k))
+```
+
+`g` is `Pacing.growth_factor`, and §26e measured its trend to be **inverted**: realized capacity
+growth decays 5.60 → 1.03 across a run while the model rises 1.47 → 2.68, over-stating late growth by
+up to **2.6×**. In this sum `g` is raised to the power `(k − ante)`, so the formula **amplifies
+exactly that error** — and the screen shows precisely where it landed: the factor rose **1.36–1.69×
+at antes 3–7**, the range where `g` is most over-stated.
+
+So the ordering was wrong, not the reasoning. A derivation is only as good as the model it consumes,
+and this one consumed the very quantity that had never been validated.
+
+**⇒ Do not re-derive `level_scale` until `growth_factor` is calibrated.** The sum is still the right
+shape; it cannot be right while its growth input points the wrong way. The comment block left in
+`consumable_value.lua` says so at the call site.
+
+### 27c. ⭐⭐ `growth_factor` is now implicated in three places
+
+| consumer | how it is wrong |
+|---|---|
+| `P.pace` → `on_pace` / `margin` bands | believes 12.1× the ante-8 requirement at ante 4 while 57 runs die at a3–a5 (§25b) |
+| the §19b flat-xmult term | a step credited as a rate — **fixed, kept, deployed**, and worth +0.034 because the bands saturate anyway (§25) |
+| **`CV.level_scale`** | **the leveling valuation inherits and amplifies the inverted trend (§27b)** |
+
+One un-validated model, three wrong answers, and it is read in **every shop of every run**. That is
+the systems-class target the frequency ceiling asks for, and it now has a **measured** calibration
+target (`tools/growth_truth.lua`) rather than a chosen one.
+
+### 27d. The session's scoreboard, honestly
+
+| change | class | verdict |
+|---|---|---|
+| deploy of the 9-file set (§18g Tier 0) | correctness | ✅ shipped, install verified identical |
+| §19b flat xmult is a step, not a rate | derived correctness | ✅ **KEPT + deployed** (+0.034, tail passes, wins 42→45) |
+| §20 derived `level_scale` | magnitude | ❌ **REVERTED** (−0.272, tail sheds at every level) |
+| §24 oracle plan at `rich10` | bound | ❌ null — **archetype planning closed at both operating points** |
+| §21 econ-flow (Tier 3) | screen | ❌ refuted, opposite direction — **income axis closed at `rich10`** |
+| §25c slot gate | drafted | ⛔ **not implemented** — screened, over-corrects |
+| §23 econ runway | located | ⛔ not implemented — recorded with its counter-evidence |
+
+**Two shipped, two closed directions, three changes correctly NOT written.** The screens are doing
+the work the arms used to do badly: `pacing_screen` corrected a "don't batch" to "batch",
+`slotgate_screen` corrected a "batch" to "don't", and `level_scale_screen` correctly said the §20
+change was real and large — which it was, and it was also harmful. **A screen sizes a change; only an
+arm signs it.**
