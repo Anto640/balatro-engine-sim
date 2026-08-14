@@ -2778,3 +2778,39 @@ point (per §6 the baseline hoard verdicts are as suspect as any other), (b) tes
 floor (e.g. hold $5 = one interest step, scaling with ante) rather than a hard $10 from ante 1, and
 (c) confirm the human's early money is actually interest rather than econ jokers — the live data can
 answer that and has not been asked. **Do not ship a floor change on this arithmetic alone.**
+
+### ❌ RESULT: `ecap3` −0.169 (n.s.) — and it measured the WRONG THING, which is the finding
+
+`ecap3` (board held to 3 jokers through ante 2), paired n=154 vs the current-code baseline:
+
+| | value |
+|---|---|
+| progress Δ | **−0.169** (t −1.44, **p 0.151**, n.s.; MDE 0.33) |
+| sign test | 58 better / 63 worse / 33 tied (p 0.72) |
+| wins | 4 → 5 |
+
+The lesion **fired** — shop buys by ante 2 fell 5.06 → 3.98. But look at what happened to the
+cash it was supposed to preserve:
+
+| | shop buys ≤a2 | sells ≤a2 | $ at a2 | $ at a3 | $ at a4 |
+|---|---|---|---|---|---|
+| baseline | 5.06 | 1.88 | $1.5 | $7.5 | $18.7 |
+| **ecap3** | **3.98** | 2.09 | $1.1 | **$3.4** | **$12.9** |
+
+**It made the engine POORER at every ante.** The cause is the probe's own design: it promotes the
+best NON-joker alternative (deliberately, so packs could still be bought), and the freed cash flowed
+straight into packs / rerolls / vouchers. Sells did not fall either (1.88 → 2.09).
+
+So `ecap3` tested *"spend on non-jokers instead of jokers"*, **not** *"hold the cash"* — and that
+trade is neutral-to-negative. The finding that survives is broader and more useful than the
+hypothesis was:
+
+> **THE ENGINE SPENDS TO ZERO REGARDLESS OF WHAT YOU BLOCK.** Restricting one purchase channel
+> just reroutes the money into the next one. `SA.ECON_FLOOR` is a soft penalty and does not hold a
+> line anywhere. Any test of the compounding hypothesis must block the SPEND, not redirect it.
+
+`ecap3bank` (same cap, but forces SAVE so the difference is actually banked) is the corrected test.
+It is narrower than `hoard` — which hard-refused ALL purchases below $10 from ante 1 and so blocked
+the *first* joker — because it banks only the 4th/5th marginal joker's cost. Given `hoard`
+(−0.396/−1.194/−1.639) and `ecap3` (−0.169) both lean negative, the prior is that this is negative
+too; if it is, **the early-compounding thread is closed** and the record will say so.
