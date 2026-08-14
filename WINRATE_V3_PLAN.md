@@ -4936,3 +4936,101 @@ Four changes have now been re-measured at `rich10` on the argument that baseline
 nulls positive, and the two that converted are both *valuation* fixes while the two that did not are
 both *policy/behaviour* changes. That split is worth watching: the operating-point argument is about
 whether the engine can AFFORD to express a preference, which bites hardest on what things are WORTH.
+
+---
+
+## §25 — ARM 2: `pacefix` KEPT — and its mechanism check found a much larger error
+
+`pacefix` vs `pd_play_r`, paired n=160, both integrity-clean. §19d pre-registered this as a **negative
+check**, not a positive-evidence test.
+
+| | value |
+|---|---|
+| progress Δ | **+0.034** (sd **1.291**, SE 0.102, t 0.34, p 0.737) |
+| sign test | 23 better / 21 worse / **116 tied** (p 0.880) |
+| wins | **42 → 45**; McNemar exact p 0.629 (discordant 7 vs 10) |
+| death-ante | 22 later / 19 earlier / 119 unchanged |
+| **tail gate** | reach5 **124 = 124** · reach6 **93 = 93** · reach7 72 → 70 · **reach8 50 → 53** |
+
+**✅ KEPT.** Positive point estimate on all three metrics, nothing close to significant, and the tail
+gate — the thing that reverted E-12 in July (reach-6+ 27→25) — **passes**: reach-6 is exactly flat and
+the top of the distribution *grew* (+3 at reach8, +3 wins). Derived correctness, no new constant, not
+significantly negative. Note sd 1.291 with 116 ties, so MDE ≈ 0.29: this arm could never have
+certified +0.034 and was not asked to.
+
+### 25a. The mechanism fired exactly as predicted
+
+| | `pd_play_r` | `pacefix` |
+|---|---|---|
+| mean `pace_margin` a2 / a3 / a4 / a5 / a6 | 3.2 / 9.7 / **12.1** / 12.4 / 8.6 | 1.7 / 4.8 / **5.9** / 6.6 / 5.4 |
+| `on_pace` at a2 | 46% | **32%** |
+| `on_pace` a3–a6 | 78 / 80 / 66 / 64% | 77 / 79 / 69 / 65% |
+| deaths a3–a5 | 57 | 58 |
+
+The false lead is **halved at every ante**, and the correction bites hardest at ante 2 (on_pace
+46% → 32%) where §13 located the cost. Mid-game deaths did not move.
+
+### 25b. ⭐⭐ THE REAL FINDING: `P.pace` is over-confident by an order of magnitude, and it is STRUCTURAL
+
+Look at that table again. **At ante 4 the engine believed it was projecting 12.1× the ante-8
+requirement — while 57 of its runs died at antes 3–5.** After the correction it still believes 5.9×.
+Every threshold the shop advisor reads (1.3 / 1.5 / 1.8) is cleared by 3–8×, which is exactly why the
+screen found only 14.8% band flips: **the decision bands saturate long before the correction matters.**
+A right fix to one term of a model that is off by an order of magnitude cannot move the outcome.
+
+Realized capacity growth, measured from consecutive `ante` records (`metrics.capacity`), against the
+requirement curve it is racing:
+
+| | a2→a3 | a3→a4 | a4→a5 | a5→a6 | a6→a7 | a7→a8 |
+|---|---|---|---|---|---|---|
+| **realized** | **4.71** | 2.57 | **1.95** | **1.44** | 1.72 | 2.10 |
+| required | 2.50 | 2.50 | 2.20 | 1.82 | 1.75 | 1.43 |
+| verdict | way ahead | level | **behind** | **behind** | level | ahead |
+
+⚠ **Survivorship**: these are conditional on reaching ante *a+1*, so the late figures are biased
+upward — the runs that fell behind died and left the sample. The true deceleration is worse.
+
+**Growth is not geometric, and `growth_factor` returns a single constant applied to every future
+ante.** The engine grows 4.7× early and 1.4–2.0× through antes 4–6, and the pacing model estimates one
+rate from the *current* board and raises it to the power of the remaining antes. Estimating at ante 3
+— when growth is still ~2.5 — and projecting five antes forward at that rate is precisely how a run
+reads "comfortably ahead" at a3–a5 and then dies there.
+
+**And the cause is already measured elsewhere in this project.** §5a's acquisition profile: acquisitions
+collapse **94 → 51 → 21 → 6** and `slots_free` is **0.00 by ante 5** — the board saturates. Now read
+`growth_factor`'s own terms:
+
+```lua
+local g = 1.25                          -- "baseline: ~1 acquisition per ante"
+  + 0.30 * xgrow + 0.15 * scaling
+  + 0.05 * math.min(hand_lv, 12)
+  + math.min(money, 40) / 160           -- "cash -> more shop buys"
+  + math.min(econ, 12) / 40             -- "passive income -> more buys"
+```
+
+**Three of its five terms are acquisition-driven, and on a full board none of them can be realized.**
+A saturated board grows only by scaling and leveling. The model claims ~1 acquisition per ante forever
+and charges money and income for buys that have nowhere to land.
+
+### 25c. The next fix, derived — recorded, NOT implemented
+
+Gate the acquisition-driven terms on remaining acquisition capacity. `slots_free` is already in the
+feature vector, the constants' own comments already say what they are for, and no new constant is
+introduced — the fix is to stop claiming a capability the state does not have:
+
+```
+g = 1 + acq_share * f(slots_free) + 0.30*xgrow + 0.15*scaling + 0.05*hand_lv
+```
+where `acq_share` collects the 1.25-baseline / money / econ terms and `f` falls to ~0 on a full board.
+
+**Not implemented.** Arm 3 is running, §20 and §23 are already unmeasured, and adding a fourth would
+be the bundle mistake this project keeps recording. But of everything currently open this is the
+best-evidenced: a **measured** calibration failure (12× believed vs death at a5), a **measured** cause
+(§5a's saturation), a derivation that removes rather than adds constants, and a firing rate of 100% —
+every shop of every run reads `on_pace`.
+
+⚠ **Predict the likely outcome honestly before anyone runs it:** correcting the margin downward makes
+the engine read *behind* far more often, which tilts `w_score` up and economy down and spends cash on
+power. That is a large behavioural change, and §18d's three demonstrations say a large behavioural
+change is not evidence of a large outcome change. **Screen it with `pacing_screen.lua` first** — and
+note the screen must be extended, because on a full board this moves `g` for *every* state, not 15%.
