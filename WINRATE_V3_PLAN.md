@@ -3549,3 +3549,22 @@ it names a specific cheap variant worth testing after the current arms report:
 > play-derived plan keeps tracking through the window where 70% of leveling happens, and only then
 > freezes. Test it as a single constant, against the arm that establishes the mechanism — not
 > bundled with it.
+
+### §12g — ✅ The "silent zeros" live-key risk is empirically CLOSED
+
+CLAUDE.md carries this as a standing, explicitly untested risk: *"Live-key mismatches are silent
+zeros… the coverage-guard test only checks catalogue↔effects, NOT catalogue↔live-game keys."* A
+mismatch means the joker scores **zero everywhere** with no error.
+
+The live telemetry is the only source of real in-game keys this project has, and it had never been
+checked at scale. Acquisitions are a thin sample; **shop offers are not** — every joker the shop
+ever displayed is in the records. `tools/key_coverage.lua`:
+
+* **147 distinct live joker keys observed** across the three captured datasets
+* **0 catalogue misses** — every key the real game emitted resolves
+* 4 catalogue keys never observed: **Chicot, Perkeo, Yorick** (all Legendary, expected) and
+  **`j_gluttonous_joker`** — the *correctly spelled* alias, which the game never emits because it
+  ships the misspelling `j_gluttenous_joker`. **That is the alias strategy working as designed.**
+
+The risk stays worth re-checking after any catalogue change or new capture (hence a tool rather
+than a one-off), but as of this dataset there is no silent zero anywhere in the joker layer.
