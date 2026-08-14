@@ -20,8 +20,10 @@ thing **headless-testable**. See the Layout section in `README.md` for the per-f
 
 ## Build / test / run
 
+- **Tool index:** `tools/README.md` — 31 analysis tools grouped by the QUESTION each answers.
+  Read it before writing a new one; most read existing telemetry and cost nothing to run.
 - **Tests (do this after every change):** `lua tests/runner.lua` (run via the Bash
-  tool). Lua 5.1+/LuaJIT, no `love`/`G`/Steamodded needed. Currently **977 pass** (+ 524 sim).
+  tool). Lua 5.1+/LuaJIT, no `love`/`G`/Steamodded needed. Currently **1024 pass** (+ 524 sim).
   Failures print `FAIL  <case>  (got X, want Y)`; exit code is non-zero on failure.
 - **Phase-1 simulator suites are SEPARATE** (they drive the real engine per hand and
   take minutes): `luajit tests/runner_sim.lua` (`test_world`, `test_driver`, `test_consumables`, `test_content_rates`, …). `luajit`
@@ -111,7 +113,9 @@ enumeration ABOVE 8 only (sim byte-identical at ≤8) and `main.lua` steps the G
 copy-target search runs AFTER selection — `CV.fool_target` now zeroes it pre-sort (an in-pack target
 only counts when `picks_left >= 2`). Live telemetry gained `blind_select`, `blind_result`
 (hands/discards actually SPENT) and per-option `ranked` valuations.
-(The install at `%APPDATA%/Balatro/Mods/balatroenginesim/` is **CURRENT as of 2026-08-14** — verified
+⚠ **THE INSTALL IS NOW BEHIND THE REPO BY 9 FILES** — see the deploy table in `NEXT_SESSION.md`,
+which splits them by which verdict gates each. Two are unconditional live fixes; the rest wait.
+(The install was **CURRENT as of the mid-2026-08-14 sync** — verified
 file-by-file: all 42 mod files match the repo and the six re-deployed engine files parse cleanly.
 The sync had drifted by SIX files, not the three the day's fixes touched — `build_plan`,
 `decision_engine` and `discard_value` were also stale — so **diff the whole tree against the install,
@@ -136,9 +140,34 @@ split already recorded: §5s "planets are the one channel where engine and winne
 (*which* hand — unaffected) vs §5z "Celestial priced −0.79, bought 6.3%" (*whether* to buy —
 destroyed). **One bug, both symptoms.** Celestial pool value 0.084 → 0.429 on real ante-3 boards.
 
-**⚠ VERDICT PENDING.** `levelbuy` measured −0.229 for buying more levels, and `level_persist` (×1–4)
-was itself a fudge for this very bug — the two are coupled (§12a). Interim behavioural readout:
-packs opened per shop **+41%** (intended) and skip rate **+26%** (the flagged Orbital risk, §12c/k).
+**⭐ VERDICT (§13–§16): it is an OPERATING-POINT lever, not a baseline one.** Paired n=160 per arm:
+
+| | baseline income | **`rich10`** |
+|---|---|---|
+| the delta (commitment + correction) | −0.076 (p 0.585) | **+0.421 (t 2.35, p 0.019)** ✅ |
+| sign test | 82 / 67 | **84 / 57 (p 0.029)** ✅ |
+| winrate | 1.9% → 0.6% | **18.8% → 26.2%** |
+
+**Interaction +0.497, t 2.19, p ≈ 0.028 — and the prediction was recorded BEFORE the batch ran.**
+§6's original demonstration was a six-commit bundle read after the fact; this one *predicted*.
+
+**Why it inverts (§15b), measured end to end.** The correction converts money → levels. At baseline
+the engine has no *spare* money, so what it converts is its **first-joker** money — ante-2 board 2.48
+vs 2.99, **ante-2 deaths +50%**, gain cancelled. At `rich10` it converts spare money instead, keeps
+its board (4.43 vs 4.52 — a 2% difference), and reaches **15.67 hand levels by ante 8 against the
+human's 18.6**, with ante-4 deaths falling 32 → 18.
+`BP.level_readiness` (§14, ante-bounded) fixes the baseline cost — ante-2 deaths 21 → 16, board
+2.48 → 2.77, leveling preserved — but that only returns it to **−0.009 vs the commitment alone**.
+**Fixing the cost is not gaining anything: at baseline the whole line nets to ZERO.**
+
+⚠ **The live mod probably sits at the `rich10` end** — it advises a *human*, and the human dataset
+has them **2–4× richer than the engine at every ante**. So the **ungated** correction may be the
+right thing to deploy for the overlay even if the gate wins in the sim. Arm E (the gate at `rich10`)
+decides that; **do not deploy either half on a baseline verdict alone.**
+
+**✅ SHIPPED on its own merit: the play-derived commitment** (§11, §13). +0.049 at p 0.092 with
+**131 of 160 seeds TIED** (sd 0.372 → MDE 0.082) — a small positive on the most precise measurement
+class this apparatus produces. 63% of runs never committed before; now 71%. Feasibility class.
 
 **Two more findings that stand on their own:**
 * **⭐ THE WINNERS' BOARDS ARE HAND-AGNOSTIC.** Human wins acquire only **8.7%** handtype-tagged

@@ -28,7 +28,7 @@ and a "sell or use a held card to make room" note), a **sell-to-fund** shop move
 single-card destroy-for-$3-and-thinning discard, and clearer advice — Standard-pack
 picks named by exact rank / suit, and tarot targets named from your **drawn hand**
 (a strategy phrase when none is dealt yet). *MCTS multi-turn lookahead is
-intentionally deferred — see "Deferred".* `740 headless tests` (+195 sim) pass.
+intentionally deferred — see "Deferred".* `1024 headless tests` (+524 sim) pass.
 
 The engine is **tuned by self-play**: a headless simulator (`sim/`) drives the real engine
 through whole runs, logs the same JSONL telemetry the live mod does, and `tools/analyze_runs.lua`
@@ -202,6 +202,9 @@ sim/    world.lua              forward simulator: faithful in-blind play, boss g
 tools/  analyze_runs.lua       death-ante / variance-vs-build / per-ante / COUNTERFACTUAL / skip stats / trace
         sim_batch.lua          run N sim seeds -> sim_out/<name>.jsonl (live progress; [shard nshards] for parallel)
         sim_par.sh             PARALLEL batch across all cores (shards seeds, merges) -- ~9x faster
+        merge_shards.sh        recover a batch whose wrapper died before the merge
+        verdict.sh             the full verdict battery: integrity + paired progress + paired wins
+        README.md              INDEX of all 31 tools, by the question each answers -- read this first
 util/   json.lua               dependency-free JSON (JSONL telemetry)
 main.lua                       Steamodded entry; namespace require-loader; F7/F8/F9
 your_mod.json                  Steamodded metadata

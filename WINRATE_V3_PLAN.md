@@ -4012,9 +4012,9 @@ the table above — **Hologram reads 0.35, not full credit**.
 Celestial pool, in-pack picks, Black Hole and Orbital tags all receive it by construction rather
 than by five correct edits.
 
-**Verdict pending: arm D (`lg_ready_d`) vs arm B.** The prediction to check is specific — arm D
-should keep arm C's late leveling (hand levels well above baseline at ante 4+) while restoring
-ante-2 survival (deaths back toward 14, not 21) and the ante-2 board (2.99 jokers, not 2.48).
+**✅ VERDICT (§16): both halves of that prediction were met** — ante-2 deaths 21 → 16, ante-2 board
+2.48 → 2.77, leveling preserved at a4 and higher at a7 — but D−B lands at **−0.009**, i.e. the gated
+correction is worth nothing at baseline income. Arm E tests it at `rich10`.
 
 ### §14a — The behaviour the gate targets, measured in arm C's own shops
 
