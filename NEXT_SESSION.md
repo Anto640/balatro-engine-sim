@@ -29,11 +29,11 @@
 >
 > * **✅ Tier 0 DONE.** The install was deployed and verified **byte-identical across all 42 files**
 >   (backup: `%APPDATA%/Balatro/bes_install_backup_20260814b`, outside `Mods/`).
->   ⚠ **It is now deliberately 2 files behind again** — `engine/pacing.lua` (§19b) and
->   `engine/consumable_value.lua` (§20) carry changes whose arms have not run. §19b is
->   correctness-class and §21c shows its double-count is **30% larger on the human's boards than on
->   the engine's**, so it is a strong live-deploy candidate *once its negative check clears*. §20 is
->   magnitude-class and must not ship on mechanism. **Do not deploy either before the arms.**
+>   ✅ **`engine/pacing.lua` (§19b) deployed too** — its negative check cleared (§25: +0.034, tail
+>   gate passes, wins 42→45) and §21c shows its double-count is **30% larger on the human's boards
+>   than on the engine's**, so it matters more live than in the sim.
+>   ⚠ **It is deliberately ONE file behind: `engine/consumable_value.lua` (§20).** That is
+>   magnitude-class and must not ship on mechanism — **arm 3 is testing it now.**
 > * **❌ Tier 1 mostly EVAPORATED on inspection (§19a).** "The graveyard was populated almost entirely
 >   by baseline nulls" is **false** — checked item by item, most went on MECHANISM (swap-damp and
 >   cost-discount were *directly measured*, 145 tied, and they fight the world's real `joker_tick`;
@@ -49,7 +49,7 @@
 >   | # | arm | probe | baseline | worktree |
 >   |---|---|---|---|---|
 >   | ~~1~~ | ~~`oracle_rich`~~ | — | — | **✅ DONE — see below** |
->   | 2 | `pacefix` (§19b alone) | `rich10` | `pd_play_r` | `bes_pacefix` @ `bb3e876` |
+>   | ~~2~~ | ~~`pacefix`~~ | — | — | **✅ DONE — KEPT + DEPLOYED (§25)** |
 >   | 3 | `levelscale` (§20 on top) | `rich10` | **arm 2**, not `pd_play_r` | `bes_levelscale` @ `ff818f5` |
 >   | 4 | `ecap3` / `ecap3a3` (§22 bound) | `ecap3`+`rich10` | `pd_play_r` | none — probe only |
 >
@@ -73,6 +73,22 @@
 > (`MCTS_PLAN.md` INC-1, slot reservation) for free **before any search is written**.
 > **⇒ §6 is a filter, not a wand (§24d):** 4 changes re-measured at `rich10`, **2 converted** (B3,
 > level_gain — both *valuation*) and **2 did not** (readiness gate, oracle — both *policy*).
+>
+> ## ⭐⭐ ARM 2 RESULT — `pacefix` KEPT, and it found something bigger (§25)
+> +0.034 (p 0.737, **116/160 tied**), wins 42→45, and the tail gate that reverted E-12 in July
+> **passes** (reach-6 exactly flat, reach8 50→53). Kept as derived correctness; **deployed live.**
+>
+> **⭐ But read §25b — the mechanism check is the real result. `P.pace` is over-confident by an order
+> of magnitude, structurally.** At ante 4 the engine believed it was projecting **12.1× the ante-8
+> requirement while 57 runs died at antes 3–5**; after the fix, 5.9×. Every advisor threshold
+> (1.3/1.5/1.8) is cleared by 3–8×, which is *why* a correct one-term fix moved nothing.
+> **Realized** growth (from consecutive `capacity` records) is **4.71 / 2.57 / 1.95 / 1.44 / 1.72 /
+> 2.10** against a requirement curve of 2.50 / 2.50 / 2.20 / 1.82 / 1.75 / 1.43 — **growth is not
+> geometric**, yet `growth_factor` estimates ONE rate from the current board and raises it to the
+> power of the remaining antes. The cause is already measured: §5a's board saturation
+> (`slots_free` = 0.00 by ante 5), and **three of `growth_factor`'s five terms are acquisition-driven**
+> and unrealizable on a full board. §25c has the derived fix (gate them on `slots_free` — removes
+> constants, adds none) and deliberately does **not** implement it. **Best-evidenced open lead.**
 
 > # ⭐⭐ THE BASELINE IS A BROKEN INSTRUMENT — read `WINRATE_V3_PLAN.md` §6 FIRST
 > The **identical** six-commit engine delta (`e7c3a8c`→`82f808f`), on the **same** seeds:
