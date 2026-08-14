@@ -2814,3 +2814,29 @@ It is narrower than `hoard` — which hard-refused ALL purchases below $10 from 
 the *first* joker — because it banks only the 4th/5th marginal joker's cost. Given `hoard`
 (−0.396/−1.194/−1.639) and `ecap3` (−0.169) both lean negative, the prior is that this is negative
 too; if it is, **the early-compounding thread is closed** and the record will say so.
+
+### The churn's actual mechanism: **SELL_TO_BUY**, 81% of it
+
+Breaking the engine's ante-1..2 sell advice down by TYPE (n=209 across 154 runs):
+
+| advice | n | share |
+|---|---|---|
+| **SELL_TO_BUY** | **170** | **81%** |
+| SELL_JOKER | 39 | 19% |
+
+**It is not "sell the weakest for cash" — it is selling a joker to FUND a purchase it cannot
+otherwise afford.** That closes the loop on §10's compounding story with a concrete code path:
+
+> poor ($1.3 at ante 2) → cannot afford the thing it wants → SELL_TO_BUY funds it at ~50% of
+> purchase price → poorer → the next want is also unaffordable → sell again.
+
+This is self-reinforcing and it fires ~1.1×/run before ante 3. It also explains why `ecap3`
+backfired: capping the *board* left SELL_TO_BUY untouched (sells actually rose, 1.88 → 2.09).
+
+⚠ The jokers being sold include **Hanging Chad** — the ONE joker present in all seven human wins
+(CLAUDE.md) — alongside Wily/Crafty/Jolly/Zany/Banner/Superposition. This is the same failure class
+as the Dusk finding in §5s: a compounding piece traded away early for immediate affordability.
+
+`nochurn2` blocks SELL_TO_BUY and non-junk SELL_JOKER before ante 3. If it measures positive, the
+fix is not a new valuation weight — it is a **feasibility gate on SELL_TO_BUY while poor**, which is
+a narrow, high-frequency, mechanism-justified change.
