@@ -131,9 +131,20 @@ only counts when `picks_left >= 2`). Live telemetry gained `blind_select`, `blin
 > entirely by baseline nulls.
 > **DON'T** conclude "logical fix, no effect" from a baseline null ever again. That verdict has been
 > the project's central mystery and it is substantially a measurement artifact.
-> ⚠ Caveats: the bundle is six commits (so this says *accumulated work* pays at income, not which
-> commit); the two deltas share a seed family so the interaction SE is approximate; the gain is
-> broad and EARLY (rich10 deaths in antes 1–3 fall 20→7), so it is not a tail artifact.
+> ⚠ Caveats: the bundle is six commits; the two deltas share a seed family so the interaction SE is
+> approximate; the gain is broad and EARLY (rich10 deaths in antes 1–3 fall 20→7), not a tail artifact.
+>
+> **✅ ISOLATED + REPLICATED (§9): it is substantially ONE CONSTANT — B3.** `VU.BASE_FRAC` 0.03→0.06
+> (reverted in July on a baseline −0.245) measures **+0.518 pooled over TWO disjoint seed pools
+> (SE 0.159, t 3.26, p 0.0011)** at `rich10`, against **−0.102** at baseline — interaction
+> **+0.620, t 2.26, p 0.0238**. That is the size of the project's whole historical retained arc.
+> Its mechanism is measured, not guessed: it makes the engine **skip 25% fewer blinds** (correcting
+> the ~2× tag over-valuation the audit itself named) and reallocates toward packs/Celestials/planets
+> at **unchanged dollars held**.
+> ⚠ **Do NOT quote "B3 doubles the winrate."** The in-sample 6→12 wins did NOT replicate (disjoint
+> pool: 6 vs 6 discordant, dead null; combined McNemar p 0.286). And the in-sample progress figure
+> (+0.672) was inflated by **winner's curse** — B3 was chosen for testing because the bundle
+> containing it looked good on that same pool. **Always replicate a selected lever out-of-sample.**
 
 **THE DATASET IS THE HEADLINE.** `data/bes_runs_live_2026-08-12.jsonl` — the mod's own user played 8
 runs (red deck / white stake) with the **overlay hidden (F9)** so their choices are independent of the
