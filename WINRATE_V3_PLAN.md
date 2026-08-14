@@ -4765,3 +4765,89 @@ of them won), so their curve is a near-all-wins sample against a mixed one. §5m
 this measures *policy*, not world, and a survivorship read ("winners naturally have fewer jokers at
 a2") cannot be excluded from the observational data alone. **That is precisely why it needs the
 lesion**, which is causal, rather than another cut of the correlational dataset.
+
+---
+
+## §23 — A THIRD INSTANCE OF THE SAME UNITS ERROR: economy is priced with no runway
+
+Located while chasing §21a's observation that **the human divests economy late (0.75 econ jokers at
+a4 → 0.14 at a8) while the engine accumulates it (0.47 → 0.71)**. That is a behavioural signature, and
+it has a cause in the code. **Not implemented — documented, because three arms are already unmeasured
+and a fourth uncommitted change would be exactly the bundle mistake this project keeps recording.**
+
+### 23a. The inconsistency, in two functions
+
+`engine/eval_function.lua` already knows how to price a per-round accrual:
+
+```lua
+-- Blinds left until the ante-8 race is decided (~3 blinds/ante: small/big/boss).
+-- This is a scaling joker's remaining growth runway.
+function Eval.blinds_remaining(gs)
+  return math.max(0, (SCALE_HORIZON_ANTE - ante) * 3)     -- 21 at ante 1, 0 at ante 8
+end
+```
+
+`Eval.scaling_projection` uses it, and the comment says why: *"an ante-1 scaler is strongly preferred"*.
+
+The economy path, in the same file, does not:
+
+```lua
+local function jp_to_fv(gs, j, jp, idx)
+  local econ = Eval.econ_value(gs, j.key)                 -- $ per ROUND
+  return FV_JOKER_WEIGHT * jp + 0.8 * econ - Downside.penalty(gs, j, idx)
+end
+```
+
+**`0.8 * econ` is flat in the ante.** A Golden Joker paying $4/round is worth the same 3.2 FV at ante 1,
+where it will pay out ~21 more times, and at ante 8, where it will pay ~2. Two per-round accruals,
+one projected over its runway and one not — in the same function file, both authored deliberately.
+
+This is the **third** instance of one error class:
+
+| # | where | the error | status |
+|---|---|---|---|
+| 1 | `CV.level_gain` (§12) | a level priced against the bare hand, not the board that multiplies it | ✅ fixed, +0.421 at `rich10` |
+| 2 | `CV.level_scale` (§20) | its persistence factor fitted rather than derived | ✅ derived, arm queued |
+| 3 | **`jp_to_fv` econ** | **a per-round stream priced with no rounds-remaining term** | ❌ **open** |
+
+and it is the same family as §5y's currency incoherence (*"the engine bought dollars at half the price
+it sold them"*) — quantities that are right in isolation and wrong in their units of time or exchange.
+
+### 23b. Why E-13 is the symptom-level version of this
+
+`SA.ENDGAME_ECON_DAMP` collapses `w_econ` by 10× — but only when `ante >= 7` **AND** `not on_pace`.
+So an engine that is *on pace* at antes 7–8 never discounts economy at all, and at `rich10` more runs
+are on pace, so the patch fires *less* exactly where the money exists to act on it. It is a
+conditional cliff standing in for a continuous decay that should never have been absent.
+
+E-13 measured +0.012 on an sd-0.066 comparison — one of the project's few genuinely detectable
+verdicts — which is consistent with a real effect reached through a narrow gate.
+
+### 23c. What the fix is, and the one free choice in it
+
+The derived form mirrors `scaling_projection`: value an econ joker at its $/round **times the income
+events it will actually see**, i.e. `Eval.blinds_remaining(gs)` (already written, already tested).
+
+The free choice is the anchor. Multiplying by `blinds_remaining` outright rescales every econ price by
+~20×, which would swamp `FV_JOKER_WEIGHT * jp`; the `0.8` was implicitly calibrated at some average
+ante. The honest neutral form keeps the run-average unchanged and only redistributes it:
+
+```
+0.8 * econ * blinds_remaining(gs) / MEAN_BLINDS_REMAINING
+```
+
+with the divisor **derived from the ante distribution the engine actually reaches**, not chosen — it is
+computable from any existing batch, so it introduces no tuned constant. ⚠ That is one judgement call
+(the neutral anchor), which makes this **magnitude class**: it needs positive evidence, and it must not
+ship on the mechanism argument alone however clean the derivation looks.
+
+### 23d. ⚠ The counter-evidence, stated up front
+
+This raises early econ value and cuts late econ value, and **the early half runs into measured
+results**: §5i found the ante-3 features predicting reach-6+ include **less `econ_total`**, and the
+hoarding probes are uniformly negative. So the *late* half (decay, aligned with the human's divestment
+and with E-13's own mechanism) is the well-supported direction; the *early* half is not.
+
+**⇒ If this is tested, test the decay alone first** — clamp the factor at 1.0 so it can only reduce
+econ value from the current level, never raise it. That isolates the half the evidence supports and
+avoids re-running the hoarding experiment by accident.
