@@ -119,6 +119,50 @@ don't copy just the files you edited.** A pre-deploy backup is at
 `%APPDATA%/Balatro/bes_install_backup_20260814` — note it is deliberately OUTSIDE `Mods/`, since a
 copy left inside `Mods/` would be loaded by Steamodded as a second, conflicting instance of the mod.)
 
+### ⭐ LATE 2026-08-14 — A UNIT ERROR IN THE LEVELING CHANNEL (read `WINRATE_V3_PLAN.md` §12)
+
+**`CV.level_gain` priced a hand level against the hand's own BASE chips/mult, then every caller
+divided that by `boss_per_hand_need` — the TOTAL a hand must reach.** Same class as the dollar unit
+error in 82f808f. Measured against the real scorer over **19 board/hand cases**, the base-only
+figure understates a level by **1.3–1.5× bare / 4.5–9.4× on a typical ante-3 board / 10.3–19.3× with
+one ×3 xmult** — the error **grows with board strength**, inverted from what a core-building engine
+needs. Fixed exactly (`dchips*M + dmult*X*C + dchips*dmult*X`, using board context that
+`hand_frequencies` already computed and discarded); verified to <1% including stacked xmults,
+polychrome editions and Glass-card decks.
+
+**It resolves an apparent contradiction in the existing findings.** The error is a near-uniform
+factor ACROSS hands, so it leaves the argmax intact while destroying the magnitude — exactly the
+split already recorded: §5s "planets are the one channel where engine and winner agree exactly"
+(*which* hand — unaffected) vs §5z "Celestial priced −0.79, bought 6.3%" (*whether* to buy —
+destroyed). **One bug, both symptoms.** Celestial pool value 0.084 → 0.429 on real ante-3 boards.
+
+**⚠ VERDICT PENDING.** `levelbuy` measured −0.229 for buying more levels, and `level_persist` (×1–4)
+was itself a fudge for this very bug — the two are coupled (§12a). Interim behavioural readout:
+packs opened per shop **+41%** (intended) and skip rate **+26%** (the flagged Orbital risk, §12c/k).
+
+**Two more findings that stand on their own:**
+* **⭐ THE WINNERS' BOARDS ARE HAND-AGNOSTIC.** Human wins acquire only **8.7%** handtype-tagged
+  jokers (engine 13.3%, same denominator); Hanging Chad / Photograph / Sock and Buskin carry no
+  handtype tag at all. **So widening the tag set is a dead end — there is nothing to widen.** But
+  those same winners level HUMBLE hands hard (Pair 18 of 32 levels in one win) and **70% of their
+  leveling happens after ante 4**; the single loss has 4 levels against wins of 7–41.
+* **✅ The "silent zeros" live-key risk is CLOSED** (`tools/key_coverage.lua`): 147 distinct real
+  in-game keys across all captures, **0 catalogue misses**. The only non-Legendary key never seen is
+  `j_gluttonous_joker` — the correctly-spelled alias the game never emits. Alias strategy confirmed.
+
+**🛑 PROCESS, learned the hard way today:**
+1. **Run every A/B arm from a git worktree, never the tree you are editing.** An arm was silently
+   contaminated — its workers started 2 minutes after an engine edit, so it tested two changes
+   against a baseline with neither. Module code is read at `require` time, i.e. at worker start.
+2. **Killing the wrapper does not kill the workers, and `TaskStop` killed neither** — the script
+   resumed with its next arm 12 minutes later. Detect quiescence from the FILES.
+3. **A nil argument fails silently in Lua.** The level_gain fix missed the free in-pack channel
+   **twice** (a nil global once, a caller-scoped upvalue once). Neither errors. **Verify a threading
+   change by MEASURING the value, not by reading the diff.**
+4. **A measured value near zero can mean the measurement never fired.** At the default 12 samples,
+   comparing card enhancements returned identical values because the added card never landed in the
+   sampled hand — which reads exactly like "the engine can't tell them apart".
+
 ### CURRENT STATE (2026-08-14) — **8 expert HUMAN runs captured, 7 wins**; engine still ~1.25%
 **➡ THE authoritative status is `WINRATE_V3_PLAN.md` §5r (read that first). Fresh-session handoff:
 `NEXT_SESSION.md`. Historical audit + roadmap: `WINRATE_AUDIT.md`. Superseded plans: `docs/archive/`.**
