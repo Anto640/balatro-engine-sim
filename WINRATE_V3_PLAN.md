@@ -3012,3 +3012,39 @@ formula; the change introduces no new constant; it measures positive, not signif
 and it is backed by a dose-responsive lesion whose incremental step was significant (p 0.031).
 ⚠ Do NOT strengthen the charge above `TYPICAL_JOKER_COST` — that would convert a derived quantity
 into a tuned one, which is the class this project has repeatedly shown backfires.
+
+### ⭐ VERDICT (rich10, n=80): **−0.034 with 76 of 80 seeds TIED** — inert, and that CONFIRMS the mechanism
+
+| | baseline | rich10 |
+|---|---|---|
+| progress Δ | **+0.096** | −0.034 (p 0.53) |
+| seeds tied | 117 / 154 | **76 / 80** |
+| **SELL_TO_BUY fired** | **1.25 /run** | **0.12 /run** |
+
+**At `rich10` the engine barely uses SELL_TO_BUY at all — 0.12/run against baseline's 1.25, ten
+times less.** It only sells to fund a purchase when it cannot afford one, and a funded engine
+always can. So the fix has nothing to act on there. A null with 95% of seeds untouched is not a
+failed lever; it is the mechanism being *absent*.
+
+### 🔑 THE TWO SHIPPED FIXES ARE EXACT OPERATING-POINT MIRRORS
+
+| fix | what it prices | baseline | `rich10` |
+|---|---|---|---|
+| **B3** (`BASE_FRAC` 0.03→0.06, §9) | the value of MONEY | **−0.102** (inert/negative) | **+0.518** (p 0.0011) |
+| **SELL_TO_BUY refill charge** (§10) | the cost of POVERTY-driven churn | **+0.096** | **−0.034** (inert, 95% tied) |
+
+This is the strongest validation the operating-point framework (§6) has: it predicts BOTH signs
+correctly, for opposite reasons.
+
+* **B3 needs money to EXPRESS.** A better price for a dollar changes nothing when you hold $1.3.
+* **The refill charge only FIRES when poor.** Its whole subject is the sell-to-afford spiral, which
+  a funded engine never enters.
+
+**Consequences that matter:**
+1. **They do not conflict, and both should ship** — each is inert exactly where the other works.
+2. **For the LIVE engine the user actually plays (baseline), the refill charge is the one that
+   matters.** B3's value there is unproven; it is banked against a future where the economy works.
+3. **"Measure at rich10" is NOT a universal upgrade.** §6 says test valuation changes where they
+   can fire — but a fix whose subject is scarcity must be measured under scarcity. **Ask what the
+   change is ABOUT, then pick the operating point that contains its mechanism.** Measuring this fix
+   only at `rich10` would have discarded it as inert.
