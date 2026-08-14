@@ -2986,3 +2986,29 @@ local funded = p.value + SA.DOLLAR_UTIL * net_cash - f.loss
 
 Verdict batches running at BOTH operating points (`stb_base` n=160, `stb_rich` n=80) — §6 says a
 valuation change may read very differently at each, and baseline is the engine a live player runs.
+
+### VERDICT (baseline, paired n=154): **+0.096**, and it is a LOW-CASCADE measurement
+
+| | value |
+|---|---|
+| progress Δ | **+0.096** (t 1.28, p 0.200, n.s.) |
+| **sd** | **0.928** — vs the usual 1.5–2.0 |
+| **seeds TIED** | **117 of 154** |
+| sign test | 24 better / 13 worse (**65% of movers improved**), p 0.100 |
+| death-ante | 15 later / 9 earlier / 130 unchanged |
+| MDE at n=154 | 0.209 |
+
+Mechanism confirmed fired, gently: SELL_TO_BUY advice at antes 1–2 **170 → 146 (−14%)**, sells
+1.88 → 1.63, $ at a3 $7.5 → **$8.2**, board 4.6 → **4.7** (more money AND more board again).
+
+**Why only −14% when the lesion cut sells 75%:** the $5 charge is weighted by `DOLLAR_UTIL` (0.3),
+so it is 1.5 utility — enough to flip a marginal trade, not a genuinely strong one. That is the
+CORRECT behaviour for a re-pricing (as opposed to the lesion's ban): a great buy should still be
+worth funding by a sale. It recovered **54% of the lesion's effect from 14% of the churn**, which is
+the expected shape if the trades it stopped were the worst ones.
+
+**KEPT** under the correctness rule: an unpriced NON-SUNK cost was provably missing from the
+formula; the change introduces no new constant; it measures positive, not significantly negative;
+and it is backed by a dose-responsive lesion whose incremental step was significant (p 0.031).
+⚠ Do NOT strengthen the charge above `TYPICAL_JOKER_COST` — that would convert a derived quantity
+into a tuned one, which is the class this project has repeatedly shown backfires.
