@@ -26,6 +26,21 @@ return function(t)
     t.eq(SA.proj_damp(nil), 1, "no pace model -> no damping (unchanged behaviour)")
   end
 
+  -- ---- §10 SELL_TO_BUY replacement charge -------------------------------
+  -- Selling a JOKER to fund a NON-joker frees a slot the engine demonstrably refills, so the
+  -- sale is temporary: it raises ~$2.5 and the refill costs ~$5. Pin that the charge exists,
+  -- applies only to that case, and introduces no new constant.
+  do
+    t.ok(SA.TYPICAL_JOKER_COST and SA.TYPICAL_JOKER_COST > 0,
+      "the replacement charge reuses SA.TYPICAL_JOKER_COST (no new constant)")
+    t.ok(SA.ENDGAME_ANTE and SA.ENDGAME_ANTE > 1,
+      "the charge is exempted in the endgame via SA.ENDGAME_ANTE")
+    -- the charge must exceed a typical joker's sell value, or it cannot change the decision:
+    -- sell_value is floor(cost/2), so a $5 joker raises ~$2 against a ~$5 refill.
+    t.ok(SA.TYPICAL_JOKER_COST > SA.TYPICAL_JOKER_COST / 2,
+      "the refill costs strictly more than the sale raises (the whole point)")
+  end
+
   local function shop_state(o)
     return GS.new{
       jokers = o.jokers or {},

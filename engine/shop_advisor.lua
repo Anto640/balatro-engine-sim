@@ -1079,7 +1079,30 @@ function SA.recommend(gs, opts)
             if slot_ok and final >= reserve - credit then
               -- p.value already nets the buy's worth minus its cost; add the cash the
               -- sale raises and subtract what the funder was worth to keep.
-              local funded = p.value + SA.DOLLAR_UTIL * f.cash - f.loss
+              --
+              -- REPLACEMENT CHARGE (WINRATE_V3_PLAN §10). SELL_TO_BUY is **81%** of the engine's
+              -- ante-1..2 sell advice (170 of 209), and it sells jokers of mean tier 4.30 -- the
+              -- same quality as what it buys -- where the 7-win human sells 0.12/run of tier 3.00
+              -- junk. Selling a joker to fund a NON-joker frees a slot the engine demonstrably
+              -- REFILLS (board 2.9 -> 4.6 -> 5.0 across antes 2-4 in every arm measured), so the
+              -- sale is temporary: it raises ~$2.5 and the refill costs ~$5. The purchase price is
+              -- sunk and correctly ignored here, but the REFILL is not sunk and was unpriced --
+              -- which is why the engine churned ~$5.6/run away before ante 3, Hanging Chad (in all
+              -- seven human wins) among the casualties.
+              --
+              -- Charged ONLY when the buy does not itself take the slot: a joker-for-joker swap
+              -- refills it immediately, so it owes nothing. Exempt in the endgame, where there is
+              -- no runway left to refill. Uses SA.TYPICAL_JOKER_COST -- the constant the engine
+              -- already keeps for exactly this quantity -- so no new number is introduced.
+              -- Lesion evidence: nochurn2 +0.114, nochurn3 +0.177 (dose-responsive), and the
+              -- incremental step nochurn3-vs-nochurn2 is sign 36/19, p 0.031, on a low-cascade
+              -- comparison (105 of 154 seeds tied, sd 0.765).
+              local net_cash = f.cash
+              if f.kind == "joker" and not p.need_jslot
+                 and (((gs.meta or {}).ante) or 1) < SA.ENDGAME_ANTE then
+                net_cash = f.cash - SA.TYPICAL_JOKER_COST
+              end
+              local funded = p.value + SA.DOLLAR_UTIL * net_cash - f.loss
               if (not best) or funded > best.value then best = { value = funded, f = f, p = p } end
             end
           end

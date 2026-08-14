@@ -2949,3 +2949,40 @@ which is exactly the `nochurn2` behaviour. It leaves consumable-funded SELL_TO_B
 ⚠ **Do not ship this on `nochurn2`'s +0.114 alone** (p 0.350). Ship only if `nochurn3` shows a
 dose–response; and because it is a valuation change, expect §6 to apply — its effect may be far
 larger at the `rich10` operating point than at baseline, so measure both.
+
+### ✅ DOSE–RESPONSE CONFIRMED, and the incremental step is significant
+
+| dose | Δ vs baseline | t / p | sign test | death-ante |
+|---|---|---|---|---|
+| none | — | — | — | — |
+| `nochurn2` (block ≤a2) | **+0.114** | 0.93 / 0.350 | 57 / 49 | 43 later / 31 earlier |
+| `nochurn3` (block ≤a3) | **+0.177** | 1.36 / 0.175 | **68 / 54** | **48 later / 38 earlier** |
+
+**Monotone: 0 → +0.114 → +0.177.** Neither is individually significant, but the pre-specified check
+was the dose–response, and the DIRECT incremental step is the cleanest comparison available:
+
+> **`nochurn3` vs `nochurn2`: sign 36 better / 19 worse, 105 TIED — p = 0.031**, sd **0.765**.
+
+105 of 154 seeds tied and sd less than half the usual 1.5–2.0: this is the low-cascade "E-13 shape"
+that CLAUDE.md identifies as the only kind of comparison this project can trust. The extra dose
+(also blocking ante-3 sells) is significantly positive.
+
+### 🔧 SHIPPED: the replacement charge on joker-funded SELL_TO_BUY
+
+`shop_advisor.lua` now charges the expected refill when a JOKER funds a NON-joker purchase:
+
+```lua
+local net_cash = f.cash
+if f.kind == "joker" and not p.need_jslot and ante < SA.ENDGAME_ANTE then
+  net_cash = f.cash - SA.TYPICAL_JOKER_COST
+end
+local funded = p.value + SA.DOLLAR_UTIL * net_cash - f.loss
+```
+
+* **No new constant** — `SA.TYPICAL_JOKER_COST` already exists for exactly this quantity.
+* **Joker-for-joker swaps are untouched** (`p.need_jslot`): the buy refills the slot itself.
+* **Endgame exempt**: no runway left to refill, so the sale really is terminal there.
+* The purchase price stays correctly ignored (sunk); only the **non-sunk refill** is added.
+
+Verdict batches running at BOTH operating points (`stb_base` n=160, `stb_rich` n=80) — §6 says a
+valuation change may read very differently at each, and baseline is the engine a live player runs.
