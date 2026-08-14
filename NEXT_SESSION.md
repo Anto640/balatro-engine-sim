@@ -96,6 +96,22 @@
 > | `pd_base_r` | `0e5596a` | `rich10` | rich10 reference |
 > | `pd_play_r` | `2e84735` | `rich10` | the pair at the operating point §6 prefers |
 
+> ## 📦 THE DEPLOY SET IS ALREADY SPLIT BY VERDICT (9 files differ from the install)
+> The live install at `%APPDATA%/Balatro/Mods/balatroenginesim/` was current as of the earlier
+> 2026-08-14 sync; exactly today's work differs. **Diff the whole tree, never just the files you
+> edited** — a previous sync had drifted by six files when three were expected.
+>
+> | group | files | ship when |
+> |---|---|---|
+> | **live-only correctness** | `core/state_extraction.lua`, `core/run_telemetry.lua` | **regardless of the verdicts.** The extractor never populated `hand_type_plays` (so the play-derived commitment would be dead in the actual mod) and `hands_played` (so Loyalty Card has been reading 0 in game). The telemetry change makes the human half of the leveling question answerable on the next captured run. |
+> | **play-derived commitment** | `engine/build_plan.lua`, `engine/deck_plan.lua` | if **B ≥ A** |
+> | **level_gain correction** | `engine/consumable_value.lua`, `engine/packs.lua`, `engine/pack_open_advisor.lua`, `engine/shop_advisor.lua`, `engine/tags.lua` | if **C ≥ B** |
+>
+> ⚠ `state_extraction` is safe to ship alone — an unread field costs nothing — but the commitment
+> will **not work live without it**, so never ship `build_plan` without it.
+> ⚠ Keep any pre-deploy backup **outside** `Mods/`, or Steamodded loads it as a second conflicting
+> instance of the mod.
+
 > ## ⚠ TWO PROCESS FAILURES WORTH NOT REPEATING
 > 1. **Run every A/B arm from a git worktree, never from the tree you are editing.** An arm was
 >    silently contaminated: its workers started at 16:30:21 against engine files written 16:28:10,
