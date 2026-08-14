@@ -3661,3 +3661,31 @@ forgone shop in the same currency the tag is priced in — a boss-hand fraction 
 `VU`, rather than a flat $6 — so both sides move together when the value of a level changes. Do NOT
 simply exclude Orbital from the correction: that would restore the comparison by re-introducing a
 known-wrong number on the tag side.
+
+### ⚠ §12l — CORRECTION to my own pre-registration: the sim says the SKIP axis is flat
+
+§12c and §12k flag arm C's +26% skip rate as the leading explanation if it measures negative. That
+framing over-weights the evidence, and the correction belongs on the record before the verdict
+arrives rather than after it.
+
+**The one direct probe on this axis says skipping is not a lever at baseline:**
+
+| probe | progress Δ | sign |
+|---|---|---|
+| `noskip` (never skip a blind) | **−0.166 (p 0.28)** | 68 / 67 |
+| `noskip_early` (play everything through a4) | −0.107 (p 0.48) | 71 / 61 |
+
+Driving the skip rate to **zero** measures dead even — if anything slightly negative. So the axis is
+flat at baseline income, and an *increase* in skipping is unlikely to be strongly harmful there.
+
+**Where the anti-skip evidence actually comes from**, and why it is weaker than it reads:
+* the human's stated preference (*"skipping is typically the wrong option"*) — a policy claim about
+  a player who is 2–4× richer, not a measurement in this world;
+* B3's measured mechanism (it skipped **25% fewer** blinds and gained +0.518) — but that was at
+  **`rich10`**, and §6's whole point is that mechanisms do not transfer across operating points.
+
+Arms B and C are at **baseline income**, where the direct probe says the axis is flat. So if C is
+negative, the skip channel is now the *least* supported of the three explanations in §12c, not the
+first. Revised order to test: **(1) `level_persist` double-count (§12a), (2) `levelbuy`'s verdict
+generalising, (3) skip inflation.** The §12k asymmetry is still a real inconsistency worth fixing on
+its own merits — it is just no longer the prime suspect.
