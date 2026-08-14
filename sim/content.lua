@@ -890,6 +890,12 @@ function Content.shop_phase(run, opts)
       local pv = Probe.pack_greed(run, shop, ranked)
       if pv then ranked = pv end
     end
+    -- EARLY BOARD CAP lesion (§10): refuse a 4th/5th early joker so ante-1..2 cash keeps
+    -- compounding. Promotes the best non-joker alternative, so packs still get bought.
+    if run.probe and run.probe.early_joker_cap then
+      local ec = Probe.early_cap(run, shop, ranked)
+      if ec then ranked = ec end
+    end
     -- Phase A HOARD lesion: refuse a purchase that would drop the bankroll below the floor.
     -- Fires in every shop of every run (see Probe.hoard); inert without a probe config.
     if run.probe and run.probe.min_bank then

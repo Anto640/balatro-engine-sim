@@ -66,6 +66,34 @@ return function(t)
     t.ok(ok2 ~= nil and ok2.best.cost == 4, "...and buys once the reserve is cleared")
   end
 
+  -- ---- §10 EARLY BOARD CAP: inert without a config, caps only joker acquisition ----
+  do
+    local shop = {}
+    local jok = { best = { type = "BUY_JOKER" },
+                  alternatives = { { type = "BUY_PACK", cost = 4 }, { type = "REROLL" } } }
+    t.eq(Probe.early_cap({ probe = {} }, shop, jok), nil, "early_cap is inert with no config")
+
+    local cfg = { early_joker_cap = 3, early_cap_until = 2 }
+    -- under the cap -> allowed
+    t.eq(Probe.early_cap({ probe = cfg, ante = 1, jokers = { {}, {} } }, shop, jok), nil,
+      "early_cap allows a buy while under the cap")
+    -- past the ante window -> inert
+    t.eq(Probe.early_cap({ probe = cfg, ante = 3, jokers = { {}, {}, {}, {} } }, shop, jok), nil,
+      "early_cap stops applying after its ante window")
+    -- non-joker actions are never touched
+    t.eq(Probe.early_cap({ probe = cfg, ante = 1, jokers = { {}, {}, {} } }, shop,
+      { best = { type = "BUY_PACK" } }), nil, "early_cap never blocks a pack buy")
+
+    -- at the cap -> promotes the best NON-joker alternative (so packs still get bought)
+    local ov = Probe.early_cap({ probe = cfg, ante = 2, jokers = { {}, {}, {} } }, shop, jok)
+    t.ok(ov and ov.best and ov.best.type == "BUY_PACK",
+      "early_cap promotes the best non-joker alternative instead of forcing SAVE")
+    -- SELL_TO_BUY is a joker acquisition too
+    local ov2 = Probe.early_cap({ probe = cfg, ante = 2, jokers = { {}, {}, {} } }, shop,
+      { best = { type = "SELL_TO_BUY" }, alternatives = {} })
+    t.ok(ov2 and ov2.best.type == "SAVE", "early_cap blocks SELL_TO_BUY, falling back to SAVE")
+  end
+
   -- ---- A1 static priority: the supermodular knowledge, hardcoded ----------
   do
     t.ok(Probe.rank("j_blueprint") > Probe.rank("j_joker"),

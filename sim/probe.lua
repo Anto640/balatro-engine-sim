@@ -285,6 +285,48 @@ function Probe.hoard(run, shop, ranked)
 end
 
 -- ---------------------------------------------------------------------------
+-- EARLY BOARD CAP (WINRATE_V3_PLAN §10). The engine's ante-1..2 behaviour, against the 7-win
+-- human, broken down by SOURCE:
+--
+--   by ante 2   shop buys   pack   sells
+--   ENGINE        5.06       0.71   1.88
+--   HUMAN         2.75       1.25   0.12
+--
+-- It buys 1.8x the human's shop jokers and sells FIFTEEN times as many: it fills all five slots
+-- by ante 2 and then churns, buying at ~$5 and selling at ~$2. Net early spend ~$21 vs the
+-- human's ~$14 -- almost exactly the $8 cash gap at ante 2 ($1.3 vs $9.2). The human holds ~3
+-- jokers and banks the rest, which is the "economy and base first, power second" sequencing.
+--
+-- Cash at ante 1-2 is the ONLY cash that still compounds (interest is $1 per $5 held, capped at
+-- $5/round), so converting it to board in that window forfeits the compounding for the whole run.
+--
+-- WHY THIS IS NOT `hoard` (which measured -0.396/-1.194/-1.639 and is NOT waved away): `hoard`
+-- HARD-REFUSED any purchase dropping the bankroll below $10 from ante 1 -- when the engine only
+-- HAS $4-10, so it blocked the FIRST joker outright and starved the board completely. This caps
+-- the BOARD SIZE instead, leaving the first `cap` jokers (the ones that actually carry ante 1-2)
+-- untouched and refusing only the 4th/5th marginal joker that gets sold at a loss anyway. It also
+-- does not block packs, consumables or vouchers -- only the joker over-buy.
+--
+-- Refuses by PROMOTING the best non-joker alternative rather than forcing SAVE, so the shop loop
+-- continues and the freed cash can still buy a pack. Inert without a probe config.
+function Probe.early_cap(run, shop, ranked)
+  local p = run.probe
+  if not (p and p.early_joker_cap) then return nil end
+  if (run.ante or 1) > (p.early_cap_until or 2) then return nil end
+  local best = ranked and ranked.best
+  if not best then return nil end
+  if best.type ~= "BUY_JOKER" and best.type ~= "SELL_TO_BUY" then return nil end
+  if #(run.jokers or {}) < p.early_joker_cap then return nil end       -- under the cap: allow
+  -- promote the best alternative that is not another joker acquisition
+  for _, a in ipairs((ranked and ranked.alternatives) or {}) do
+    if a.type ~= "BUY_JOKER" and a.type ~= "SELL_TO_BUY" and a.type ~= "SAVE" then
+      return { best = a, alternatives = {} }
+    end
+  end
+  return { best = { type = "SAVE", value = 0, reason = "probe: early board cap" }, alternatives = {} }
+end
+
+-- ---------------------------------------------------------------------------
 -- Config plumbing
 -- ---------------------------------------------------------------------------
 
@@ -326,6 +368,12 @@ Probe.CONFIGS = {
   packgreed    = { pack_greed = true, pack_reserve = 0 },     -- the destructive-reserve control
   packgreed10  = { pack_greed = true, pack_reserve = 10 },    -- packs-only arm
   richpack     = { income_bonus = 10, pack_greed = true, pack_reserve = 10 },  -- INTERACTION cell
+  -- EARLY BOARD CAP (§10): hold the board to `cap` jokers through `until` ante, so ante-1..2
+  -- cash (the only cash that still compounds) is not converted into a 4th/5th marginal joker
+  -- that gets sold at half price anyway. cap3 matches the human's measured ~2.75 shop buys.
+  ecap3        = { early_joker_cap = 3, early_cap_until = 2 },
+  ecap3a3      = { early_joker_cap = 3, early_cap_until = 3 },
+  ecap4        = { early_joker_cap = 4, early_cap_until = 2 },
   -- HOARD: refuse purchases that drop the bankroll below the floor, before the given ante.
   -- Fires in EVERY shop of EVERY run (unlike a joker fix, capped at ~5% firing).
   hoard10      = { min_bank = 10, hoard_until = 5 },
