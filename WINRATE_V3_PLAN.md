@@ -3449,3 +3449,39 @@ explanations, in the order to test them:
 1. **skip inflation** — Orbital chasing costs a blind reward, its interest, and a shop visit;
 2. **`level_persist` double-count** — it was a fudge for this very bug (§12a);
 3. **`levelbuy`'s verdict generalising** — purchased levels really do net ~zero even when chosen well.
+
+### §12d — ❌ The Celestial finding does NOT generalise to Standard packs. Do not "fix" that cell the same way
+
+Standard is the other cell where the engine is worst (−1.35, 6.8% buy rate) and the human is
+heaviest, so the obvious next move is to look for the same unit error there. **It is not there, and
+the error runs the other way.**
+
+Standard packs are priced by a HEURISTIC — `DeckPlan.card_quality × QUALITY_FRAC` (0.02) — while
+Buffoon and Celestial are MEASURED. But the engine already *has* a measured card value
+(`CV.card_add_value`, used for card tarots: re-score the deck with the card added). Comparing them
+on a typical ante-3 board, **at 200 samples**:
+
+| card | MEASURED | heuristic | ratio |
+|---|---|---|---|
+| plain King | **−0.013** | 0.200 | — (measured is negative: deck bloat) |
+| Bonus King | 0.038 | 0.320 | 8.5× |
+| Mult King | 0.050 | 0.360 | 7.3× |
+| Glass King | 0.038 | 0.400 | 10.5× |
+
+**The heuristic is 7–10× HIGHER than the measured value, not lower.** So on the measurable axis
+Standard packs are already *over*-valued, and "correcting" them would push the buy rate further
+down, away from the human.
+
+That is §5s restated from the other side: *the engine buys what a per-decision measurement can price
+TODAY; the human buys what pays LATER.* A single added card, measured over 200 sampled hands,
+captures only its immediate scoring — never the compounding of shaping a deck across eight antes.
+The heuristic's 7–10× premium is an attempt to represent exactly that, and the shape work is
+already known-hard (`shape_credit` −0.001 with 157/160 tied; `shape_dir` −0.054 and a destroyed
+win, §5t).
+
+⚠ **Methodological note, because it nearly produced a false finding here.** At the default 12
+samples this comparison returned the *identical* measured value for plain / Bonus / Mult / Glass /
+foil Kings — the added card simply never landed in the first 8 of any sample ((45/53)^12 ≈ 14%
+chance). That reads exactly like "the engine can't tell enhancements apart", which would have been
+a dramatic and completely false conclusion. **A measured value near zero can mean the measurement
+never fired.** Check the sample count before believing it.
