@@ -28,7 +28,7 @@ and a "sell or use a held card to make room" note), a **sell-to-fund** shop move
 single-card destroy-for-$3-and-thinning discard, and clearer advice — Standard-pack
 picks named by exact rank / suit, and tarot targets named from your **drawn hand**
 (a strategy phrase when none is dealt yet). *MCTS multi-turn lookahead is
-intentionally deferred — see "Deferred".* `1024 headless tests` (+524 sim) pass.
+intentionally deferred — see "Deferred".* `1017 headless tests` (+524 sim) pass.
 
 The engine is **tuned by self-play**: a headless simulator (`sim/`) drives the real engine
 through whole runs, logs the same JSONL telemetry the live mod does, and `tools/analyze_runs.lua`
@@ -255,7 +255,7 @@ Requires a standalone Lua 5.1+ (or LuaJIT). From the project root:
 
 ```sh
 lua tests/runner.lua          # 740 unit tests
-luajit tests/runner_sim.lua   # 195 sim integration tests (test_world / test_driver / …)
+luajit tests/runner_sim.lua   # 524 sim integration tests (test_world / test_driver / …)
 ```
 
 Exit code is non-zero on any failure; failures print as `FAIL  <case>  (got X, want Y)`.

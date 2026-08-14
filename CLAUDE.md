@@ -23,7 +23,7 @@ thing **headless-testable**. See the Layout section in `README.md` for the per-f
 - **Tool index:** `tools/README.md` — 31 analysis tools grouped by the QUESTION each answers.
   Read it before writing a new one; most read existing telemetry and cost nothing to run.
 - **Tests (do this after every change):** `lua tests/runner.lua` (run via the Bash
-  tool). Lua 5.1+/LuaJIT, no `love`/`G`/Steamodded needed. Currently **1024 pass** (+ 524 sim).
+  tool). Lua 5.1+/LuaJIT, no `love`/`G`/Steamodded needed. Currently **1017 pass** (+ 524 sim).
   Failures print `FAIL  <case>  (got X, want Y)`; exit code is non-zero on failure.
 - **Phase-1 simulator suites are SEPARATE** (they drive the real engine per hand and
   take minutes): `luajit tests/runner_sim.lua` (`test_world`, `test_driver`, `test_consumables`, `test_content_rates`, …). `luajit`
@@ -156,14 +156,29 @@ the engine has no *spare* money, so what it converts is its **first-joker** mone
 vs 2.99, **ante-2 deaths +50%**, gain cancelled. At `rich10` it converts spare money instead, keeps
 its board (4.43 vs 4.52 — a 2% difference), and reaches **15.67 hand levels by ante 8 against the
 human's 18.6**, with ante-4 deaths falling 32 → 18.
-`BP.level_readiness` (§14, ante-bounded) fixes the baseline cost — ante-2 deaths 21 → 16, board
-2.48 → 2.77, leveling preserved — but that only returns it to **−0.009 vs the commitment alone**.
-**Fixing the cost is not gaining anything: at baseline the whole line nets to ZERO.**
+⚠ **The live mod sits at the `rich10` end** — it advises a *human*, and the human dataset has them
+**2–4× richer than the engine at every ante**. So the correction is a *ship* on the operating point
+that actually matters for the overlay, even though it is worth zero on the sim's.
 
-⚠ **The live mod probably sits at the `rich10` end** — it advises a *human*, and the human dataset
-has them **2–4× richer than the engine at every ante**. So the **ungated** correction may be the
-right thing to deploy for the overlay even if the gate wins in the sim. Arm E (the gate at `rich10`)
-decides that; **do not deploy either half on a baseline verdict alone.**
+### ❌ AND A COUNTER-EXAMPLE WORTH MORE THAN THE FIX: the readiness gate (§14, §17)
+
+A board-readiness gate ("buy the base first, then level it") was built to fix the baseline cost, and
+**it did exactly what it was designed to do** — ante-2 deaths **21 → 16**, ante-2 board
+**2.48 → 2.77**, ante-6 reach restored, leveling preserved. The full 2×2:
+
+| gate effect | baseline | `rich10` |
+|---|---|---|
+| progress Δ | +0.116 (p 0.286) | −0.165 (p 0.284) |
+| sign test | **39 / 43** | **35 / 34** |
+
+**Null at both operating points, means pointing opposite ways, sign tests against-to-even.
+REVERTED** (a magnitude change introducing constants needs positive evidence; on mechanism, there
+is no opportunity cost to avoid at `rich10`, so damping there is pure loss).
+
+**⭐ The finding is not the revert — it is that the mechanism worked and did NOT convert.** Closing a
+precisely-diagnosed behavioural gap moved nothing. File it beside §5m's "capability without intent
+changes nothing" and the indiscriminate dig: **a measured behavioural gap is not a lever until the
+metric says so.**
 
 **✅ SHIPPED on its own merit: the play-derived commitment** (§11, §13). +0.049 at p 0.092 with
 **131 of 160 seeds TIED** (sd 0.372 → MDE 0.082) — a small positive on the most precise measurement

@@ -102,8 +102,9 @@
 > |---|---|---|---|---|---|---|
 > | **B−A** play-derived commitment | **+0.049** | **0.372** | **0.092** | 3→3 | **131** | **KEEP** |
 > | C−B level_gain correction | −0.125 | 1.812 | 0.383 | 3→1 | 12 | gate it, don't revert |
-> | **D−C** the readiness gate | **+0.116** | 1.380 | 0.286 | — | 78 | fixed the cost — §16 |
-> | **D−B** gated correction, net | **−0.009** | 1.707 | 0.949 | 3→2 | 18 | **worth ZERO at baseline** |
+> | D−C the readiness gate | +0.116 | 1.380 | 0.286 | — | 78 | mechanism worked — §16 |
+> | D−B gated correction, net | −0.009 | 1.707 | 0.949 | 3→2 | 18 | worth ZERO at baseline |
+> | **E−`pd_play_r`** the gate at `rich10` | **−0.165** | 1.944 | 0.284 | 42→40 | 91 | **REVERTED — §17** |
 >
 > **B keeps.** The power prediction (§12r) held exactly: 131/160 tied → sd 0.372 → **MDE 0.082**,
 > so +0.049 at p 0.092 is a small *positive* on the most precise measurement class this apparatus
@@ -119,19 +120,27 @@
 > * ❌ predicted cost — **ante-2 deaths 14 → 21 (+50%)**, survivorship to a3 142 → 131, ante-2 board
 >   **2.48 jokers vs 2.99**. It mortgages the early game, exactly as §12q predicted.
 >
-> ✅ **`BP.level_readiness` (§14, ante-bounded) PASSED both halves of its pre-registered condition**
-> (§16): ante-2 deaths **21 → 16**, ante-2 board **2.48 → 2.77**, ante-6 reach back to 27 — while
-> leveling is preserved at a4 (3.72 → 3.51) and *higher* late (a7 8.73 → **10.67**).
+> ❌ **THE READINESS GATE IS REVERTED (§17).** Arm E completed the 2x2:
 >
-> ⚠ **But fixing the cost is not gaining anything: D−B = −0.009.** At baseline the engine has no
-> *spare* money, so a better price for levels cannot buy more of them — only redirect money already
-> committed. **The whole level_gain line nets to ZERO at baseline income. Stop testing it there.**
+> | gate effect | baseline | `rich10` |
+> |---|---|---|
+> | progress delta | +0.116 (p 0.286) | -0.165 (p 0.284) |
+> | sign test | **39 / 43** | **35 / 34** |
 >
-> ⏳ **RUNNING: arm E (`lg_ready_e`) — the gate at `rich10`.** Pre-registered (§16): the gate fires on
-> **19% / 8% / 16%** of `rich10` boards at antes 2–4 versus **46% / 16% / 14%** at baseline, because a
-> funded engine already has its base by ante 2. **So E should land near `pd_play_r`'s +0.42.** If it
-> does, the gate is safe to ship at both operating points; if it is materially below, the gate is
-> another operating-point mirror and must be **income-conditioned**, not shipped flat.
+> Null at both, means pointing opposite ways, sign tests against-to-even. A magnitude change
+> introducing constants needs positive evidence and had none. On mechanism: at `rich10` there is no
+> opportunity cost to avoid (it fires on 19%/8%/16% of boards vs 46%/16%/14%), so damping there is
+> pure loss.
+>
+> ⭐ **The finding is that the mechanism WORKED and did not CONVERT.** The gate hit its
+> pre-registered condition exactly — ante-2 deaths **21 -> 16**, board **2.48 -> 2.77**, ante-6 reach
+> restored, leveling preserved — and the sign test on those seeds is **39 better / 43 worse**.
+> Closing a precisely-diagnosed behavioural gap moved nothing. **A measured behavioural gap is not a
+> lever until the metric says so.**
+>
+> The one variant still worth trying: **income-condition** the gate (fire it only when money is
+> actually scarce, which is its whole justification), so it keeps the baseline mechanism fix and is
+> inert at `rich10` by construction. Needs its own two arms; **no evidence yet.**
 
 > ## 📦 THE DEPLOY SET IS ALREADY SPLIT BY VERDICT (9 files differ from the install)
 > The live install at `%APPDATA%/Balatro/Mods/balatroenginesim/` was current as of the earlier
@@ -143,7 +152,7 @@
 > | **live-only correctness** | `core/state_extraction.lua`, `core/run_telemetry.lua` | **regardless of the verdicts.** The extractor never populated `hand_type_plays` (so the play-derived commitment would be dead in the actual mod) and `hands_played` (so Loyalty Card has been reading 0 in game). The telemetry change makes the human half of the leveling question answerable on the next captured run. |
 > | **play-derived commitment** | `engine/build_plan.lua`, `engine/deck_plan.lua` | if **B ≥ A** |
 > | **level_gain correction** | `engine/consumable_value.lua`, `engine/packs.lua`, `engine/pack_open_advisor.lua`, `engine/shop_advisor.lua`, `engine/tags.lua` | **significantly positive at `rich10` (+0.421, p 0.019); ZERO at baseline.** The live mod's user is 2–4× richer than the engine, i.e. nearer the `rich10` end — so this is a *ship* on the human's operating point, not the sim's |
-> | **readiness gate** | `engine/build_plan.lua` (`level_readiness`, and the `level_scale` rename it forced) | fixes the baseline cost (§16) but is inert-to-harmful where there is no cost to fix. **Gated on arm E** — if it subtracts at `rich10`, income-condition it rather than shipping flat |
+> | ~~readiness gate~~ | — | **REVERTED (§17)** — null at both operating points. Nothing to deploy. |
 >
 > ⚠ `state_extraction` is safe to ship alone — an unread field costs nothing — but the commitment
 > will **not work live without it**, so never ship `build_plan` without it.
@@ -368,7 +377,7 @@
 > * Sim baselines: **progress 3.789 / 3 wins** at baseline income (`sim_out/pd_base_a.jsonl`,
 >   n=160) and **5.311 / 30 wins (18.8%)** at `rich10` (`sim_out/pd_base_r.jsonl`, n=160).
 >   The older n=480 reference is `sim_out/dig_base_all.jsonl` (3.744, pre-2026-08-14 code).
-> * Tests: **1024 unit** (`lua tests/runner.lua`) + **524 sim** (`luajit tests/runner_sim.lua`).
+> * Tests: **1017 unit** (`lua tests/runner.lua`) + **524 sim** (`luajit tests/runner_sim.lua`).
 > * **Tool index: `tools/README.md`** — 31 tools grouped by the question each answers. Read it
 >   before writing a new one.
 > * **Run every A/B arm from a git worktree**, never the tree you are editing (an arm was
