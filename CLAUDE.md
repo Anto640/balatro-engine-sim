@@ -111,11 +111,13 @@ enumeration ABOVE 8 only (sim byte-identical at ≤8) and `main.lua` steps the G
 copy-target search runs AFTER selection — `CV.fool_target` now zeroes it pre-sort (an in-pack target
 only counts when `picks_left >= 2`). Live telemetry gained `blind_select`, `blind_result`
 (hands/discards actually SPENT) and per-option `ranked` valuations.
-⚠ **THE LIVE INSTALL IS STALE as of 2026-08-14.** `%APPDATA%/Balatro/Mods/balatroenginesim/` was
-current at 2026-08-13, but the three 2026-08-14 fixes above touch `engine/value_units.lua`,
-`engine/shop_advisor.lua` and `engine/eval_function.lua` and have **NOT** been copied there. The
-overlay a live player follows is therefore running the OLD advice. **Re-deploy before trusting the
-in-game recommendations** (the repo is not the install — see Build / test / run).
+(The install at `%APPDATA%/Balatro/Mods/balatroenginesim/` is **CURRENT as of 2026-08-14** — verified
+file-by-file: all 42 mod files match the repo and the six re-deployed engine files parse cleanly.
+The sync had drifted by SIX files, not the three the day's fixes touched — `build_plan`,
+`decision_engine` and `discard_value` were also stale — so **diff the whole tree against the install,
+don't copy just the files you edited.** A pre-deploy backup is at
+`%APPDATA%/Balatro/bes_install_backup_20260814` — note it is deliberately OUTSIDE `Mods/`, since a
+copy left inside `Mods/` would be loaded by Steamodded as a second, conflicting instance of the mod.)
 
 ### CURRENT STATE (2026-08-14) — **8 expert HUMAN runs captured, 7 wins**; engine still ~1.25%
 **➡ THE authoritative status is `WINRATE_V3_PLAN.md` §5r (read that first). Fresh-session handoff:
