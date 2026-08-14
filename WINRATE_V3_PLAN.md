@@ -3633,3 +3633,31 @@ negative, §12c's explanation 1 is now *measured*, not merely suspected, which m
 (exclude Orbital from the correction, or cap the tag's share) specific rather than speculative.
 
 ⚠ Partial data (~20% of each arm). Directional, to be confirmed at completion.
+
+### §12k — WHY arm C skips more: the tag side was corrected and the shop side was not
+
+`skip_advisor` compares two **dollar** quantities:
+
+```
+play_value = blind reward + SK.SHOP_VALUE * (1 + 2*(1-fill)) + hand_money + gen_value
+tag_value  = VU.frac_to_dollars(gs, frac)          -- Orbital: persist * freq * level_gain(3) / need
+```
+
+`tag_value` for Orbital is a direct function of `level_gain`, so the §12 correction multiplies it by
+the same **5–20×**. `SK.SHOP_VALUE` is the flat constant **6**.
+
+**So the correction moved one side of the comparison and not the other.** That is the mechanism
+behind the measured +26% skip rate in §12j, and it is not a tuning quibble — it is an inconsistency
+the fix introduced. The shop is *also* a leveling channel (it sells loose planets and Celestial
+packs); if a level is worth 5–20× more, a shop visit is worth more too, and `SK.SHOP_VALUE = 6`
+cannot know that.
+
+⚠ **The bias predates this change and grows with ante.** `SHOP_VALUE` is a constant in dollars while
+`frac_to_dollars` is ante-aware, so the tag side already grew relative to the shop side across a
+run. The correction amplifies an existing tilt rather than creating one from nothing.
+
+**The minimal principled fix**, to test *after* the verdict and as a single change: express the
+forgone shop in the same currency the tag is priced in — a boss-hand fraction converted through
+`VU`, rather than a flat $6 — so both sides move together when the value of a level changes. Do NOT
+simply exclude Orbital from the correction: that would restore the comparison by re-introducing a
+known-wrong number on the tag side.
