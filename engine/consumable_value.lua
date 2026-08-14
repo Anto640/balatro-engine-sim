@@ -25,16 +25,13 @@ local function mc(n) local c = rawget(_G, "BES_MC_CAP"); if c and n > c then ret
 -- bounded and tapering to 1 by the ante-8 race. SHARED by the standalone-planet value
 -- (below) and the Celestial-pack value (engine/packs) so both paths agree.
 --
--- BOARD READINESS (2026-08-14). Multiplied in here rather than at the four call sites, because
--- this is THE shared hook every leveling channel already consumes -- loose planets, the Celestial
--- pool, in-pack picks, Black Hole and Orbital tags -- so a single multiplication reaches all of
--- them by construction. That property matters: threading the level_gain context by hand missed a
--- channel twice in one afternoon, silently, because a nil argument is not an error in Lua.
--- Rationale and the measurement behind it are in BP.level_readiness.
+-- The name is `level_scale` rather than `level_persist` because a board-READINESS factor was
+-- briefly folded in here (2026-08-14). That gate is reverted -- it measured null on the outcome
+-- metric at BOTH operating points (WINRATE_V3_PLAN 17) -- but the name is kept: it is the better
+-- name, and renaming back would churn six files to no purpose.
 function CV.level_scale(gs)
   local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
-  local runway = math.max(1, math.min(4, 1 + (8 - ante) * 0.45))
-  return runway * BuildPlan.level_readiness(gs)
+  return math.max(1, math.min(4, 1 + (8 - ante) * 0.45))
 end
 
 CV.MIN_DECK = 5

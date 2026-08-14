@@ -4174,3 +4174,62 @@ roughly half its baseline rate (46% / 16% / 14%), because a funded engine alread
 ante 2. **So arm E should land close to `pd_play_r`**, i.e. the gate should cost little or nothing at
 `rich10`. If E ≈ +0.42 the gate is safe to ship at both operating points; if E is materially below
 it, the gate is an operating-point mirror and must be income-conditioned rather than shipped flat.
+
+---
+
+## §17 — ARM E, THE FULL 2×2, AND WHY THE READINESS GATE IS REVERTED
+
+`lg_ready_e` = the gated fix at `rich10`, paired n=160, integrity-clean. That completes the 2×2:
+
+| progress Δ vs that column's baseline | baseline income | **`rich10`** |
+|---|---|---|
+| **ungated correction** (C / `pd_play_r`) | −0.076 | **+0.421 (p 0.019)** |
+| **gated** (D / `lg_ready_e`) | −0.009 | +0.256 (p 0.152) |
+| **⇒ the gate's own effect** | **+0.116** | **−0.165** |
+| its sign test | **39 / 43** | **35 / 34** |
+| its p | 0.286 | 0.284 |
+| wins | 3 → 2 | 42 → 40 |
+
+### ❌ REVERTED — and on mechanism, not on the null
+
+**The gate has no positive evidence on the outcome metric at either operating point.** Its two
+progress means point in *opposite* directions, both p ≈ 0.28, and its sign tests are
+**39/43 (slightly against) and 35/34 (dead even)**. Under the standing rule — *a magnitude change
+introducing constants requires positive evidence* — that is a revert, and it introduced two
+(`LEVEL_READY_FLOOR`, `LEVEL_READY_MAX_ANTE`).
+
+The mechanism is the reason it cannot be kept on the mechanism: the gate exists to avoid an
+**opportunity cost**, and at `rich10` there is none to avoid — the firing rate itself says so
+(19%/8%/16% of boards at antes 2–4, against 46%/16%/14% at baseline). Where there is no cost to
+avoid, damping the leveling credit is pure loss, and the point estimate (−0.165, ~40% of the gain)
+is consistent with exactly that.
+
+### ⭐ The finding is not the revert — it is that the mechanism worked and did not convert
+
+The gate **did what it was designed to do**, measurably: ante-2 deaths **21 → 16**, ante-2 board
+**2.48 → 2.77**, ante-6 reach restored to 27, leveling preserved (a4 3.72 → 3.51) and higher late
+(a7 8.73 → **10.67**). And the sign test on those same seeds is **39 better / 43 worse**.
+
+**Fixing the diagnosed harm did not produce better outcomes.** That is worth more than the constant
+was: it is a direct counter-example to the assumption that closing a measured behavioural gap moves
+the metric, and it belongs beside §5m's "capability without intent changes nothing" and §5q's
+indiscriminate dig.
+
+### ✅ What ships, and why
+
+| change | evidence | call |
+|---|---|---|
+| **play-derived commitment** (§11) | +0.049, p 0.092, **131/160 tied**, MDE 0.082 | **SHIP** — feasibility class, and a positive on the most precise measurement class here |
+| **level_gain correction** (§12) | **+0.421, p 0.019 at `rich10`** (both metrics), −0.076 at baseline, interaction p 0.028 | **SHIP** — a measured 1.4–19× unit error with an exact fix, significantly positive where it can express |
+| **readiness gate** (§14) | null at both points, sign tests 39/43 and 35/34 | **REVERTED** |
+
+`CV.level_persist` keeps the name **`level_scale`** it acquired when readiness was folded in.
+Renaming back would churn six files for nothing, and the rename is what made every consumer visible
+at the moment the factor was added — the property that caught two silently-missed channels.
+
+### 📌 The one variant still worth trying
+
+**Income-condition the gate** rather than shipping it flat: fire it only when the money is actually
+scarce, which is the entire content of its justification. That would keep the baseline mechanism fix
+and be inert at `rich10` by construction. It needs its own two arms and has **no evidence yet** —
+recorded here so it is not re-derived, not so it is assumed to work.

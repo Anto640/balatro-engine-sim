@@ -874,11 +874,9 @@ return function(t)
   -- levelled (hand-lv=0/12) because one level was valued at its single-hand gain.
   do
     local Packs = require("engine.packs")
-    local BP = require("engine.build_plan")
-    -- `level_scale` = runway x BOARD READINESS. Give it a board with a base so readiness is 1
-    -- and the runway property is what is being asserted (it was `level_persist` until readiness
-    -- was folded in; the rename is deliberate, so a missed caller errors instead of silently
-    -- losing the factor).
+    -- `level_scale` was `level_persist` until a board-readiness factor was briefly folded in
+    -- (reverted -- WINRATE_V3_PLAN 17). The name stayed: renaming back would churn six files, and
+    -- the rename is what made every consumer visible when the factor was added.
     local function ready(ante)
       return GS.new{ meta = { ante = ante },
         jokers = { joker{ key = "j_jolly" }, joker{ key = "j_sly" } } }
@@ -887,30 +885,6 @@ return function(t)
       "leveling persistence is higher early (more runway) than late")
     t.eq(Packs.level_scale(ready(8)), 1, "no persistence boost at the ante-8 race")
     t.ok(Packs.level_scale(ready(3)) > 1, "leveling is projected up while runway remains")
-
-    -- BOARD READINESS: a level multiplies a base, so before the base exists the same dollars
-    -- should be buying the base instead. Measured cost of NOT gating this: ante-2 deaths +50%.
-    t.eq(BP.level_readiness(ready(3)), 1, "a board with BASE_MIN scorers collects the full credit")
-    t.ok(BP.level_readiness(GS.new{ meta = { ante = 3 }, jokers = {} }) < 1,
-      "an empty board collects less -- buy the base first, then level it")
-    t.eq(BP.level_readiness(GS.new{ meta = { ante = 3 }, jokers = {} }), BP.LEVEL_READY_FLOOR,
-      "...bottoming at LEVEL_READY_FLOOR, never zero")
-    local one = GS.new{ meta = { ante = 3 }, jokers = { joker{ key = "j_jolly" } } }
-    t.ok(BP.level_readiness(one) > BP.LEVEL_READY_FLOOR and BP.level_readiness(one) < 1,
-      "readiness rises monotonically with the base it has")
-    t.ok(Packs.level_scale(ready(3)) > Packs.level_scale(GS.new{ meta = { ante = 3 }, jokers = {} }),
-      "the gate reaches the shared hook, so every leveling channel gets it")
-
-    -- ANTE-BOUNDED: the opportunity-cost argument only holds while the money has a first joker
-    -- to buy instead. Past LEVEL_READY_MAX_ANTE it does not, and damping there would undo the
-    -- one thing the level_gain correction demonstrably achieves -- converting the banked cash
-    -- the engine otherwise dies holding. Firing-rate measurement caught this: un-bounded the
-    -- gate fired on 26-36% of ante 6-7 boards, which was never the intent.
-    local late = GS.new{ meta = { ante = BP.LEVEL_READY_MAX_ANTE + 1 }, jokers = {} }
-    t.eq(BP.level_readiness(late), 1,
-      "past LEVEL_READY_MAX_ANTE an empty board is NOT damped (cash has nothing better to buy)")
-    local inwindow = GS.new{ meta = { ante = BP.LEVEL_READY_MAX_ANTE }, jokers = {} }
-    t.ok(BP.level_readiness(inwindow) < 1, "...but inside the window it still is")
   end
 
   -- 31e. SELL GUARDS (B1/B2): a rich (above-cap) full board with ONE real scorer must
