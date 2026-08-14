@@ -16,6 +16,46 @@
 >
 > ⚠ The bundle is six commits, so this says accumulated work pays AT INCOME, not which commit does.
 
+> ## 📌 SESSION 2026-08-14 — what was established, in priority order
+>
+> 1. **✅ B3 RESURRECTED** (§9). `VU.BASE_FRAC` 0.03→0.06, reverted in July on a baseline −0.245,
+>    measures **+0.518 pooled over two disjoint seed pools (p 0.0011)** at `rich10`. Mechanism
+>    measured: **25% fewer skips** (correcting the ~2× tag over-valuation the audit itself named)
+>    plus a reallocation toward packs/Celestials/planets at **unchanged dollars held**.
+>    ⚠ The in-sample +0.672 was **winner's curse**; the win-doubling (6→12) did **NOT** replicate
+>    (disjoint pool 6 v 6). Do not quote it.
+> 2. **❌ A RECORDED NUMBER WAS WRONG** (§5z). "sim uses MORE planets/run than the human (1.67 vs
+>    1.05)" — live records carry `key`, not `set`. Truth: **1.77 vs 8.38**, opposite sign. That
+>    figure motivated the expressibility workstream, which returned exactly 0.000.
+> 3. **⭐ THE PACK GAP, PAIRED** (§5z). On **244 identical states** where a 7-of-8 winner bought a
+>    pack, the engine agreed **13.5%**, preferring **SAVE (47.9%)** or **REROLL (29.9%)**. Agreement
+>    bottoms at **4% at ante 4**. Engine 1.36 packs/ante vs human 6.10.
+> 4. **❓ pack×income interaction** (§7): `richpack` +0.137 (p 0.63), wins 12→19 but McNemar p 0.189
+>    and only 5 seeds won in BOTH arms. **Suggestive, not demonstrated.**
+>
+> ### Negative results — recorded so they are not re-derived
+> * **Rerolls are NOT the leak.** $129/run at `rich10` looks damning, but winners/losers reroll
+>   identically in the fixed a1–a3 window (9.25 v 8.72) and the ordering has **0 inversions** across
+>   1295 shops. **Do not build a reroll gate.**
+> * **C1 is OBSOLETE.** Its premise (conditional xmults read ~0 at 6–8 samples) is already solved
+>   ANALYTICALLY by `conditional_xmult_marginal` (`p·(x−1)·base`, max'd with the measured delta) on
+>   both the shop and pack paths. Do not re-implement adaptive samples.
+> * **`ecap3` −0.169 and it measured the WRONG THING.** Capping the board cut board power, and
+>   board power EARNS income — the engine got POORER ($7.5→$3.4 at a3). Surviving finding:
+>   **the engine spends to zero regardless of what you block.**
+>
+> ### The live thread
+> Early joker QUALITY is identical to the human's (mean tier 4.51 v 4.43, xmult 14% v 14%). The
+> whole difference is **churn**: the engine sells **1.88 jokers of tier 4.30** by ante 2; the human
+> sells **0.12**, and only tier-3 junk. Equivalent-quality cycling at ~50% cash loss ≈ **$5.6/run**.
+> `nochurn2` tests blocking exactly that — sell-side only, no purchase blocked, board size
+> unchanged, so no board-power confound.
+>
+> 🛡 **`tools/sim_par.sh` now guards against a REAL corruption** that nearly produced a false
+> verdict (orphaned luajit children from a killed wrapper wrote the same shards as a new run:
+> 69 unique seeds where 80 were expected, torn JSON). It refuses colliding batch names and
+> validates every merge. **If you see an INTEGRITY WARNING, do not compute a verdict.**
+
 
 > 🛑 **FOUR large probes, three dead-even coin flips. STOP running single-axis decision probes.**
 > `oracle_plan` (a perfect archetype target) **41/40** · `noskip` **68/67** · `noskip_early`
