@@ -8,6 +8,7 @@ local HandEval = require("engine.hand_eval")
 local Mechanics = require("engine.mechanics")
 local JokerValue = require("engine.joker_value")
 local JokerData = require("engine.joker_data")
+local Pacing = require("engine.pacing")   -- growth_factor only (cheap + pure); see CV.level_scale
 local Tarot = require("engine.tarot")
 local DeckPlan = require("engine.deck_plan")
 local VU = require("engine.value_units")
@@ -29,9 +30,52 @@ local function mc(n) local c = rawget(_G, "BES_MC_CAP"); if c and n > c then ret
 -- briefly folded in here (2026-08-14). That gate is reverted -- it measured null on the outcome
 -- metric at BOTH operating points (WINRATE_V3_PLAN 17) -- but the name is kept: it is the better
 -- name, and renaming back would churn six files to no purpose.
+--
+-- ⭐ DERIVED, NOT TUNED (2026-08-14, WINRATE_V3_PLAN 20). This was `clamp(1 + (8-ante)*0.45, 1, 4)`
+-- -- a hand-fitted ramp that 12a flagged in advance as *"itself a fudge for this very bug; the two
+-- are coupled and must be calibrated together, never one at a time."* 12 fixed `level_gain` exactly
+-- and left this untouched, so the pair was half-calibrated. This closes it.
+--
+-- Every caller uses `level_scale(gs) * level_gain(...) / boss_per_hand_need(gs)`, i.e. the units are
+-- FRACTION OF WHAT ONE HAND MUST DELIVER at the CURRENT ante. A level bought now also applies at
+-- every later ante, where the gain has grown with the board and the requirement has grown on its own
+-- curve -- so the honest multiplier is that same fraction summed over the remaining antes:
+--
+--     level_scale = SUM over k = ante..8 of  min(1,  g^(k-ante) * need(ante) / need(k))
+--
+-- with `g` the board's projected capacity growth (Pacing.growth_factor -- the engine's own model,
+-- not a new constant) and `need(k)` the REAL `blind_requirement` curve, which is not the flat 2x/ante
+-- the ramp assumed: its ratios are 2.67, 2.50, 2.50, 2.20, 1.82, 1.75, 1.43 -- it DECELERATES, so a
+-- level bought late keeps more of its value than a linear taper allows.
+--
+-- The per-ante cap at 1 is not a fudge, it is the unit: the term is a fraction of what one hand must
+-- deliver, and a hand delivering more than 100% of that is surplus which buys no extra survival. It
+-- also bounds the sum by the number of remaining antes.
+--
+-- ⚠ What this changes, and why it is a JOINT calibration rather than a bump: the old ramp was
+-- board-BLIND at exactly the point where the answer is board-DEPENDENT. At ante 1 it returned a flat
+-- 4.0; the derived value is ~2.0 on a bare board (g 1.25) and ~5.1 on a strong one (g 2.0). At ante 6
+-- it returned 1.9 against a derived ~2.8. So this is not "more leveling" -- it is less on the weak
+-- early boards where 13 measured the correction's cost (ante-2 deaths +50%), and more on boards that
+-- can actually cash it, which is the shape the readiness gate tried and failed to impose by fiat (17).
+--
+-- ⚠ Mild positive feedback, bounded: `growth_factor` counts hand levels (0.05 each, capped at 12), so
+-- leveling raises g raises this. Both ends are clamped, so it converges; it is noted, not hidden.
 function CV.level_scale(gs)
   local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
-  return math.max(1, math.min(4, 1 + (8 - ante) * 0.45))
+  if ante >= 8 then return 1 end
+  local need_now = Mechanics.blind_requirement(ante, "Boss")
+  if not need_now or need_now <= 0 then return 1 end
+  local g = Pacing.growth_factor(gs)
+  local total = 0
+  for k = ante, 8 do
+    local req = Mechanics.blind_requirement(k, "Boss")
+    if req and req > 0 then
+      local term = (g ^ (k - ante)) * need_now / req
+      total = total + math.min(1, term)
+    end
+  end
+  return math.max(1, total)
 end
 
 CV.MIN_DECK = 5
