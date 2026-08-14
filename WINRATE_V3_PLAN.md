@@ -2565,7 +2565,37 @@ reports, because it averages the whole distribution. When the two disagree, note
 quoting whichever is more favourable. (Equally: with 5/12 overlap the win gain could simply be
 noise. That is the point — at n=80 neither metric can tell.)
 
-### Status: replication running, out of sample
+### ✅ RESULT: the replication landed. Wins replicate in DIRECTION, and pooled it is p 0.088
+
+Both arms had in fact been re-run on the disjoint `BES_SEED_OFF=4` pool and never analysed
+(`sim_out/rich10_s4.jsonl`, `sim_out/richpack_s4.jsonl`; both integrity-checked — 80 run_starts,
+80 unique seeds, 0 duplicates, 0 torn lines, which matters because an earlier corruption hit
+`rich10_s4` specifically).
+
+| pool | progress Δ | sign | wins | McNemar (A-only vs B-only) |
+|---|---|---|---|---|
+| in-sample (s3) | +0.137 (p 0.63) | 38/36 | 12 → 19 | 7 vs 14, **p 0.189** |
+| **out-of-sample (s4)** | **+0.036 (p 0.89)** | 44/32 | **10 → 15** | 8 vs 13, **p 0.383** |
+| **POOLED n=160** | **+0.082, SE 0.191, t 0.43** | — | **22 → 34 (13.75% → 21.25%)** | **15 vs 27, exact p 0.0884** |
+
+**What replicated and what did not.** The *progress* effect is a flat null in both pools and pooled
+(+0.082, t 0.43) — that axis is settled. The *win* effect reproduced in **direction and rough
+magnitude** out-of-sample (13 vs 8 discordant, against 14 vs 7 in-sample), which is the thing a
+disjoint pool can actually test, and pools to **p 0.088**. So the §7 caution stands but softens:
+this is now a consistent, replicated, **still-not-significant** win effect of about **+7.5pp**.
+
+**The churn is confirmed too, and it is why the two metrics disagree.** Only **2 of 80** seeds won in
+*both* arms of the s4 pool (5 of 80 in-sample). Forcing pack throughput does not lift a fixed set of
+runs — it re-rolls **which** seeds win, and nets positive. That is exactly the shape `progress`
+averages away and `wins` counts, and it is §5z's chaotic-policy-sensitivity finding appearing in the
+outcome that actually matters.
+
+**Status: no longer "do not act" — but not a green light either.** Reaching significance on the win
+metric needs roughly another 160 paired seeds (~n=320 total, projecting ~30 vs ~54 discordant,
+p≈0.01). That is the cheapest outstanding experiment in the project: no new code, two probe arms,
+and it settles the largest measured behavioural gap in the dataset.
+
+### (superseded) Status: replication running, out of sample
 
 Extending to n=160 should roughly double the discordant pairs (~14 vs ~28), which lands McNemar
 near p≈0.04 — borderline. Both arms are being re-run on a **disjoint seed pool** (`BES_SEED_OFF=4`
