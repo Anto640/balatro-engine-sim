@@ -4640,3 +4640,68 @@ states from a4 on, so it is nowhere near the frequency ceiling); it does not say
 
 ⚠ **Mild positive feedback, bounded and noted rather than hidden:** `growth_factor` counts hand levels
 (0.05 each, capped at 12), so leveling raises `g` raises `level_scale`. Both ends are clamped.
+
+---
+
+## §21 — ❌ TIER 3 IS A NEGATIVE, AND THE INCOME AXIS IS CLOSED AT `rich10`
+
+§18g Tier 3 named the last open income hypothesis: every other route to the human's 2–4× advantage is
+refuted (early stock — `ecap3bank` −0.073 and `hoard*` all negative; skipping — `noskip` 68/67;
+rerolls — 0 ordering inversions across 1295 shops; unused hands — §18e), leaving the **FLOW**, from
+the docs' own line: *"by ante 5 they have acquired 1.5× more jokers and 1.6× more economy — just
+LATER."* `tools/econ_flow.lua` (new) screens it directly. **It is refuted, in the opposite direction.**
+
+### 21a. Economy held, and when it was acquired
+
+| ante | HUMAN econ jokers | ENGINE econ jokers | human board | engine board |
+|---|---|---|---|---|
+| a2 | 0.25 | **0.51** | 1.38 | 4.43 |
+| a3 | 0.50 | 0.48 | 3.88 | 5.09 |
+| a4 | 0.75 | 0.51 | 5.12 | 5.21 |
+| a5 | 0.75 | 0.47 | 5.38 | 5.33 |
+| a6 | 0.57 | **0.60** | 5.43 | 5.48 |
+| a7 | 0.29 | **0.63** | 5.43 | 5.69 |
+| a8 | **0.14** | **0.71** | 5.43 | 5.90 |
+
+Acquisition timing from `joker_gain`: **econ is 18% of the human's ante-3+ pickups and 20% of the
+engine's** (17% vs 15% over the whole run). The engine is not acquiring economy later *or* less.
+
+**The human DIVESTS economy late** — 0.75 at a4 down to 0.14 by a8 — while the engine accumulates it
+to 0.71. That is the E-13 shape (collapse econ weight in the endgame) showing up in human behaviour,
+and the engine already has E-13; it is evidently not collapsing hard enough. ⚠ But note E-13 is +0.012
+on an sd-0.066 measurement and W-ECON-class frequency, so this is an observation, not a lever.
+
+⚠ **The "1.6× more economy" figure in the docs is not reproduced by joker count.** It presumably
+measured econ *value* or a different cut. Stated as a discrepancy, not a correction — but do not quote
+it as evidence of an acquisition gap without re-deriving it, which is the §5z lesson exactly.
+
+### 21b. ⭐ The bigger result: at `rich10` the dollar curve is CLOSED
+
+The same scan reads dollars, and the engine at `rich10` now tracks the human within ~20% at every ante:
+
+| ante | a3 | a4 | a5 | a6 | a7 | a8 |
+|---|---|---|---|---|---|---|
+| human | 21.5 | 25.5 | 43.4 | 42.4 | 48.9 | 47.3 |
+| **engine (`rich10`)** | **24.1** | **31.8** | 35.6 | 37.8 | 42.8 | 42.3 |
+
+The engine is **ahead** at a3–a4 and 8–18% behind from a5. Against the baseline-income engine — $1.0 at
+a2 against the human's $7.5, p 0.009 — that axis is gone.
+
+**⇒ The income axis is closed at `rich10`, and the winrate gap is still 26.2% vs 87.5%.** That is the
+cleanest available statement of what is left: matched money, matched board size from a3, matched econ
+acquisition, **and a 3.3× winrate difference.** Whatever remains is not a resource.
+
+⚠ This does NOT restore §5u's conclusion. It says the *income* axis is exhausted at `rich10`, which is
+what `rich10` was constructed to do. §18a's point stands: valuation levers are large there and were
+invisible at baseline. Two axes, and only one of them is closed.
+
+### 21c. ✅ Free cross-check: §19b is *bigger* on the boards that actually won
+
+The LIVE records carry `metrics.growth` (the sim's do not), so the human's own boards can be run
+through §19b's correction:
+
+> **59 human ante-states: 76% hold a FLAT xmult, mean growth over-credit 0.422/ante**
+
+against the sim's 66.4% and 0.319. **The double-count is ~30% larger on the boards of a 7-of-8-win
+policy than on the engine's own** — so the correction matters *more* for the live overlay than for the
+sim, which is the operating point that actually ships. Independent of the pending `pacefix` verdict.
