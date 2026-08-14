@@ -213,6 +213,15 @@ class this apparatus produces. 63% of runs never committed before; now 71%. Feas
 (§18g). Read it first, then §6. Fresh-session handoff: `NEXT_SESSION.md`. Historical audit +
 roadmap: `WINRATE_AUDIT.md`. Superseded plans: `docs/archive/`.**
 
+> ### ⭐ §24 — ARCHETYPE PLANNING IS CLOSED, at BOTH operating points
+> A perfect deck-frequency plan handed to the engine free from ante 1, at `rich10`: progress
+> **−0.165 (p 0.228)**, sign **47/52**, wins **42 → 40** (McNemar p 0.860) — **replicating** the 41/40
+> measured at baseline. It **executed** (commitment in 577/577 ante-states vs 622/828). So the gap is
+> not the engine failing to know what to build. **NOT closed: search over the SHOP STREAM** — a
+> different object; bound its cheapest slice with `ecap3rich` (§22) before writing any search.
+> **⚠ §6 is a filter, not a wand:** 4 changes re-measured at `rich10` — 2 converted (B3, level_gain,
+> both *valuation*), 2 did not (readiness gate, oracle, both *policy*).
+>
 > ### 🧭 §18, in four lines
 > * **§5u is REVISED.** Its *"wrong SIZE by 1–2 orders of magnitude; do not open another single-lever
 >   arm"* was computed at baseline income. At `rich10` the gap is **1.36 sd, not 2.47**, and the two

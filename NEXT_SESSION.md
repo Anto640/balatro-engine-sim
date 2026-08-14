@@ -48,7 +48,7 @@
 >
 >   | # | arm | probe | baseline | worktree |
 >   |---|---|---|---|---|
->   | 1 | `oracle_rich` (§18g Tier 4 bound) | `oracle_rich` | `pd_play_r` | `bes_oracle` @ `5d82d0e` |
+>   | ~~1~~ | ~~`oracle_rich`~~ | — | — | **✅ DONE — see below** |
 >   | 2 | `pacefix` (§19b alone) | `rich10` | `pd_play_r` | `bes_pacefix` @ `bb3e876` |
 >   | 3 | `levelscale` (§20 on top) | `rich10` | **arm 2**, not `pd_play_r` | `bes_levelscale` @ `ff818f5` |
 >   | 4 | `ecap3` / `ecap3a3` (§22 bound) | `ecap3`+`rich10` | `pd_play_r` | none — probe only |
@@ -59,6 +59,20 @@
 >   §19d pre-registers arm 2's reading (a NEGATIVE CHECK, not positive evidence; also re-check the
 >   ante-6+ tail, which is what reverted E-12 in July). §20c states arm 3's risk plainly: it cuts
 >   ante-2 leveling 9–31%, at the operating point where the level_gain correction earned its +0.421.
+>
+> ## ⭐ ARM 1 RESULT — ARCHETYPE PLANNING IS CLOSED (§24)
+> A **perfect deck-frequency plan, free, from ante 1**, at `rich10`: progress **−0.165 (p 0.228)**,
+> sign **47/52/61 tied**, wins **42 → 40** (McNemar p 0.860). Dead even on every metric — and it
+> **replicates** the 41/40 measured at baseline. **Two operating points, two nulls.**
+> It **executed** (checked first): commitment present in **577/577** ante-states vs the baseline's
+> 622/828, content changed, planet use followed. Not a §5t non-result.
+> **⇒ Closed: knowing WHICH HAND to build.** With §5m's expressibility work at exactly 0.000 and §5t's
+> shape credit, that thread is tested four ways and has never produced anything.
+> **⇒ NOT closed: search over the SHOP STREAM** (§5u item 1) — a different object (acquisitions, not
+> hand type) — but its prior should fall, and §22's `ecap3rich` bounds its cheapest slice
+> (`MCTS_PLAN.md` INC-1, slot reservation) for free **before any search is written**.
+> **⇒ §6 is a filter, not a wand (§24d):** 4 changes re-measured at `rich10`, **2 converted** (B3,
+> level_gain — both *valuation*) and **2 did not** (readiness gate, oracle — both *policy*).
 
 > # ⭐⭐ THE BASELINE IS A BROKEN INSTRUMENT — read `WINRATE_V3_PLAN.md` §6 FIRST
 > The **identical** six-commit engine delta (`e7c3a8c`→`82f808f`), on the **same** seeds:
