@@ -207,8 +207,10 @@ class this apparatus produces. 63% of runs never committed before; now 71%. Feas
    comparing card enhancements returned identical values because the added card never landed in the
    sampled hand — which reads exactly like "the engine can't tell them apart".
 
-### CURRENT STATE (2026-08-14) — **8 expert HUMAN runs captured, 7 wins**; engine ~1.25% at
+### CURRENT STATE (2026-08-15) — **8 expert HUMAN runs captured, 7 wins**; engine ~1.25% at
 ### baseline income and **26.2% at `rich10`**, the operating point the live mod actually serves
+### The §18g four-arm queue is COMPLETE: 2 shipped, 2 directions closed, arm 4 (`ecap3rich`) refuted
+### its own bound at p<0.0001 (§28). Best-evidenced open lead: §26e `growth_factor` trend inversion.
 **➡ THE authoritative status is `WINRATE_V3_PLAN.md` §18 — the current checkpoint AND the plan
 (§18g). Read it first, then §6. Fresh-session handoff: `NEXT_SESSION.md`. Historical audit +
 roadmap: `WINRATE_AUDIT.md`. Superseded plans: `docs/archive/`.**
@@ -218,9 +220,22 @@ roadmap: `WINRATE_AUDIT.md`. Superseded plans: `docs/archive/`.**
 > **−0.165 (p 0.228)**, sign **47/52**, wins **42 → 40** (McNemar p 0.860) — **replicating** the 41/40
 > measured at baseline. It **executed** (commitment in 577/577 ante-states vs 622/828). So the gap is
 > not the engine failing to know what to build. **NOT closed: search over the SHOP STREAM** — a
-> different object; bound its cheapest slice with `ecap3rich` (§22) before writing any search.
-> **⚠ §6 is a filter, not a wand:** 4 changes re-measured at `rich10` — 2 converted (B3, level_gain,
-> both *valuation*), 2 did not (readiness gate, oracle, both *policy*).
+> different object; its cheapest slice (slot reservation, `MCTS_PLAN.md` INC-1) was bounded by
+> `ecap3rich` (§28) and **REFUTED before being built** (below).
+> **⚠ §6 is a filter, not a wand:** 5 changes re-measured at `rich10` — 2 converted (B3, level_gain,
+> both *valuation*), 3 did not (readiness gate, oracle, **`ecap3` early board cap**, all *policy/
+> behaviour*).
+>
+> ### ❌❌ §28 — EARLY BOARD DISCIPLINE IS REFUTED, HARDER AT `rich10`
+> `ecap3rich` (board ≤3 jokers through ante 2, **plus** +$10/round) vs `pacefix`, paired n=160:
+> progress **−0.945 (t −4.85, p < 0.0001)**, wins **45 → 24** (McNemar p 0.0065), tail collapsing at
+> every level. **5.6× more negative at `rich10` than baseline** — opposite of §22's prediction. My §22
+> reasoning was wrong: `rich10`'s exogenous +$10/round did NOT close the harm channel (capped engine
+> still ends ante 2 with HALF the money, $4.8 vs $9.9) because the harm channel is **board power
+> itself**, which produces money AND survival jointly. **Refinement to §6: the operating-point
+> argument holds only when the point SUPPLIES the thing the lesion removes — "income" is not one
+> thing.** ⇒ the human's empty ante-2 board is a CONSEQUENCE of their play, not a cause; **INC-1 slot
+> reservation is dead unbuilt** — the second search-adjacent direction closed after §24.
 >
 > ### 🧭 §18, in four lines
 > * **§5u is REVISED.** Its *"wrong SIZE by 1–2 orders of magnitude; do not open another single-lever

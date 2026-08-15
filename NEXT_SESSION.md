@@ -1,4 +1,13 @@
-# NEXT_SESSION.md — fresh-session handoff (updated 2026-08-14)
+# NEXT_SESSION.md — fresh-session handoff (updated 2026-08-15)
+
+> **🆕 2026-08-15 — THE FOUR-ARM QUEUE IS COMPLETE.** Arm 3 (`levelscale`) reverted (§27), arm 4
+> (`ecap3rich`) catastrophically refuted its own §22 bound (**−0.945, p < 0.0001**, §28). Net for the
+> arc: **2 shipped** (B3, level_gain+commitment), **2 closed directions** (archetype planning §24,
+> income axis §21), **1 refuted lesion** (early board discipline §28) that also kills `MCTS_PLAN.md`
+> INC-1 unbuilt. **The best-evidenced open lead is §26e: `growth_factor`'s trend is inverted** and it
+> is read in every shop of every run — the systems-class target. Do NOT re-derive `level_scale` (§27b)
+> or re-open a single lesion arm until `growth_factor` is calibrated against `tools/growth_truth.lua`.
+
 
 > # 🧭 START HERE — `WINRATE_V3_PLAN.md` **§18** is the current checkpoint and the plan
 >
@@ -50,7 +59,10 @@
 >   | ~~1~~ | ~~`oracle_rich`~~ | — | — | **✅ DONE — see below** |
 >   | ~~2~~ | ~~`pacefix`~~ | — | — | **✅ DONE — KEPT + DEPLOYED (§25)** |
 >   | ~~3~~ | ~~`levelscale`~~ | — | — | **✅ DONE — ❌ REVERTED (§27)** |
->   | 4 | `ecap3rich` (§22 bound) | `ecap3rich` | **`pacefix`** | `bes_ecap` @ `2036a4b` |
+>   | ~~4~~ | ~~`ecap3rich`~~ | — | — | **✅ DONE — ❌❌ REFUTED, −0.945 (§28)** |
+>
+>   **THE QUEUE IS COMPLETE.** Do not start a new arm without checking in — §18g's four-arm plan is
+>   fully executed (2 shipped, 2 closed directions, arm 4 catastrophically refuted its own bound).
 >
 >   Arm 4's baseline is `sim_out/pacefix.jsonl`, not `pd_play_r` — HEAD's engine was verified
 >   **code-identical** to the `pacefix` arm's (the §20 revert restored it exactly; the only diff is
@@ -59,6 +71,21 @@
 >   §19d pre-registers arm 2's reading (a NEGATIVE CHECK, not positive evidence; also re-check the
 >   ante-6+ tail, which is what reverted E-12 in July). §20c states arm 3's risk plainly: it cuts
 >   ante-2 leveling 9–31%, at the operating point where the level_gain correction earned its +0.421.
+>
+> ## ❌❌ ARM 4 RESULT — EARLY BOARD DISCIPLINE REFUTED, HARDER AT `rich10` (§28)
+> `ecap3rich` (board capped at 3 jokers through ante 2, **plus** +$10/round) vs `pacefix`, paired
+> n=160, both integrity-clean: progress **−0.945 (t −4.85, p < 0.0001)**, sign **51/96/13 (p 0.0003)**,
+> wins **45 → 24** (McNemar p 0.0065), tail collapsing at every level (reach6 93→59, reach8 53→33).
+> **5.6× MORE negative at `rich10` than at baseline (−0.169)** — the opposite of what §22 predicted.
+> **⇒ My §22 reasoning was wrong** (§28a): `rich10`'s exogenous +$10/round did NOT close the harm
+> channel — the capped engine still ends ante 2 with HALF the money ($4.8 vs $9.9), because the harm
+> channel is **board power itself**, which produces money and survival jointly, not the income faucet.
+> **Refinement to §6:** the operating-point argument only holds when the point SUPPLIES the thing the
+> lesion removes; "income" is not one thing.
+> **⇒ Closes (§28b):** the human's 1.38 jokers at ante 2 is a **consequence** of their play, not a
+> cause; **`MCTS_PLAN.md` INC-1 (slot reservation) is refuted before being built** — the second
+> search-adjacent direction closed this session after §24. `rich10` scorecard now **2 of 5**; both
+> converts are *valuation*, all three failures are *policy/behaviour*.
 >
 > ## ⭐ ARM 1 RESULT — ARCHETYPE PLANNING IS CLOSED (§24)
 > A **perfect deck-frequency plan, free, from ante 1**, at `rich10`: progress **−0.165 (p 0.228)**,
