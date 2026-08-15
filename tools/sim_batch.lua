@@ -40,6 +40,37 @@ local probe_opts = Probe.opts(probe_name)
 -- Default 3 keeps every existing batch byte-identical.
 local seed_off = tonumber(os.getenv("BES_SEED_OFF") or "") or 3
 
+-- SEED-LATTICE CHECK (methodology-shift-2026-08, step 1). The pool s*1000+seed_off is an
+-- ARITHMETIC sequence fed RAW into the world's Park-Miller MINSTD LCG, whose first outputs are
+-- LINEAR in the seed -- so nearby seeds sit on a lattice, not independent draws (verified: the raw
+-- first-draws for s=1..6 are 0.0078/0.0157/0.0235/... an exact ramp). BES_SEED_HASH=1 runs each raw
+-- seed through a NONLINEAR scramble first. NOTE a warm-up through MINSTD does NOT work -- MINSTD is
+-- pure multiplication, so any number of steps is x(constant) mod m and stays a lattice; the SQUARING
+-- step below is what breaks linearity. All arithmetic is kept under 2^53 (mulmod) so it is exact in
+-- LuaJIT doubles. This changes WHICH runs happen, so a hashed batch is compared to the arithmetic
+-- batch DISTRIBUTIONALLY (winrate / death-ante / mean progress), NOT paired: a match means the
+-- lattice is harmless and every past verdict's pool was fine; a divergence means history was measured
+-- on a skewed sample. Default off (existing batches byte-identical).
+local seed_hash = os.getenv("BES_SEED_HASH")
+local SEED_M = 2147483647
+local function mulmod(a, b)           -- (a*b) % SEED_M without exceeding 2^53
+  a = a % SEED_M; local r = 0
+  while b > 0 do
+    if b % 2 == 1 then r = (r + a) % SEED_M end
+    a = (a * 2) % SEED_M
+    b = math.floor(b / 2)
+  end
+  return r
+end
+local function scramble(seed)
+  local z = seed % SEED_M
+  z = mulmod(z, 2654435761 % SEED_M)  -- Fibonacci mixing
+  z = mulmod(z, z)                    -- SQUARE: the nonlinearity that breaks the lattice
+  z = (mulmod(z, 40503) + 1013904223) % SEED_M
+  if z <= 0 then z = z + (SEED_M - 1) end
+  return z
+end
+
 -- Optional SHARDING for parallel runs (see tools/sim_par.sh). When nshards is given, this
 -- process runs ONLY the seeds assigned to `shard` (interleaved: seed index s belongs to
 -- shard (s-1) % nshards), writing its slice to its own <name> file. The orchestrator then
@@ -58,7 +89,8 @@ end
 io.write(string.format("running %d sim seeds -> %s%s%s\n", n, outpath,
   cap and (" (mc_cap=" .. cap .. ")") or " (full fidelity)",
   (probe_opts and ("  [PROBE " .. probe_name .. "]") or "")
-  .. ((seed_off ~= 3) and ("  [SEEDS +" .. seed_off .. "]") or "")))
+  .. ((seed_off ~= 3) and ("  [SEEDS +" .. seed_off .. "]") or "")
+  .. (seed_hash and "  [SEED_HASH: nonlinear scramble -- lattice check]" or "")))
 io.flush()
 
 local wins, hist = 0, {}
@@ -69,6 +101,7 @@ local t0 = os.clock()
 for s = 1, n do
   if (not nshards) or ((s - 1) % nshards) == shard then
     local seed = s * 1000 + seed_off
+    if seed_hash then seed = scramble(seed) end
     local ropts = { content = Content, max_ante = 8 }
     if probe_opts then for k, v in pairs(probe_opts) do ropts[k] = v end end
     local res = Driver.run(seed, ropts)

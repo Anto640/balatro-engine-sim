@@ -53,6 +53,7 @@ local suites = {
   "tests.test_mechanics",
   "tests.test_advisors",
   "tests.test_value_units",
+  "tests.test_replay_fixture",
   "tests.test_telemetry",
   "tests.test_probe",
 }
