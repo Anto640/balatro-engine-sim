@@ -6,11 +6,10 @@
 -- fall below the requirement. The shop advisor uses the verdict to decide when to
 -- stop saving and start buying power. PURE (measurement uses an injected rng).
 --
--- The growth factor is calibrated (§29) against the growth the engine actually
--- REALIZES: it DECAYS across a run (base-effect + board saturation), high early and
--- ~flat late, and a flat board projects below the requirement curve while an
--- xmult/scaling/income board projects above it. So "you need xmult/scaling to keep
--- pace" still falls out of the model. Magnitudes are calibrated, not gospel.
+-- The growth factor is a heuristic: a flat board (no xmult/scaling, no economy)
+-- barely grows (~1.3x/ante) and falls behind the ~2x requirement curve; an engine
+-- with xmult/scaling jokers + economy out-scales it. So "you need xmult/scaling to
+-- keep pace" falls out of the model. Magnitudes are tunable, not gospel.
 
 local Mechanics = require("engine.mechanics")
 local JokerValue = require("engine.joker_value")
@@ -38,36 +37,16 @@ P.TARGET_ANTE = 8  -- the race: beat ante 8's boss
 --
 -- An xmult_scaling joker is genuinely different: its own X grows each round, so
 --     cap' / cap = (X + dX) / X > 1
--- is a real rate. It keeps its scaling credit (0.18 + 0.08 = 0.26; see §29 for why the weights fell).
+-- is a real rate. It keeps the full 0.30 + 0.15 = 0.45 it has always had.
 --
 -- This is the E-12 diagnosis (2026-07-14), which measured the CONSEQUENCE before the cause was
 -- derived: the ante-6-8 DEATH cohort reads "comfortably ahead" at antes 3-5 (median margin 2-3) and
 -- then dies -- a false lead, bought with credit for multipliers that are not growing, which tells
 -- the shop advisor to stop buying power. E-12 was reverted at BASELINE income on a -0.038 null;
 -- pacing decides WHEN TO STOP SAVING AND START BUYING, which is unmeasurable on an engine holding
--- $1.3 at ante 2 (6).
---
--- ⭐ §29 (2026-08-15) -- THE TREND WAS INVERTED, and the cause is two more stock-as-rate double
--- counts of the SAME class as the flat-xmult one above. `growth_truth.lua` measured what capacity
--- growth the engine actually REALIZES (from consecutive `metrics.capacity`): it DECAYS 4.6 -> ~1.7
--- across a run (base-effect + board saturation), while this model RISES 1.7 -> 2.8. `P.pace` raises
--- g to the (8 - ante), so a model that rises where truth falls over-projects late by ~3x -- the
--- structural over-confidence §25b found (ante 4: believes 12x the ante-8 need while 57 runs die at
--- a3-a5), and the reason level_scale (§27) and the pace bands both inherited a backwards trend.
---   Measured over the real per-ante board averages (rich10, n>=300/ante), the two RISING terms were
--- the culprits: `hand_lv` (0.05*min(lv,12), +0.06 -> +0.60 across the run) and `money`
--- (+0.06 -> +0.25). Both are STOCKS already inside the measured `cap` -- avg_score scores the
--- leveled board, and a cash pile is one spend, not a rate -- so crediting them again as growth is
--- the flat-xmult error twice more. What actually funds FUTURE growth is INCOME (econ) and the
--- board's ongoing SCALING, plus a base-effect head-room that shrinks as antes remain shrink and the
--- board saturates (`slots_free` is ~0 from ante 3, so the room is quality/scaling, not empty slots).
---   Removing the two stocks and adding a decaying head-room lands the AVERAGE board on the measured
--- realized curve (model 2.13/2.05/1.96/1.87/1.77/1.70 vs realized ~2.18/1.88/1.76/1.70/1.84/2.0,
--- antes 2..7) with the RIGHT sign of trend, and still discriminates: a flat board projects below the
--- requirement curve (falls behind) while a scaling/income board projects above it. Weights are
--- calibrated, so this is a magnitude change riding on a correctness core -- judged on an arm.
+-- $1.3 at ante 2 (6). E-12 also bundled a tuned leveling bump (0.05->0.06, cap 12->15) that is NOT
+-- reproduced here: this changes only what the derivation dictates, so the result is attributable.
 function P.growth_factor(gs)
-  local ante = math.floor((gs.meta and gs.meta.ante) or 1)
   local scaling, xgrow, econ = 0, 0, 0
   for _, j in ipairs(gs.jokers or {}) do
     if JokerData.is_scaling(j.key) then
@@ -78,14 +57,17 @@ function P.growth_factor(gs)
     end
     econ = econ + (JokerData.resolve(j.key).econ or 0)
   end
-  -- head-room: room to improve, high early and decaying to ~0 by ante 8. This is the term that
-  -- carries the (measured) DECAY the old model lacked -- and it is why an average board's g falls.
-  local headroom = math.max(0, math.min(1, (P.TARGET_ANTE - ante) / 6))
-  local g = 1.30                            -- irreducible floor: a near-flat late board still creeps
-    + 0.70 * headroom                       -- base-effect + acquisition room, DECAYS with ante
-    + 0.18 * xgrow                          -- xmult whose X ITSELF grows compounds (a real rate)
-    + 0.08 * scaling                        -- scaling jokers grow each round (a real rate)
-    + math.min(econ, 12) / 50               -- passive INCOME funds future buys (a rate, not a stock)
+  local money = math.max(0, (gs.economy and gs.economy.dollars) or 0)
+  local hand_lv = 0
+  for _, h in pairs((gs.run and gs.run.hand_levels) or {}) do
+    hand_lv = hand_lv + math.max(0, (h.level or 1) - 1)
+  end
+  local g = 1.25                            -- baseline: ~1 acquisition per ante
+    + 0.30 * xgrow                          -- xmult whose X ITSELF grows compounds
+    + 0.15 * scaling                        -- scaling jokers grow each round
+    + 0.05 * math.min(hand_lv, 12)          -- leveled hands
+    + math.min(money, 40) / 160             -- cash -> more shop buys
+    + math.min(econ, 12) / 40               -- passive income -> more buys
   return math.max(1.0, math.min(g, 3.0))
 end
 
