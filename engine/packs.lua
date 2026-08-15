@@ -206,11 +206,13 @@ local function tarot_pool(gs, opts)
   local items = {}
   for _, key in ipairs(sorted_keys(ConsumableValue.TAROT_BASE)) do
     local vfrac, gain = ConsumableValue.card_value(gs, "Tarot", key, nil, n, rng, sm)
-    items[#items + 1] = { v = math.max(0, (vfrac or 0) + VU.dollars_to_frac(gs, gain or 0)), w = 1 }
+    items[#items + 1] = { v = math.max(0, (vfrac or 0) + VU.income_frac(gs, gain or 0)), w = 1 }
   end
   for _, key in ipairs({ "c_hermit", "c_temperance" }) do  -- money tarots (not in the catalogue)
     local vfrac, gain = ConsumableValue.card_value(gs, "Tarot", key, nil, n, rng, sm)
-    items[#items + 1] = { v = math.max(0, (vfrac or 0) + VU.dollars_to_frac(gs, gain or 0)), w = 1 }
+    -- income_frac (not dollars_to_frac): a money tarot that climbs toward the interest cap
+    -- compounds -- the human buys these for exactly that (human-economy-policy P4)
+    items[#items + 1] = { v = math.max(0, (vfrac or 0) + VU.income_frac(gs, gain or 0)), w = 1 }
   end
   return items
 end
@@ -246,7 +248,7 @@ local function spectral_pool(gs, opts)
       v = bh
     else
       local vfrac, gain = ConsumableValue.card_value(gs, "Spectral", key, nil, n, rng, sm)
-      v = (vfrac or 0) + VU.dollars_to_frac(gs, gain or 0)
+      v = (vfrac or 0) + VU.income_frac(gs, gain or 0)
     end
     items[#items + 1] = { v = math.max(0, v), w = 1 }  -- best-of-N picks the good ones; a trap spectral floors to 0 (you'd skip it)
   end

@@ -691,7 +691,11 @@ function SA.recommend(gs, opts)
     -- why standalone planets were ~never bought and the leveling channel died at the source.
     -- (The DOLLAR term below is real money -- already in utility units -- so it is NOT x5'd.)
     if gain and gain > 0 then
-      value = w_score * SA.JOKER_SCORE_WEIGHT * (vfrac + sbonus) + (gain - cost) * SA.DOLLAR_UTIL  -- net money
+      -- GAIN via income_frac (bankroll-aware: money climbing toward the interest cap compounds,
+      -- human-economy-policy P4) x the frac->utility bridge; COST stays in raw dollar utility so
+      -- the cost side is unchanged (the §28 guard -- don't make buys look pricier when poor).
+      value = w_score * SA.JOKER_SCORE_WEIGHT * (vfrac + sbonus)
+        + VU.income_frac(gs, gain) * SA.JOKER_SCORE_WEIGHT - cost * SA.DOLLAR_UTIL  -- net money
       verb = "Buy & use"
     else
       value = w_score * SA.JOKER_SCORE_WEIGHT * (vfrac + sbonus) - net_cost(cost)

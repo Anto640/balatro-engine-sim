@@ -36,6 +36,31 @@ return function(t)
   t.near(f3, VU.BASE_FRAC, "dollar_frac at the reference ante equals BASE_FRAC", 1e-9)
   t.ok(f1 <= VU.FRAC_MAX + 1e-9 and f8 >= VU.FRAC_MIN - 1e-9, "dollar_frac stays within bounds")
 
+  -- ---- income_frac: money GAINED is worth more below the interest cap (P4/P2) ----
+  -- A gain that unlocks interest (climbs toward the cap) compounds every remaining round,
+  -- so income_frac > dollars_to_frac when poor+early, and == it at/above the cap.
+  local function gs_money(d, a)
+    return GS.new{ economy = { dollars = d, interest_cap = 5 },
+      meta = { ante = a, round = 1, state = "SHOP", seed_hash = "" } }
+  end
+  do
+    local poor = gs_money(0, 2)      -- $0 ante 2: +$5 unlocks $1/round for many rounds
+    local capd = gs_money(25, 2)     -- at the cap: a further $5 earns no new interest
+    local rich = gs_money(40, 2)     -- above the cap
+    t.ok(VU.income_frac(poor, 5) > VU.dollars_to_frac(poor, 5) * 1.5,
+      "income below the cap is worth well over face value (unlocked interest)")
+    t.near(VU.income_frac(capd, 5), VU.dollars_to_frac(capd, 5),
+      "at the interest cap, a gained dollar is just face value (P2: sell/spend econ)", 1e-9)
+    t.near(VU.income_frac(rich, 5), VU.dollars_to_frac(rich, 5),
+      "above the cap, a gained dollar is just face value", 1e-9)
+    -- the interest bonus DECAYS with ante (fewer rounds left to compound)
+    local early = VU.income_frac(gs_money(0, 2), 5) / VU.dollars_to_frac(gs_money(0, 2), 5)
+    local late  = VU.income_frac(gs_money(0, 7), 5) / VU.dollars_to_frac(gs_money(0, 7), 5)
+    t.ok(early > late, "the below-cap interest premium shrinks late (fewer rounds to compound)")
+    -- COST side is untouched: dollars_to_frac (used for prices) is unchanged
+    t.eq(VU.income_frac(rich, 0), VU.dollars_to_frac(rich, 0), "zero gain -> no premium")
+  end
+
   -- ---- THE BRIDGE INVARIANT: a dollar costs the same in both currencies ----
   -- shop_advisor ranks in "utility" (1 boss-hand fraction = JOKER_SCORE_WEIGHT,
   -- $1 gained = DOLLAR_UTIL). pack_open_advisor / packs / consumable_value rank in

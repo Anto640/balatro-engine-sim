@@ -77,6 +77,34 @@ function VU.frac_to_dollars(gs, frac)
   return (frac or 0) / r
 end
 
+-- Value of $d GAINED, as a boss-hand fraction. Unlike dollars_to_frac (raw face value,
+-- also used for COSTS), this credits the forward INTEREST a gain unlocks while the bankroll
+-- is BELOW the interest cap: a dollar that reaches the cap compounds every remaining round,
+-- which is why the winning human generates econ toward the cap EARLY (human-economy-policy P2/P4).
+-- INCOME-SIDE ONLY -- the cost side is deliberately unchanged, because raising cost when poor
+-- would suppress board spend, which is the §28 harm. So this makes income worth more exactly
+-- when the engine is poor (where it must build economy) and decays to face value at/above the
+-- cap (P2: at the cap a dollar is just spendable, so sell econ / don't over-generate).
+VU.INTEREST_LOOKAHEAD_MAX = 12   -- rounds of interest an early gain is credited for (bounded)
+VU.INTEREST_DISCOUNT      = 0.5  -- interest isn't guaranteed (may be spent, may die) -> halve it
+function VU.income_frac(gs, d)
+  d = d or 0
+  local base = VU.dollars_to_frac(gs, d)
+  if d <= 0 then return base end
+  local e = (gs and gs.economy) or {}
+  local D0 = math.max(0, e.dollars or 0)
+  local cap = e.interest_cap or Mechanics.INTEREST_CAP
+  -- extra interest/round this gain unlocks (only the portion landing below the cap)
+  local int0 = math.min(math.floor(D0 / Mechanics.INTEREST_PER), cap)
+  local int1 = math.min(math.floor((D0 + d) / Mechanics.INTEREST_PER), cap)
+  local extra = int1 - int0                         -- $/round newly earned, forever (until spent)
+  if extra <= 0 then return base end                -- already at/above cap -> face value only
+  local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
+  local rounds_left = math.min((math.max(0, 8 - ante)) * 3, VU.INTEREST_LOOKAHEAD_MAX)
+  local yield = extra * rounds_left * VU.INTEREST_DISCOUNT   -- forward interest dollars
+  return base + VU.dollars_to_frac(gs, yield)
+end
+
 -- ---- fraction of a boss hand <-> future-value points ------------------------
 -- Pinned ONCE here (see calibration note above) so the sell-side rework and the
 -- buy-side scoring_gain agree on what a boss-hand fraction is worth in FV points.
