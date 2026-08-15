@@ -1,12 +1,21 @@
 # NEXT_SESSION.md — fresh-session handoff (updated 2026-08-15)
 
-> **🆕 2026-08-15 — THE FOUR-ARM QUEUE IS COMPLETE.** Arm 3 (`levelscale`) reverted (§27), arm 4
-> (`ecap3rich`) catastrophically refuted its own §22 bound (**−0.945, p < 0.0001**, §28). Net for the
-> arc: **2 shipped** (B3, level_gain+commitment), **2 closed directions** (archetype planning §24,
-> income axis §21), **1 refuted lesion** (early board discipline §28) that also kills `MCTS_PLAN.md`
-> INC-1 unbuilt. **The best-evidenced open lead is §26e: `growth_factor`'s trend is inverted** and it
-> is read in every shop of every run — the systems-class target. Do NOT re-derive `level_scale` (§27b)
-> or re-open a single lesion arm until `growth_factor` is calibrated against `tools/growth_truth.lua`.
+> **🆕 2026-08-15 — THE FOUR-ARM QUEUE IS COMPLETE, and §26e was TRIED and REVERTED.** Arm 3
+> (`levelscale`) reverted (§27), arm 4 (`ecap3rich`) refuted its own §22 bound (**−0.945, p<0.0001**,
+> §28). Then §26e's `growth_factor` recalibration (`growthcal`, §29): the trend inversion is real and
+> was fixed by removing two §19b-class stock-as-rate double-counts (`hand_lv`, `money`) + a decaying
+> head-room — but the arm was **null-negative (−0.158 n.s.) with the tail shedding at every level**,
+> so ❌ **REVERTED** (`04b725d`; HEAD engine back byte-identical to pacefix). The correctness core is
+> real but RE-HOMED (§29b) — not another single-lever arm.
+>
+> **⭐⭐ THE NEXT WORK IS A METHODOLOGY REBUILD, not a lever (user-endorsed 2026-08-15).**
+> Single-lever/mean-progress self-play is retired as the primary loop: it is good hygiene but can't
+> climb an interaction-dominated surface, and run-outcome on 160 chaotic seeds measures the structural
+> bottleneck worst. The ORDERED plan is in the `methodology-shift-2026-08` memory and §29c:
+> **(1)** instrument foundation — hash the seed (raw `s*1000+3` into a MINSTD LCG is a LATTICE),
+> verify the lattice is harmless, set up a dev/confirm two-pool split; **(2)** a dense per-decision
+> AGREEMENT objective replaying the engine over winning-human states; **(3)** a tail-weighted verdict;
+> **(4)** rewrite the tuning doctrine from single-lever to co-calibrated bundles. Start at Step 1.
 
 
 > # 🧭 START HERE — `WINRATE_V3_PLAN.md` **§18** is the current checkpoint and the plan

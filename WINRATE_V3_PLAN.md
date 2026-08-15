@@ -5304,3 +5304,66 @@ taken, at p < 0.0001.
 **2 of 5.** Both converts are *valuation* fixes; the three failures are a *policy gate*, a *plan*, and
 a *board lesion*. The pattern from §24d holds and strengthens: `rich10` reveals what things are
 WORTH; it does not rescue changes to what the engine DOES.
+
+---
+
+## §29 — `growthcal` REVERTED: the growth_factor recalibration is a null-negative, tail sheds
+
+The §26e lead executed: `growth_truth` measured `growth_factor`'s trend INVERTED (realized capacity
+growth decays 4.6→~1.7 across a run while the model rises 1.7→2.8), and the cause was located as two
+more stock-as-rate double-counts of the §19b class — `hand_lv` and `money`, both already inside the
+measured `cap` and both RISING, are what drive the inversion. §29 removed them, kept xgrow/scaling/
+econ as genuine rates, and added a decaying head-room calibrated so an AVERAGE board lands on the
+measured realized curve (model 2.13/2.05/1.95/1.87/1.77/1.65 vs realized ~2.18/1.88/1.76/1.70/1.84/2.0).
+Screened at a **19.6% band-flip rate**, correctly signed (early: stop panic-buying power; late: buy
+when truly behind). Tests updated to the corrected theory (1020 pass).
+
+`growthcal` vs `pacefix`, paired n=160, rich10, integrity-clean:
+
+| | value |
+|---|---|
+| progress Δ | **−0.158** (sd 2.194, SE 0.174, t 0.91, **p 0.363 n.s.**) |
+| sign test | **62 better / 65 worse / 33 tied** (p 0.859 — dead even) |
+| wins | **41 ← 45**; McNemar exact **p 0.672**, win-set overlap only **18** of 41/45 |
+| tail | reach5 124→**116** · reach6 93→**90** · reach7 70→**68** · reach8 53→**48** |
+
+**❌ REVERTED (commit `04b725d`).** No positive signal anywhere: progress null-leaning-negative,
+sign test dead even, wins down, and — the decisive part — **the tail sheds mass at every reach
+level**, the exact criterion that reverted E-12 and §20 `level_scale`. The low win-set overlap
+(18 of 41/45) is the envelope-noise signature: the change RE-ROLLS which seeds win rather than
+lifting a fixed set.
+
+### 29a. Why NOT keep the "correctness core"
+
+The `hand_lv`/`money` double-counts ARE genuine §19b-class unit errors, and the temptation was to
+keep only that part. Rejected, for two reasons that matter more than the temptation:
+* **§19b's fix was NARROW** (flat xmult fires in ~5% of states); removing `hand_lv`+`money` is a
+  BROAD every-state change, and it was bundled with the head-room recalibration. Keeping a sub-
+  component that was never measured in isolation is precisely the narrated-mechanism / winner's-curse
+  cherry-pick the methodology review (below) named as a thing to STOP doing.
+* The bundle as tested does not pay, and the tail says it slightly hurts. A correctness argument
+  earns a KEEP only when the change carrying it is at least tail-neutral (§19b was: reach8 50→53 UP).
+  This one is not.
+
+### 29b. ⇒ The growth_factor correctness core is not dead — it is RE-HOMED
+
+The trend inversion is real and measured; it is still wrong in three consumers (§27c). But another
+single mean-progress arm is the wrong instrument for it — the change is broad, the surface is
+chaotic (sd 2.19, MDE ~0.49), and the payoff (if any) is structural. It belongs in the methodology
+rebuild: a co-calibrated BUNDLE, judged by the dense per-decision agreement objective and a
+TAIL-weighted verdict, not by one more ±0.15 on run-outcome mean-progress. Recorded in the
+`methodology-shift-2026-08` plan as the first change to re-attempt once that apparatus exists.
+
+### 29c. ⭐ The methodology turn (2026-08-15, user-endorsed)
+
+This arm is the last of the old-style single-lever/mean-progress loop. The agreed critique:
+the revert discipline is good HYGIENE but self-limiting as STRATEGY on an interaction-dominated
+surface (a per-lever loop discards components that only pay in combination); and run-outcome
+mean-progress on 160 chaotic full-run seeds is a low-information, sample-hostage instrument that
+measures the claimed structural/planning bottleneck worst of all. Plus a concrete instrument defect
+found while auditing it: the fixed seed pool `s*1000+3` is fed RAW into a Park-Miller MINSTD LCG, so
+the seeds are a LATTICE, not independent draws (likely minor for full runs, never verified). The
+ordered replacement plan lives in the `methodology-shift-2026-08` memory: (1) instrument foundation
+— hash the seed, verify the lattice is harmless, establish a dev/confirm two-pool split; (2) a dense
+per-decision agreement objective replaying the engine over winning-human states; (3) a tail-weighted
+verdict; (4) rewrite the tuning doctrine from single-lever to co-calibrated bundles.
