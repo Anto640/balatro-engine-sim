@@ -432,6 +432,11 @@ return function(t)
 
   -- 22. Whole-run pacing drives the shop: a behind engine is flagged (and weights
   -- scoring up so it stops saving and buys power).
+  -- §29: the "behind" check is at a LATE ante now. A lone-joker board EARLY is no longer flagged
+  -- behind -- calibration against realized growth (every run starts ~1 joker and grows ~4.6x to a3)
+  -- says early near-flat boards ARE on pace, and flagging them "behind" over-urged early power-buying
+  -- (the very move §28's ecap arm and the human's econ-first data refute). Deep in a run with no
+  -- scaling, though, a lone joker genuinely falls off -- which is the case this test now pins.
   do
     local deck, id = {}, 0
     for _, s in ipairs({ "Spades", "Hearts", "Clubs", "Diamonds" }) do
@@ -440,14 +445,14 @@ return function(t)
     local gs = GS.new{
       jokers = { joker{ key = "j_joker" } }, deck = deck,
       economy = { dollars = 12, interest_cap = 5 },
-      meta = { ante = 1, round = 1, state = "x", seed_hash = "" },
+      meta = { ante = 6, round = 1, state = "x", seed_hash = "" },
       run = { hand_levels = {}, hand_size = 8 },
       blind = { base_hands = 4 },
       shop = { jokers = {}, vouchers = {}, boosters = {}, joker_slots = 5 },
     }
     local r = SA.recommend(gs)
     t.ok(r.pace ~= nil, "pace assessment is computed in the shop")
-    t.ok(r.pace_hint ~= nil and r.pace_hint:find("Behind") ~= nil, "a flat engine is flagged behind pace")
+    t.ok(r.pace_hint ~= nil and r.pace_hint:find("Behind") ~= nil, "a flat engine late in a run is flagged behind pace")
   end
 
   -- ---- E-13: endgame + behind pace collapses econ-joker value (near-win fix) ----
