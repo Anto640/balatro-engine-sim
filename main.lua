@@ -61,6 +61,9 @@ local Telemetry = try_require("core.run_telemetry")
 local Pacing    = try_require("engine.pacing")
 local Eval      = try_require("engine.eval_function")
 local Json      = try_require("util.json")
+-- Step 2-B (methodology-shift-2026-08): emit a replay FIXTURE at each shop/pack decision so the
+-- human's runs can be replayed under the current engine for the per-decision agreement objective.
+local ReplayFixture = try_require("core.replay_fixture")
 
 -- Monte-Carlo sample count per evaluation. Higher = smoother probabilities but
 -- more cost; the signature gate means this only runs when state changes.
@@ -348,6 +351,45 @@ function BES.telemetry_instance()
   return BES.telemetry
 end
 
+-- ---- Step 2-B: per-decision REPLAY FIXTURES (methodology-shift-2026-08) ------
+-- One fixture per DISTINCT shop/pack decision state, appended to bes_fixtures.jsonl. Dedup by a
+-- content signature (owned board + cash + the offers on the table) so the many ticks inside one
+-- shop don't each log. The fixture is a full POD (via core.replay_fixture) so the human's runs can
+-- later be REPLAYED under the current engine and its top pick compared to what the human did.
+-- Fully pcall-guarded by the caller -- must NEVER take the game down.
+BES_FIXLOG = "bes_fixtures.jsonl"
+BES._fix = { seed = nil, idx = 0, sig = nil }
+
+function BES.emit_fixture(gs)
+  if not (ReplayFixture and Json and love and love.filesystem) then return end
+  if not (gs.shop or gs.pack) then return end
+  local m = gs.meta or {}
+  local seed = m.seed_hash or ""
+  if BES._fix.seed ~= seed then BES._fix = { seed = seed, idx = 0, sig = nil } end
+  local parts = { tostring((gs.economy or {}).dollars or 0), tostring(#(gs.jokers or {})) }
+  for _, j in ipairs(gs.jokers or {}) do parts[#parts + 1] = j.key or "?" end
+  if gs.shop then
+    parts[#parts + 1] = "S" .. tostring(gs.shop.reroll_cost)
+    for _, j in ipairs(gs.shop.jokers or {}) do parts[#parts + 1] = j.key or "?" end
+    for _, p in ipairs(gs.shop.boosters or {}) do parts[#parts + 1] = p.key or p.name or "?" end
+  end
+  if gs.pack then
+    parts[#parts + 1] = "P"
+    for _, it in ipairs(gs.pack.items or {}) do parts[#parts + 1] = (it.key or it.set or "?") end
+  end
+  local sig = table.concat(parts, "|")
+  if sig == BES._fix.sig then return end     -- same decision state -> already logged
+  BES._fix.sig = sig
+  BES._fix.idx = BES._fix.idx + 1
+  local last = BES.last
+  local best = last and last.ranked and last.ranked.best
+  local choice = best and { type = best.type,
+      target = best.target and (best.target.name or best.target.key),
+      hand_type = best.hand_type, key = best.target and best.target.key } or nil
+  local fx = ReplayFixture.fixture_of(gs, choice, BES._fix.idx, gs.pack and "pack" or "shop")
+  pcall(love.filesystem.append, BES_FIXLOG, Json.encode(fx) .. "\n")
+end
+
 -- Build the "scene" the action tracer diffs: current board + (if open) shop/pack
 -- offerings + the engine's latest recommendation. Lets the trace reconstruct what
 -- the engine bought/skipped/sold/used without hooking inputs.
@@ -414,6 +456,7 @@ function BES.observe(gs)
   if not tel then return end
   pcall(function() tel:observe_gs(gs) end)
   pcall(function() tel:trace(BES.scene_of(gs)) end)
+  pcall(function() BES.emit_fixture(gs) end)
 end
 
 -- Gate: only re-evaluate when something relevant changed. Runs the CHEAP engine
