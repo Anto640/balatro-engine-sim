@@ -372,12 +372,14 @@ function BES.emit_fixture(gs)
   -- Which decision channel is this? shop / pack / IN-BLIND play. In-blind = a blind with hands
   -- left and cards in hand (the PLAY/DISCARD decision) -- captured so the offline scorer can
   -- replay the engine's in-blind play too, not just shop/pack.
+  local m = gs.meta or {}
   local kind
   if gs.pack then kind = "pack"
   elseif gs.shop then kind = "shop"
-  elseif gs.blind and (gs.blind.hands_left or 0) > 0 and #(gs.hand or {}) > 0 then kind = "blind"
+  -- SELECTING_HAND only: DRAW_TO_HAND is the transient deal (partial hand) -- not a decision.
+  elseif m.state == "SELECTING_HAND" and (gs.blind and (gs.blind.hands_left or 0) > 0)
+      and #(gs.hand or {}) > 0 then kind = "blind"
   else return end
-  local m = gs.meta or {}
   local seed = m.seed_hash or ""
   if BES._fix.seed ~= seed then BES._fix = { seed = seed, idx = 0, sig = nil } end
   -- content signature: what the decision IS, so the many ticks between actions log ONCE. Card
@@ -412,6 +414,46 @@ function BES.emit_fixture(gs)
   -- Without it the decision-state and the outcome can't be aligned across the two logs.
   fx.t = (love and love.timer and love.timer.getTime()) or 0
   pcall(love.filesystem.append, BES_FIXLOG, Json.encode(fx) .. "\n")
+end
+
+-- ids of the currently SELECTED (highlighted) cards, matching state_extraction's id scheme so a
+-- play record's cards line up with the blind fixture's hand cards.
+local function bes_highlighted_ids()
+  local G = _G.G
+  local h = G and G.hand
+  if not (h and h.highlighted) then return nil end
+  local out = {}
+  for _, c in ipairs(h.highlighted) do out[#out + 1] = c.sort_id or c.unique_val end
+  return (#out > 0) and out or nil
+end
+
+BES._play_prev = nil
+
+-- Capture the human's ACTUAL play/discard the moment it happens. During SELECTING_HAND the player
+-- highlights cards; when they commit, hands_left (PLAY) or discards_left (DISCARD) drops. The cards
+-- highlighted on the PREVIOUS tick are the ones played/discarded. This catches EVERY play -- crucially
+-- the LAST of a blind (which diffing consecutive fixtures misses) and the case where the human plays a
+-- DIFFERENT hand than max-score (reorders / underplays for econ or a joker trigger while still
+-- clearing). Emits {kind="play"} into bes_fixtures.jsonl, joined offline to the blind fixture by seed+t.
+function BES.track_play(gs)
+  if not (Json and love and love.filesystem) then return end
+  local m, b = gs.meta or {}, gs.blind or {}
+  local seed = m.seed_hash or ""
+  local hl, dl = b.hands_left, b.discards_left
+  local prev = BES._play_prev
+  if prev and prev.seed == seed and prev.hi then
+    local action
+    if hl ~= nil and prev.hl ~= nil and hl < prev.hl then action = "PLAY"
+    elseif dl ~= nil and prev.dl ~= nil and dl < prev.dl then action = "DISCARD"
+    elseif prev.selecting and m.state ~= "SELECTING_HAND" then action = "PLAY" end  -- last play ended the blind
+    if action then
+      pcall(love.filesystem.append, BES_FIXLOG, Json.encode({
+        kind = "play", seed = tonumber(seed) or seed, ante = m.ante, action = action,
+        cards = prev.hi, t = (love.timer and love.timer.getTime()) or 0 }) .. "\n")
+    end
+  end
+  BES._play_prev = { seed = seed, hl = hl, dl = dl, hi = bes_highlighted_ids(),
+                     selecting = (m.state == "SELECTING_HAND") }
 end
 
 -- Build the "scene" the action tracer diffs: current board + (if open) shop/pack
@@ -481,6 +523,7 @@ function BES.observe(gs)
   pcall(function() tel:observe_gs(gs) end)
   pcall(function() tel:trace(BES.scene_of(gs)) end)
   pcall(function() BES.emit_fixture(gs) end)
+  pcall(function() BES.track_play(gs) end)
 end
 
 -- Gate: only re-evaluate when something relevant changed. Runs the CHEAP engine

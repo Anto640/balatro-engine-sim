@@ -57,9 +57,11 @@ local function pick_of(kind, ranked)
            target = b.target and (b.target.name or b.target.key) or nil }
 end
 
-local n, bykind, errs = 0, {}, 0
+local n, bykind, errs, plays = 0, {}, 0, 0
 for line in fh:lines() do
-  if line:match('"kind":"state"') then
+  if line:match('"kind":"play"') then
+    plays = plays + 1     -- the human's ACTUAL in-blind play (joined to a blind fixture by seed+t)
+  elseif line:match('"kind":"state"') then
     local ok, fix = pcall(Json.decode, line)
     if ok and fix and fix.gs then
       local kind = fix.decision or "shop"
@@ -88,5 +90,6 @@ print(("replayed %d decisions from %s"):format(n, infile:gsub(".*/", "")))
 for _, k in ipairs({ "shop", "pack", "blind" }) do
   if bykind[k] then print(("  %-6s %5d"):format(k, bykind[k])) end
 end
+if plays > 0 then print(("  %-6s %5d  (human's actual in-blind plays, for the blind-agreement join)"):format("plays", plays)) end
 if errs > 0 then print(("  (%d fixtures skipped: decode/replay error)"):format(errs)) end
 if outfile then print("  engine picks -> " .. outfile .. " (join vs bes_runs.jsonl for agreement)") end
