@@ -407,6 +407,10 @@ function BES.emit_fixture(gs)
       target = best.target and (best.target.name or best.target.key),
       hand_type = best.hand_type, key = best.target and best.target.key } or nil
   local fx = ReplayFixture.fixture_of(gs, choice, BES._fix.idx, kind)
+  -- timestamp (same clock as bes_runs.jsonl) so a fixture can be JOINED to the human's ACTUAL
+  -- action -- the joker_gain/loss/consumable/blind_result with the smallest t greater than this.
+  -- Without it the decision-state and the outcome can't be aligned across the two logs.
+  fx.t = (love and love.timer and love.timer.getTime()) or 0
   pcall(love.filesystem.append, BES_FIXLOG, Json.encode(fx) .. "\n")
 end
 
