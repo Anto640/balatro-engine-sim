@@ -360,33 +360,53 @@ end
 BES_FIXLOG = "bes_fixtures.jsonl"
 BES._fix = { seed = nil, idx = 0, sig = nil }
 
+-- CAPTURE-ONLY mode (data collection). When true, BES.tick still logs telemetry + replay fixtures
+-- but SKIPS the Monte-Carlo evaluation -- the expensive per-change work that causes the in-game lag.
+-- The overlay shows nothing (nothing is computed), which is exactly right when the point is to record
+-- the HUMAN's decisions for OFFLINE replay under the current engine. Defaults ON in this frozen
+-- data-collection build so the human runs are lag-free with no action needed; F10 toggles it.
+BES.capture_only = true
+
 function BES.emit_fixture(gs)
   if not (ReplayFixture and Json and love and love.filesystem) then return end
-  if not (gs.shop or gs.pack) then return end
+  -- Which decision channel is this? shop / pack / IN-BLIND play. In-blind = a blind with hands
+  -- left and cards in hand (the PLAY/DISCARD decision) -- captured so the offline scorer can
+  -- replay the engine's in-blind play too, not just shop/pack.
+  local kind
+  if gs.pack then kind = "pack"
+  elseif gs.shop then kind = "shop"
+  elseif gs.blind and (gs.blind.hands_left or 0) > 0 and #(gs.hand or {}) > 0 then kind = "blind"
+  else return end
   local m = gs.meta or {}
   local seed = m.seed_hash or ""
   if BES._fix.seed ~= seed then BES._fix = { seed = seed, idx = 0, sig = nil } end
-  local parts = { tostring((gs.economy or {}).dollars or 0), tostring(#(gs.jokers or {})) }
+  -- content signature: what the decision IS, so the many ticks between actions log ONCE. Card
+  -- selection is deliberately NOT in the signature (highlighting a card is not a new decision).
+  local parts = { kind, tostring((gs.economy or {}).dollars or 0), tostring(#(gs.jokers or {})) }
   for _, j in ipairs(gs.jokers or {}) do parts[#parts + 1] = j.key or "?" end
-  if gs.shop then
+  if kind == "shop" then
     parts[#parts + 1] = "S" .. tostring(gs.shop.reroll_cost)
     for _, j in ipairs(gs.shop.jokers or {}) do parts[#parts + 1] = j.key or "?" end
     for _, p in ipairs(gs.shop.boosters or {}) do parts[#parts + 1] = p.key or p.name or "?" end
-  end
-  if gs.pack then
-    parts[#parts + 1] = "P"
+  elseif kind == "pack" then
     for _, it in ipairs(gs.pack.items or {}) do parts[#parts + 1] = (it.key or it.set or "?") end
+  else -- blind: the hand you must act on + what you have left to spend on it
+    local b = gs.blind
+    parts[#parts + 1] = "H" .. tostring(b.hands_left) .. "D" .. tostring(b.discards_left or 0)
+    for _, c in ipairs(gs.hand or {}) do parts[#parts + 1] = tostring(c.id or "?") end
   end
   local sig = table.concat(parts, "|")
   if sig == BES._fix.sig then return end     -- same decision state -> already logged
   BES._fix.sig = sig
   BES._fix.idx = BES._fix.idx + 1
-  local last = BES.last
+  -- capture-only skips evaluation, so there is no fresh advice to record; the offline scorer
+  -- computes the engine's pick. In full mode, record the live advice as metadata.
+  local last = (not BES.capture_only) and BES.last or nil
   local best = last and last.ranked and last.ranked.best
   local choice = best and { type = best.type,
       target = best.target and (best.target.name or best.target.key),
       hand_type = best.hand_type, key = best.target and best.target.key } or nil
-  local fx = ReplayFixture.fixture_of(gs, choice, BES._fix.idx, gs.pack and "pack" or "shop")
+  local fx = ReplayFixture.fixture_of(gs, choice, BES._fix.idx, kind)
   pcall(love.filesystem.append, BES_FIXLOG, Json.encode(fx) .. "\n")
 end
 
@@ -468,6 +488,9 @@ function BES.tick()
   -- telemetry observes EVERY tick (before the change-gate) so it never misses an
   -- ante advance or a GAME_OVER; the recorder itself only acts at boundaries.
   BES.observe(gs)
+  -- CAPTURE-ONLY (data collection): telemetry + fixtures are logged in observe above; skip the
+  -- Monte-Carlo evaluation entirely (the lag). The engine is replayed OFFLINE over the fixtures.
+  if BES.capture_only then return end
   if not BES.tracker.changed(gs) then return end
   -- cheap, measurement-free pass for EVERY state -> panel updates immediately (C4:
   -- the only snapshot this cycle; evaluate reuses it rather than snapshotting again)
@@ -598,6 +621,12 @@ if _G.G and _G.SMODS then
       if key == "f7" then Log.info("--- joker ability dump ---"); pcall(BES.dump_jokers) end
       if key == "f8" then Log.info("--- manual evaluation (with sim) ---"); BES.evaluate(true) end
       if key == "f9" and HUDInject then HUDInject.toggle() end
+      if key == "f10" then
+        BES.capture_only = not BES.capture_only
+        Log.info("BES capture-only " .. (BES.capture_only
+          and "ON  (fast: logs decisions, NO evaluation -> no lag)"
+          or  "OFF (full evaluation + live recommendations)"))
+      end
       if prev then return prev(key, ...) end
     end
 
@@ -622,7 +651,10 @@ if _G.G and _G.SMODS then
   end
 
   BES.telemetry_instance()  -- create the run log up front so its path is logged on load
-  Log.info("Balatro Engine Sim loaded. F7 = dump jokers, F8 = evaluate, F9 = toggle overlay."
+  Log.info("Balatro Engine Sim loaded. F7 = dump jokers, F8 = evaluate, F9 = toggle overlay, "
+    .. "F10 = capture-only toggle."
+    .. "  CAPTURE-ONLY is " .. (BES.capture_only and "ON (data-collection: no lag, logs decisions to "
+      .. BES_FIXLOG .. "; press F10 for live recommendations)" or "OFF")
     .. "  Run telemetry -> " .. BES_RUNLOG .. " (analyze with tools/analyze_runs.lua).")
 end
 
