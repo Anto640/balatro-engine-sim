@@ -324,7 +324,9 @@ end
 function Telemetry:trace(scene)
   if not scene or not scene.seed or scene.seed == "" then return end
   if not self.run or self.run.seed ~= scene.seed then return end  -- only within a started run
-  local via = scene.pack and "pack" or (scene.shop and "shop") or "other"
+  -- a gain is "via pack" while a pack is open AND on the very next tick after it closes (the last
+  -- pick's gain lands as the pack disappears) -- self.was_pack carries that one-tick grace.
+  local via = (scene.pack or self.was_pack) and "pack" or (scene.shop and "shop") or "other"
   local now = self:_now()
 
   -- On the first trace of a run we seed the diff baseline to the CURRENT board so
@@ -334,15 +336,17 @@ function Telemetry:trace(scene)
   if first then
     self.board = { seed = scene.seed, jokers = countmap(scene.jokers),
       consumables = countmap(scene.consumables), levels = copy_map(scene.hand_levels),
-      dollars = scene.dollars }
-    self.shop_sig, self.pack_sig, self.blind_sig = nil, nil, nil
+      vouchers = countmap(scene.vouchers), dollars = scene.dollars }
+    self.shop_sig, self.pack_sig, self.blind_sig, self.pack_items = nil, nil, nil, nil
   end
   local b = self.board
+  local acquired = false  -- did the player GAIN a joker/consumable/voucher this tick? (reroll gate)
 
   if not first then
     -- joker gains / losses (money delta on the same tick attributes a buy/sell)
     local jg, jl = diff_counts(b.jokers, countmap(scene.jokers))
     for k, n in pairs(jg) do for _ = 1, n do
+      acquired = true
       self.emit({ kind = "joker_gain", seed = scene.seed, t = now, ante = scene.ante,
         key = k, via = via, dollars_before = b.dollars, dollars_after = scene.dollars })
     end end
@@ -356,6 +360,7 @@ function Telemetry:trace(scene)
     -- consumable gains / used (a loss outside the shop = used; in shop w/ +$ = sold)
     local cg, cl = diff_counts(b.consumables, countmap(scene.consumables))
     for k, n in pairs(cg) do for _ = 1, n do
+      acquired = true
       self.emit({ kind = "consumable_gain", seed = scene.seed, t = now, ante = scene.ante, key = k, via = via })
     end end
     for k, n in pairs(cl) do for _ = 1, n do
@@ -364,14 +369,24 @@ function Telemetry:trace(scene)
         seed = scene.seed, t = now, ante = scene.ante, key = k })
     end end
 
-    -- hand level-ups (planet used / blue seal / etc.)
+    -- hand level-ups (planet used / blue seal / etc.). via lets a Celestial-pack planet be told
+    -- apart from a loose one, which the pack-pick agreement needs.
     for hand, lv in pairs(scene.hand_levels or {}) do
       local old = b.levels[hand] or 0
       if lv > old then
         self.emit({ kind = "level_up", seed = scene.seed, t = now, ante = scene.ante,
-          hand = hand, from = old, to = lv })
+          hand = hand, from = old, to = lv, via = via })
       end
     end
+
+    -- VOUCHER purchases (used_vouchers is a set; a new key = bought this round). Previously
+    -- untracked entirely, so a Seed Money / Director's Cut buy was invisible to the analysis.
+    local vg = diff_counts(b.vouchers, countmap(scene.vouchers))
+    for k, n in pairs(vg) do for _ = 1, n do
+      acquired = true
+      self.emit({ kind = "voucher_gain", seed = scene.seed, t = now, ante = scene.ante,
+        key = k, dollars_before = b.dollars, dollars_after = scene.dollars })
+    end end
   end
 
   -- BLIND SELECT, once per distinct (ante, blind) pairing. Emitted when the player is on the
@@ -395,6 +410,13 @@ function Telemetry:trace(scene)
   if scene.shop then
     local sig = shop_signature(scene.shop)
     if sig ~= self.shop_sig then
+      -- REROLL: the offers changed while still in the shop, cash dropped, nothing was bought and no
+      -- pack is opening. (A buy also changes the sig -- one offer leaves -- but sets `acquired`; a
+      -- pack buy sets scene.pack.) Previously a reroll was invisible except as a fresh shop record.
+      if self.shop_sig ~= nil and not acquired and not scene.pack and scene.dollars < b.dollars then
+        self.emit({ kind = "reroll", seed = scene.seed, t = now, ante = scene.ante,
+          cost = b.dollars - scene.dollars, dollars_after = scene.dollars })
+      end
       self.shop_sig = sig
       self.emit({ kind = "shop", seed = scene.seed, t = now, ante = scene.ante,
         dollars = scene.dollars, reroll_cost = scene.shop.reroll_cost,
@@ -405,22 +427,38 @@ function Telemetry:trace(scene)
     end
   else self.shop_sig = nil end
 
-  -- pack contents + engine advice, once per distinct pack
+  -- pack contents + engine advice, once per distinct pack. Also emit an explicit PACK_PICK when an
+  -- item leaves the pack (picking one shrinks the item list -> the sig changes). This makes the
+  -- human's pick directly recoverable instead of only by diffing consecutive fixtures (which missed
+  -- single-pick and last-pick cases). A fresh pack (items ADDED) resets rather than logging picks.
   if scene.pack then
+    local ikeys = {}
+    for _, it in ipairs(scene.pack.items or {}) do ikeys[#ikeys + 1] = it.key or it.set or "?" end
+    local cur = countmap(ikeys)
     local sig = pack_signature(scene.pack)
     if sig ~= self.pack_sig then
+      if self.pack_items then
+        local added, picked = diff_counts(self.pack_items, cur)
+        if not next(added) then   -- no new items => same pack, the missing ones were PICKED
+          for k, n in pairs(picked) do for _ = 1, n do
+            self.emit({ kind = "pack_pick", seed = scene.seed, t = now, ante = scene.ante, key = k })
+          end end
+        end
+      end
       self.pack_sig = sig
+      self.pack_items = cur
       self.emit({ kind = "pack", seed = scene.seed, t = now, ante = scene.ante,
         items = Json.array(scene.pack.items or {}),
         ranked = scene.ranked and Json.array(scene.ranked) or nil,
         advice = scene.advice })
     end
-  else self.pack_sig = nil end
+  else self.pack_sig = nil; self.pack_items = nil end
 
   -- advance the diff baseline
+  self.was_pack = scene.pack ~= nil     -- one-tick grace so a closing pick's gain is via=pack
   self.board = { seed = scene.seed, jokers = countmap(scene.jokers),
     consumables = countmap(scene.consumables), levels = copy_map(scene.hand_levels),
-    dollars = scene.dollars }
+    vouchers = countmap(scene.vouchers), dollars = scene.dollars }
 end
 
 return Telemetry

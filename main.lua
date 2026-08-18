@@ -466,10 +466,15 @@ function BES.scene_of(gs)
   local jk, ck = {}, {}
   for _, j in ipairs(gs.jokers or {}) do jk[#jk + 1] = j.key or "?" end
   for _, c in ipairs(gs.consumables or {}) do ck[#ck + 1] = c.key or "?" end
+  -- owned vouchers (used_vouchers is a map key->truthy) -> so a purchase shows as a diff below
+  local vk = {}
+  for k, v in pairs((gs.run and gs.run.vouchers_owned) or {}) do
+    if v then vk[#vk + 1] = (type(k) == "string" and k) or (type(v) == "table" and v.key) or tostring(k) end
+  end
   local scene = {
     seed = meta.seed_hash or "", ante = math.floor(meta.ante or 1), state = meta.state,
     dollars = (gs.economy and gs.economy.dollars) or 0,
-    jokers = jk, consumables = ck, hand_levels = levels,
+    jokers = jk, consumables = ck, hand_levels = levels, vouchers = vk,
   }
   if gs.shop then
     local oj = {}

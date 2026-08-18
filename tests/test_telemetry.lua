@@ -418,4 +418,36 @@ return function(t)
     t.ok(p ~= nil and #p.items == 2, "pack record logs the revealed items")
     t.eq(p.advice.target, "j_baron", "pack record carries the engine's pick advice")
   end
+
+  -- 2026-08-17 telemetry-gap fixes: voucher_gain, reroll, pack_pick
+  do
+    local tel, recs = recorder()
+    tel:observe(frame{ seed = "TG", ante = 1 })
+    local function sc(o) o.seed = "TG"; o.ante = 1; o.jokers = o.jokers or {}
+      o.consumables = o.consumables or {}; o.hand_levels = o.hand_levels or {}
+      o.vouchers = o.vouchers or {}; return o end
+    -- baseline shop scene (first trace only seeds the diff baseline)
+    tel:trace(sc{ dollars = 12, shop = { reroll_cost = 5, offer_jokers = { { key = "j_a", cost = 4 } }, offer_packs = {} } })
+    -- VOUCHER buy: a new owned voucher + cash drop (same joker offers -> not a reroll)
+    tel:trace(sc{ dollars = 2, vouchers = { "v_seed_money" },
+      shop = { reroll_cost = 5, offer_jokers = { { key = "j_a", cost = 4 } }, offer_packs = {} } })
+    t.eq(count_kind(recs, "voucher_gain"), 1, "voucher purchase is logged")
+    t.eq(first_kind(recs, "voucher_gain").key, "v_seed_money", "voucher_gain names the voucher")
+    -- REROLL: joker offers change, cash drops, nothing gained, no pack
+    tel:trace(sc{ dollars = 0, vouchers = { "v_seed_money" },
+      shop = { reroll_cost = 6, offer_jokers = { { key = "j_b", cost = 4 } }, offer_packs = {} } })
+    t.eq(count_kind(recs, "reroll"), 1, "a reroll (offers change, cash drops, nothing bought) is logged")
+    -- a BUY must NOT be mistaken for a reroll: offers change AND a joker is gained
+    tel:trace(sc{ dollars = 0, jokers = { "j_b" }, vouchers = { "v_seed_money" },
+      shop = { reroll_cost = 6, offer_jokers = {}, offer_packs = {} } })
+    t.eq(count_kind(recs, "reroll"), 1, "buying a joker is NOT counted as a reroll")
+    t.eq(count_kind(recs, "joker_gain"), 1, "the buy is logged as a joker_gain")
+    -- PACK PICK: a 2-item pack loses one item -> that card was taken
+    tel:trace(sc{ dollars = 0, jokers = { "j_b" }, vouchers = { "v_seed_money" },
+      pack = { items = { { set = "Tarot", key = "c_moon" }, { set = "Tarot", key = "c_sun" } } } })
+    tel:trace(sc{ dollars = 0, jokers = { "j_b" }, vouchers = { "v_seed_money" },
+      pack = { items = { { set = "Tarot", key = "c_sun" } } } })
+    t.eq(count_kind(recs, "pack_pick"), 1, "picking a card from a pack is logged")
+    t.eq(first_kind(recs, "pack_pick").key, "c_moon", "pack_pick names the taken card")
+  end
 end

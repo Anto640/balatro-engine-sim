@@ -53,7 +53,9 @@ local function pick_of(kind, ranked)
   end
   local b = ranked.best
   if not b then return nil end
-  return { type = b.type, value = b.value, hand_type = b.hand_type,
+  local cards  -- the card ids the engine would PLAY/DISCARD (blind) -> compare to the human's play
+  if b.cards then cards = {}; for _, c in ipairs(b.cards) do cards[#cards + 1] = c.id end end
+  return { type = b.type, value = b.value, hand_type = b.hand_type, cards = cards,
            target = b.target and (b.target.name or b.target.key) or nil }
 end
 
