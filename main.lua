@@ -471,10 +471,20 @@ function BES.scene_of(gs)
   for k, v in pairs((gs.run and gs.run.vouchers_owned) or {}) do
     if v then vk[#vk + 1] = (type(k) == "string" and k) or (type(v) == "table" and v.key) or tostring(k) end
   end
+  -- currently SELECTED cards (for tarot/spectral targets: the telemetry attaches last tick's
+  -- selection to a consumable_use so "which cards you enhanced/converted" is recoverable)
+  local sel = {}
+  do
+    local G = _G.G
+    local h = G and G.hand
+    if h and h.highlighted then
+      for _, c in ipairs(h.highlighted) do sel[#sel + 1] = c.sort_id or c.unique_val end
+    end
+  end
   local scene = {
     seed = meta.seed_hash or "", ante = math.floor(meta.ante or 1), state = meta.state,
     dollars = (gs.economy and gs.economy.dollars) or 0,
-    jokers = jk, consumables = ck, hand_levels = levels, vouchers = vk,
+    jokers = jk, consumables = ck, hand_levels = levels, vouchers = vk, selected = sel,
   }
   if gs.shop then
     local oj = {}

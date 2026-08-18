@@ -449,5 +449,12 @@ return function(t)
       pack = { items = { { set = "Tarot", key = "c_sun" } } } })
     t.eq(count_kind(recs, "pack_pick"), 1, "picking a card from a pack is logged")
     t.eq(first_kind(recs, "pack_pick").key, "c_moon", "pack_pick names the taken card")
+    -- CONSUMABLE_USE targets: last tick's card selection is attached to the use
+    tel:trace(sc{ dollars = 0, jokers = { "j_b" }, vouchers = { "v_seed_money" },
+      consumables = { "c_empress" }, selected = { 101, 102 } })
+    tel:trace(sc{ dollars = 0, jokers = { "j_b" }, vouchers = { "v_seed_money" }, consumables = {} })
+    local cu = first_kind(recs, "consumable_use")
+    t.ok(cu ~= nil and cu.key == "c_empress", "consumable use is logged")
+    t.ok(cu.targets ~= nil and #cu.targets == 2, "consumable_use carries the targeted card ids")
   end
 end

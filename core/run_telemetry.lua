@@ -366,7 +366,11 @@ function Telemetry:trace(scene)
     for k, n in pairs(cl) do for _ = 1, n do
       local sold = scene.shop and scene.dollars > b.dollars
       self.emit({ kind = sold and "consumable_sell" or "consumable_use",
-        seed = scene.seed, t = now, ante = scene.ante, key = k })
+        seed = scene.seed, t = now, ante = scene.ante, key = k,
+        -- which cards a targeting tarot/spectral hit: the selection on the tick BEFORE the use
+        -- (using it clears the highlight). Only meaningful for a use, not a sale.
+        targets = (not sold and self.prev_selected and #self.prev_selected > 0)
+          and self.prev_selected or nil })
     end end
 
     -- hand level-ups (planet used / blue seal / etc.). via lets a Celestial-pack planet be told
@@ -456,6 +460,7 @@ function Telemetry:trace(scene)
 
   -- advance the diff baseline
   self.was_pack = scene.pack ~= nil     -- one-tick grace so a closing pick's gain is via=pack
+  self.prev_selected = scene.selected   -- last tick's selection -> targets for next tick's use
   self.board = { seed = scene.seed, jokers = countmap(scene.jokers),
     consumables = countmap(scene.consumables), levels = copy_map(scene.hand_levels),
     vouchers = countmap(scene.vouchers), dollars = scene.dollars }
