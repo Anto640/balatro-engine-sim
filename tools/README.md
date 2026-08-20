@@ -58,6 +58,8 @@ Almost everything here reads **existing** telemetry and costs nothing to run. On
 | `divergence.lua` | the engine's own valuation paired against what a winning human actually did |
 | `pick_order.lua` | reproduce the measured human/engine pack-pick divergence |
 | `real_vs_sim.lua` | is the simulator's world as generous as real Balatro? (yes — settled) |
+| **`replay_fixtures.lua`** | replay the CURRENT engine over the human's captured decision states (`bes_fixtures.jsonl` from the live mod's capture-only mode) -> `picks.jsonl`. The "run the eval while you sleep" half of the agreement objective |
+| **`agreement.py`** | join those engine picks to what the human ACTUALLY did (blind plays, pack picks, shop buys/rerolls/vouchers) and report per-decision agreement per channel. Auto-discovers the winning-run pool. Found: engine plays DIFFERENT cards 81% of shared plays, over-buys 28% + over-rerolls 17% vs winners |
 
 ## Search / ceiling
 
