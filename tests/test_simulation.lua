@@ -327,11 +327,11 @@ return function(t)
   -- ---- whole-run pacing (ante race) ----
   do
     local Pacing = require("engine.pacing")
-    -- a scaling/xmult engine with money grows faster than a flat joker
-    t.ok(Pacing.growth_factor(GS.new{ jokers = { joker{ key = "j_cavendish" }, joker{ key = "j_baron" } },
-        economy = { dollars = 30, interest_cap = 5 } })
+    -- a scaling engine grows faster than a flat joker (§29: money-on-hand is a STOCK, no longer a
+    -- growth term; what compounds is the board's ongoing scaling, so score the scaling mechanism)
+    t.ok(Pacing.growth_factor(GS.new{ jokers = { joker{ key = "j_hologram" }, joker{ key = "j_runner" } } })
        > Pacing.growth_factor(GS.new{ jokers = { joker{ key = "j_joker" } } }),
-      "xmult + money grows the engine faster than a flat joker")
+      "a scaling/xmult-scaling engine grows faster than a flat joker")
 
     -- A FLAT XMULT IS A STEP, NOT A RATE (see engine/pacing growth_factor). cap = base * X, so a
     -- growth step gives cap'/cap = (base+d)/base with X cancelling -- and `cap` already MEASURES

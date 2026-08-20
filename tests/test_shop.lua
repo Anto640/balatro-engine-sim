@@ -437,17 +437,19 @@ return function(t)
     for _, s in ipairs({ "Spades", "Hearts", "Clubs", "Diamonds" }) do
       for r = 2, 14 do id = id + 1; deck[id] = card{ id = id, rank_id = r, suit = s } end
     end
+    -- §29: a lone-joker board EARLY is no longer "behind" (early near-flat boards grow ~4.6x and ARE
+    -- on pace; flagging them behind over-urged early power-buying). Deep in a run a flat board falls off.
     local gs = GS.new{
       jokers = { joker{ key = "j_joker" } }, deck = deck,
       economy = { dollars = 12, interest_cap = 5 },
-      meta = { ante = 1, round = 1, state = "x", seed_hash = "" },
+      meta = { ante = 6, round = 1, state = "x", seed_hash = "" },
       run = { hand_levels = {}, hand_size = 8 },
       blind = { base_hands = 4 },
       shop = { jokers = {}, vouchers = {}, boosters = {}, joker_slots = 5 },
     }
     local r = SA.recommend(gs)
     t.ok(r.pace ~= nil, "pace assessment is computed in the shop")
-    t.ok(r.pace_hint ~= nil and r.pace_hint:find("Behind") ~= nil, "a flat engine is flagged behind pace")
+    t.ok(r.pace_hint ~= nil and r.pace_hint:find("Behind") ~= nil, "a flat engine late in a run is flagged behind pace")
   end
 
   -- ---- E-13: endgame + behind pace collapses econ-joker value (near-win fix) ----
