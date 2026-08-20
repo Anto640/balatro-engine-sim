@@ -59,7 +59,8 @@ Almost everything here reads **existing** telemetry and costs nothing to run. On
 | `pick_order.lua` | reproduce the measured human/engine pack-pick divergence |
 | `real_vs_sim.lua` | is the simulator's world as generous as real Balatro? (yes — settled) |
 | **`replay_fixtures.lua`** | replay the CURRENT engine over the human's captured decision states (`bes_fixtures.jsonl` from the live mod's capture-only mode) -> `picks.jsonl`. The "run the eval while you sleep" half of the agreement objective |
-| **`agreement.py`** | join those engine picks to what the human ACTUALLY did (blind plays, pack picks, shop buys/rerolls/vouchers) and report per-decision agreement per channel. Auto-discovers the winning-run pool. Found: engine plays DIFFERENT cards 81% of shared plays, over-buys 28% + over-rerolls 17% vs winners |
+| **`agreement.py`** | join those engine picks to what the human ACTUALLY did (blind plays, pack picks, shop buys/rerolls/vouchers) and report per-decision agreement per channel. Auto-discovers the winning-run pool. Found: engine plays DIFFERENT cards 83% of shared plays, over-buys 26% + over-rerolls 15% vs winners |
+| **`blind_outcome.lua`** | for each blind decision where engine & human played DIFFERENT cards, forward-simulate BOTH with `Sim.survive_after` (CRN) + take each play's immediate score. Answers "who is right." Found: 88% BOTH clear (survival-neutral); the engine clears in ONE big hand (88%) & banks unused hands while the winner plays WEAKER hands (0.32x vs 1.70x target) to MILK the blind for value/scaling -- in-blind economy generation the engine misses |
 
 ## Search / ceiling
 
