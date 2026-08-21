@@ -449,6 +449,13 @@ Probe.CONFIGS = {
   -- n=160 verdict (CLAUDE.md, THE FREQUENCY CEILING) -- and it is not in the refuted set.
   -- Unlike every other config here this one is an ENGINE flag, not a world lesion.
   dig          = { dig_surplus = true },
+  -- MILK (2026-08-21, WINRATE_V3_PLAN §30). Once a clear is GUARANTEED the engine clears-in-one and
+  -- banks the rest; the blind-outcome scorer showed the winners instead play weaker hands and milk the
+  -- blind for gold-seal/Lucky $. Now that the rollout is money-aware (survive_after returns E[$] and
+  -- E[banked hands]), DE can defer a locked clear to farm $ ONLY when the money-aware rollout shows
+  -- survival holds and the $ beats the forgone hand-rewards. An ENGINE flag, not a world lesion; fires
+  -- in every guaranteed-clear blind (a high-frequency class).
+  milk         = { milk_money = true },
   -- ORACLE PLAN (2026-08-13). The probe series measured RESOURCES (money, slots, levels) but
   -- never measured KNOWING WHAT TO BUILD -- and §5t showed the planner is nearly inert as a
   -- direction source: it commits to Full House in 100% of observed valuations and yields an
@@ -509,6 +516,7 @@ function Probe.opts(name)
   -- explicitly BOTH ways so a batch can never inherit a stale flag from a previous config.
   local DE = require("engine.decision_engine")
   DE.DIG_SURPLUS = c.dig_surplus and true or false
+  DE.MILK_MONEY  = c.milk_money and true or false
   if not next(c) then return nil end
   local o = { probe = {} }
   for k, v in pairs(c) do o.probe[k] = v end

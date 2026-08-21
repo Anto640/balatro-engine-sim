@@ -91,12 +91,17 @@ end
 -- {kind="DISCARD", cards=cards} -- then the boss-aware greedy policy finishes the
 -- rest. This lets Sim.survive_after arbitrate the engine's play-vs-discard by
 -- expected survival instead of the mean-of-one-hand heuristic (F1/F2).
-local function rollout(gs, start_hand, pile, target, chips0, hands, discards, hand_size, rng, eff, first)
+local function money_credit(_, ev) return (ev and ev.money) or 0 end
+
+local function rollout(gs, start_hand, pile, target, chips0, hands, discards, hand_size, rng, eff, first, milk)
   local bgs = with_boss(gs, eff)
   local current = {}
   for i = 1, #start_hand do current[i] = start_hand[i] end
   local draw = shuffled(pile, rng)         -- draw from the end
   local chips = chips0
+  local money = 0                          -- in-blind $ farmed FROM HERE forward (gold seal/Lucky/
+                                           -- money jokers, retrigger-aware via ev.money). Accumulated
+                                           -- separately from chips so survival math is untouched.
   local hands_left = hands
   local discards_left = discards or 0
   local pstate = { types = {}, first = nil } -- boss play-legality cross-hand state
@@ -135,6 +140,7 @@ local function rollout(gs, start_hand, pile, target, chips0, hands, discards, ha
     if first.kind == "PLAY" and first.sel and #first.sel > 0 then
       local ev = HandEval.score(bgs, first.sel)   -- boss-aware score of the exact play
       chips = chips + ((ev and ev.score) or 0)
+      money = money + ((ev and ev.money) or 0)
       after_play(ev or { hand_type = "?" }, first.sel)
       hands_left = hands_left - 1
     elseif first.kind == "DISCARD" and first.cards and #first.cards > 0
@@ -146,28 +152,49 @@ local function rollout(gs, start_hand, pile, target, chips0, hands, discards, ha
 
   while hands_left > 0 and #current > 0 do
     local rem = target - chips
-    if rem <= 0 then return chips end
+    if rem <= 0 then return chips, money, hands_left end
     local ev, sel = HandEval.best_play_target(bgs, current, rem, filter)
     if not ev then break end -- no legal play (e.g. can't make 5 under Psychic)
 
-    if ev.score < rem and discards_left > 0 then
+    -- MILK finishing policy: the clear is available NOW and a spare hand remains, so play a
+    -- money-MAXIMAL non-clearing hand this turn (farm gold-seal/Lucky $, keep premium + cycle the
+    -- deck) and defer the clear to a later hand. Deferring is HONESTLY risky -- a bad later draw can
+    -- cost the clear -- so this stays inside the rollout and shows up as a lower `frac`, which the
+    -- caller's survival gate reads. Only fires when a strictly-more-$ non-clearing play exists.
+    if milk and hands_left >= 2 and ev.score >= rem then
+      local mev, msel = HandEval.best_fuel_play(bgs, current, 0, money_credit)
+      if mev and msel and (mev.money or 0) > (ev.money or 0) and mev.score < rem then
+        chips = chips + mev.score
+        money = money + (mev.money or 0)
+        after_play(mev, msel)
+        hands_left = hands_left - 1
+      else
+        chips = chips + ev.score
+        money = money + (ev.money or 0)
+        if chips >= target then return chips, money, hands_left end
+        after_play(ev, sel)
+        hands_left = hands_left - 1
+      end
+    elseif ev.score < rem and discards_left > 0 then
       local d = Heuristics.best_discard(with_hand(bgs, current))
       if d and d.cards and #d.cards > 0 and #d.cards < #current then
         remove_played(d.cards); refill()
         discards_left = discards_left - 1
       else
         chips = chips + ev.score
+        money = money + (ev.money or 0)
         after_play(ev, sel)
         hands_left = hands_left - 1
       end
     else
       chips = chips + ev.score
-      if chips >= target then return chips end
+      money = money + (ev.money or 0)
+      if chips >= target then return chips, money, hands_left end
       after_play(ev, sel)
       hands_left = hands_left - 1
     end
   end
-  return chips
+  return chips, money, hands_left
 end
 
 local function hand_size_of(gs) return (gs.run and gs.run.hand_size) or 8 end
@@ -222,7 +249,10 @@ end
 -- safe near-clear (the mistake the reverted last-hand P>0 rule made). Boss-aware: the
 -- rollout applies scoring debuffs, play-legality and the Hook. Call the two candidate
 -- actions with the SAME seeded rng for common random numbers (a low-variance paired delta).
-function Sim.survive_after(gs, first, samples, rng)
+-- `milk` (optional): finish the rollout with the money-maximising MILK policy (defer an available
+-- clear to farm $ across more hands) instead of clear-ASAP. Use it to VALUE a milk line -- `frac`
+-- still reports whether the deferred clear lands, so the caller can gate on survival.
+function Sim.survive_after(gs, first, samples, rng, milk)
   rng = rng or default_rng
   samples = samples or 60
   local b = gs.blind or {}
@@ -235,14 +265,22 @@ function Sim.survive_after(gs, first, samples, rng)
   local hands = b.hands_left or 0
   local discards = b.discards_left or 0
   local hs = hand_size_of(gs)
-  local sum_frac, clears = 0, 0
+  local sum_frac, clears, sum_money, sum_banked = 0, 0, 0, 0
   for _ = 1, samples do
-    local chips = rollout(gs, hand, pile, target, chips0, hands, discards, hs, rng, eff, first)
+    local chips, money, banked = rollout(gs, hand, pile, target, chips0, hands, discards, hs, rng, eff, first, milk)
     local f = chips / target
     sum_frac = sum_frac + (f > 1 and 1 or f)
+    sum_money = sum_money + (money or 0)
+    sum_banked = sum_banked + (banked or 0)
     if chips >= target then clears = clears + 1 end
   end
-  return { frac = sum_frac / samples, clear = clears / samples }
+  -- `money`  = E[$ farmed over the rest of the blind] -- the in-blind economy the CLEARANCE objective
+  --            (frac/clear) is blind to. Separate field so callers weight economy WITHOUT trading survival.
+  -- `banked` = E[hands left UNUSED at the end] -- each pays $1 at round-end (Mechanics.HAND_REWARD),
+  --            so a milk line that burns hands to farm $ must beat the clear line by MORE than the
+  --            banked-hand difference. The caller charges it; the field makes that cost visible.
+  return { frac = sum_frac / samples, clear = clears / samples,
+           money = sum_money / samples, banked = sum_banked / samples }
 end
 
 -- Probability of clearing a FRESH blind (full deck, base hands, empty start).

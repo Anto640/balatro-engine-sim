@@ -164,6 +164,19 @@ DE.DIG_KEEP_GUARANTEE = true -- only pitch cards OUTSIDE the guaranteed play, so
 -- value. A PURPLE seal scores only +3 (it spawns a Tarot when DISCARDED), so it stays pitchable.
 DE.DIG_MAX_KEEP = 20
 
+-- ---- MILK probe (DE.MILK_MONEY, off by default) --------------------------------------
+-- When THIS hand already GUARANTEES the clear and hands remain, the winning human does not
+-- clear-in-one and bank the rest -- they play a money-MAXIMAL hand now (gold-seal $3/trigger,
+-- Lucky, Rough Gem, money jokers), defer the clear to a later hand, and cycle more money cards
+-- through the blind. The clear-focused rollout throws this away; `Sim.survive_after` now surfaces
+-- E[$ farmed], so we switch to the money play ONLY when the money-aware rollout shows survival is
+-- PRESERVED (frac holds within tol) AND total $ rises past a margin. SELF-GATING: if deferring the
+-- clear actually risks it, frac drops and we don't switch. This is the in-blind arm of the same
+-- economy-generation gap the shop over-spend / pack-throughput analyses found (WINRATE_V3_PLAN §30).
+DE.MILK_MONEY = false       -- probe flag: milk the blind for $ once the clear is locked
+DE.MILK_SURV_TOL = 0.02     -- max survival-frac the milk play may cost vs the straight clear
+DE.MILK_MONEY_MARGIN = 2    -- min extra $ (E[money]) the milk must farm to justify deferring
+
 local function planet_use(gs, base_ev, remaining, held, gs2)
   if not held or #held == 0 or not base_ev then return nil end
   local ev2, cards2 = HandEval.best_play_target(gs2, gs.hand or {}, remaining, boss_filter(gs))
@@ -447,6 +460,47 @@ function DE.decide(gs, opts)
     end
   end
 
+  -- ---- MILK: farm in-blind $ when the clear is already assured (DE.MILK_MONEY) -------
+  -- The clear is GUARANTEED this hand and hands remain -> consider playing a money-MAXIMAL hand
+  -- instead and clearing on a later hand. Only commit when the money-aware survive_after shows the
+  -- clear still lands (frac within tol) AND more $ is farmed. See DE.MILK_MONEY note above.
+  local milk_action = nil
+  if DE.MILK_MONEY and guaranteed and hands_left >= 2 and remaining > 0 and #hand > 0 then
+    -- max-$ play in this hand: remaining=0 makes every subset tier-0, so best_fuel_play ranks by
+    -- the fuel credit (= ev.money) then score -> the highest-$ legal play.
+    local mev, mcards = HandEval.best_fuel_play(gs, hand, 0, function(_, ev) return ev.money or 0 end)
+    if mev and mcards and not same_cards(mcards, play_cards)
+       and (mev.money or 0) > (play_ev.money or 0) + 1e-9 then
+      local seed = disc_seed(gs)
+      -- clear line: play the clear now, finish clear-ASAP.  milk line: play the money hand now,
+      -- finish with the MILK policy (defer the clear, cycle more $). CRN (same seed) pairs them.
+      local vc = Simulation.survive_after(gs, { kind = "PLAY", sel = play_cards },
+        DE.SURV_SAMPLES, lcg(seed), false)
+      local vm = Simulation.survive_after(gs, { kind = "PLAY", sel = mcards },
+        DE.SURV_SAMPLES, lcg(seed), true)
+      -- NET milk gain = extra $ farmed MINUS the round-end reward on the hands milking burns
+      -- (each unused hand pays Mechanics.HAND_REWARD). survive_after reports E[banked hands] so the
+      -- milk only wins when the $ it cycles beats the hand-rewards it forgoes.
+      local hand_cost = ((vc.banked or 0) - (vm.banked or 0)) * Mechanics.HAND_REWARD
+      local net_gain = (vm.money or 0) - (vc.money or 0) - hand_cost
+      if vm.frac >= vc.frac - DE.MILK_SURV_TOL and net_gain > DE.MILK_MONEY_MARGIN then
+        milk_action = {
+          type = "PLAY", cards = mcards, hand_type = mev.hand_type,
+          score = mev.score, approx = mev.approx,
+          -- ranked just above the straight clear: while the clear is locked the extra score is
+          -- overkill, and this farms real $. It only exists when the survival gate passed.
+          value = (play_action and play_action.value or 0) + 1,
+          play_econ = HandEval.play_econ(gs, mev, mcards),
+          ordering = Ordering.optimize(gs, mcards, { objective = "money", remaining = remaining }),
+          milk = true,
+          reason = string.format(
+            "Milk the blind: play the %s to farm ~+$%.0f — the clear is locked for a later hand.",
+            mev.hand_type, net_gain),
+        }
+      end
+    end
+  end
+
   -- Allow a dig even on the LAST hand (hands_left==1): with discards still in hand you
   -- can improve the single hand you're about to play. This is the Needle boss (1 hand,
   -- discards intact) and any last hand with discards left -- the engine used to refuse
@@ -529,6 +583,7 @@ function DE.decide(gs, opts)
   local candidates = { play_action }
   if discard_action then candidates[#candidates + 1] = discard_action end
   if dig_action then candidates[#candidates + 1] = dig_action end
+  if milk_action then candidates[#candidates + 1] = milk_action end
 
   -- Selection rule (DESIGN.md Phase 4) + hand economy:
   --   clears OR last hand -> PLAY
@@ -549,8 +604,10 @@ function DE.decide(gs, opts)
   if clears then
     -- The clear is in hand. Baseline plays immediately and forfeits every remaining
     -- discard; with DE.DIG_SURPLUS on we first spend the surplus on a free redraw
-    -- (the dig keeps the guaranteed play's cards, so the clear cannot be lost).
-    best = dig_action or play_action
+    -- (the dig keeps the guaranteed play's cards, so the clear cannot be lost); with
+    -- DE.MILK_MONEY on we instead play a money-maximal hand now and clear later, but only
+    -- when its survival gate passed (milk_action is nil otherwise).
+    best = milk_action or dig_action or play_action
   elseif forced_play then
     -- last hand with discards left: E-6 (the corrected F3). The old mean-rule dug only
     -- when the expected dug hand ALSO beat the target in expectation -- refusing digs
