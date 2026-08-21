@@ -33,7 +33,8 @@
 >    session: Option 3 rollout fidelity + milk (live), §29 pacing (deployed). **The work continues on
 >    (1)+(2); the target is still a win, not the 3% baseline.**
 
-> **🆕 2026-08-21 — §30 IS THE CURRENT CHECKPOINT.** Read `WINRATE_V3_PLAN.md` **§30** first, then §18.
+> **2026-08-21 — §30 CONTEXT (superseded by §31e above; retained because the endgame-power finding and
+> the Option 3 rationale below still hold).**
 >
 > **§29 is now KEPT, not reverted.** `growth_factor` was reverted at *rich10* (tail sheds); re-measured
 > at **BASELINE** (the true operating point — the engine must generate its OWN money; rich10 is only a
