@@ -210,7 +210,10 @@ class this apparatus produces. 63% of runs never committed before; now 71%. Feas
 ### CURRENT STATE (2026-08-15) — **8 expert HUMAN runs captured, 7 wins**; engine ~1.25% at
 ### baseline income and **26.2% at `rich10`**, the operating point the live mod actually serves
 ### The §18g four-arm queue is COMPLETE (2 shipped, 2 closed, arm 4 refuted §28). §26e's
-### `growth_factor` recalibration (§29 `growthcal`) was tried and ❌ REVERTED (null, tail sheds).
+### `growth_factor` recalibration (§29) — ❌ null at RICH10 (tail sheds) but ✅ KEPT: re-measured at
+### BASELINE (n=320, the operating point where pace binds), it is +0.111 progress (p 0.25) and IMPROVES
+### the tail (reach-7 +8, reach-8 +5) — derived correctness that moves runs deeper. Wins flat (10=10):
+### the extra reach-8 runs die at the ANTE-8 BOSS = an endgame POWER wall, not a pace problem.
 ### ⭐ NEXT IS A METHODOLOGY REBUILD, not another lever — see `methodology-shift-2026-08` memory
 ### + §29c: single-lever/mean-progress is retired; build the agreement objective + two-pool + bundles.
 **➡ THE authoritative status is `WINRATE_V3_PLAN.md` §18 — the current checkpoint AND the plan
