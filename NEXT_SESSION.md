@@ -17,12 +17,17 @@
 >    lower bound. Pack-aware re-run LOOKED validated (18%/89%) — ❌❌ **but §31c: that was a MEASUREMENT
 >    ARTIFACT.** The offline probe added the round income to the SAVE branch ONLY, a free budget advantage
 >    that manufactured the flips. Corrected (both branches earn income): flip rate 14%→4%, and the engine
->    version (built into `shop_advisor`, no sim dep) fires **0 times in 8 full runs** — the flip regime
->    never coincides with a BUY_JOKER rec (econ floor already saves there = frequency ceiling). **Engine
->    lookahead REVERTED; the 1-step (a) lookahead is CLOSED.** LESSON: a validated-looking agreement signal
->    is worthless if its valuation has an asymmetry — measure under the SAME model the engine uses, and
->    screen a lever's FIRE RATE in real runs first. **(a) now: a real MULTI-STEP search (expensive + §5z
->    chaos) or accept the autonomous ceiling.** Corrected diagnostic tools kept as the record.
+>    version fires 0 in 8 runs — the 1-step lookahead is CLOSED (§31c artifact).
+>    ⭐⭐ **MULTI-STEP SEARCH BUILT + INERT (§31d).** `engine/shop_search` (depth-3 DP over capacity/money,
+>    engine-internal) fires **0 in 8 runs**: it only banks at POVERTY ($≈cost), where the econ floor
+>    already saves; when the engine actually recommends BUY_JOKER (money not binding) a joker is free
+>    additive capacity → buy. **⇒ the 24% over-buy is NOT economic — it's supermodular, target-directed
+>    banking** (reserve a slot for a synergy build), which additive search can't represent and which
+>    `oracle_plan` (a perfect target, §24) measured NULL. Search REVERTED. **§31e — THE HONEST CEILING:
+>    every reachable over-buy lever (1-step, pack-aware, depth-3) closed on mechanism; the autonomous
+>    engine's ~3% baseline ceiling is reached by tools this apparatus can build + honestly measure.**
+>    Shipped this session: Option 3 rollout fidelity + milk (live), §29 pacing (deployed). The remaining
+>    gap is a RESEARCH problem (represent supermodular build value / a target that converts), not a lever.
 
 > **🆕 2026-08-21 — §30 IS THE CURRENT CHECKPOINT.** Read `WINRATE_V3_PLAN.md` **§30** first, then §18.
 >
