@@ -1,5 +1,28 @@
 # NEXT_SESSION.md — fresh-session handoff (updated 2026-08-21)
 
+> **🆕 2026-08-21 (late) — §30–§31 ARE THE CHECKPOINT.** Read `WINRATE_V3_PLAN.md` §30 then §31.
+> Session delivered THREE things:
+> 1. **Option 3 (sim-fidelity) — DONE.** The in-blind rollout is economy-aware (`survive_after` returns
+>    `money`+`banked`; baseline byte-identical). Milk lever measured paired n=320: **+0.032 n.s., 307
+>    tied, money trajectory identical** — milk fires but the sim engine's decks lack the gold-seal
+>    density to milk. **Closed the in-blind economy channel; traced the gap to deck-shaping/acquisition**
+>    (§30d).
+> 2. **(b) SHIPPED TO LIVE.** `DE.MILK_MONEY` on by default (correct human advice, sim-neutral);
+>    deployed 3 stale install files incl. `engine/pacing.lua` (§29 was never deployed); backup
+>    `bes_install_backup_20260821`; honest annotation + 2 gate correctness fixes. Commits a2cb4cc.
+> 3. **(a) STARTED — the cross-decision planner.** Scoped (§31) to the one un-confounded direction:
+>    in-decision LOOKAHEAD judged by the AGREEMENT objective. Dataset grew to **14 wins** (7 in the
+>    fixture+win pool). First diagnostic (`tools/lookahead_headroom.lua` + `lookahead_score.py`):
+>    **shallow 1-step lookahead flips only ~11% of the over-buys** (10/87, +5 net, 67% precision) — a
+>    lower bound. ⭐ **PACK-AWARE re-run (§31b) VALIDATES the direction: 18% flipped (16/87), +14 net,
+>    89% PRECISION** (joker-only was 11%/+5/67%) — the winner banks marginal jokers to open PACKS, and a
+>    pack-aware lookahead predicts their SAVE with high precision; the over-buy is 48% of all joker-buys.
+>    ⭐ **NEXT (the (a) payoff, specified): integrate the 1-step pack-aware lookahead into `shop_advisor`**
+>    — when best = BUY_JOKER and marginal (prune strong buys, they never flip), run V_save vs V_buy (cheap
+>    K + MC cap) and downgrade to SAVE when V_save > V_buy + margin. Probe-gate it; MEASURE at BASELINE
+>    (paired sim) — agreement is validated, the RUN is the proof. Reuse `tools/lookahead_headroom.lua`.
+>    ⚠ Perf: nested MC is slow (~40 min/1048 in the diagnostic) — prune + low K/cap so a sim arm is feasible.
+
 > **🆕 2026-08-21 — §30 IS THE CURRENT CHECKPOINT.** Read `WINRATE_V3_PLAN.md` **§30** first, then §18.
 >
 > **§29 is now KEPT, not reverted.** `growth_factor` was reverted at *rich10* (tail sheds); re-measured
