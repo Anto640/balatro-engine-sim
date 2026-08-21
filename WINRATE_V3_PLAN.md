@@ -5367,3 +5367,67 @@ ordered replacement plan lives in the `methodology-shift-2026-08` memory: (1) in
 — hash the seed, verify the lattice is harmless, establish a dev/confirm two-pool split; (2) a dense
 per-decision agreement objective replaying the engine over winning-human states; (3) a tail-weighted
 verdict; (4) rewrite the tuning doctrine from single-lever to co-calibrated bundles.
+
+---
+
+## §30 — CHECKPOINT 2026-08-21: §29 RE-HOMED & KEPT, the ENDGAME POWER WALL, and the IN-BLIND FIDELITY CONFOUND located
+
+**This supersedes the §29 "REVERTED" verdict.** §29's `growth_factor` recalibration was reverted
+*at rich10* (tail sheds). Re-measured at **BASELINE** (n=320, paired, `sim_out/base29.jsonl` vs
+`sim_out/g29.jsonl`) — the operating point where pace actually binds (per the
+`rich10-is-not-the-operating-point` correction: the engine must generate its OWN money; rich10 is a
+diagnostic ceiling, not the live operating point) — it is **+0.111 progress (p 0.25, n.s.) with the
+TAIL IMPROVED (reach-7 +8, reach-8 +5)**. Kept on the correctness rule (derived fix, not sim-negative,
+moves runs deeper, helps the human overlay's pace advice). HEAD `a7b5801`.
+
+### 30a. ⭐ THE NEW SIGNAL — the wall moved from PACE to ENDGAME POWER
+Wins stay flat (10/320 = 3.1%) even though more runs now reach ante 8, because **the extra runs
+reaching ante 8 DIE AT THE ANTE-8 BOSS.** Diagnosed on `g29`:
+- per-ante hand-level trajectory (median): a3=1, a4=3, a5=5, a6=7, a7=10, **a8=12** vs the human's
+  **~18.6**. The engine reaches the end **under-levelled**.
+- money is HELD, not converted: **$27 at antes 7–8, unspent into the final boss** (money can't score a
+  boss — only power can).
+- endgame decision probe (ante 8, behind, $27, a Celestial pack available): the engine's best move is
+  **REROLL (1.46) over the Celestial leveling (0.43)** — it gambles its endgame cash speculatively
+  instead of converting to guaranteed power. Same over-reroll the human agreement flagged (15%).
+
+An **endgame reroll-damp** (`SA.ENDGAME_REROLL_DAMP`, damp paid rerolls when behind at ante ≥7) was
+built and **REVERTED**: it flips reroll→SAVE (the Celestial is only ~2 levels on a behind board, so it
+saves rather than levels) and is **not clearly beneficial** — a held $27 does nothing into the boss,
+whereas a speculative reroll *might* surface a saving joker, so damping it can hurt close-behind runs.
+⇒ **The endgame is decided UPSTREAM.** The 12-vs-18.6 leveling gap accumulates over antes 3–7; no
+single ante-8 shop action saves it. Endgame tuning is futile; the lever is earlier throughput.
+
+### 30b. ⭐⭐ THE IN-BLIND FIDELITY CONFOUND, PRECISELY LOCATED (this is the Option-3 target)
+Three in-blind economy levers (dig-surplus −0.110, the shop over-spend screen, the in-blind milk
+lever) all read **null/negative**. Root cause is now located in the code, not hypothesised:
+**`engine/simulation.lua` `rollout` — the objective every in-blind decision is arbitrated against
+(`Sim.survive_after`, `Sim.survive_current`) — models ONLY clearance** (`chips` vs `target`) plus boss
+effects. It:
+- **throws away `ev.money`** — `HandEval.score` returns retrigger-aware in-blind $ (gold seal $3/trig,
+  Lucky, Rough Gem, money jokers), and the rollout accumulates `chips` only, discarding `money`.
+- **never uses held tarots on drawn cards** mid-blind (the `dig→draw→enhance→farm` sequence).
+- its greedy policy plays **to-clear / clear-in-one**, never sequencing to keep premium cards for a
+  later higher-multiplier hand (the option value the winner actually captures).
+
+So `survive_after.frac = E[min(1, chips/target)]` is **structurally blind to in-blind economy
+generation** — the exact thing the blind-outcome scorer showed the winners doing (engine clears-in-one
+88% at 1.70× and banks; the winner plays weaker hands at 0.32× and milks gold-seal money / keeps
+premium for later). The milk lever was inert *because it was measured against an objective that cannot
+see money.* **A per-decision credit can't fix this; the ROLLOUT itself must model the economy.**
+
+### 30c. ⭐ THE PLAN — Option 3 (fidelity) then Option 2 (planning), user-approved 2026-08-21
+- **Option 3 — make the rollout ECONOMY-AWARE (fidelity, unblocks measurement).**
+  (A) `rollout` accumulates `money` (Σ `ev.money`); `survive_after`/`survive_current` return
+  `money = E[total farmed]` as a SEPARATE field (survival/`frac`/`clear` unchanged, so no survival
+  regression). (B) a money-aware rollout POLICY variant: when survival slack exists (hands beyond what
+  clearing needs), play to maximise (money + scaling-fuel + value) instead of clear-in-one — so the
+  rollout VALUES the milking line. This is the faithful model (the game DOES pay the money), and it is
+  the prerequisite that makes the in-blind economy levers measurable at all.
+- **Option 2 — the in-blind PLANNING layer (the real build).** With an economy-aware objective, extend
+  DE's in-blind arbitration to a shallow lookahead / sequencing search: when survival is assured,
+  choose the play/discard sequence that maximises economy (money farmed + premium kept for a later
+  high-mult finish), not the one that clears soonest. Measure at BASELINE (full-run arm, large n) vs
+  the §29 build (`sim_out/g29.jsonl`).
+- **Verdict standard unchanged:** paired n≥160 at baseline; screen cheap via `replay_fixtures` +
+  `blind_outcome` before any full-run arm.

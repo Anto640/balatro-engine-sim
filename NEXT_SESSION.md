@@ -1,21 +1,32 @@
-# NEXT_SESSION.md — fresh-session handoff (updated 2026-08-15)
+# NEXT_SESSION.md — fresh-session handoff (updated 2026-08-21)
 
-> **🆕 2026-08-15 — THE FOUR-ARM QUEUE IS COMPLETE, and §26e was TRIED and REVERTED.** Arm 3
-> (`levelscale`) reverted (§27), arm 4 (`ecap3rich`) refuted its own §22 bound (**−0.945, p<0.0001**,
-> §28). Then §26e's `growth_factor` recalibration (`growthcal`, §29): the trend inversion is real and
-> was fixed by removing two §19b-class stock-as-rate double-counts (`hand_lv`, `money`) + a decaying
-> head-room — but the arm was **null-negative (−0.158 n.s.) with the tail shedding at every level**,
-> so ❌ **REVERTED** (`04b725d`; HEAD engine back byte-identical to pacefix). The correctness core is
-> real but RE-HOMED (§29b) — not another single-lever arm.
+> **🆕 2026-08-21 — §30 IS THE CURRENT CHECKPOINT.** Read `WINRATE_V3_PLAN.md` **§30** first, then §18.
 >
-> **⭐⭐ THE NEXT WORK IS A METHODOLOGY REBUILD, not a lever (user-endorsed 2026-08-15).**
-> Single-lever/mean-progress self-play is retired as the primary loop: it is good hygiene but can't
-> climb an interaction-dominated surface, and run-outcome on 160 chaotic seeds measures the structural
-> bottleneck worst. The ORDERED plan is in the `methodology-shift-2026-08` memory and §29c:
-> **(1)** instrument foundation — hash the seed (raw `s*1000+3` into a MINSTD LCG is a LATTICE),
-> verify the lattice is harmless, set up a dev/confirm two-pool split; **(2)** a dense per-decision
-> AGREEMENT objective replaying the engine over winning-human states; **(3)** a tail-weighted verdict;
-> **(4)** rewrite the tuning doctrine from single-lever to co-calibrated bundles. Start at Step 1.
+> **§29 is now KEPT, not reverted.** `growth_factor` was reverted at *rich10* (tail sheds); re-measured
+> at **BASELINE** (the true operating point — the engine must generate its OWN money; rich10 is only a
+> diagnostic ceiling, per the `rich10-is-not-the-operating-point` memory) it is **+0.111 (n.s.) with
+> the tail IMPROVED** (reach-7 +8, reach-8 +5). Kept on the correctness rule. HEAD `a7b5801`.
+>
+> **⭐ The wall moved from PACE to ENDGAME POWER.** More runs now reach ante 8 but DIE at the ante-8
+> boss: the engine arrives **under-levelled (~12 hand-levels vs the human's ~18.6)** and HOLDS ~$27
+> unspent into the final boss. The gap accumulates over antes 3–7; no ante-8 shop action saves it (an
+> endgame reroll-damp was built and reverted — not cleanly beneficial, §30a).
+>
+> **⭐⭐ THE ACTIVE WORK — Option 3 (fidelity) then Option 2 (planning), user-approved 2026-08-21.**
+> The in-blind economy levers (dig/milk) read null because the objective they're measured against is
+> broken: **`engine/simulation.lua` `rollout` models ONLY clearance** (`chips` vs `target`) — it throws
+> away `ev.money` (gold-seal/Lucky/joker $ that `HandEval.score` DOES compute), never uses tarots on
+> drawn cards, and plays to-clear rather than sequencing to keep premium for a later hand. So
+> `survive_after` is blind to in-blind economy — the exact thing winners milk (§30b).
+> **Option 3:** make `rollout` economy-aware — accumulate `money`, return it as a separate field
+> (survival unchanged), add a money-aware policy variant that milks when survival slack exists.
+> **Option 2:** the in-blind planning/lookahead layer that sequences for economy once the objective can
+> see it. Measure at BASELINE vs the §29 build (`sim_out/g29.jsonl`); screen via
+> `replay_fixtures`+`blind_outcome` before any full-run arm. Full plan: §30c.
+>
+> ⚠ The methodology-shift steps (dense agreement objective, two-pool split, bundle doctrine —
+> `methodology-shift-2026-08` memory) still stand; the agreement apparatus (`agreement.py`,
+> `blind_outcome.lua`, `replay_fixtures.lua`) is BUILT and is the cheap screen for the above.
 
 
 > # 🧭 START HERE — `WINRATE_V3_PLAN.md` **§18** is the current checkpoint and the plan
