@@ -62,7 +62,9 @@
 > `blind_outcome.lua`, `replay_fixtures.lua`) is BUILT and is the cheap screen for the above.
 
 
-> # 🧭 START HERE — `WINRATE_V3_PLAN.md` **§18** is the current checkpoint and the plan
+> # 🧭 CURRENT CHECKPOINT is `WINRATE_V3_PLAN.md` **§31e** (see the top banner). §18 below is RETAINED
+> # HISTORY — the operating-point turn that reopened the tuning family; read it for context, not as the
+> # current plan.
 >
 > **§18 revises §5u**, the project's most-quoted strategic conclusion. §5u's *"the fixes are the
 > wrong SIZE by 1–2 orders of magnitude; do not open another single-lever arm"* was computed
