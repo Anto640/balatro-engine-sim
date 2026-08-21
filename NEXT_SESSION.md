@@ -23,11 +23,15 @@
 >    already saves; when the engine actually recommends BUY_JOKER (money not binding) a joker is free
 >    additive capacity → buy. **⇒ the 24% over-buy is NOT economic — it's supermodular, target-directed
 >    banking** (reserve a slot for a synergy build), which additive search can't represent and which
->    `oracle_plan` (a perfect target, §24) measured NULL. Search REVERTED. **§31e — THE HONEST CEILING:
->    every reachable over-buy lever (1-step, pack-aware, depth-3) closed on mechanism; the autonomous
->    engine's ~3% baseline ceiling is reached by tools this apparatus can build + honestly measure.**
->    Shipped this session: Option 3 rollout fidelity + milk (live), §29 pacing (deployed). The remaining
->    gap is a RESEARCH problem (represent supermodular build value / a target that converts), not a lever.
+>    `oracle_plan` (a perfect target, §24) measured NULL. Search REVERTED. **§31e — THE PER-DECISION /
+>    ADDITIVE-LEVER FAMILY IS EXHAUSTED ON MECHANISM (this is NOT "3% is good enough" — the win target is
+>    unchanged; a whole class of approach is ruled out, which REDIRECTS the work).** ⇒ **the next phase is
+>    RESEARCH, well-posed by the evidence:** (1) represent build value SUPERMODULARLY — score the board as
+>    a SET (copiers × xmult × triggers as a PRODUCT, not a sum of marginals), so a marginal joker reads as
+>    worthless because it doesn't multiply the build; (2) a target as a SET of pieces-to-assemble (slot
+>    reservation + the supermodular scorer) — the untested pairing `oracle_plan` never tried. Shipped this
+>    session: Option 3 rollout fidelity + milk (live), §29 pacing (deployed). **The work continues on
+>    (1)+(2); the target is still a win, not the 3% baseline.**
 
 > **🆕 2026-08-21 — §30 IS THE CURRENT CHECKPOINT.** Read `WINRATE_V3_PLAN.md` **§30** first, then §18.
 >

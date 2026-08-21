@@ -5562,9 +5562,9 @@ the record.
 **⇒ (a) shallow lookahead is CLOSED** — like every prior shallow/per-decision attempt, it does not
 survive correct measurement. The over-buy (48% of joker-buys) is real but resists a 1-step fix. What
 remains for (a): a genuine MULTI-STEP search (expensive, and the §5z content-chaos confound grows with
-depth), or accepting the autonomous ceiling. **The durable lesson (again): a validated-looking agreement
-signal is worthless if the valuation feeding it has an asymmetry — measure the value under the SAME
-model the engine will use, and screen a lever's FIRE RATE in real runs before trusting an offline number.**
+depth), pursued next in §31d. **The durable lesson (again): a validated-looking agreement signal is
+worthless if the valuation feeding it has an asymmetry — measure the value under the SAME model the
+engine will use, and screen a lever's FIRE RATE in real runs before trusting an offline number.**
 
 ### 31d. ⭐⭐ MULTI-STEP SEARCH BUILT + INERT — and it CLOSES the loop on the over-buy
 Built `engine/shop_search.lua`: a depth-3 DP over (board capacity, money, ante) using the engine's own
@@ -5595,13 +5595,31 @@ the 24% over-buy is target-directed/supermodular banking, and the one probe that
 target did not convert. **The search direction is CLOSED, on mechanism, not on a noisy null.**
 `engine/shop_search.lua` reverted (git history preserves it); the finding stands.
 
-### 31e. ⭐ THE HONEST CEILING (2026-08-21, end of the (a) arc)
-Across this session every reachable lever on the over-buy — the project's largest single divergence —
-was built and measured: 1-step lookahead (inert, §31c artifact), pack-aware lookahead (artifact), depth-3
-economy search (inert, §31d). All fail for ONE understood reason: **the human's edge is supermodular,
-target-directed build assembly, which (a) additive/measured valuation cannot represent, and (b) a perfect
-target (oracle_plan) does not convert to winrate anyway (§24).** Combined with §30d (in-blind economy is a
-leaf of deck-shaping) and §6/§5u (valuation family), the autonomous engine's ceiling (~3% baseline) is
-reached by the tools this apparatus can build and honestly measure. **Retained and shipped this session:
-Option 3's rollout economy-fidelity fix + the milk lever (live), §29 pacing (deployed).** The remaining
-gap is a research problem (representing supermodular build value / a target that converts), not a lever.
+### 31e. ⭐ THE LEVER FAMILY IS EXHAUSTED — THE GAP IS A RESEARCH PROBLEM (NOT A STOPPING POINT)
+**This is NOT "3% is good enough" — the winrate target is unchanged; what is settled is that a whole
+CLASS of approach cannot reach it, which redirects the work rather than ending it.** Across this session
+every reachable *lever* on the over-buy — the project's largest single divergence — was built and
+measured: 1-step lookahead (inert, §31c artifact), pack-aware lookahead (artifact), depth-3 economy search
+(inert, §31d). All fail for ONE understood reason: **the human's edge is supermodular, target-directed
+build assembly, which (a) additive/measured valuation cannot represent, and (b) a perfect target
+(oracle_plan) did not convert to winrate as-formulated (§24).** Combined with §30d (in-blind economy is a
+leaf of deck-shaping) and §6/§5u (the valuation family), this closes the **per-decision / additive-lever**
+family on mechanism.
+
+**⇒ THE NEXT PHASE IS RESEARCH, and it is well-posed** — two concrete, non-lever directions the evidence
+now points at, either of which could break the ~3% baseline:
+1. **Represent build value SUPERMODULARLY.** Every valuation here is an additive marginal; the win
+   condition is a PRODUCT. A joker-value model that scores the BOARD AS A SET (copiers × xmult × triggers
+   as a product, not a sum of marginals) is the missing primitive — it is what would let the engine see
+   that a marginal joker is worthless *because it does not multiply the build*, which is the real reason
+   the winners bank it. This is a scoring-model rebuild, not a tuning constant.
+2. **A target formulation that CONVERTS.** `oracle_plan` handed a perfect deck-frequency target and paid
+   nothing (§24) — but it only steered *which hand to level*, never *which slot to reserve* or *which
+   synergy to complete*. A target expressed as a SET of pieces-to-assemble (with slot reservation +
+   the supermodular scorer above) is untested and is the natural pairing for direction 1.
+
+**Retained and shipped this session (real, kept gains):** Option 3's rollout economy-fidelity fix + the
+milk lever (live), §29 pacing (deployed). **The apparatus** (agreement.py, blind_outcome, replay_fixtures,
+the corrected lookahead diagnostics) is the durable asset — it now kills a bad lever in minutes and has
+precisely characterized WHY the additive family fails, which is exactly what makes the research directions
+above well-posed instead of a shot in the dark. **The work continues on those; the target is still a win.**

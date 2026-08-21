@@ -207,7 +207,7 @@ class this apparatus produces. 63% of runs never committed before; now 71%. Feas
    comparing card enhancements returned identical values because the added card never landed in the
    sampled hand — which reads exactly like "the engine can't tell them apart".
 
-### CURRENT STATE (2026-08-21, §30) — **8 expert HUMAN runs captured, 7 wins**; engine ~3.1% at
+### CURRENT STATE (2026-08-21, §31e) — **8 expert HUMAN runs captured, 7 wins**; engine ~3.1% at
 ### BASELINE, the TRUE operating point (the engine must generate its OWN money — rich10 is a diagnostic
 ### ceiling only, NOT what the live mod serves; see `rich10-is-not-the-operating-point`). §29
 ### `growth_factor` is ✅ KEPT: reverted at rich10 (tail sheds) but re-measured at BASELINE (n=320)
@@ -215,15 +215,23 @@ class this apparatus produces. 63% of runs never committed before; now 71%. Feas
 ### ⭐ THE WALL MOVED from pace to ENDGAME POWER: more runs reach ante 8 but DIE there under-levelled
 ### (~12 hand-levels vs the human's ~18.6), holding ~$27 unspent into the final boss. The gap
 ### accumulates over antes 3–7; no ante-8 action saves it (endgame reroll-damp built + reverted, §30a).
-### ⭐⭐ OPTION 3 DONE (§30d, commit e66b3b6): the rollout is now money-aware (survive_after returns
-### money+banked; baseline BYTE-IDENTICAL to g29) + a MILK lever. PAIRED n=320: +0.032 (n.s.), wins
-### 10=10, 307 tied, per-ante $ IDENTICAL. Milk fires but farms nothing — the sim engine's decks lack
-### the gold-seal/money-card DENSITY to milk (the human BUILDS it). ⇒ the in-blind economy gap is a
-### LEAF of a deck-shaping/ACQUISITION gap. Phase A kept (fidelity); MILK_MONEY stays a probe (off).
-### ⇒ REDIRECT (§30e): Option 2's planning target is SHOP/ACQUISITION (value money+shape cards by the
-### economy they compound, incl their now-computable milk potential), NOT in-blind sequencing.
-**➡ THE authoritative status is `WINRATE_V3_PLAN.md` §30 — the current checkpoint AND the plan.
-Read it first, then §18/§6. Fresh-session handoff: `NEXT_SESSION.md`. Historical audit +
+### ⭐⭐ OPTION 3 DONE + SHIPPED (§30d): the rollout is money-aware (survive_after returns money+banked;
+### baseline byte-identical) + a MILK lever — LIVE. Milk is sim-neutral (+0.032) because the sim engine's
+### decks lack the gold-seal density to milk; the in-blind economy gap is a LEAF of deck-shaping.
+### ⭐⭐ (a) MULTI-STEP PLANNER BUILT + CLOSED ON MECHANISM (§31c–e). Every reachable lever on the 24%
+### over-buy — 1-step lookahead (§31c: an income-asymmetry ARTIFACT), pack-aware lookahead (artifact),
+### depth-3 economy search (§31d: fires 0; buying dominates additive capacity when money isn't binding,
+### and the econ floor already saves when it is). ⇒ the over-buy is NOT economic — it's SUPERMODULAR,
+### target-directed banking (the win condition is a PRODUCT; an additive marginal can't represent it),
+### exactly what `oracle_plan` (a perfect target) measured NULL (§24).
+### ⭐ §31e — THE PER-DECISION/ADDITIVE-LEVER FAMILY IS EXHAUSTED. **This is NOT "3% is acceptable" — the
+### win target is unchanged; a whole CLASS is ruled out, which REDIRECTS the work to a RESEARCH problem:**
+### (1) score the board as a SET (copiers×xmult×triggers as a PRODUCT, not a sum of marginals); (2) a
+### target as a SET of pieces-to-assemble + slot reservation (the pairing oracle_plan never tried). The
+### work continues on (1)+(2); the apparatus (agreement.py, blind_outcome, replay/lookahead diagnostics)
+### is the durable asset that makes them well-posed. Retained: Option 3 fidelity+milk (live), §29 pacing.
+**➡ THE authoritative status is `WINRATE_V3_PLAN.md` §31 (esp. §31e) — the current checkpoint AND the
+forward plan. Read it first, then §30/§18/§6. Fresh-session handoff: `NEXT_SESSION.md`. Historical audit +
 roadmap: `WINRATE_AUDIT.md`. Superseded plans: `docs/archive/`.**
 
 > ### ⭐ §24 — ARCHETYPE PLANNING IS CLOSED, at BOTH operating points
