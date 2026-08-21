@@ -5431,3 +5431,39 @@ see money.* **A per-decision credit can't fix this; the ROLLOUT itself must mode
   the §29 build (`sim_out/g29.jsonl`).
 - **Verdict standard unchanged:** paired n≥160 at baseline; screen cheap via `replay_fixtures` +
   `blind_outcome` before any full-run arm.
+
+### 30d. ⭐⭐ RESULT: Option 3 fixed the confound, and the measurement CLOSES in-blind milking
+Phase A (money-aware rollout: `survive_after` now returns `money` + `banked`) + a MILK policy +
+`DE.MILK_MONEY` gate, all committed (e66b3b6). **The baseline is byte-identical** — `milk_base` ==
+`g29` exactly (death-ante 20/40/47/84/70/26/13/10, progress 3.906) — so the default in-blind path is
+untouched; the money-awareness is purely additive. PAIRED n=320 (`sim_out/milk_on` vs `milk_base`):
+
+| | milk_on | milk_base | Δ |
+|---|---|---|---|
+| progress | 3.938 | 3.907 | **+0.032 (t 1.58, p 0.115, n.s.)** |
+| wins | 10 | 10 | 0 |
+| sign test | 8 better / 5 worse | | **307 TIED** |
+| per-ante $ (median) | 2/1/10/18/25/26/27 | 2/1/10/18/25/26/27 | **identical** |
+
+**Milk FIRES (it flipped 13 seeds, both directions — chaotic cascade, net ≈0) but farms nothing
+systematic: the money trajectory does not move.** The gate needs gold-seal/Lucky/money cards OUTSIDE
+the max-econ clear play, and **the sim engine's decks don't have that density.** The human BUILDS it
+(gold seals, Midas Mask, Business Card, money tarots; §5z measured money pack-picks at human 20% vs
+engine 1%). ⇒ **the in-blind economy gap is a LEAF of a deck-shaping/ACQUISITION gap, not an
+in-blind-play gap.** This is the intended payoff of a fidelity fix: it made the channel measurable, and
+the measurement closed it cleanly and pointed upstream.
+
+**Disposition.** Phase A (money-aware objective) is KEPT — correct fidelity, byte-identical baseline,
+and the reusable foundation any future in-blind-economy work needs. `DE.MILK_MONEY` stays a **probe
+(off)**: sim-null, so it does not ship to autonomous play; a live-overlay ship would additionally need
+the `_annotate` fix (a deferred milk play currently mis-prints "beats the blind") and validation on the
+human's actual (milk-able) decks, since humans DO build the density the sim engine lacks.
+
+### 30e. ⇒ THE REDIRECT for Option 2 (the planning layer)
+The original Option 2 was "in-blind sequencing/lookahead." **§30d shows that is inert at the source** —
+there is nothing to sequence for when the deck has no economy cards. The planning that matters is
+**SHOP/ACQUISITION**: value money+shape cards (gold seals, Midas, Business Card, money tarots) by the
+**compounding economy they generate** — including their now-real in-blind MILK potential (Phase A makes
+that computable). This closes a loop: buy money cards *because* they milk → milk them → economy. It is
+the same object §5z/§5s named (the engine prices each acquisition in isolation and never assembles the
+money×shape×milk synergy). That is the next lever; the in-blind planner is deprioritised.

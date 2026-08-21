@@ -215,10 +215,13 @@ class this apparatus produces. 63% of runs never committed before; now 71%. Feas
 ### ⭐ THE WALL MOVED from pace to ENDGAME POWER: more runs reach ante 8 but DIE there under-levelled
 ### (~12 hand-levels vs the human's ~18.6), holding ~$27 unspent into the final boss. The gap
 ### accumulates over antes 3–7; no ante-8 action saves it (endgame reroll-damp built + reverted, §30a).
-### ⭐⭐ ACTIVE WORK — Option 3 (fidelity) then Option 2 (planning), user-approved: the in-blind economy
-### levers read null because `engine/simulation.lua` `rollout` — the objective every in-blind decision
-### is scored against — models ONLY clearance and throws away `ev.money` + cross-hand sequencing (§30b).
-### Fix the rollout to see economy (Option 3), then add the in-blind planning layer (Option 2).
+### ⭐⭐ OPTION 3 DONE (§30d, commit e66b3b6): the rollout is now money-aware (survive_after returns
+### money+banked; baseline BYTE-IDENTICAL to g29) + a MILK lever. PAIRED n=320: +0.032 (n.s.), wins
+### 10=10, 307 tied, per-ante $ IDENTICAL. Milk fires but farms nothing — the sim engine's decks lack
+### the gold-seal/money-card DENSITY to milk (the human BUILDS it). ⇒ the in-blind economy gap is a
+### LEAF of a deck-shaping/ACQUISITION gap. Phase A kept (fidelity); MILK_MONEY stays a probe (off).
+### ⇒ REDIRECT (§30e): Option 2's planning target is SHOP/ACQUISITION (value money+shape cards by the
+### economy they compound, incl their now-computable milk potential), NOT in-blind sequencing.
 **➡ THE authoritative status is `WINRATE_V3_PLAN.md` §30 — the current checkpoint AND the plan.
 Read it first, then §18/§6. Fresh-session handoff: `NEXT_SESSION.md`. Historical audit +
 roadmap: `WINRATE_AUDIT.md`. Superseded plans: `docs/archive/`.**
