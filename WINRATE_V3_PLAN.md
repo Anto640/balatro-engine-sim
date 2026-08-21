@@ -5539,3 +5539,29 @@ real, high-precision lever on the over-buy** (the project's largest single diver
 buys). NEXT: integrate the 1-step pack-aware lookahead into `shop_advisor` (downgrade a BUY_JOKER to
 SAVE when V_save > V_buy), then MEASURE at baseline (paired sim). Agreement is validated; the run is the
 proof. The apparatus (`lookahead_headroom.lua` + `lookahead_score.py`) is the reusable screen.
+
+### 31c. ⭐⭐ CORRECTION: §31b's "validation" was a MEASUREMENT ARTIFACT — the lookahead is INERT
+Building the lookahead into `shop_advisor` (pure-engine, using `Packs.expected_shop_joker` +
+`Packs.value` — no sim dep) surfaced the bug. The offline probe priced
+`V_buy = value + γ·E_next(M − cost)` against `V_save = γ·E_next(M + income)` — **income was added to the
+SAVE branch only.** That is a free budget advantage of (cost + income) handed to saving, not the real
+difference (which is just `cost` + the joker gained — BOTH branches earn the round income). The same
+subtle-asymmetry class as the level_gain unit error and the milk banked over-count.
+
+Corrected (both branches get income), measured two ways:
+- **diagnostic** (`lookahead_headroom.lua`, income fix): flip rate **14% → 4%** (1/28 on the sample).
+- **engine** (consistent-income, pack-affordability prune): **0 flips in 8 full runs.**
+
+The flip regime — banking `$cost` crosses the pack-affordability line the buy misses — essentially
+never coincides with a BUY_JOKER recommendation, because the engine's econ floor already makes it SAVE
+in exactly the poverty regime where the transition occurs (frequency ceiling). **So the pack-aware
+18%/89% was inflated by the asymmetry; the correct 1-step lookahead is inert.** The engine lookahead is
+REVERTED (shop_advisor clean, off-by-default probe removed); the corrected diagnostic tool is kept as
+the record.
+
+**⇒ (a) shallow lookahead is CLOSED** — like every prior shallow/per-decision attempt, it does not
+survive correct measurement. The over-buy (48% of joker-buys) is real but resists a 1-step fix. What
+remains for (a): a genuine MULTI-STEP search (expensive, and the §5z content-chaos confound grows with
+depth), or accepting the autonomous ceiling. **The durable lesson (again): a validated-looking agreement
+signal is worthless if the valuation feeding it has an asymmetry — measure the value under the SAME
+model the engine will use, and screen a lever's FIRE RATE in real runs before trusting an offline number.**

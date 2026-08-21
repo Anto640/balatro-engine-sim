@@ -51,12 +51,16 @@ local function e_next_best(gs, budget, rng)
     for _ = 1, Content.SHOP_SLOTS do
       local j = Content.gen_joker(run, rng); if j then jk[#jk + 1] = j end
     end
-    -- a next-shop state: same board, the given budget, the rolled jokers on offer
+    -- ALSO offer booster packs: the winners bank money to open PACKS (the pack-throughput channel),
+    -- so a joker-only next valuation understates SAVE. gen_pack gives the real weighted pack offer.
+    local bo = {}
+    for _ = 1, Content.PACK_SLOTS do local p = Content.gen_pack(rng, run); if p then bo[#bo + 1] = p end end
+    -- a next-shop state: same board, the given budget, the rolled jokers + packs on offer
     local ngs = GS.new{
       jokers = gs.jokers, deck = gs.deck, consumables = gs.consumables or {},
       run = gs.run, economy = { dollars = budget, interest_cap = (gs.economy or {}).interest_cap or 5 },
       meta = gs.meta,
-      shop = { jokers = jk, vouchers = {}, boosters = {}, reroll_cost = 5,
+      shop = { jokers = jk, vouchers = {}, boosters = bo, reroll_cost = 5,
                joker_slots = (gs.shop and gs.shop.joker_slots) or (gs.run and gs.run.joker_slots) or 5 },
     }
     local ok, ranked = pcall(SA.recommend, ngs, { rng = rng })
@@ -78,7 +82,10 @@ local function lookahead_pick(gs, greedy, rng)
     -- cost not on the action; approximate from value scale unavailable -> keep greedy
     return greedy
   end
-  local v_buy  = (greedy.value or 0) + GAMMA * e_next_best(gs, math.max(0, M - cost), rng)
+  -- BOTH branches earn the round income before the next shop (the real difference is the cost, not
+  -- income). The original probe added income to SAVE only -- an asymmetry that inflated the headroom;
+  -- corrected here so the diagnostic matches the engine's consistent-income model.
+  local v_buy  = (greedy.value or 0) + GAMMA * e_next_best(gs, math.max(0, M - cost + ROUND_INCOME), rng)
   local v_save = GAMMA * e_next_best(gs, M + ROUND_INCOME, rng)
   if v_save > v_buy + MARGIN then
     return { type = "SAVE", value = v_save, lookahead_flip = true,
