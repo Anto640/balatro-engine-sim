@@ -5518,3 +5518,24 @@ the whole investment cheaply, on the un-confounded objective, before any search 
   content-chaos confound grow with depth; (ii) accept that the over-buy needs an economy-DISCIPLINE
   mechanism (a winner-calibrated buy bar), not a search. The diagnostic did its job: it bounded the
   cheapest planner at ~11% (lower bound) BEFORE any search was built — exactly what §31 set out to do.
+
+### 31b. ⭐ PACK-AWARE LOOKAHEAD VALIDATES THE DIRECTION (2026-08-21)
+Adding booster packs to the next-shop valuation (`e_next_best` now offers `Content.gen_pack`, so the
+SAVE branch credits the pack channel the winners actually bank for) — same 7-win pool, 1048 decisions:
+
+| | joker-only (§31a) | **pack-aware** |
+|---|---|---|
+| over-buys flipped to SAVE | 10/87 (11%) | **16/87 (18%)** |
+| false-flips (cost) | 5 | **2** |
+| net agreement / 183 buys | +5 | **+14** |
+| flip PRECISION | 67% | **89%** |
+
+Modeling packs **nearly tripled the net gain and pushed precision to 89%.** This confirms §5z at the
+DECISION level: the winner banks marginal jokers to open PACKS, and a lookahead that sees the pack
+channel predicts their SAVE with high precision (it almost never banks a joker the human wanted). 18%
+is still a LOWER bound (1-step, MC-capped, no multi-step compounding) — a deeper, pack-aware search
+would capture more. **⇒ The (a) fork resolves toward BUILD, not abandon: a pack-aware lookahead is a
+real, high-precision lever on the over-buy** (the project's largest single divergence, 48% of joker-
+buys). NEXT: integrate the 1-step pack-aware lookahead into `shop_advisor` (downgrade a BUY_JOKER to
+SAVE when V_save > V_buy), then MEASURE at baseline (paired sim). Agreement is validated; the run is the
+proof. The apparatus (`lookahead_headroom.lua` + `lookahead_score.py`) is the reusable screen.
