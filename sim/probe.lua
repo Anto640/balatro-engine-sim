@@ -509,7 +509,8 @@ Probe.CONFIGS = {
 -- Resolve a config name to the opts overlay Driver.run consumes. Returns nil for the
 -- baseline so the default code paths stay untouched.
 function Probe.opts(name)
-  local c = Probe.CONFIGS[name or "engine"]
+  if name == nil or name == "" then name = "engine" end   -- unset OR empty BES_PROBE = baseline
+  local c = Probe.CONFIGS[name]
   if not c then error("unknown probe config: " .. tostring(name)) end
   -- ENGINE-flag probes (as opposed to world lesions) are applied to the engine module itself,
   -- since the flag is read deep inside decide() where no per-run opts table reaches. Set
