@@ -5565,3 +5565,43 @@ remains for (a): a genuine MULTI-STEP search (expensive, and the §5z content-ch
 depth), or accepting the autonomous ceiling. **The durable lesson (again): a validated-looking agreement
 signal is worthless if the valuation feeding it has an asymmetry — measure the value under the SAME
 model the engine will use, and screen a lever's FIRE RATE in real runs before trusting an offline number.**
+
+### 31d. ⭐⭐ MULTI-STEP SEARCH BUILT + INERT — and it CLOSES the loop on the over-buy
+Built `engine/shop_search.lua`: a depth-3 DP over (board capacity, money, ante) using the engine's own
+analytic future offers (`expected_shop_joker` + `Packs.value`), so multi-shop BANKING (accumulate for a
+premium / compound economy) is visible where the 1-step couldn't. Pure + engine-internal (could ship).
+**Fires 0 times in 8 full runs.** Direct probing (`Search.prefer_save`) shows exactly why, and it is not
+a bug — it computes correctly:
+
+| money | weak joker (cap 0.3) | strong joker (cap 1.0) |
+|---|---|---|
+| $6 (≈cost) | **SAVE** | **SAVE** |
+| $10 | buy | buy |
+| $15 | buy | buy |
+| $25 | buy | buy |
+
+The search prefers banking ONLY at poverty ($6 ≈ the joker cost), where buying starves the next
+purchase. **But the engine's econ floor already SAVEs in exactly that regime** — so when the engine
+actually recommends BUY_JOKER (money not binding), the search agrees "buy," because a joker is free
+additive capacity when you can still afford the same future purchases. **0 fires because the engine is
+already correct wherever the search would flip.**
+
+⇒ **THE OVER-BUY IS NOT AN ECONOMIC ERROR.** Banking an affordable, economically-fine joker only makes
+sense if it does not fit a **target build** (slot reservation) or lacks **synergy** — i.e. the value is
+SUPERMODULAR (the win condition is a PRODUCT; a measured/additive marginal cannot represent it, as
+`sim/probe.lua`'s own header states). That is precisely the target-directed planning `oracle_plan`
+handed the engine for free and **measured NULL (§24, 41/40)**. So the multi-step search closes the loop:
+the 24% over-buy is target-directed/supermodular banking, and the one probe that supplied a perfect
+target did not convert. **The search direction is CLOSED, on mechanism, not on a noisy null.**
+`engine/shop_search.lua` reverted (git history preserves it); the finding stands.
+
+### 31e. ⭐ THE HONEST CEILING (2026-08-21, end of the (a) arc)
+Across this session every reachable lever on the over-buy — the project's largest single divergence —
+was built and measured: 1-step lookahead (inert, §31c artifact), pack-aware lookahead (artifact), depth-3
+economy search (inert, §31d). All fail for ONE understood reason: **the human's edge is supermodular,
+target-directed build assembly, which (a) additive/measured valuation cannot represent, and (b) a perfect
+target (oracle_plan) does not convert to winrate anyway (§24).** Combined with §30d (in-blind economy is a
+leaf of deck-shaping) and §6/§5u (valuation family), the autonomous engine's ceiling (~3% baseline) is
+reached by the tools this apparatus can build and honestly measure. **Retained and shipped this session:
+Option 3's rollout economy-fidelity fix + the milk lever (live), §29 pacing (deployed).** The remaining
+gap is a research problem (representing supermodular build value / a target that converts), not a lever.
