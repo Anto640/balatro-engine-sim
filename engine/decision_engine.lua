@@ -173,7 +173,11 @@ DE.DIG_MAX_KEEP = 20
 -- PRESERVED (frac holds within tol) AND total $ rises past a margin. SELF-GATING: if deferring the
 -- clear actually risks it, frac drops and we don't switch. This is the in-blind arm of the same
 -- economy-generation gap the shop over-spend / pack-throughput analyses found (WINRATE_V3_PLAN §30).
-DE.MILK_MONEY = false       -- probe flag: milk the blind for $ once the clear is locked
+DE.MILK_MONEY = true        -- SHIPPED ON (2026-08-21): correct play (milk a locked blind for $ when
+                            -- survival holds) + correct advice for the human overlay, whose real decks
+                            -- DO carry the gold-seal/money density the sim engine lacks. Sim-neutral
+                            -- (+0.032, n.s., 307/320 tied), so it ships on the correctness rule. The
+                            -- `nomilk` sim probe disables it for A/B. §30d.
 DE.MILK_SURV_TOL = 0.02     -- max survival-frac the milk play may cost vs the straight clear
 DE.MILK_MONEY_MARGIN = 2    -- min extra $ (E[money]) the milk must farm to justify deferring
 
@@ -478,11 +482,18 @@ function DE.decide(gs, opts)
         DE.SURV_SAMPLES, lcg(seed), false)
       local vm = Simulation.survive_after(gs, { kind = "PLAY", sel = mcards },
         DE.SURV_SAMPLES, lcg(seed), true)
+      -- Compare against the MONEY-ORDERED clear, not the raw one: the engine already reorders a
+      -- locked clear for $ (e.g. Gold-seal card first for a Hanging Chad retrigger), and the rollout
+      -- scores in default order -- so credit the clear that reorder before judging the milk. Without
+      -- this the milk "wins" merely by ordering, farming the SAME $ over more hands (loses a banked
+      -- hand for nothing). Real milk still fires: it cycles NEW $ cards from the deck the clear can't.
+      local clear_reorder = (play_action.ordering and play_action.ordering.objective == "money"
+        and (play_action.ordering.money_gain or 0)) or 0
       -- NET milk gain = extra $ farmed MINUS the round-end reward on the hands milking burns
       -- (each unused hand pays Mechanics.HAND_REWARD). survive_after reports E[banked hands] so the
       -- milk only wins when the $ it cycles beats the hand-rewards it forgoes.
       local hand_cost = ((vc.banked or 0) - (vm.banked or 0)) * Mechanics.HAND_REWARD
-      local net_gain = (vm.money or 0) - (vc.money or 0) - hand_cost
+      local net_gain = (vm.money or 0) - (vc.money or 0) - clear_reorder - hand_cost
       if vm.frac >= vc.frac - DE.MILK_SURV_TOL and net_gain > DE.MILK_MONEY_MARGIN then
         milk_action = {
           type = "PLAY", cards = mcards, hand_type = mev.hand_type,
@@ -728,7 +739,14 @@ function DE._annotate(best, c)
   -- NOT a calibrated probability. _apply_sim upgrades the basis when sim is on.
   best.confidence_basis = "heuristic_margin"
   if best.type == "PLAY" then
-    if c.clears then
+    if best.milk then
+      -- A deferred MILK play does NOT clear this hand (that's the point) even though a clear was
+      -- available -- so DON'T use the clears template ("beats the blind X >= Y" with a sub-clear
+      -- score). Keep the honest milk reason set in decide(); the clear is locked for a later hand.
+      best.confidence = 0.85
+      best.expected_value = 0
+      -- best.reason already reads "Milk the blind: play the <hand> to farm ~+$N ..."
+    elseif c.clears then
       local margin = (c.remaining > 0) and (best.score - c.remaining) / c.remaining or 0
       best.confidence = clamp((c.guaranteed and 0.90 or 0.75) + margin * 0.05, 0.7, 0.99)
       best.expected_value = margin

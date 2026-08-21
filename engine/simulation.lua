@@ -171,7 +171,7 @@ local function rollout(gs, start_hand, pile, target, chips0, hands, discards, ha
       else
         chips = chips + ev.score
         money = money + (ev.money or 0)
-        if chips >= target then return chips, money, hands_left end
+        if chips >= target then return chips, money, hands_left - 1 end
         after_play(ev, sel)
         hands_left = hands_left - 1
       end
@@ -189,7 +189,7 @@ local function rollout(gs, start_hand, pile, target, chips0, hands, discards, ha
     else
       chips = chips + ev.score
       money = money + (ev.money or 0)
-      if chips >= target then return chips, money, hands_left end
+      if chips >= target then return chips, money, hands_left - 1 end
       after_play(ev, sel)
       hands_left = hands_left - 1
     end
