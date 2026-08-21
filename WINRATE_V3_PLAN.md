@@ -5498,3 +5498,23 @@ the engine's top pick differs from the human's AND a 1-step lookahead (buy each 
 board) would flip the engine toward the human's pick. High flip-rate ⇒ lookahead has real headroom and
 the planner is worth building; low ⇒ even lookahead can't close it and (a) is mis-aimed too. This bounds
 the whole investment cheaply, on the un-confounded objective, before any search is built.
+
+### 31a. FIRST (a) RESULT (2026-08-21): shallow lookahead is a WEAK lever — the over-buy is DEEPER
+`tools/lookahead_headroom.lua` + `lookahead_score.py`, 7-win pool, 1048 shop decisions:
+- greedy BUY_JOKER: **183**; of those **eng_buy_human_save = 87 (48% of all joker-buys)** — nearly half
+  the engine's joker purchases are ones the winner banked.
+- 1-step lookahead (V_save vs V_buy, E_next Monte-Carlo'd over `Content.gen_joker`, MC-capped) flips
+  **10/87 over-buys to SAVE (11% headroom)**, with **5 false-flips** (human actually bought) →
+  **net +5 agreement / 183 buys, 67% flip precision**. The flips are the right targets (Egg, Walkie
+  Talkie, Oops! All 6s) but few.
+- **Lower bound** (two reasons the true ceiling is higher): MC-capped values are noisy, and `e_next_best`
+  credits only next-shop JOKER buys — not packs or multi-step compounding, the very channels the winners
+  save FOR. Even so, the headline is robust: **a one-step opportunity-cost lookahead barely dents a gap
+  that covers half the engine's buys.**
+- ⇒ **The over-buy is not a one-step pricing error.** The winner's SAVE reflects DEEP compounding
+  (bank → interest → a bigger purchase 2-3 shops later / a pack / deck-shape) that a shallow lookahead
+  cannot see. This matches every prior finding (the value is multi-step economy ASSEMBLY). Options for
+  (a): (i) a DEEPER (2-3 step) + pack-aware lookahead — the true ceiling test, but cost and the §5z
+  content-chaos confound grow with depth; (ii) accept that the over-buy needs an economy-DISCIPLINE
+  mechanism (a winner-calibrated buy bar), not a search. The diagnostic did its job: it bounded the
+  cheapest planner at ~11% (lower bound) BEFORE any search was built — exactly what §31 set out to do.
