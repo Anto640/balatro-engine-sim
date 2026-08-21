@@ -14,14 +14,15 @@
 >    in-decision LOOKAHEAD judged by the AGREEMENT objective. Dataset grew to **14 wins** (7 in the
 >    fixture+win pool). First diagnostic (`tools/lookahead_headroom.lua` + `lookahead_score.py`):
 >    **shallow 1-step lookahead flips only ~11% of the over-buys** (10/87, +5 net, 67% precision) — a
->    lower bound. ⭐ **PACK-AWARE re-run (§31b) VALIDATES the direction: 18% flipped (16/87), +14 net,
->    89% PRECISION** (joker-only was 11%/+5/67%) — the winner banks marginal jokers to open PACKS, and a
->    pack-aware lookahead predicts their SAVE with high precision; the over-buy is 48% of all joker-buys.
->    ⭐ **NEXT (the (a) payoff, specified): integrate the 1-step pack-aware lookahead into `shop_advisor`**
->    — when best = BUY_JOKER and marginal (prune strong buys, they never flip), run V_save vs V_buy (cheap
->    K + MC cap) and downgrade to SAVE when V_save > V_buy + margin. Probe-gate it; MEASURE at BASELINE
->    (paired sim) — agreement is validated, the RUN is the proof. Reuse `tools/lookahead_headroom.lua`.
->    ⚠ Perf: nested MC is slow (~40 min/1048 in the diagnostic) — prune + low K/cap so a sim arm is feasible.
+>    lower bound. Pack-aware re-run LOOKED validated (18%/89%) — ❌❌ **but §31c: that was a MEASUREMENT
+>    ARTIFACT.** The offline probe added the round income to the SAVE branch ONLY, a free budget advantage
+>    that manufactured the flips. Corrected (both branches earn income): flip rate 14%→4%, and the engine
+>    version (built into `shop_advisor`, no sim dep) fires **0 times in 8 full runs** — the flip regime
+>    never coincides with a BUY_JOKER rec (econ floor already saves there = frequency ceiling). **Engine
+>    lookahead REVERTED; the 1-step (a) lookahead is CLOSED.** LESSON: a validated-looking agreement signal
+>    is worthless if its valuation has an asymmetry — measure under the SAME model the engine uses, and
+>    screen a lever's FIRE RATE in real runs first. **(a) now: a real MULTI-STEP search (expensive + §5z
+>    chaos) or accept the autonomous ceiling.** Corrected diagnostic tools kept as the record.
 
 > **🆕 2026-08-21 — §30 IS THE CURRENT CHECKPOINT.** Read `WINRATE_V3_PLAN.md` **§30** first, then §18.
 >
