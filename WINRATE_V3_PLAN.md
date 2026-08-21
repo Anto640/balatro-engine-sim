@@ -5467,3 +5467,34 @@ there is nothing to sequence for when the deck has no economy cards. The plannin
 that computable). This closes a loop: buy money cards *because* they milk → milk them → economy. It is
 the same object §5z/§5s named (the engine prices each acquisition in isolation and never assembles the
 money×shape×milk synergy). That is the next lever; the in-blind planner is deprioritised.
+
+### 30f. (b) SHIPPED TO THE LIVE OVERLAY (2026-08-21)
+`DE.MILK_MONEY` now defaults ON. Deployed to the install (`%APPDATA%/Balatro/Mods/balatroenginesim`)
+— the whole-tree diff found THREE stale files: the two milk files AND `engine/pacing.lua` (§29 had
+never been deployed). All three synced + parse-verified; backup at `bes_install_backup_20260821`
+(outside `Mods/`). Gate correctness fixes shipped with it: `banked` no longer over-counts on a
+mid-loop clear; the milk compares against the MONEY-ORDERED clear (else it "wins" by ordering alone).
+
+## §31 — (a) THE CROSS-DECISION PLANNER (the structural investment; user-approved 2026-08-21, "do b then a")
+The remaining winrate gap is **synergy ASSEMBLY across decisions** (money × shape × milk × scaling),
+which per-decision valuation cannot express — established from every leaf channel now being
+measured-closed (in-blind play/milk §30d, shop over-spend, satisficing, dig). This is the large,
+multi-session build the roadmap has deferred. **Scope it against what is already CLOSED so it is not a
+fourth null:**
+* **§24 CLOSED archetype planning** — a perfect deck-frequency commitment paid nothing (41/40).
+  ⇒ the gap is NOT "knowing what to build"; do not rebuild a commitment/plan-setting layer.
+* **§28 REFUTED shop-stream slot reservation** (INC-1) — early board discipline is negative.
+* **§5z ENVELOPE / chaos** — 85% of seeds flip outcome under tiny perturbations; **run-outcome on the
+  shared pool cannot measure a planner** (max-over-k is not an oracle; a retrospective line-existence
+  oracle over the greedy engine's realized offer stream is confounded the same way).
+⇒ **The one genuinely-untested, least-confounded direction: IN-DECISION LOOKAHEAD measured by the
+AGREEMENT objective, not run-outcome.** At each shop, simulate a few steps ahead (buy X → re-value the
+reachable board/economy) and pick the action with the best lookahead value; judge it by whether its
+choices move toward the human WINNERS' choices on the same captured states (`agreement.py`,
+`replay_fixtures`, the dense per-decision objective from `methodology-shift-2026-08`) — which is immune
+to the seed chaos that sank every run-outcome arm. **First step (this is a DIAGNOSTIC, build before the
+planner): the lookahead-headroom probe** — over the captured winning-run shop states, measure how often
+the engine's top pick differs from the human's AND a 1-step lookahead (buy each option → re-score the
+board) would flip the engine toward the human's pick. High flip-rate ⇒ lookahead has real headroom and
+the planner is worth building; low ⇒ even lookahead can't close it and (a) is mis-aimed too. This bounds
+the whole investment cheaply, on the un-confounded objective, before any search is built.
