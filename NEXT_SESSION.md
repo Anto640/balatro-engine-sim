@@ -29,10 +29,19 @@
 > Corrected (real Buffoon pack, `{key=...}`): HEAD pack value is FLAT across board states (0.690 bare /
 > 0.689 core-deficit / 0.680 core-forming) — the completion primitive is NOT already present. So the target
 > model is NON-REDUNDANT and genuinely untested. Built it (`BP.completion_credit` gated on `needs_xmult`,
-> hooked into Buffoon pack EV + joker skip-tags), verified firing (core-deficit Buffoon 0.689→0.864); paired
-> BASELINE sim arm `tgt_31f` vs `base_31f` IN PROGRESS. Verdict → §32b. The §32 block below is FALSIFIED,
-> kept for the audit trail. **Lesson: pass structured args, not bare keys — a mis-read measurement nearly
-> closed a live direction.**
+> hooked into Buffoon pack EV + joker skip-tags), verified firing (core-deficit Buffoon 0.689→0.864).
+>
+> **⭐ §32b VERDICT — THE TARGET MODEL CONVERTS AT rich10 (operating-point signature).** Paired n=160:
+> BASELINE income NULL (**−0.009, p 0.866, sign 7/7**) but **rich10 +0.067 (p 0.065), sign 9/2 (p 0.070),
+> wins 39→43**, ASYMMETRIC swings (gains +4.71/+2.80 vs losses ≤0.64). Interaction +0.076 — the SAME
+> null-baseline→positive-rich10 shape as B3 (+0.518) and level_gain (+0.421), exactly what §6 predicts for a
+> PREFERENCE change the engine can't afford at baseline ($1.3 at ante 2). **This is a SUGGESTIVE-POSITIVE
+> (near but not below 0.05), the strongest build of the session** — and the §32a retraction was VINDICATED
+> (the buggy pack-key measurement would have wrongly killed it). NOT a definitive ship yet. **Two next
+> moves:** (1) replicate out-of-sample (`BES_SEED_OFF=7`, both rich10 arms) before shipping; (2) DEPLOY LIVE
+> on the operating-point argument like B3/level_gain — the mod advises a HUMAN at the rich10 end. Lever in
+> `bes_tgt_31f` worktree; arms `sim_out/{base,tgt,baser,tgtr}_31f.jsonl`. **The §32 "closed on mechanism"
+> block below is FALSIFIED — audit trail only.** Lesson: pass structured args, not bare keys.
 >
 > **↓ FALSIFIED (audit trail): §32 — DIR-2 (THE TARGET MODEL) IS CLOSED ON MECHANISM.** Scoped before building (the §31d rule).
 > Three converging checks: (1) H3 — the completion interaction a forward-product target would encode is

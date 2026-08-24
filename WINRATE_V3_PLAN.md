@@ -5814,3 +5814,31 @@ it often cannot AFFORD the Buffoon pack it now wants more. This is the exact pro
 +0.518 rich10) and level_gain (−0.076 → +0.421 rich10). **A baseline null is therefore NOT the verdict for
 this lever.** The rich10 arm (pristine-HEAD rich10 baseline `baser_31f` + rich10 target) is in progress;
 final verdict below.
+
+**RICH10 RESULT — the target model CONVERTS at the operating point where it can be afforded.** rich10
+baseline `baser_31f` (39 wins) vs rich10 target `tgtr_31f` (43 wins), paired n=160:
+
+| metric | BASELINE income | **rich10** |
+|---|---|---|
+| progress Δ | −0.009 (p 0.866) | **+0.067 (sd 0.460, t 1.84, p 0.065)** |
+| sign test | 7 / 7 / 145 (p 1.0) | **9 better / 2 worse / 149 tied (p 0.070)** |
+| wins | 4 → 5 | **39 → 43** |
+| swing shape | symmetric chaos (±5 both ways) | **ASYMMETRIC: gains +4.71/+2.80/+1.29, losses ≤ 0.64** |
+
+**Operating-point interaction +0.076 — the SAME signature as B3 (−0.102→+0.518) and level_gain
+(−0.076→+0.421): inert at baseline, positive at rich10** (§6, exactly as predicted for a PREFERENCE change
+the engine can't afford to act on when it holds $1.3 at ante 2). The rich10 swings are cleanly asymmetric —
+the lever lifts runs decisively (70003 a4→a9 WIN, 126003 a6→a9 WIN) and barely hurts any (worst −0.64) —
+which is the shape of a real effect, NOT the ±5 both-ways re-roll the baseline arm showed. High tie count
+(149) ⇒ low sd ⇒ trustworthy measurement class.
+
+**⇒ THE TARGET MODEL IS A SUGGESTIVE-POSITIVE at rich10 (both metrics p≈0.065–0.070, near but not below
+0.05).** It is the strongest of this session's builds and — critically — **§32's "closed on mechanism"
+retraction (§32a) was the right call: had the buggy pack-key measurement stood, this genuinely-valuable
+direction would have been wrongly killed.** Status: NOT yet a definitive ship (a selected lever near p 0.05
+needs out-of-sample replication — the B3 winner's-curse lesson). Two defensible next moves: (1) replicate
+out-of-sample (`BES_SEED_OFF=7`, both rich10 arms) before shipping; (2) DEPLOY LIVE on the operating-point
+argument as B3/level_gain were — the live mod advises a HUMAN who sits at the rich10 end (2–4× richer than
+the engine), so a rich10-positive preference change is a ship for the OVERLAY even at baseline sim-neutral.
+The lever, constants, and both arms are on disk (`sim_out/{baser,tgtr}_31f.jsonl`); the change lives in the
+`bes_tgt_31f` worktree.
