@@ -5719,3 +5719,45 @@ result is the mechanistic confirmation that closes dir-1-alone and sharpens the 
 re-measure is LOW expected value here: the gap is not affordability (the shop simply lacks the multiplier),
 so more money does not create the redirect target. **The next real step remains the multi-channel target
 model (dir-2), not another present-board damp.**
+
+## §32 — DIR-2 (THE TARGET MODEL) IS CLOSED ON MECHANISM: the primitive is ALREADY in the valuation
+Per the standing rule (bound before build; §31d closed the multi-step search by DIRECT PROBING, not a
+noisy sim), the dir-2 "target model" (§31e/§31g: a target as a SET of pieces-to-assemble that redirects a
+declined additive toward a MULTIPLIER via the right channel) was SCOPED before building. Three checks, and
+they converge:
+
+1. **H3 — the completion interaction is only a WEAK second-order signal** (`supermodular_headroom.lua`,
+   new block). Take-rate in the 2x2 {candidate role} x {board has a base}:
+   multiplier 72% (base) / 67% (no base); additive 40% (base) / 48% (no base). The *predicted* dir-2
+   slopes are present but small (multiplier +5pp with a base, additive −8pp). **ROLE dominates** (mult ~70%
+   vs additive ~44%); the completion interaction a forward-product target would encode is weak in the
+   ground truth — so a from-scratch product-scorer is low expected value.
+2. **The engine's pack valuation ALREADY reflects completion.** `Packs.value(Buffoon)` on a standard
+   deck: bare board **0.353** → based/core-deficit board **0.433 (+23%)**. Because `joker_pool` MEASURES
+   each sampled joker against your ACTUAL board (`JokerValue.score_delta`), a multiplier inside a pack is
+   already priced by the product it makes on your base. The "credit a multiplier-channel by the product it
+   completes" idea is **already expressed** — adding a completion credit would double-count / be inert,
+   exactly the §31d "the search fires 0 because the engine is already correct there" pattern.
+3. **§5s + §5z + §31g corroborate:** the engine prices the multipliers it is OFFERED ~right (§5s, rank#1→
+   47% kept); it under-OPENS packs not because pack EV is low but because packs lose to SAVE/REROLL in the
+   ranking (§5z: 1337 declined packs it rated positive itself) — a CURRENCY/throughput effect; and a
+   shop-scoring damp can't redirect to a multiplier the shop doesn't offer (§31g).
+
+**⇒ THE TARGET-MODEL AXIS IS THE WRONG AXIS.** Every form of it (shop-completion damp §31g, forward-product
+scorer H3, pack/tag completion credit — this section) is either weak in the data or already present in the
+measurement. The residual gap is **income/throughput at the operating point**: the engine holds ~$1.3 at
+ante 2 and cannot afford the pack volume (6.10/ante human vs 1.36 engine) that SUPPLIES the multipliers its
+valuation already wants. That is the §6/§18 operating-point axis — and the LIVE MOD already sits at the
+richer (human) end, where B3 (+0.518) and the level_gain correction (+0.421) already converted.
+
+**What this leaves as genuinely open (NOT a per-decision lever):** the pack-throughput × income INTERACTION
+(§5z's `richpack` reached 5.75 packs/ante and was suggestive, McNemar p 0.189, not demonstrated). This is
+an operating-point/economy investigation, not a scoring or target-model build — and it must be run as an
+INTERACTION (money alone = refuted `levelbuy`/`packgreed`; throughput alone = refuted). It is the one
+thread the evidence still points at, and it is squarely in the §6 frame, not the §31e research frame.
+
+**Retained/durable:** `tools/supermodular_headroom.lua` (H1/H2/H3 + the buy-bar record). The §31e research
+fork is now BOUNDED at both ends — dir-1 (supermodular scoring) is a partial layer already present and its
+sharpening is a null (§31g); dir-2 (target model) closes on mechanism (this section). The additive-family
+AND the target-family are both exhausted; the open frontier is operating-point economy (pack×income), not
+per-decision valuation.

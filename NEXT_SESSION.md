@@ -22,11 +22,25 @@
 > (magnitude lever, no positive evidence). **Mechanism check is the point:** the damp barely fired
 > (flat_chips 122→118) and the declines went to OTHER ADDITIVES (flat_mult 218→224), NOT multipliers —
 > the shop simply lacks the multiplier the human builds toward (acquired diffusely via packs/tags).
-> **⇒ dir-1 (present-board additive damp) is confirmed INSUFFICIENT; the real lever is the
-> multi-channel dir-2 target.** Buy-bar reverted (lived only in a worktree). NEXT: dir-2 — a target
-> model that can redirect a decline toward a multiplier via the RIGHT channel (packs/tags/later shops),
-> which a shop-only damp structurally cannot. A rich10 re-measure of the buy-bar is low-value (the gap
-> is channel, not affordability). Full write-up: `WINRATE_V3_PLAN.md` §31g.
+> **⇒ dir-1 (present-board additive damp) is confirmed INSUFFICIENT.** Buy-bar reverted (worktree only).
+>
+> **🆕 §32 — DIR-2 (THE TARGET MODEL) IS CLOSED ON MECHANISM.** Scoped before building (the §31d rule).
+> Three converging checks: (1) H3 — the completion interaction a forward-product target would encode is
+> only a WEAK second-order signal in the human data (multiplier take +5pp with a base, additive −8pp;
+> ROLE dominates ~70% vs ~44%); (2) the engine's pack valuation ALREADY reflects completion —
+> `Packs.value(Buffoon)` rises 0.353→0.433 (+23%) on a core-deficit board, because `joker_pool` MEASURES
+> each sampled joker against your real board, so a completion credit would be inert (the §31d "already
+> correct there" pattern); (3) §5s/§5z/§31g — the engine prices offered multipliers ~right and
+> under-OPENS packs for CURRENCY reasons (they lose to SAVE/reroll), not low pack EV. **⇒ the target-model
+> axis is the wrong axis; the residual gap is income/throughput at the operating point (§6/§18), where the
+> LIVE MOD already sits and where B3/level_gain already converted.** The ONE open thread the evidence still
+> points at: the pack-throughput × income INTERACTION (§5z `richpack` suggestive, not demonstrated) — an
+> operating-point/economy investigation, NOT a per-decision or target-model build. Full write-up: §32.
+>
+> **NET for the next session:** the §31e research fork is bounded at BOTH ends (dir-1 null §31g, dir-2
+> closed-on-mechanism §32). The additive-family AND target-family are exhausted. The frontier is
+> operating-point economy (pack×income as an interaction), squarely in the §6 frame. `WINRATE_V3_PLAN.md`
+> §32 is the checkpoint.
 >
 > **2026-08-21 (late) — §30–§31 CONTEXT.** Read `WINRATE_V3_PLAN.md` §30 then §31.
 > Session delivered THREE things:

@@ -388,6 +388,44 @@ do
   end
 end
 print("")
+-- H3. THE COMPLETION INTERACTION — scoping dir-2 EMPIRICALLY (don't hand-design weights). --
+-- A supermodular target says the human's TAKE should depend on whether the candidate COMPLETES a
+-- product: a multiplier is worth taking once a BASE exists to multiply; an additive is worth taking
+-- to BUILD a base, but not once the base is there and a multiplier is the missing piece. Measure the
+-- take-rate in the 2x2 {candidate role} x {board already has a base}. Whichever interaction predicts
+-- TAKE is exactly what a forward-product score must encode. base := >=2 additive scorers on board.
+print("--- H3. THE COMPLETION INTERACTION (scoping dir-2: what predicts the human's TAKE?) ---")
+do
+  local B = {}  -- key: role_group.."|"..hasbase -> {tk,sv}
+  local function bump(rg, hasbase, took)
+    local k = rg .. "|" .. tostring(hasbase); B[k] = B[k] or { tk = 0, sv = 0 }
+    if took then B[k].tk = B[k].tk + 1 else B[k].sv = B[k].sv + 1 end
+  end
+  for _, sess in ipairs(sessions) do
+    local b = session_top_joker_buy(sess)
+    if b and b.target then
+      local key = target_key(b.target)
+      local ro = key and role(key) or "additive"
+      local rg = (ro == "additive") and "additive" or "multiplier"
+      local took = human_took_joker(sess, b.target)
+      local counts = board_before(sess.run, sess.t0 or 0)
+      local nm, na = board_roles(counts)
+      bump(rg, na >= 2, took)
+    end
+  end
+  local function row(rg, hasbase)
+    local e = B[rg .. "|" .. tostring(hasbase)] or { tk = 0, sv = 0 }
+    local n = e.tk + e.sv
+    print(("    %-11s  board-has-base=%-5s  n=%2d  TOOK %2d / saved %2d  -> take-rate %.0f%%")
+      :format(rg, tostring(hasbase), n, e.tk, e.sv, pct(e.tk, n)))
+  end
+  row("multiplier", true);  row("multiplier", false)
+  row("additive",   true);  row("additive",   false)
+  print("    dir-2 PREDICTION: multiplier take-rate should RISE with a base (completes the product);")
+  print("    additive take-rate should FALL once a base exists (the missing piece is a multiplier).")
+  print("    The gap between those two slopes is the supermodular signal a forward-product score adds.")
+end
+print("")
 print("READING: H1 confirmed (mult kept-rate >> additive, winning boards mostly multipliers) AND")
 print("H2 confirmed (additive over-buy rate high, decent flip precision) => directions (1)+(2) have")
 print("headroom, build the supermodular scorer. Either failing => the product model is mis-aimed too.")

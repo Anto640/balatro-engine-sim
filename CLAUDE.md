@@ -243,10 +243,18 @@ class this apparatus produces. 63% of runs never committed before; now 71%. Feas
 ### paired n=159: +0.036 (p 0.158 n.s.), 144 tied, wins 4→4. Mechanism explains it: the damp barely fired
 ### (flat_chips 122→118) and declines went to OTHER ADDITIVES (flat_mult 218→224), NOT multipliers — the
 ### shop lacks the multiplier the human builds toward. ⇒ dir-1 present-board damp CONFIRMED INSUFFICIENT;
-### the real lever is the multi-channel dir-2 target (redirect a decline toward a multiplier via packs/
-### tags/later shops). Buy-bar reverted (worktree only). NEXT: build/scope the dir-2 target model.
+### the real lever is the multi-channel dir-2 target. Buy-bar reverted (worktree only).
+### ⭐ §32 — DIR-2 (THE TARGET MODEL) IS CLOSED ON MECHANISM (scoped before building, the §31d rule). The
+### completion primitive is ALREADY in the valuation: `Packs.value(Buffoon)` rises 0.353→0.433 (+23%) on a
+### core-deficit board because `joker_pool` MEASURES sampled jokers against your real board — a completion
+### credit would be inert. H3: the completion interaction is only a WEAK signal in the human data (ROLE
+### dominates). §5s/§5z: engine prices offered multipliers ~right; under-opens packs for CURRENCY reasons.
+### ⇒ the target-model axis is WRONG; the residual gap is income/throughput at the operating point (§6/§18,
+### where the live mod already sits). The one open thread: pack-throughput × income INTERACTION (§5z
+### richpack suggestive) — an economy investigation, NOT a per-decision/target build. Both the additive-
+### family and the target-family are now exhausted; the frontier is operating-point economy.
 
-**➡ THE authoritative status is `WINRATE_V3_PLAN.md` §31f (then §31e) — the current checkpoint AND the
+**➡ THE authoritative status is `WINRATE_V3_PLAN.md` §32 (then §31/§6) — the current checkpoint AND the
 forward plan. Read it first, then §30/§18/§6. Fresh-session handoff: `NEXT_SESSION.md`. Historical audit +
 roadmap: `WINRATE_AUDIT.md`. Superseded plans: `docs/archive/`.**
 
