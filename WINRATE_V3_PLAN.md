@@ -5791,3 +5791,26 @@ target model is therefore genuinely UNTESTED, not inert. **Built it** (`BP.compl
 via `MULT_PROB_BY_RARITY`), verified firing, and it is now in a paired BASELINE sim arm (`tgt_31f` vs the
 existing HEAD baseline `base_31f`). Verdict to follow in §32b. **Lesson (again): a decisive-looking mechanism
 result is worthless if the measurement feeding it is wrong — pass structured args, not bare keys.**
+
+### 32b. THE TARGET-MODEL VERDICT — baseline NULL (but it's a PREFERENCE change → rich10 arm required)
+`tgt_31f` (the non-redundant target model: `BP.completion_credit` on Buffoon packs + joker tags, gated on
+`needs_xmult`) vs the pristine-HEAD baseline `base_31f`, paired n=159 BASELINE income:
+
+| metric | baseline | target model | Δ |
+|---|---|---|---|
+| progress | 3.981 | 3.972 | **−0.009** (sd 0.708, t −0.17, **p 0.866 n.s.**) |
+| sign test | — | — | **7 better / 7 worse / 145 tied** (p 1.0) |
+| death-ante | — | — | 4 later / 5 earlier |
+| wins | 4 | 5 | +1 |
+
+**Dead null on the mean AND the sign test.** But note the sd is 0.708 (2.2× the buy-bar's 0.321): this lever
+FIRES and CASCADES — biggest swings 131003 a2→a8 (+5.66), 78003 a5→a9 (a win) against 109003 a7→a4 (−3.18),
+21003 a8→a5. It **re-rolls WHICH seeds win around a zero mean** — the §5w chaos signature (noskip/oracle_plan
+all landed 50/50), NOT the buy-bar's low-fire null.
+
+**⚠️ This is a PREFERENCE change (chase the multiplier-supplying channel when core-deficient), and §6 is
+explicit that preference changes are UNMEASURABLE at baseline income** — the engine holds ~$1.3 at ante 2, so
+it often cannot AFFORD the Buffoon pack it now wants more. This is the exact profile of B3 (−0.102 baseline →
++0.518 rich10) and level_gain (−0.076 → +0.421 rich10). **A baseline null is therefore NOT the verdict for
+this lever.** The rich10 arm (pristine-HEAD rich10 baseline `baser_31f` + rich10 target) is in progress;
+final verdict below.
