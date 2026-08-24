@@ -24,7 +24,17 @@
 > the shop simply lacks the multiplier the human builds toward (acquired diffusely via packs/tags).
 > **⇒ dir-1 (present-board additive damp) is confirmed INSUFFICIENT.** Buy-bar reverted (worktree only).
 >
-> **🆕 §32 — DIR-2 (THE TARGET MODEL) IS CLOSED ON MECHANISM.** Scoped before building (the §31d rule).
+> **⚠️ §32a RETRACTS §32.** §32's linchpin ("pack EV already rises +23% on a core-deficit board") was a
+> MEASUREMENT ERROR — the probe passed the pack key as a STRING, so `P.size_of` mis-read it as a CARD pack.
+> Corrected (real Buffoon pack, `{key=...}`): HEAD pack value is FLAT across board states (0.690 bare /
+> 0.689 core-deficit / 0.680 core-forming) — the completion primitive is NOT already present. So the target
+> model is NON-REDUNDANT and genuinely untested. Built it (`BP.completion_credit` gated on `needs_xmult`,
+> hooked into Buffoon pack EV + joker skip-tags), verified firing (core-deficit Buffoon 0.689→0.864); paired
+> BASELINE sim arm `tgt_31f` vs `base_31f` IN PROGRESS. Verdict → §32b. The §32 block below is FALSIFIED,
+> kept for the audit trail. **Lesson: pass structured args, not bare keys — a mis-read measurement nearly
+> closed a live direction.**
+>
+> **↓ FALSIFIED (audit trail): §32 — DIR-2 (THE TARGET MODEL) IS CLOSED ON MECHANISM.** Scoped before building (the §31d rule).
 > Three converging checks: (1) H3 — the completion interaction a forward-product target would encode is
 > only a WEAK second-order signal in the human data (multiplier take +5pp with a base, additive −8pp;
 > ROLE dominates ~70% vs ~44%); (2) the engine's pack valuation ALREADY reflects completion —

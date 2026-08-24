@@ -244,6 +244,12 @@ class this apparatus produces. 63% of runs never committed before; now 71%. Feas
 ### (flat_chips 122→118) and declines went to OTHER ADDITIVES (flat_mult 218→224), NOT multipliers — the
 ### shop lacks the multiplier the human builds toward. ⇒ dir-1 present-board damp CONFIRMED INSUFFICIENT;
 ### the real lever is the multi-channel dir-2 target. Buy-bar reverted (worktree only).
+### ⚠️ §32a RETRACTS §32 (below): §32's "pack EV already rises +23%" was a MEASUREMENT ERROR (passed the
+### pack key as a STRING → P.size_of mis-read it as a CARD pack). Corrected: the real Buffoon pv is FLAT
+### across board states in HEAD (0.690 bare / 0.689 core-deficit) — the completion primitive is NOT already
+### present, so the target model is NON-REDUNDANT. Built it (BP.completion_credit gated on needs_xmult,
+### hooked into Buffoon pack EV + joker tags); paired sim arm (tgt_31f vs base_31f) IN PROGRESS, verdict §32b.
+### ↓ THE §32 CLAIM BELOW IS FALSIFIED — kept only for the audit trail:
 ### ⭐ §32 — DIR-2 (THE TARGET MODEL) IS CLOSED ON MECHANISM (scoped before building, the §31d rule). The
 ### completion primitive is ALREADY in the valuation: `Packs.value(Buffoon)` rises 0.353→0.433 (+23%) on a
 ### core-deficit board because `joker_pool` MEASURES sampled jokers against your real board — a completion

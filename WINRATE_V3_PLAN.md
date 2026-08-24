@@ -5761,3 +5761,33 @@ fork is now BOUNDED at both ends — dir-1 (supermodular scoring) is a partial l
 sharpening is a null (§31g); dir-2 (target model) closes on mechanism (this section). The additive-family
 AND the target-family are both exhausted; the open frontier is operating-point economy (pack×income), not
 per-decision valuation.
+
+### 32a. ⚠️ CORRECTION — §32's "closed on mechanism" is FALSIFIED by a measurement error (the string-arg trap)
+§32 check #2 claimed the engine's Buffoon-pack value "already rises 0.353→0.433 (+23%) on a core-deficit
+board", concluding the completion primitive was already in the valuation and a target credit would be inert.
+**That measurement was wrong.** The probe called `Packs.value(gs, "p_buffoon_normal", ...)` — passing the
+pack key as a STRING. `P.value` reads `pk.key or pk.name`; on a string `pk.key` is nil, so `P.size_of(nil)`
+returned kind=**"card"**, and the "0.353→0.433" was a CARD pack, not Buffoon. (This is exactly the "re-derive
+the measurement before concluding" failure the project documents — §5z's `set`-vs-`key` mis-read.)
+
+**Corrected measurement (real Buffoon pack, `{key=...}`), pristine HEAD engine, standard deck, samples=16:**
+
+| board | needs_xmult | Buffoon pv (HEAD) | Buffoon pv (target model) |
+|---|---|---|---|
+| bare | false | 0.690 | 0.690 (credit gated off) |
+| core-deficit (2 base, 0 xmult) | true | **0.689** | **0.864** (+0.175) |
+| core-forming (+1 xmult) | true | 0.680 | 0.768 (+0.087, tapered) |
+
+**The HEAD pack value is FLAT across board states — it does NOT rise when the board needs a multiplier.**
+So the completion primitive is NOT already present (the expected-pick average is dominated by non-multiplier
+jokers and a base lifts pool jokers ~uniformly, so board core-deficit doesn't move the pack's EV). ⇒ **§32's
+"closed on mechanism" is RETRACTED.** The target-model credit is NON-REDUNDANT: it genuinely raises the
+multiplier-supplying channel's value exactly when the board is core-deficient, tapering as the core forms.
+
+Also narrowing §32's other checks: H3 (the weak completion interaction) was measured on SHOP-joker take/save,
+not on the PACK/TAG channel the target model actually credits — so it does not bound this lever either. The
+target model is therefore genuinely UNTESTED, not inert. **Built it** (`BP.completion_credit` gated on
+`needs_xmult`, hooked into `packs.lua` Buffoon EV via `P.BUFFOON_MULT_PROB=0.35` and `tags.lua` joker tags
+via `MULT_PROB_BY_RARITY`), verified firing, and it is now in a paired BASELINE sim arm (`tgt_31f` vs the
+existing HEAD baseline `base_31f`). Verdict to follow in §32b. **Lesson (again): a decisive-looking mechanism
+result is worthless if the measurement feeding it is wrong — pass structured args, not bare keys.**
