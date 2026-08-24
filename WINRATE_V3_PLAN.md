@@ -5623,3 +5623,99 @@ milk lever (live), §29 pacing (deployed). **The apparatus** (agreement.py, blin
 the corrected lookahead diagnostics) is the durable asset — it now kills a bad lever in minutes and has
 precisely characterized WHY the additive family fails, which is exactly what makes the research directions
 above well-posed instead of a shot in the dark. **The work continues on those; the target is still a win.**
+
+### 31f. ⭐ SUPERMODULAR-HEADROOM PROBE — H1 confirmed hard, dir-1 role-rule too blunt, naive dir-2 REFUTED
+`tools/supermodular_headroom.lua` (new; reuses divergence.lua's reconstruction + a per-run owned-board
+timeline) tests §31e's two directions on the winning-human dataset directly — no sim-seed chaos, the
+un-confounded objective §31 relies on. It classifies every joker by whether it MULTIPLIES the build
+(**copier | xmult | retrigger**) or merely ADDS to it (flat/econ/additive-scaler), and asks whether that
+split explains the human's SAVE. 8 runs (7 win), 197 sessions, 77 engine top-BUY_JOKER decisions.
+
+**H1 (payoff) — DECISIVELY CONFIRMED. Winning boards are PRODUCTS.**
+* Across 7 winning final boards, **86% of the 37 held jokers are multipliers** (18 xmult / 12 retrigger /
+  2 copier) — only **5 additive**, and 3 of the 7 boards carry ZERO additive jokers.
+* Kept-rate splits cleanly by role: **multiplier acquisitions kept 77% (33/43) vs additive 13% (8/63)**.
+  The human buys additives and CHURNS them; buys multipliers and HOLDS them. This is the §31e thesis,
+  measured on the outcome-labelled data.
+
+**H2 (over-buy) — confirmed in DIRECTION, but a role-only flip is LOW-PRECISION.**
+* The engine's top joker-buy is one the human SAVED past **48% of the time (37/77)** — reproducing the
+  §31a "24–48% over-buy" headline from a second, independent reconstruction.
+* Over-buy is concentrated in additives: **ADDITIVE 57% (30/53) vs MULTIPLIER 29% (7/24)**. So the
+  additive/multiplier axis is aimed right.
+* BUT humans still TAKE additives 43% of the time, so a blunt "downgrade every additive" flip is only
+  **57% precise (+7 net)** — the same shape as §31a's shallow lookahead: a real gap, barely dented by a
+  1-feature rule.
+* **Sub-split by catalogue category is the sharp finding:** `flat_chips` **76%** over-buy (13/17 saved)
+  and `scaling_mult` **80%** (4/5) dominate; `flat_mult` is only **42%** (humans take it 11/19). Two
+  concrete consequences for the *existing* partial-supermodular layer:
+  1. **`BP.is_core` treats `scaling_mult` as CORE** (protected at `keep_bias` CORE_KEEP; not diluted by
+     `BP.fit`) — yet winners churn it hardest (80% over-buy, low kept-rate). Additive scalers compound
+     over TIME but do NOT multiply the board's PRODUCT; the winners do not treat them as core. Candidate
+     taxonomy correction (§31e dir-1 made concrete — score by product-role, not by compounding-over-time).
+  2. **`BP.fit` damps flat_chips and flat_mult EQUALLY** (`is_flat`), but flat_chips is ~2× the over-buy
+     of flat_mult (chips are out-scaled by mult late — the project already prices this at
+     `SCALING_GROWTH.scaling_chips=0.10`). Restricting the flip to {flat_chips, scaling_mult} alone is
+     **77% precise (+12 net, 17/22)** vs the blunt all-additive rule (+7/57%) — a sharper lever, though
+     a post-hoc n=22 slice, so it needs a sim verdict, not a ship.
+
+**⇒ THE ENGINE IS NOT PURELY ADDITIVE (§31e's framing refined).** It already carries `BP.is_core`
+(xmult|scaling|retrigger), `BP.analyze` (axis counts + `needs_xmult/base`), `BP.fit` redundant-flat
+dilution, and `BP.level_amplifier` (XMULT_EST^n). So dir-1 is a **refinement** of an existing partial
+layer — retune WHICH categories count as core / get diluted — not a from-scratch scorer.
+
+**Direction (2) — the NAIVE slot-reservation mechanism is REFUTED.** Two tests:
+* Over-buy on additives is HIGHEST (**71%**) when the board has NO multiplier core yet — the human saves
+  additives while lacking a core, consistent with saving-to-assemble rather than present-board redundancy.
+* BUT: after saving past an additive, the human's NEXT joker acquisition is a multiplier only **37%**,
+  BELOW their 41% base rate. **So the SAVE is NOT "bank a slot for the very next multiplier buy."**
+  Winners acquire their multipliers DIFFUSELY — via packs, skip-tags, and shops several steps later — not
+  as an immediate next purchase. A buildable dir-2 therefore cannot be a naive "reserve slot → buy core
+  next shop"; it must model a multi-channel, multi-step target whose pieces arrive from packs/tags/future
+  shops, which is exactly the horizon the §31d depth-3 shop-only search could not see.
+
+**NET (advances §31e, does not close it):** the payoff thesis is now hard-measured (H1); dir-1 reduces to
+a concrete, testable RETUNE of the existing core/dilution taxonomy (demote `scaling_mult` from core;
+weight flat_chips dilution above flat_mult), whose cheapest form (a {flat_chips, scaling_mult} buy-bar) is
++12/77% on agreement and is the next SIM arm to run (baseline, paired) — with the §17 readiness-gate
+caveat loud: agreement headroom is a SCREEN, not a winrate promise. Dir-2's naive form is dead; a real
+dir-2 needs a multi-channel target model. Durable asset: `tools/supermodular_headroom.lua`.
+
+### 31g. ❌ THE §31f BUY-BAR SIM ARM — BASELINE NULL, and the mechanism check EXPLAINS it (dir-1 insufficient)
+Built the {flat_chips, scaling_mult} buy-bar in `engine/build_plan.lua` `BP.fit` (damp flat_chips once a
+base exists; damp additive scalers when not investing the growth axis; buy-side only, `keep_bias`/`is_core`
+untouched — constants `BP.CHIPS_GLUT`/`BP.SCALER_GLUT` = 1.4). Verified firing at the unit level
+(0.00→−1.40 on a base≥2/n_flat<2 board; invest-window scaler fill preserved). Paired sim, BASELINE income,
+each arm from its own worktree (anti-contamination), n=159 paired (one baseline seed lost to a session
+teardown, recovered from surviving shards):
+
+| metric | baseline | buy-bar | Δ |
+|---|---|---|---|
+| progress | 3.981 | 4.017 | **+0.036** (sd 0.321, t 1.41, **p 0.158 n.s.**) |
+| sign test | — | — | 11 better / 4 worse / **144 tied** (p 0.121) |
+| death-ante | — | — | **8 later / 2 earlier**, 149 unchanged |
+| wins | 4 | 4 | 0 |
+
+**Directionally positive on every metric, high-tie/low-sd (the trustworthy class), but the effect
+(+0.036) sits BELOW this batch's MDE (~0.071) — it cannot be certified, and as a magnitude lever
+(new constants) it does not clear the burden of proof.** Not shipped.
+
+**⭐ The mechanism check is the finding (per the §31 rule: a null can mean "didn't fire").** Shop
+joker-buys by category, baseline→buy-bar over 160 runs: flat_chips **122→118 (−4)**, scaling_mult
+**111→108 (−3)**, scaling_chips **31→29** — the damp fired but WEAKLY, and the declines were absorbed by
+OTHER ADDITIVES (flat_mult **218→224**, economy **185→191**), NOT by multipliers (xmult flat 124→124,
+retrigger 43→43). **So when the engine declines a flat_chips it buys the next additive in the shop,
+because the multiplier it "should" build toward is not on offer that shop.** This is §31f's dir-2 finding
+replayed at the sim level: winners acquire multipliers DIFFUSELY (packs/tags/later shops), so a
+present-board additive DAMP just reshuffles additive→additive and barely moves the outcome. **Dir-1
+(supermodular present-board scoring) alone is confirmed INSUFFICIENT; the lever that matters is the
+multi-channel dir-2 target that can redirect a decline toward a multiplier acquired through the RIGHT
+channel — which a shop-only additive damp structurally cannot do.**
+
+⚠ One regression worth noting: seed 64003 collapsed a9→a6 (−2.15), the batch's largest swing — a
+reminder that even a low-firing additive damp can knock a would-be winner off its line. **Net: revert the
+buy-bar** (it lives only in the `bes_bar_31f` worktree; nothing in the main tree changed). The durable
+result is the mechanistic confirmation that closes dir-1-alone and sharpens the case for dir-2. A rich10
+re-measure is LOW expected value here: the gap is not affordability (the shop simply lacks the multiplier),
+so more money does not create the redirect target. **The next real step remains the multi-channel target
+model (dir-2), not another present-board damp.**

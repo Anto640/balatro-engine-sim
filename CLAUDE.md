@@ -230,7 +230,23 @@ class this apparatus produces. 63% of runs never committed before; now 71%. Feas
 ### target as a SET of pieces-to-assemble + slot reservation (the pairing oracle_plan never tried). The
 ### work continues on (1)+(2); the apparatus (agreement.py, blind_outcome, replay/lookahead diagnostics)
 ### is the durable asset that makes them well-posed. Retained: Option 3 fidelity+milk (live), §29 pacing.
-**➡ THE authoritative status is `WINRATE_V3_PLAN.md` §31 (esp. §31e) — the current checkpoint AND the
+### ⭐ §31f (2026-08-24) — THE RESEARCH FORK IS BOUNDED (not built) BY A CHEAP HUMAN-DATA PROBE.
+### `tools/supermodular_headroom.lua` classifies jokers MULTIPLIER (copier|xmult|retrigger) vs ADDITIVE.
+### H1 (payoff) confirmed HARD: winning boards **86% multiplier**, kept-rate **77% vs 13%**. H2 (over-buy):
+### additive over-buy 57% vs multiplier 29%, concentrated in **flat_chips 76% / scaling_mult 80%**; a
+### role-only flip is +7/57% (too blunt), a {flat_chips,scaling_mult} buy-bar +12/77% (post-hoc n=22 —
+### SIM-verdict it, don't ship; §17 caveat). Engine is NOT purely additive (`BP.is_core`/`BP.fit`/
+### `level_amplifier` exist) ⇒ dir-1 = two RETUNES: demote scaling_mult from `BP.is_core`; weight
+### flat_chips dilution > flat_mult. Naive dir-2 REFUTED (post-save next-joker multiplier 37% < 41% base;
+### winners get multipliers via packs/tags/later shops).
+### ⭐ §31g — THE BUY-BAR WAS SIM-TESTED → BASELINE NULL. Built {flat_chips,scaling_mult} damp in `BP.fit`,
+### paired n=159: +0.036 (p 0.158 n.s.), 144 tied, wins 4→4. Mechanism explains it: the damp barely fired
+### (flat_chips 122→118) and declines went to OTHER ADDITIVES (flat_mult 218→224), NOT multipliers — the
+### shop lacks the multiplier the human builds toward. ⇒ dir-1 present-board damp CONFIRMED INSUFFICIENT;
+### the real lever is the multi-channel dir-2 target (redirect a decline toward a multiplier via packs/
+### tags/later shops). Buy-bar reverted (worktree only). NEXT: build/scope the dir-2 target model.
+
+**➡ THE authoritative status is `WINRATE_V3_PLAN.md` §31f (then §31e) — the current checkpoint AND the
 forward plan. Read it first, then §30/§18/§6. Fresh-session handoff: `NEXT_SESSION.md`. Historical audit +
 roadmap: `WINRATE_AUDIT.md`. Superseded plans: `docs/archive/`.**
 

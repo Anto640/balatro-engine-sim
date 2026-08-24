@@ -1,6 +1,34 @@
-# NEXT_SESSION.md — fresh-session handoff (updated 2026-08-21)
+# NEXT_SESSION.md — fresh-session handoff (updated 2026-08-24)
 
-> **🆕 2026-08-21 (late) — §30–§31 ARE THE CHECKPOINT.** Read `WINRATE_V3_PLAN.md` §30 then §31.
+> **🆕 2026-08-24 — §31f IS THE CHECKPOINT.** Read `WINRATE_V3_PLAN.md` §31f first, then §31e/§30.
+> The §31e research fork was BOUNDED cheaply before any rebuild (same discipline as §31's lookahead
+> probe): `tools/supermodular_headroom.lua` classifies every joker as MULTIPLIER (copier|xmult|
+> retrigger) vs ADDITIVE and tests both directions on the winning-human data.
+> **RESULTS:** H1 (payoff) confirmed HARD — winning boards are **86% multipliers**, kept-rate
+> **multiplier 77% vs additive 13%**. H2 (over-buy) confirmed in direction (additive over-buy 57% vs
+> multiplier 29%) but a role-only flip is **+7/57% precise** (too blunt); the over-buy concentrates in
+> **flat_chips (76%) and scaling_mult (80%)**, and a {flat_chips, scaling_mult} buy-bar is **+12/77%**
+> on agreement (post-hoc n=22 — needs a SIM verdict, not a ship; §17 readiness-gate caveat applies).
+> **Two concrete dir-1 retunes fall out** (the engine is NOT purely additive — it already has
+> `BP.is_core`/`BP.fit`/`level_amplifier`): (1) DEMOTE `scaling_mult` from `BP.is_core` (winners churn
+> it), (2) weight flat_chips dilution above flat_mult in `BP.fit`. **Naive dir-2 (slot reservation) is
+> REFUTED:** after saving an additive the human's next joker is a multiplier only 37% (< 41% base) —
+> winners get multipliers DIFFUSELY (packs/tags/later shops), so a real dir-2 needs a multi-channel,
+ multi-step target model, not "reserve slot → buy core next shop".
+>
+> **🆕 §31g — THE BUY-BAR WAS SIM-TESTED → BASELINE NULL, mechanism explains it.** Built the
+> {flat_chips, scaling_mult} damp in `BP.fit`, paired n=159 baseline: progress **+0.036 (p 0.158
+> n.s.), 144 tied, 8-later/2-earlier, wins 4→4** — directionally positive but below MDE, not shipped
+> (magnitude lever, no positive evidence). **Mechanism check is the point:** the damp barely fired
+> (flat_chips 122→118) and the declines went to OTHER ADDITIVES (flat_mult 218→224), NOT multipliers —
+> the shop simply lacks the multiplier the human builds toward (acquired diffusely via packs/tags).
+> **⇒ dir-1 (present-board additive damp) is confirmed INSUFFICIENT; the real lever is the
+> multi-channel dir-2 target.** Buy-bar reverted (lived only in a worktree). NEXT: dir-2 — a target
+> model that can redirect a decline toward a multiplier via the RIGHT channel (packs/tags/later shops),
+> which a shop-only damp structurally cannot. A rich10 re-measure of the buy-bar is low-value (the gap
+> is channel, not affordability). Full write-up: `WINRATE_V3_PLAN.md` §31g.
+>
+> **2026-08-21 (late) — §30–§31 CONTEXT.** Read `WINRATE_V3_PLAN.md` §30 then §31.
 > Session delivered THREE things:
 > 1. **Option 3 (sim-fidelity) — DONE.** The in-blind rollout is economy-aware (`survive_after` returns
 >    `money`+`banked`; baseline byte-identical). Milk lever measured paired n=320: **+0.032 n.s., 307
