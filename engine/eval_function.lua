@@ -510,12 +510,38 @@ function Eval.is_xmult(key) return JokerData.is_xmult(key) end
 -- bites the no-deck/unmodelled prior path; the measured path already reflects the
 -- real magnitude. Left flat by design -- refine only if it proves mis-ranking.
 function Eval.edition_score_bonus(edition, include_scoring)
-  if edition == "negative" then return 0.5 end       -- a whole extra joker slot
+  if edition == "negative" then return 0.5 end       -- a whole extra joker slot (fallback; see negative_slot_fv)
   if not include_scoring then return 0 end
   if edition == "polychrome" then return 0.40        -- x1.5 mult
   elseif edition == "holo" then return 0.25          -- +10 mult
   elseif edition == "foil" then return 0.15 end      -- +50 chips
   return 0
+end
+
+-- GRAND_AUDIT P1 (2026-08-25). A NEGATIVE-edition joker is SLOT-FREE: it brings its own
+-- +1 PERMANENT joker slot (sim/content.lua note_negative_gain; the real rule). So its worth
+-- is the joker's own measured value PLUS the value of that slot -- and the slot is the SAME
+-- game effect the Antimatter voucher grants, which engine/vouchers.lua prices at ~8-12.
+-- The flat 0.5/1.0 above under-priced it ~16x, so whenever the joker itself measured weak the
+-- engine passed a joker that would have handed it a free permanent slot -- exactly the
+-- capacity the ceiling probe measured as a large lever (+0.732 baseline / +1.265 rich10 for
+-- +2 slots; §5a A3, GRAND_AUDIT §B/P1). This prices the slot board-awarely: ~a future joker,
+-- tapered by the RUNWAY left to fill it and discounted when slots are not yet binding. Kept
+-- deliberately BELOW Antimatter's base (it rides on a joker that already carries its own value,
+-- and negatives are rare so the blast radius is tiny -- correctness over aggression).
+Eval.NEG_SLOT_FV    = 6.0    -- a +1 permanent slot ~ a future joker (Antimatter base is 8.0)
+Eval.NEG_SLOT_FLOOR = 0.5    -- late-game / no-runway residual (matches the old flat credit)
+function Eval.negative_slot_fv(gs)
+  local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
+  local runway = 8 - ante
+  if runway < 1 then return Eval.NEG_SLOT_FLOOR end        -- ante 8: no time to collect on the slot
+  local rf = math.min(1.0, runway / 6)                     -- more antes left -> more value from the capacity
+  local slots = (gs and gs.run and gs.run.joker_slots) or 5
+  local njok  = #((gs and gs.jokers) or {})
+  local jfree = math.max(0, slots - njok)
+  -- full board -> the extra slot is immediately binding; free slots -> option value only
+  local bf = (jfree == 0) and 1.0 or math.max(0.4, 1.0 - 0.2 * jfree)
+  return math.max(Eval.NEG_SLOT_FLOOR, Eval.NEG_SLOT_FV * rf * bf)
 end
 
 return Eval

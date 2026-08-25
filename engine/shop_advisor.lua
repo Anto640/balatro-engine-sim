@@ -501,10 +501,14 @@ local function scoring_gain(gs, sj, rng, pace)
     if JokerData.has_tag(sj.key, "retrigger") or JokerData.has_tag(sj.key, "enh:steel") then
       floor_frac = 0.9
     end
-    return math.max(m, floor_frac * prior) * proj + Eval.edition_score_bonus(sj.edition, false)
+    -- a negative-edition joker is SLOT-FREE (+1 permanent slot); price that slot board-awarely
+    -- (GRAND_AUDIT P1) instead of the flat 0.5 the edition helper falls back to.
+    local ed = (sj.edition == "negative") and Eval.negative_slot_fv(gs) or Eval.edition_score_bonus(sj.edition, false)
+    return math.max(m, floor_frac * prior) * proj + ed
   end
   -- prior: tier (consideration, not truth) + the joker's edition value
-  return prior * proj + Eval.edition_score_bonus(sj.edition, true)
+  local ed = (sj.edition == "negative") and Eval.negative_slot_fv(gs) or Eval.edition_score_bonus(sj.edition, true)
+  return prior * proj + ed
 end
 
 -- ---- candidate generation ---------------------------------------------------

@@ -106,9 +106,12 @@ local function value_item(gs, it, need, freq, base, rng, cheap, hctx)
       -- so a Trio/Tribe/Duo picked from a Buffoon pack is valued for the core it is, not the ~0 its
       -- noisy 6-sample delta reads on a weak board (which used to let a flat common out-rank it).
       local frac, measured = Eval.joker_pick_frac(gs, it.joker, need, { samples = 6, rng = rng })
-      return frac + Eval.edition_score_bonus(it.joker.edition, false), measured
+      -- negative edition is a free +1 permanent slot: price it board-awarely (GRAND_AUDIT P1)
+      local ed = (it.joker.edition == "negative") and Eval.negative_slot_fv(gs) or Eval.edition_score_bonus(it.joker.edition, false)
+      return frac + ed, measured
     end
-    return (JokerData.resolve(it.key).tier or 3) * 0.3 + Eval.edition_score_bonus(it.joker.edition, true), false
+    local ed = (it.joker.edition == "negative") and Eval.negative_slot_fv(gs) or Eval.edition_score_bonus(it.joker.edition, true)
+    return (JokerData.resolve(it.key).tier or 3) * 0.3 + ed, false
   elseif it.set == "Planet" then
     local hand = ConsumableValue.PLANET_KEY_HAND[it.key]
     if cheap then return 0.3 + BuildPlan.planet_credit(gs, hand), false end
