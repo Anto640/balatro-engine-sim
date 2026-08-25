@@ -429,12 +429,20 @@ BP.SCORER_KEEP = 1.2
 -- retrigger at 0.9 x prior instead of 0.6 -- so keep_bias was simply inconsistent with it.
 -- Evidence beyond the one run: Hanging Chad appears in 7 of 7 human wins, Sock and Buskin in 3.
 function BP.is_retrigger(key) return JokerData.has_tag(key, "retrigger") end
+-- CORE = a COMPOUNDING piece that MULTIPLIES the rest of the board: xmult + xmult_scaling (both via
+-- is_xmult) + retrigger. §P3 (2026-08-25): ADDITIVE scalers (cat scaling_mult/scaling_chips -- Ride
+-- the Bus / Green Joker / Runner / Square / Wee) were counted core, but they accrue a growing
+-- +mult/+chips and ADD to the base rather than multiply it. The human dataset churns them hard
+-- (scaling_mult over-buy 80%, additive kept-rate 13% vs 77% for multipliers -- supermodular_headroom),
+-- so they are demoted here to a FLAT-SCORER keep: they still contribute a base (SCORER_KEEP, not
+-- filler 0), but a clear multiplier upgrade may now displace them. is_scaling (which also matches
+-- xmult_scaling) is deliberately NOT used here; xmult_scaling stays core through is_xmult.
 function BP.is_core(key)
-  return JokerData.is_xmult(key) or JokerData.is_scaling(key) or BP.is_retrigger(key)
+  return JokerData.is_xmult(key) or BP.is_retrigger(key)
 end
 local function is_flat_scorer(key)
   local c = JokerData.resolve(key).cat
-  return c == "flat_mult" or c == "flat_chips"
+  return c == "flat_mult" or c == "flat_chips" or c == "scaling_mult" or c == "scaling_chips"
 end
 function BP.keep_bias(key, gs)
   local c = gs and BP.anchored_commitment(gs)
