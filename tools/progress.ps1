@@ -21,6 +21,9 @@ function Show-Progress {
   $roots = @("$repo\sim_out")
   Get-ChildItem (Split-Path -Parent $repo) -Directory -Filter "bes_*" -ErrorAction SilentlyContinue |
     ForEach-Object { $roots += "$($_.FullName)\sim_out" }
+  # also scan internal git worktrees (git worktree add / EnterWorktree default to .claude\worktrees\)
+  Get-ChildItem "$repo\.claude\worktrees" -Directory -ErrorAction SilentlyContinue |
+    ForEach-Object { $roots += "$($_.FullName)\sim_out" }
   $any = $false
   foreach ($root in $roots) {
     if (-not (Test-Path $root)) { continue }

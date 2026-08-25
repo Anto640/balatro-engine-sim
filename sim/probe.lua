@@ -502,6 +502,11 @@ Probe.CONFIGS = {
   slots6       = { joker_slots = 6 },
   slots7       = { joker_slots = 7 },
   rich_slots   = { income_bonus = 100, joker_slots = 8 },
+  -- GRAND_AUDIT 2026-08-25 (P1 test): +2 REACHABLE slots at the operating wealth (rich10). The
+  -- ceiling ladder showed the engine wins 24% at rich10 while the human wins 87% at ~rich10 wealth
+  -- (an ALLOCATION gap). This isolates how much of that gap is joker-SLOTS (the +3-slot lesion was
+  -- +0.984 at baseline; +2 is reachable via negative editions / Antimatter). Diagnostic bound for P1.
+  rich10_slots7 = { income_bonus = 10, joker_slots = 7 },
   toppool      = { top_pool = true },
   everything   = { income_bonus = 100, joker_slots = 8, top_pool = true },
   expert_rich  = { policy = "expert", income_bonus = 100 },
