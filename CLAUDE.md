@@ -270,9 +270,18 @@ class this apparatus produces. 63% of runs never committed before; now 71%. Feas
 ### richpack suggestive) — an economy investigation, NOT a per-decision/target build. Both the additive-
 ### family and the target-family are now exhausted; the frontier is operating-point economy.
 
-**➡ THE authoritative status is `WINRATE_V3_PLAN.md` §32 (then §31/§6) — the current checkpoint AND the
-forward plan. Read it first, then §30/§18/§6. Fresh-session handoff: `NEXT_SESSION.md`. Historical audit +
-roadmap: `WINRATE_AUDIT.md`. Superseded plans: `docs/archive/`.**
+**➡ THE authoritative status is now `GRAND_AUDIT.md`** (2026-08-25) — a ground-up re-derivation +
+section scorecard + ranked forward plans that re-establishes (and in places overturns) the conclusions
+below. **Read it FIRST.** It supersedes the *navigation* role of the docs below but preserves them as the
+audit trail: `WINRATE_V3_PLAN.md` §32 (then §31/§6/§30/§18) is the detailed checkpoint every `GRAND_AUDIT`
+citation resolves into; fresh-session handoff: `NEXT_SESSION.md`; historical audit + roadmap:
+`WINRATE_AUDIT.md`; superseded plans: `docs/archive/`.
+_Key `GRAND_AUDIT` corrections to the block below: (1) the level_gain "+0.421 rich10" is UNCONFIRMED
+(never OOS-replicated, same profile as the target model that failed OOS) — treat as correctness-only until
+re-run; (2) "converts at rich10 in-sample" is NOT a reliable ship signal (B3 weak-OOS, level_gain untested,
+target-model OOS-fail); (3) the current-code operating-point gap is 2.5%→24–32% (robust); (4) the biggest
+tractable un-probed lever is SLOT-EXPANSION valuation (+3 slots = +0.984); (5) the scripted-expert ceiling
+re-confirms valuation EARNS ITS KEEP (engine 2.5% vs expert 0.6%)._
 
 > ### ⭐ §24 — ARCHETYPE PLANNING IS CLOSED, at BOTH operating points
 > A perfect deck-frequency plan handed to the engine free from ante 1, at `rich10`: progress

@@ -1,6 +1,18 @@
-# NEXT_SESSION.md — fresh-session handoff (updated 2026-08-24)
+# NEXT_SESSION.md — fresh-session handoff (updated 2026-08-25)
 
-> **🆕 2026-08-24 — §31f IS THE CHECKPOINT.** Read `WINRATE_V3_PLAN.md` §31f first, then §31e/§30.
+> **🆕🆕 2026-08-25 — READ `GRAND_AUDIT.md` FIRST.** A full re-audit re-derived the project state, scored
+> every section, and produced ranked forward plans. Headlines that change what you do next:
+> **(P0)** OOS-replicate level_gain's "+0.421 rich10" — it was NEVER OOS-tested and has the exact profile of
+> the target model that FAILED OOS; treat +0.421 as unconfirmed. **(P1, top new lever)** SLOT-EXPANSION
+> valuation — +3 slots = +0.984 progress unchanged; value negative editions + Antimatter as +1 capacity,
+> reserve an open slot through a3 (distinct from the refuted ecap board-cap). **(P2)** economy-generation as a
+> co-calibrated BUNDLE (satisfice-then-invest), not single levers. **Re-derived facts:** operating-point gap
+> 2.5%→24–32% (robust, current code); scripted-expert ceiling 0.6% << engine 2.5% (valuation earns its keep);
+> winning boards 86% multiplier acquired 73% via SHOP by ante 2–4 (not "diffusely via packs" — §31f overturned
+> on provenance); §5s "valuation not mis-ordered" is selection-biased; agreement.py/blind_outcome numbers are
+> unverifiable from the repo (inputs not checked in). The block below is retained as the prior checkpoint.
+>
+> **🆕 2026-08-24 — §31f WAS THE CHECKPOINT (now context).** Read `WINRATE_V3_PLAN.md` §31f, then §31e/§30.
 > The §31e research fork was BOUNDED cheaply before any rebuild (same discipline as §31's lookahead
 > probe): `tools/supermodular_headroom.lua` classifies every joker as MULTIPLIER (copier|xmult|
 > retrigger) vs ADDITIVE and tests both directions on the winning-human data.
