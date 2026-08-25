@@ -39,9 +39,19 @@
 > (near but not below 0.05), the strongest build of the session** — and the §32a retraction was VINDICATED
 > (the buggy pack-key measurement would have wrongly killed it). NOT a definitive ship yet. **Two next
 > moves:** (1) replicate out-of-sample (`BES_SEED_OFF=7`, both rich10 arms) before shipping; (2) DEPLOY LIVE
-> on the operating-point argument like B3/level_gain — the mod advises a HUMAN at the rich10 end. Lever in
-> `bes_tgt_31f` worktree; arms `sim_out/{base,tgt,baser,tgtr}_31f.jsonl`. **The §32 "closed on mechanism"
-> block below is FALSIFIED — audit trail only.** Lesson: pass structured args, not bare keys.
+> on the operating-point argument like B3/level_gain — the mod advises a HUMAN at the rich10 end.
+>
+> **⭐ §32c — OUT-OF-SAMPLE VERDICT: THE rich10 SIGNAL DID NOT REPLICATE (winner's-curse).** Both rich10 arms
+> on a disjoint pool (`+7`): progress **+0.039 (p 0.519)**, sign **6/7 EVEN** (in-sample was 9/2), swings
+> symmetric ±5 chaos (in-sample was clean-asymmetric). Inverse-variance pooled +0.060 (p≈0.055, +6 wins/320)
+> is a FRAGILE mean carried by big-win flips, sign-test-null OOS. **⇒ NOT a proven lever; REVERTED
+> (worktree-only, main tree untouched).** What stands: zero baseline harm + sound human-aligned mechanism
+> (chase multiplier packs/tags when core-deficit, the §5z under-opens-packs gap) = a defensible LIVE-ADVICE
+> option a future session could deploy, NOT a demonstrated winrate win. **Bigger conclusion hardens: the win
+> gap is NOT reachable by per-decision valuation OR target-model levers — the strongest one this apparatus can
+> build lands at a fragile p≈0.055 that fails replication.** Frontier stays operating-point economy
+> (pack×income, §5z/§6). Arms on disk: `sim_out/{base,tgt,baser,tgtr,baser7,tgtr7}_31f.jsonl`. **§32 block
+> below FALSIFIED — audit trail only.** Lesson: pass structured args, not bare keys.
 >
 > **↓ FALSIFIED (audit trail): §32 — DIR-2 (THE TARGET MODEL) IS CLOSED ON MECHANISM.** Scoped before building (the §31d rule).
 > Three converging checks: (1) H3 — the completion interaction a forward-product target would encode is

@@ -252,10 +252,13 @@ class this apparatus produces. 63% of runs never committed before; now 71%. Feas
 ### ⭐ §32b — THE TARGET MODEL CONVERTS AT rich10 (the operating-point signature, like B3/level_gain):
 ### baseline income NULL (−0.009, p 0.866, sign 7/7) but rich10 **+0.067 (p 0.065), sign 9/2 (p 0.070),
 ### wins 39→43**, with ASYMMETRIC swings (gains +4.71/+2.80 vs losses ≤0.64). Interaction +0.076. A
-### SUGGESTIVE-POSITIVE (near but not below 0.05) — NOT a definitive ship; needs out-of-sample replication
-### (BES_SEED_OFF=7), OR deploy-live on the operating-point arg (the mod advises a rich human). The §32a
-### retraction was VINDICATED — the buggy measurement would have wrongly killed this. Lever in bes_tgt_31f;
-### arms sim_out/{base,tgt,baser,tgtr}_31f.jsonl.
+### SUGGESTIVE-POSITIVE in-sample (p 0.065, sign 9/2). §32c OUT-OF-SAMPLE (BES_SEED_OFF=7): DID NOT REPLICATE
+### — Δ+0.039 (p 0.519), sign 6/7 EVEN, symmetric ±5 chaos. Pooled +0.060 (p≈0.055, +6 wins/320) is a fragile
+### MEAN carried by big-win flips, sign-test-null OOS = winner's-curse (the B3 lesson). ⇒ NOT a proven lever,
+### REVERTED (worktree-only). Stands: zero baseline harm + sound human-aligned mechanism (chase multiplier
+### packs/tags when core-deficit) = a defensible LIVE-ADVICE option, NOT a demonstrated winrate win. §32a
+### retraction still vindicated (direction was real enough to warrant the 4 arms). Arms on disk:
+### sim_out/{base,tgt,baser,tgtr,baser7,tgtr7}_31f.jsonl. Frontier stays operating-point economy (pack×income).
 ### ↓ THE §32 CLAIM BELOW IS FALSIFIED — kept only for the audit trail:
 ### ⭐ §32 — DIR-2 (THE TARGET MODEL) IS CLOSED ON MECHANISM (scoped before building, the §31d rule). The
 ### completion primitive is ALREADY in the valuation: `Packs.value(Buffoon)` rises 0.353→0.433 (+23%) on a

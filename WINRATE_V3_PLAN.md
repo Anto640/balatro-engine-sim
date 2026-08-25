@@ -5842,3 +5842,37 @@ argument as B3/level_gain were — the live mod advises a HUMAN who sits at the 
 the engine), so a rich10-positive preference change is a ship for the OVERLAY even at baseline sim-neutral.
 The lever, constants, and both arms are on disk (`sim_out/{baser,tgtr}_31f.jsonl`); the change lives in the
 `bes_tgt_31f` worktree.
+
+### 32c. ❌ OUT-OF-SAMPLE: THE rich10 SIGNAL DID NOT REPLICATE — winner's-curse, as the B3 lesson warned
+Replicated both rich10 arms on a DISJOINT seed pool (`BES_SEED_OFF=7`), paired n=160:
+
+| | in-sample (+3) | **OOS (+7)** |
+|---|---|---|
+| progress Δ | +0.067 (p 0.065) | **+0.039 (p 0.519, n.s.)** |
+| sign test | 9 better / 2 worse (p 0.070) | **6 better / 7 worse (p 1.0) — EVEN** |
+| wins | 39 → 43 (+4) | 52 → 54 (+2) |
+| swing shape | asymmetric (gains big, losses ≤0.64) | **symmetric ±5 chaos** (+5.03/+3.84 AND −5.04/−3.07) |
+
+**The robust signals did NOT corroborate out-of-sample.** The sign test collapsed 9/2 → 6/7 (dead even), and
+the clean in-sample asymmetry became symmetric ±5 both-ways chaos — the §5w re-roll signature. Inverse-
+variance pooling the two rich10 arms: progress **+0.060, SE 0.031, t 1.92, p ≈ 0.055** with **+6 wins / 320
+seeds** — a MEAN that is weakly, borderline-positive but **carried by a handful of big-win flips netting
+against big-loss flips, NOT a broad shift** (the sign test is null OOS). This is precisely the winner's-curse
+the B3 note flags: the in-sample rich10 result (9/2, clean asymmetry) looked like a real effect and did not
+hold on fresh seeds.
+
+**⇒ VERDICT: the target model is a WEAK, FRAGILE, UNCONFIRMED positive — it does NOT meet the burden of proof
+for a magnitude lever** (a mean at p≈0.055 that is sign-test-null and re-rolls symmetrically out-of-sample).
+NOT shipped as a proven winrate lever; REVERTED (it lives only in the `bes_tgt_31f` worktree — nothing in the
+main tree changed). **What stands, honestly:** (1) it is the session's ONLY non-negative direction and has
+ZERO measured harm at baseline; (2) its mechanism is sound and human-aligned (it makes the engine chase the
+multiplier-supplying channel — packs/tags — when core-deficient, the §5z "engine under-opens packs" gap); so
+it is a defensible LIVE-ADVICE improvement the user could choose to deploy despite the marginal sim signal,
+but it is NOT a demonstrated winrate win. (3) The §32a retraction remains vindicated — the direction was real
+enough to be worth the four arms, which is exactly what the measurement-error correction unlocked.
+
+**The larger conclusion is unchanged and now hardened:** the win gap is not reachable by per-decision
+valuation OR target-model levers — the strongest such lever this apparatus can build lands at a fragile
+p≈0.055 that fails replication. The open frontier remains operating-point economy (pack×income, §5z/§6),
+which is a different investigation. Durable assets: `tools/supermodular_headroom.lua`, the target-model
+mechanism (preserved in git history / the worktree), and the four rich10/baseline arms on disk.
