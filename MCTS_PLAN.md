@@ -212,6 +212,18 @@ Concrete findings from wiring the search into the existing sim:
   (determinism guard) — then the ante-boundary search; upgrade to (a) mid-ante resumability only if the
   coarser search shows signal on the agreement screen.
 
+- **✅ ROLLOUT PRIMITIVE DONE + BYTE-VALIDATED (2026-08-26).** Implemented the loop reuse as a MINIMAL,
+  lower-risk refactor instead of moving 130 lines: `Driver.run` gained `opts.run` (supply a pre-built fork,
+  loop starts at `run.ante`) + `opts.silent` (no-op emit), both nil-guarded so the normal path is unchanged.
+  `Driver.rollout(fork, {content, horizon})` rolls the fork forward under the greedy policy and returns
+  `{won, death_ante, survived, value, final_ante}` where value = 1 (win) / 0 (death) / `pace_margin` at the
+  horizon. **Determinism PROVEN:** the refactored `Driver.run` reproduces the reference arm
+  `p2a_treat_base.jsonl` **BYTE-IDENTICALLY** on 4 seeds (66/78/72/76 records each), and a silent rollout
+  from a fresh run matches `Driver.run`'s outcome. Tests: engine 1046, `test_driver` 35 (fork + rollout).
+  **Next: the ante-boundary search** — at a shop, enumerate actions (buy top-K / save / reroll), `fork` +
+  `rollout` each to ~ante-5 horizon (N samples averaged), argmax; wrap `content.shop_phase` to apply it;
+  screen on the agreement objective before any sim arm.
+
 ## 6. Phase 3 — learned rollout value (only if Phase 2 clears)
 
 Replace the capacity heuristic leaf with a **learned value** trained on sim outcomes — the ONE use the

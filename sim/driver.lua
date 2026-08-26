@@ -210,15 +210,20 @@ function Driver.run(seed, opts)
   opts = opts or {}
   local content = opts.content or STUB_CONTENT
   local max_ante = opts.max_ante or 8
-  local run = World.new_run(seed, opts)
+  -- MCTS Phase 2: opts.run lets a caller supply a PRE-BUILT run (a Driver.fork) so the same loop
+  -- resumes a counterfactual rollout from mid-run; opts.silent makes emit a no-op (rollouts want no
+  -- telemetry). Both default off -> a normal Driver.run(seed) is byte-identical (nil-guarded branches).
+  local run = opts.run or World.new_run(seed, opts)
   local recs = {}
-  local function emit(r) r.seed = tostring(seed); recs[#recs + 1] = r end
+  local function emit(r) if opts.silent then return end; r.seed = tostring(seed); recs[#recs + 1] = r end
 
-  emit({ kind = "run_start", ante = 1, dollars = run.economy.dollars, engine = engine_meta() })
+  if not opts.run then
+    emit({ kind = "run_start", ante = 1, dollars = run.economy.dollars, engine = engine_meta() })
+  end
 
   -- W4: the ante counter is MUTABLE -- Hieroglyph's -1 ante (content sets run._ante_back)
   -- is consumed at the boundary below by replaying the ante, so the loop is a while.
-  local ante = 1
+  local ante = (opts.run and run.ante) or 1
   while ante <= max_ante do
     run.ante = ante
     -- Phase A probe: free hand levels per ante (sim/probe.lua). Applied BEFORE the ante's
@@ -355,6 +360,24 @@ function Driver.run(seed, opts)
     end
   end
   return { records = recs, won = run.won or false, death_ante = nil, seed = seed }
+end
+
+-- MCTS Phase 2: roll a FORKED run forward under the greedy policy to a horizon, silently, and
+-- return the leaf value. Reuses Driver.run's exact loop (opts.run + opts.silent), so a rollout is
+-- byte-faithful to a real run. value = 1 on a win, 0 on a death, else pace_margin at the reached
+-- horizon (the leaf V validated in Phase 1: weak early / strong late, so roll to ~ante 5+ before
+-- trusting it). `opts.content` MUST be the real content module (the greedy shop policy); with the
+-- default stub the rollout dies early (no shop). See MCTS_PLAN.md §5.
+function Driver.rollout(fork, opts)
+  opts = opts or {}
+  local horizon = opts.horizon or opts.max_ante or 8
+  local res = Driver.run(fork.seed, { run = fork, content = opts.content, max_ante = horizon, silent = true })
+  local value
+  if res.won then value = 1.0
+  elseif res.death_ante then value = 0.0
+  else value = (metrics(fork).pace_margin or 0) end   -- survived to horizon: leaf = pace_margin
+  return { won = res.won, death_ante = res.death_ante,
+           survived = (res.death_ante == nil), value = value, final_ante = fork.ante }
 end
 
 -- Run a batch of seeds, append all records to a JSONL file (sim output that

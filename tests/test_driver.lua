@@ -94,4 +94,19 @@ return function(t)
     local f1, f2 = Driver.fork(run, 777), Driver.fork(run, 777)
     t.ok(math.abs(f1.rng() - f2.rng()) < 1e-12, "same priv_seed reproduces the rng stream")
   end
+
+  -- MCTS Phase 2: Driver.rollout reuses the real loop (opts.run + silent) and returns a leaf value.
+  -- A silent rollout from a FRESH run must reproduce Driver.run's outcome for the same seed (the
+  -- opts.run/silent branches must not change behaviour). Stub content -> fast, ante-1 cap.
+  do
+    local World = require("sim.world")
+    for _, seed in ipairs({ 7, 13, 21 }) do
+      local ref  = Driver.run(seed, { max_ante = 1 })
+      local ro   = Driver.rollout(World.new_run(seed), { horizon = 1 })
+      t.eq(tostring(ro.won), tostring(ref.won), "rollout won matches Driver.run (seed " .. seed .. ")")
+      t.eq(tostring(ro.death_ante), tostring(ref.death_ante), "rollout death_ante matches (seed " .. seed .. ")")
+      t.ok(type(ro.value) == "number", "rollout returns a numeric leaf value")
+      t.ok(type(ro.survived) == "boolean", "rollout reports survived")
+    end
+  end
 end
