@@ -122,16 +122,30 @@ function BES.evaluate(with_sim, gs)
   -- At blind select, recommend whether to skip for the tag or play.
   if gs.meta and gs.meta.in_blind_select and SkipAdvisor then
     local ok, sk = pcall(SkipAdvisor.recommend, gs)
-    if ok and sk then
-      local action = {
-        type = sk.recommend == "SKIP" and "SKIP" or "CONTINUE",
-        target = sk.recommend == "SKIP" and { name = sk.tag } or nil,
-        reason = sk.reason, confidence = 0.7,
-        expected_value = (sk.tag_value - sk.play_value) / math.max(1, sk.play_value),
-      }
+    if ok then
+      local action
+      if sk then
+        action = {
+          type = sk.recommend == "SKIP" and "SKIP" or "CONTINUE",
+          target = sk.recommend == "SKIP" and { name = sk.tag } or nil,
+          reason = sk.reason, confidence = 0.7,
+          expected_value = (sk.tag_value - sk.play_value) / math.max(1, sk.play_value),
+        }
+      else
+        -- SkipAdvisor returns nil when there is nothing to skip FOR: the boss (unskippable)
+        -- or a blind with no offered tag. The only move is to play the blind, so say so
+        -- explicitly instead of leaving the panel blank (2026-08-26 advice-review #10).
+        local btype = (gs.blind or {}).blind_type
+        action = {
+          type = "CONTINUE", confidence = 0.7,
+          reason = (btype == "Boss")
+            and "Play the blind — the boss can't be skipped."
+            or "Play the blind — no skip tag worth taking here.",
+        }
+      end
       BES.last = { gs = gs, ranked = { best = action }, skip = true }
       if Overlay then Overlay.set({ best = action }) end
-      Log.info("SKIP: " .. (sk.reason or ""))
+      Log.info((action.type == "SKIP" and "SKIP: " or "PLAY: ") .. (action.reason or ""))
       return
     end
   end
@@ -214,6 +228,7 @@ function BES.apply_pack(gs, po)
   local action = {
     type = po.skip and "SKIP" or "PICK",
     target = pick and { name = pick.name or pick.key } or nil,
+    target_note = po.target_note,          -- "apply to AS, KS" in the BIG line (#10)
     reason = po.reason, confidence = 0.75,
   }
   BES.last = { gs = gs, ranked = { best = action }, pack = true }

@@ -408,7 +408,12 @@ function PO.recommend(gs, opts)
     end
   end
 
-  return { ranked = valued, picks = ordered, best = ordered[1].it, reason = reason, sell = sell }
+  -- Surface the TOP pick's target ("apply to which card") as a dedicated field so the overlay
+  -- can put it in the BIG line, not just the grey reason -- matching owned/shop tarots
+  -- (2026-08-26 advice-review #10: Empress inside a pack had no main-line target text).
+  local best_target_note = ordered[1] and Tarot.target_note(gs, ordered[1].key) or nil
+  return { ranked = valued, picks = ordered, best = ordered[1].it, reason = reason, sell = sell,
+           target_note = best_target_note }
 end
 
 return PO

@@ -107,8 +107,10 @@
 - 🎨 **[R1] "Discard QH" was ambiguous** between a steel and a standard Queen of Hearts. [FIXED:
   "QH (steel)" vs "QH (plain)"]
 - 🎨 **[R2] Still no main-line target text for applying Empress *inside a PACK*** — present for owned
-  consumables but not pack picks. [PENDING: extend target_note to pack-pick tarots]
-- 🎨 **[R2] Should say "Play blind" at a boss with no skip option** (currently shows nothing). [PENDING]
+  consumables but not pack picks. [FIXED: pack advisor returns `target_note`; big line shows "Take
+  Empress — apply to AS, KS"]
+- 🎨 **[R2] Should say "Play blind" at a boss with no skip option** (currently shows nothing). [FIXED:
+  blind-select falls back to a CONTINUE "Play blind — the boss can't be skipped." action]
 
 ## 11. Method / efficiency questions
 
