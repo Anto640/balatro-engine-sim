@@ -5,8 +5,11 @@
 # capacity-only by +0.147 (ante 4), +0.132 (ante 5), +0.021 (ante 6) -- big exactly in the WEAK-EARLY regime
 # where pacing fails. Aggregate COUNTS do NOT (they saturate at capacity, matching the P5 bound) => the P5
 # "learned value bounded weak" was a REPRESENTATION artifact; the config (which pieces) carries the signal,
-# the chess/NNUE lesson. Caveats: overfit-prone (78 wins x ~67 feats; L2=8 + repeated splits used, AUC noisy
-# +-0.05); pooled/late gains smaller; needs OOS. => Phase 3 learned leaf value is the live path. No new sim runs.
+# the chess/NNUE lesson. **BUT ❌ FAILED OOS (2026-08-26):** on a DISJOINT seed pool (rich10 BES_SEED_OFF=7,
+# 122 runs/37 wins) the joker-identity model is WORSE than capacity at every ante -- a4 -0.088, a5 -0.032,
+# a6 -0.056. The +0.13 in-sample gain was WINNER'S-CURSE OVERFITTING (~80 wins x ~67 feats cannot generalize;
+# NNUE needs MILLIONS of positions). => P5's bound STANDS: no cheap value reliably beats pacing OOS on
+# available data. The wall is DATA. Kept as the cautionary probe. No new sim runs.
 import json, sys, math, random
 random.seed(11)
 

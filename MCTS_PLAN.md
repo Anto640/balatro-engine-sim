@@ -269,13 +269,21 @@ win-from-here. **Rich arms (78 wins), held-out test-AUC over 6 splits:**
 | 5 | 0.751 | **0.883** | **+0.132** |
 | 6 | 0.804 | 0.825 | +0.021 |
 
-**The piece representation beats capacity by +0.13–0.15 AUC at antes 4–5 — exactly the WEAK-EARLY regime where
-pacing fails and the search needs a value.** Aggregate COUNTS do NOT (they saturate at capacity, matching P5).
-⇒ **P5's "learned value bounded weak" was a REPRESENTATION artifact** — the configuration (which pieces) carries
-the signal, not summary stats (the chess/NNUE lesson). Caveats: overfit-prone (78 wins × ~67 feats; L2=8 +
-repeated held-out splits used, AUC noisy ±~0.05); pooled/late gains smaller (capacity strong late); **needs
-OOS confirmation** before shipping. But this is the first evidence of a CHEAP value that BEATS pacing early —
-the thing the whole search needs.
+The piece representation beat capacity by +0.13–0.15 AUC at antes 4–5 IN SAMPLE — but **❌ IT FAILED OOS.**
+
+**⛔ OOS REFUTATION (2026-08-26): the in-sample gain was WINNER'S-CURSE OVERFITTING.** On a DISJOINT seed pool
+(rich10 `BES_SEED_OFF=7`, 122 runs / 37 wins) the joker-identity model is **WORSE than capacity at every ante**
+— a4 **−0.088**, a5 **−0.032**, a6 **−0.056** (flipped sign from the in-sample +0.147/+0.132/+0.021). The model
+memorized which specific jokers appeared in the in-sample winning runs; that did not generalize.
+
+**⇒ P5's bound STANDS: no cheap value reliably beats pacing out-of-sample on available data. The wall is DATA.**
+NNUE works because chess trains on MILLIONS of positions; here a piece-level model has ~80 wins × ~67 features
+and cannot generalize. This is the honest terminus of the value-function search: the gap is real (Phase 0a),
+the search architecture is sound (Phase 1–2), but the CHEAP VALUE needed to make the search feasible-AND-
+better-than-greedy is neither learnable from ~80 wins (overfits, this probe) nor cheaply analytic (≈ pacing,
+weak early). To break it you need ORDERS more training wins — which needs either enormous compute (2.5–24%
+winrate ⇒ 40k–400k runs for 10k wins) or a self-play bootstrap (AlphaZero-style, where the value trains itself
+as the policy improves). That is the real frontier, and it is a compute/data problem, not a design one.
 
 **⇒ This makes the corrected architecture concrete and feasible:** a learned piece-level eval `V(state)` (an
 NNUE-style linear/small model over {joker multi-hot, deck aggregates, economy, ante}) as the leaf, plugged
