@@ -439,7 +439,13 @@ function CV.card_value(gs, set, key, freq, need, rng, samples, hand_ctx)
       local jokers = gs.jokers or {}
       local n = #jokers
       local base = CV.SPECTRAL_BASE[key] or 0.6
-      if n <= 1 then
+      if n == 0 then
+        -- nothing to copy/polychrome: the spectral does NOTHING. It must not be recommended
+        -- (live run Z9PBGTL2: Ankh advised with 0 jokers -> would softlock a self-play run).
+        return 0, 0, (key == "c_hex" and "no joker to polychrome" or "no joker to copy — does nothing")
+      end
+      if n == 1 then
+        -- one joker: Hex polychromes it / Ankh gives a 2nd copy, destroying 0 others. A real gain.
         return base, 0, (key == "c_hex" and "polychrome your joker" or "copy your joker")
       end
       local total = 0
