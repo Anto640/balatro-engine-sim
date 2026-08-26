@@ -419,8 +419,16 @@ mean-progress objective and the strongest argument for the **agreement objective
   (`%APPDATA%/Balatro/`) — a NEWER 14-win corpus; validated end-to-end (BLIND 55% / PACK 20% same / SHOP
   over-buy 25%). Pipeline: `luajit tools/replay_fixtures.lua <fixtures> picks.jsonl` → `python tools/agreement.py
   <fixtures> <runs> picks.jsonl`. ⚠ The corpus itself is NOT checked in (26 MB); it lives in the save folder.
-- **Learned win-probability model** (Phase B, never built) to replace hand-tuned pacing and give a denser,
-  less-chaotic objective — the structural answer to the §5z chaos wall.
+- **Learned win-probability model** (Phase B) — **⚖️ BOUNDED WEAK as a denser OBJECTIVE (2026-08-26,
+  `tools/winprob_headroom.py`).** On the per-ante features already logged, `capacity` alone gives test-AUC
+  ~0.70–0.81 at every ante (baseline 17 wins/640 AND rich 78 wins/320); a 23-feature logistic adds ≈0 on
+  average and overfits the rare positive class. `capacity` ≈ the sufficient statistic and is what `pace_margin`
+  already uses ⇒ replacing pacing with a learned classifier won't move much, and 2.5% win-rate starves it of
+  positives. ⚠ Bounds the OBJECTIVE use only; a learned **rollout value inside a planner/search** (MCTS —
+  intentionally deferred) is a different, larger, un-bounded use.
+- **⇒ Tractable frontier exhausted; the one un-bounded direction is the deferred PLANNER/SEARCH (MCTS) with a
+  learned rollout value** to price DYNAMIC target-directed play (the residual the agreement screen localized).
+  A multi-session architecture to SCOPE, not a lever.
 
 ---
 
