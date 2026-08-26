@@ -89,11 +89,37 @@ must be run at TWO levels and the gap between them is the headroom:**
   - ≫ 2.5% (e.g. the human-implied ~85%) → **the ceiling is POLICY, not supply — MCTS has real headroom.
     Proceed to Phase 1.** (This directly overturns the 2026-07-14 verdict on the sim's own runs.)
   - ≈ 2.5% → the 2026-07-14 supply-ceiling was right after all → **stop; MCTS is dead, honestly.**
-- **Data:** `sim/content.lua` already logs the action trace (buys/skips/rerolls + per-offer engine VALUE).
-  ⚠ **First task: confirm the FULL offer set per shop/pack is recorded, not just the taken item** (the
-  oracle needs the roads not taken). If not, add stream logging to the trace (one field; stream-neutral).
-- **Effort:** ~1–2 days. This is the highest-value cheapest thing in the whole plan; it can KILL or GREEN-
-  LIGHT the entire architecture for the cost of one analysis tool. Do not build search before it passes.
+- **Data readiness (VERIFIED 2026-08-26):** the `shop` trace record (`sim/content.lua` `emit_shop`) already
+  logs the FULL observed offer set per shop — `offer_jokers`/`offer_packs`/`offer_consumables`/`offer_vouchers`
+  each with `{key, cost, value}`, plus `reroll_cost`/`reroll_value`/`dollars`/`ante`; opened packs log full
+  `items`. ⇒ **Phase 0a (observed-stream oracle) is buildable NOW as a pure analysis over the arm JSONL on
+  disk — no logging changes.** ⚠ Phase 0b (policy-reachable) needs a re-sim harness: DECLINED packs never roll
+  their contents into the trace (packs roll only on open), and reroll continuations must be re-sampled from
+  `sim/content` — so (b) requires driving the sim forward under an oracle policy, not replaying the trace.
+- **Effort:** 0a ~half a day (JSONL walk + capacity-vs-requirement foresight over observed offers); 0b ~1–2 d
+  (re-sim). This is the highest-value cheapest thing in the whole plan; 0a alone gives a conservative LOWER
+  bound that may already settle supply-vs-policy. Do not build search before it passes.
+
+### ✅ Phase 0a RESULT (2026-08-26, `tools/stream_oracle.lua`) — THE GATE PASSES; supply ceiling REFUTED
+
+Observed-stream keystone-availability oracle (LOWER bound; pure JSONL analysis, no re-sim). Across **623 LOST
+baseline runs**: **70% were OFFERED ≥2 affordable multiplier keystones** (xmult/copier/retrigger) and **69%
+also had a leveling source offered** — yet the run acquired on average only **1.46 of the 2.75 affordable
+multipliers offered** (39% of the ≥2-offered runs took <2). The stricter "≥4 offered" (near a full 86%-mult
+winning board) still holds for ~28% of losses. **Rich10 cross-check (242 losses): 92%** offered ≥2 affordable
+keystones — the availability rises 70%→92% with money/rerolls, **directly demonstrating the §1.5 endogenous-
+offer point** (more resources ⇒ more affordable offers surfaced).
+
+**⇒ The 2026-07-14 "supply ceiling / keystones genuinely scarce / no policy can manufacture the offers"
+conclusion is REFUTED on the sim's own runs:** the winning PIECES were in the observed stream in 70–92% of
+losses, and the engine passed them up. The 2.5% ceiling is a POLICY (assembly) gap, not a supply gap.
+
+⚠ **Honest scope of the claim:** this proves the *pieces* were available and individually affordable — it is
+NECESSARY, not yet SUFFICIENT for a full winning LINE (surviving every blind *while* spending on the keystones
+— the survival-vs-assemble bind INC-1 showed is real). So Phase 0a shifts the burden decisively (supply is not
+the wall) but the survivable-line question is exactly what the **search** (evaluating full lines with the
+capacity value + survival check) must answer — which is the whole point of Phases 1–2. Phase 0b (re-sim with
+declined-pack contents + rerolls) is the fuller confirmation; 0a alone already green-lights the build.
 
 ## 4. Phase 1 — the forward model + value (only if Phase 0 clears)
 

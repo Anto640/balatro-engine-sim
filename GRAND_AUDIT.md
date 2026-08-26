@@ -434,6 +434,12 @@ mean-progress objective and the strongest argument for the **agreement objective
   runs' actual offer streams?): the cheapest, highest-information step, never run, which alone green-lights or
   kills the architecture. Phases 1–3: sim-as-environment + capacity leaf value (validated AUC 0.8 this pass) →
   depth-2 expectimax over the shop stream, screened on the agreement objective → learned rollout value.
+- **✅✅ Phase 0a RUN → THE GATE PASSES (2026-08-26, `tools/stream_oracle.lua`).** Of 623 lost baseline runs,
+  **70% were offered ≥2 affordable multiplier keystones + leveling** yet acquired only 1.46 of 2.75 offered;
+  rich10 **92%**. ⇒ the winning PIECES are in the observed stream in 70–92% of losses — **the 2.5% ceiling is
+  a POLICY (assembly) gap, not supply; the 2026-07-14 supply-ceiling is refuted on the sim's own runs and the
+  MCTS direction is GREEN-LIT.** (Honest caveat: proves piece-availability, not yet a full survivable line —
+  that is what the search itself tests.)
 
 ---
 
