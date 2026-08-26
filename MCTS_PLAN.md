@@ -135,6 +135,22 @@ declined-pack contents + rerolls) is the fuller confirmation; 0a alone already g
 - **Calibration check:** V's win-discrimination on held-out arms should match `winprob_headroom` (~0.8
   AUC). If V under-performs capacity-alone, fix V before searching.
 
+### ✅ Phase 1 (sim-as-environment) FEASIBILITY CONFIRMED (2026-08-26) — no rewrite needed
+
+The sim is cleanly **forkable** for MCTS: `World.new_run` (`sim/world.lua:104`) returns a `run` that is ALL
+plain data (deck, jokers, economy, hand_levels, ante, round, vouchers, …) **plus exactly one non-data field**
+— `run.rng = lcg(seed)`, a closure with hidden state (`sim/world.lua:60`).
+- **fork(run, priv_seed) = deep-copy the data fields + fresh `lcg(priv_seed)`.** The hidden rng state can't
+  be snapshot, but MCTS does not need it: a fresh private stream samples an INDEPENDENT plausible future
+  (different shop draws / shuffles) — exactly what chance-node determinization requires. Seed it from
+  (node-id, rollout-index) for reproducible-yet-varied samples.
+- **The steps are already modular, re-enterable functions** taking `run` explicitly: `World.play_blind`,
+  `World.ante_blinds`, `Content.shop_phase`, `Content.open_pack` — the driver loop is NOT monolithic, so a
+  fork can be advanced step-by-step under a custom policy.
+- **Remaining Phase-2 wrapper work:** a `fork()` helper + parameterize the shop step to accept the SEARCH's
+  action selection (or call the lower-level buy/reroll primitives directly), then apply V=`pace_margin` at a
+  late horizon (roll greedy to ~ante 5 per the leaf finding). Architecture de-risked; the build is mechanical.
+
 ### ✅ Phase 1 (leaf value) FOUNDATION RESULT (2026-08-26, `tools/leaf_value_auc.py`)
 
 Measured the win-discrimination (AUC vs eventual win) of every logged leaf signal, by ante:
