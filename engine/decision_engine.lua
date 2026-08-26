@@ -155,6 +155,15 @@ DE.SURV_MARGIN  = 0.06
 -- This is the first candidate at 100% frequency (every blind of every run) that is not
 -- already in the refuted set -- see CLAUDE.md, THE FREQUENCY CEILING.
 DE.DIG_SURPLUS = false      -- probe flag: dig with surplus discards once the clear is locked
+-- MONEY-AWARE surplus dig (SHIPPED ON, 2026-08-26 advice-review). The general DIG_SURPLUS above
+-- is a FREE REDRAW -- sim-negative (-0.150) because the sim's decks carry no discard-payout density,
+-- so it just burns draw-pile depth. But when the player owns a joker that PAYS to discard (Faceless
+-- Joker: $5 per 3+ face cards discarded; Pareidolia makes every card a face), a spare discard once
+-- the clear is locked banks real $ AND the cards return to the deck -- pure gain. The human demonstrated
+-- this every blind (a1-Boss cleared with 3 hands + 2 discards unused holding Faceless + Pareidolia).
+-- Gated on ACTUALLY farming money (owns Faceless AND the pitch has 3+ faces), so it is sim-neutral --
+-- it fires only when the money density the sim lacks is present. Same ship rationale as DE.MILK_MONEY.
+DE.DIG_FOR_MONEY = true
 DE.DIG_MIN_HANDS = 1        -- require at least this many hands left (a discard costs no hand)
 DE.DIG_KEEP_GUARANTEE = true -- only pitch cards OUTSIDE the guaranteed play, so it stays guaranteed
 -- Pitch only cards whose DiscardValue.keep_value is below this. Ordering alone is not enough:
@@ -427,7 +436,10 @@ function DE.decide(gs, opts)
   -- spend the surplus discards on a free redraw instead of banking them. Pitches only cards
   -- OUTSIDE the guaranteed play, so the clear survives the discard by construction.
   local dig_action = nil
-  if DE.DIG_SURPLUS and guaranteed and discards_left > 0
+  -- MONEY-AWARE dig fires when a discard-payout joker is owned (Faceless); the general probe
+  -- fires unconditionally. Either way we only pitch cards OUTSIDE the guaranteed play.
+  local want_money_dig = DE.DIG_FOR_MONEY and owns(gs, "j_faceless")
+  if (DE.DIG_SURPLUS or want_money_dig) and guaranteed and discards_left > 0
      and hands_left >= DE.DIG_MIN_HANDS and #hand > 0 then
     local keep = {}
     if DE.DIG_KEEP_GUARANTEE then
@@ -436,30 +448,47 @@ function DE.decide(gs, opts)
     -- CHAFF-FIRST. v1 pitched the first non-clearing cards in hand order and measured
     -- -0.150 with money down at EVERY ante: it was throwing away held value (a Gold card
     -- pays $3 at round end, Steel/Glass carry xmult while held). DiscardValue.keep_value
-    -- already prices exactly this, so sort by it and pitch the cheapest.
+    -- already prices exactly this (a plain card is <= ~11, any enhancement/edition >= 25),
+    -- so sort by it and pitch the cheapest -- plain faces pass, enhanced faces are excluded.
     local spare = {}
     for i, c in ipairs(hand) do
       if not keep[c] and DiscardValue.keep_value(c) < DE.DIG_MAX_KEEP then
         spare[#spare + 1] = { c = c, i = i }
       end
     end
+    -- For a Faceless money-dig, FLOAT face cards to the front so a 3+face discard triggers the
+    -- $5 even when only some spare cards are faces (Pareidolia makes every card a face). Ties
+    -- and the non-money dig keep the pure cheapest-first ordering.
+    local pareidolia = owns(gs, "j_pareidolia")
+    local face_of = {}
+    for _, s in ipairs(spare) do face_of[s] = (pareidolia or Cards.is_face(s.c)) and true or false end
     table.sort(spare, function(a, b)
+      if want_money_dig and face_of[a] ~= face_of[b] then return face_of[a] end   -- faces first
       local ka, kb = DiscardValue.keep_value(a.c), DiscardValue.keep_value(b.c)
       if ka ~= kb then return ka < kb end
       return a.i < b.i                                  -- stable -> deterministic
     end)
-    local pitch = {}
-    for i = 1, math.min(5, #spare) do pitch[i] = spare[i].c end
-    if #pitch > 0 then
+    local pitch, nface = {}, 0
+    for i = 1, math.min(5, #spare) do
+      pitch[i] = spare[i].c
+      if face_of[spare[i]] then nface = nface + 1 end
+    end
+    -- $ farmed by THIS discard: Faceless pays $5 for discarding 3+ face cards at once.
+    local dig_money = (want_money_dig and nface >= 3) and 5 or 0
+    if #pitch > 0 and (DE.DIG_SURPLUS or dig_money > 0) then
       dig_action = {
         type = "DISCARD", cards = pitch,
         -- ranked ABOVE the play: while the clear is locked the play banks nothing extra,
         -- and the dig is a free roll. It stops firing as soon as the surplus is spent.
         value = (play_action and play_action.value or 0) + 1,
-        surplus_dig = true,
-        reason = string.format(
-          "Dig with a spare discard (%d) — the clear is already locked, so the extra score is wasted.",
-          discards_left),
+        surplus_dig = true, farms_money = dig_money > 0, banked_money = dig_money,
+        reason = (dig_money > 0)
+          and string.format(
+            "Discard %d face cards to farm $%d from Faceless first — the clear is locked and the cards return to your deck.",
+            nface, dig_money)
+          or string.format(
+            "Dig with a spare discard (%d) — the clear is already locked, so the extra score is wasted.",
+            discards_left),
       }
     end
   end
@@ -618,7 +647,14 @@ function DE.decide(gs, opts)
     -- (the dig keeps the guaranteed play's cards, so the clear cannot be lost); with
     -- DE.MILK_MONEY on we instead play a money-maximal hand now and clear later, but only
     -- when its survival gate passed (milk_action is nil otherwise).
-    best = milk_action or dig_action or play_action
+    -- A money-farming dig wins outright: a spare discard that banks $ (Faceless) keeps the
+    -- clear in hand AND costs no hand-reward, so it strictly dominates milking a hand. It chains
+    -- itself down through the discards (fires again next decision), then milk/play finishes.
+    if dig_action and dig_action.farms_money then
+      best = dig_action
+    else
+      best = milk_action or dig_action or play_action
+    end
   elseif forced_play then
     -- last hand with discards left: E-6 (the corrected F3). The old mean-rule dug only
     -- when the expected dug hand ALSO beat the target in expectation -- refusing digs

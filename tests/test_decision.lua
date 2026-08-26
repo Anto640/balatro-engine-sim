@@ -783,4 +783,59 @@ return function(t)
     t.eq(DE.decide(state(4)).best.type, "PLAY", "flag restored -> baseline behaviour again")
     t.eq(DE.DIG_SURPLUS, false, "DIG_SURPLUS is OFF by default (baseline stays byte-identical)")
   end
+
+  -- ---- MONEY-AWARE DIG (DE.DIG_FOR_MONEY, SHIPPED ON, 2026-08-26 advice-review) ----
+  -- The human held Faceless (+$5 per 3+ face cards discarded) + Pareidolia (every card is a face)
+  -- and every blind he cleared with hands + discards to spare -- the engine played immediately and
+  -- forfeited the free money. With Faceless owned, a locked clear + a spare discard should DIG a
+  -- 3+face pitch to bank the $5 first (the cards return to the deck). Sim-neutral: fires ONLY when
+  -- a discard-payout joker is actually held, so DIG_SURPLUS can stay off (baseline byte-identical).
+  do
+    -- The clear is a low CLUB FLUSH (uses no face cards), leaving 3 face SINGLETONS as pure
+    -- spare -- so the money-dig has 3+ faces to pitch without ever touching the clearing play.
+    local function faceless_state(jokers)
+      return GS.new{
+        jokers = jokers,
+        hand = {
+          card{ id = 1, rank = "2", suit = "Clubs" }, card{ id = 2, rank = "3", suit = "Clubs" },
+          card{ id = 3, rank = "4", suit = "Clubs" }, card{ id = 4, rank = "5", suit = "Clubs" },
+          card{ id = 5, rank = "6", suit = "Clubs" },
+          -- spare face singletons (different suits/ranks -> no play better than the flush)
+          card{ id = 6, rank = "King", suit = "Hearts" }, card{ id = 7, rank = "Queen", suit = "Diamonds" },
+          card{ id = 8, rank = "Jack", suit = "Spades" },
+        },
+        deck = (function()
+          local d = {}
+          for i = 1, 40 do d[i] = card{ id = 100 + i, rank = "7", suit = "Spades" } end
+          return d
+        end)(),
+        run = { hand_levels = {}, hand_size = 8 },
+        blind = { target_chips = 30, chips_scored = 0, hands_left = 4, discards_left = 2,
+                  base_hands = 4, base_discards = 4, played_hand_types = {} },
+      }
+    end
+
+    -- NO discard-payout joker -> baseline: a locked clear plays at once (DIG_SURPLUS stays off).
+    local none = DE.decide(faceless_state({})).best
+    t.eq(none.type, "PLAY", "money-dig: no Faceless -> a locked clear plays immediately (baseline)")
+
+    -- WITH Faceless -> digs 3+ face cards to farm the $5 before playing the clear.
+    local fdug = DE.decide(faceless_state({ joker{ key = "j_faceless" } })).best
+    t.eq(fdug.type, "DISCARD", "money-dig: Faceless owned -> digs a spare discard for the $5")
+    t.ok(fdug.farms_money, "...tagged as a money-farming dig")
+    t.eq(fdug.banked_money, 5, "...banks $5 from Faceless")
+    -- it must pitch 3+ FACE cards (that is what triggers Faceless), and never the Ace-pair clear
+    local nface, play_ids = 0, {}
+    for _, c in ipairs(none.cards or {}) do play_ids[c.id] = true end
+    for _, c in ipairs(fdug.cards or {}) do
+      if Cards.is_face(c) then nface = nface + 1 end
+      t.ok(not play_ids[c.id], "the money-dig never pitches a card the clearing play needs")
+    end
+    t.ok(nface >= 3, "the money-dig pitches 3+ face cards so Faceless actually pays")
+
+    -- Pareidolia makes non-face spares count too -- still fires (and still keeps the clear).
+    local pdug = DE.decide(faceless_state({ joker{ key = "j_faceless" }, joker{ key = "j_pareidolia" } })).best
+    t.eq(pdug.type, "DISCARD", "money-dig: Faceless + Pareidolia -> still digs for the $5")
+    t.ok(pdug.farms_money, "...still tagged as money-farming")
+  end
 end
