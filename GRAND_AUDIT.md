@@ -387,8 +387,18 @@ mean-progress objective and the strongest argument for the **agreement objective
 - *Kill:* OOS-null at rich10 (expected base rate) → keep only if the same-state agreement improves (overlay
   value) with zero baseline harm; otherwise revert. (§31g damp-side was null; this is the credit side, untested.)
 
-### P4 — SUPERMODULAR BOARD-VALUE + MULTI-CHANNEL TARGET (big headroom; research)
-- *Mechanism:* the missing primitive — score the board as a **product** (copiers × xmult × retriggers), so a
+### P4 — SUPERMODULAR BOARD-VALUE + MULTI-CHANNEL TARGET (BOUNDED WEAK on the cheap screen — not built)
+- **⛔ VERDICT (2026-08-26, commit 298c2ab): the present-board product-scorer is BOUNDED WEAK — the cheap
+  agreement/flip screen the plan promised, achieved WITHOUT a scorer build or sim arm.** On the newer 14-win
+  corpus: supermodular flip precision **57%, +8/85** (replicates Aug-12); a completion-AWARE product damp
+  (gated on `needs_xmult`, not blunt role) measured on the agreement objective moved the over-buy
+  `eng_buy_human_save` **264→263 (unmoved)**. Confirmed 3 ways (flip proxy 57% / damp ~0 / §31g sim-null) that
+  present-board product structure does NOT explain the human's saves; dir-2 refuted again (next-buy multiplier
+  **33% < 40%** base). **The residual is DYNAMIC/target-directed** (save for interest/deck-shape/future
+  multiplier) — not a present-STATE scorer's to capture. ⇒ redirect to the LEARNED WIN-PROBABILITY model (P5
+  Phase B), the only thing that can price dynamic target-directed play. Apparatus (agreement objective) now
+  hardened + validated — the durable win of this fork.
+- *Mechanism (original plan, now bounded-out above):* the missing primitive — score the board as a **product** (copiers × xmult × retriggers), so a
   marginal additive reads as worthless *because it doesn't multiply the build*, and a target expressed as a
   **set of pieces to assemble** across channels (shop/pack/tag) with slot reservation. This is the §31e
   research fork, but note its two bounding nulls tested only the *present-board damp* (§31g) and a *generic
@@ -403,9 +413,12 @@ mean-progress objective and the strongest argument for the **agreement objective
 ### P5 — OBJECTIVE & APPARATUS UPGRADES (enabling)
 - **Tail-weighted verdict** (reach-7/reach-8 alongside mean-progress) — winning is a tail event the mean
   under-reports (§7). Cheap; do next batch.
-- **Harden the agreement objective** — check in `bes_fixtures.jsonl`/`picks.jsonl` (or a regenerator), and add
-  the guard the subagent recommends so `agreement.py` **errors** instead of silently zeroing when its input
-  lacks `reroll`/`pack_pick` records. Without this the whole per-decision objective is untrustworthy.
+- **✅ DONE (2026-08-26, 298c2ab): hardened the agreement objective.** `agreement.py` `load()` now returns []
+  on a missing file + 3 loud guards (empty input / empty fixture-pick join / all-channels-zero) → errors
+  instead of silently zeroing. Inputs `bes_fixtures.jsonl`+`bes_runs.jsonl` live in the LÖVE save folder
+  (`%APPDATA%/Balatro/`) — a NEWER 14-win corpus; validated end-to-end (BLIND 55% / PACK 20% same / SHOP
+  over-buy 25%). Pipeline: `luajit tools/replay_fixtures.lua <fixtures> picks.jsonl` → `python tools/agreement.py
+  <fixtures> <runs> picks.jsonl`. ⚠ The corpus itself is NOT checked in (26 MB); it lives in the save folder.
 - **Learned win-probability model** (Phase B, never built) to replace hand-tuned pacing and give a denser,
   less-chaotic objective — the structural answer to the §5z chaos wall.
 
