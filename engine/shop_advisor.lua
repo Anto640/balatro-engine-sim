@@ -32,7 +32,16 @@ local SA = {}
 -- the buy-vs-save trade-off. Jokers are the engine of the game, so FV gains are
 -- weighted heavily relative to raw money.
 SA.W_FV = 2.0
-SA.INTEREST_HORIZON = 3  -- rounds we expect to keep earning interest
+SA.INTEREST_HORIZON = 3  -- rounds we expect to keep earning interest (EARLY/MID run)
+-- ...but interest forgone by spending is only real if you are still around to COLLECT it.
+-- Near the end of the run far fewer than INTEREST_HORIZON rounds remain (at ante 8 the run
+-- ends the moment you clear -- interest never pays out), so a flat horizon over-charges the
+-- cost of spending late and STRANDS cash. The sim baseline holds a median $25-29 idle from
+-- ante 5-8 while under-levelled (12 vs the human's ~18.6) -- roughly the leveling gap held in
+-- cash (§30 "$27 unspent into the final boss"). SA.interest_horizon(gs) decays the horizon
+-- over the endgame so that idle reserve can convert to power. Antes <=5 are UNCHANGED (frac=1),
+-- so early banking discipline is untouched -- this is not the refuted early-board cap (§28).
+SA.INTEREST_HORIZON_MIN = 0.4  -- floor at the final ante (interest ~worthless, but not zero)
 SA.COST_WEIGHT = VU.DOLLAR_UTIL -- utility charged per dollar of PRICE (so cheaper wins,
                          -- on top of the interest lost by spending). Same rate as
                          -- DOLLAR_UTIL BY CONSTRUCTION now, not by coincidence: a
@@ -232,6 +241,16 @@ function SA.bankroll_plan(gs, opts)
   return { target = target, budget = budget, reason = reason }
 end
 
+-- Rounds-remaining-aware interest horizon: the forgone-interest multiplier, capped by how
+-- many interest-collecting rounds are actually LEFT in the run. Decays over the endgame
+-- (ante 6 -> 2.0, ante 7 -> 1.0, ante 8 -> floor), so spending idle late-game cash on power
+-- stops being over-priced. Ante <=5: frac = 1 -> unchanged (see SA.INTEREST_HORIZON comment).
+function SA.interest_horizon(gs)
+  local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
+  local frac = math.max(0, math.min(1, (8 - ante) / 3))   -- 1 at ante<=5, 0 at ante 8
+  return math.max(SA.INTEREST_HORIZON_MIN, SA.INTEREST_HORIZON * frac)
+end
+
 -- Opportunity cost (in FV-comparable units) of the INTEREST forgone by spending
 -- `spend` now: the exact step loss over the horizon. Spending the interest-free
 -- zone (see free_spend) costs 0 here; each $5 past a boundary costs the horizon.
@@ -239,7 +258,7 @@ local function interest_penalty(gs, spend)
   local cap = interest_cap(gs)
   local before = interest_at(dollars(gs), cap)
   local after = interest_at(dollars(gs) - spend, cap)
-  return (before - after) * SA.INTEREST_HORIZON
+  return (before - after) * SA.interest_horizon(gs)
 end
 
 -- Purchasing-power cost of a spend, drawn against the shop's planned free budget.
