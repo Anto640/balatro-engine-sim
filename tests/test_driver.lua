@@ -70,4 +70,28 @@ return function(t)
       t.ok(res.won ~= nil, "no death -> run completed the capped antes")
     end
   end
+
+  -- MCTS Phase 1: Driver.fork deep-copies the run data + gives a fresh independent rng
+  do
+    local World = require("sim.world")
+    local run = World.new_run(12345)
+    run.ante = 3; run.round = 5; run.economy.dollars = 20
+    run.jokers = { { key = "j_cavendish" }, { key = "j_hanging_chad" } }
+    local fork = Driver.fork(run)
+    -- independence: mutating the fork must not touch the original
+    fork.economy.dollars = 999
+    fork.jokers[#fork.jokers + 1] = { key = "j_baron" }
+    fork.deck[1].rank = "__X__"
+    t.eq(run.economy.dollars, 20, "fork is independent: original dollars unchanged")
+    t.eq(#run.jokers, 2, "fork is independent: original jokers unchanged")
+    t.ok(run.deck[1].rank ~= "__X__", "fork is independent: original deck unchanged")
+    -- faithful copy + fresh valid rng
+    t.eq(fork.ante, 3, "fork copies ante")
+    t.eq(#fork.deck, #run.deck, "fork copies the full deck")
+    t.ok(type(fork.rng) == "function", "fork has a fresh rng function")
+    local r = fork.rng(); t.ok(r >= 0 and r < 1, "fork rng yields [0,1)")
+    -- reproducible with an explicit private seed (deterministic rollouts)
+    local f1, f2 = Driver.fork(run, 777), Driver.fork(run, 777)
+    t.ok(math.abs(f1.rng() - f2.rng()) < 1e-12, "same priv_seed reproduces the rng stream")
+  end
 end

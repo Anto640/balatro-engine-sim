@@ -190,6 +190,28 @@ Measured the win-discrimination (AUC vs eventual win) of every logged leaf signa
 - **Kill:** agreement unmoved → the search isn't finding the human's lines → wrong value or wrong object,
   fix or stop before any sim arm.
 
+### ▶ Phase 2 build architecture (in progress 2026-08-26)
+
+Concrete findings from wiring the search into the existing sim:
+- **✅ `Driver.fork(run, priv_seed)` BUILT + TESTED** (`sim/driver.lua`; `tests/test_driver.lua`, 23 pass):
+  deep-copies the run data + fresh `World.lcg` — independence, faithful copy, and reproducible-per-priv-seed
+  all verified. The foundational rollout primitive.
+- **✅ The injection point is `content.shop_phase(run, {rng, emit})`** (driver loop ~line 315) — the shop
+  decision is ALREADY a pluggable content method taking an `emit` callback. ⇒ a search policy plugs in by
+  wrapping `content` (its `shop_phase` runs the search, then executes the chosen action) — **no driver-loop
+  change needed for injection.**
+- **⚠ THE ONE HARD SUB-PROBLEM: mid-ante rollout resumability.** A fork happens at a shop MID-ante (after a
+  blind), but the driver's ante loop calls `World.ante_blinds(run)` and replays the ante from blind 1, and
+  the run does not track intra-ante blind progress resumably. So a rollout that continues "from this shop"
+  needs either (a) the driver refactored to resume at a given blind index with the ante's already-chosen
+  blinds carried on the run, or (b) the search restricted to fork at ANTE BOUNDARIES (clean today: a fork at
+  ante start + a `play_loop` that plays whole antes is correct) as a coarser first granularity. **Recommended
+  build order:** first (b) — extract the `while ante<=max_ante` loop into `Driver.play_loop(run, content,
+  max_ante, emit)` starting at `run.ante`, add `Driver.rollout(fork, horizon)` (no-op emit) returning
+  {won, death_ante, pace_margin}, VALIDATE that a fresh-run rollout reproduces `Driver.run` byte-identically
+  (determinism guard) — then the ante-boundary search; upgrade to (a) mid-ante resumability only if the
+  coarser search shows signal on the agreement screen.
+
 ## 6. Phase 3 — learned rollout value (only if Phase 2 clears)
 
 Replace the capacity heuristic leaf with a **learned value** trained on sim outcomes — the ONE use the

@@ -23,6 +23,30 @@ local JokerData   = require("engine.joker_data")   -- B1 feature vector
 
 local Driver = {}
 
+-- ---- MCTS Phase 1: fork a run for a counterfactual rollout ------------------
+-- The `run` object is ALL plain data EXCEPT `run.rng` (a World.lcg closure with hidden state), so
+-- a fork = deep-copy the data + a FRESH lcg. The fresh stream samples an INDEPENDENT plausible
+-- future (different shop draws / shuffles) -- exactly what chance-node determinization needs; we do
+-- NOT (and cannot) reproduce the original's hidden rng state. Functions are skipped in the copy
+-- (rng is the only one, and it's set explicitly). Deterministic per (seed, priv_seed) so a rollout
+-- is reproducible. See MCTS_PLAN.md §4.
+local function deep_copy(v)
+  if type(v) ~= "table" then return v end
+  local out = {}
+  for k, val in pairs(v) do
+    if type(val) ~= "function" then out[k] = deep_copy(val) end
+  end
+  return out
+end
+Driver._deep_copy = deep_copy
+function Driver.fork(run, priv_seed)
+  local f = deep_copy(run)
+  -- default private seed derived from the run position, so distinct fork points differ
+  local base = math.floor((tonumber(run.seed) or 1))
+  f.rng = World.lcg(priv_seed or ((base * 1000003 + (run.round or 0) * 101 + (run.ante or 1)) % 2147483647 + 1))
+  return f
+end
+
 -- ---- engine identity (P6) ---------------------------------------------------
 -- Stamp each run_start with the tuning constants + git SHA in effect, so an old
 -- sim_out/*.jsonl stays interpretable after the engine is retuned (you can tell
