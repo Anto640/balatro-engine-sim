@@ -320,6 +320,25 @@ if COMPARE_MODE then
     else same = same + 1 end
   end
 
+  -- TAIL REACH (§7: winning is a TAIL event the mean under-reports -- a change can move the mean
+  -- while shedding the tail, or vice-versa, so report reach-7/reach-8 alongside progress). death_ante
+  -- is the ante REACHED (wins counted as 9), so reach-k = death_ante>=k counts wins too. McNemar on
+  -- reach-8 is the paired tail verdict (discordant seeds only), same shape as the wins test.
+  local r7A, r7B, r8A, r8B, m_ba, m_ab = 0, 0, 0, 0, 0, 0
+  for _, p in ipairs(paired) do
+    if p.a.death_ante >= 7 then r7A = r7A + 1 end
+    if p.b.death_ante >= 7 then r7B = r7B + 1 end
+    local a8, b8 = p.a.death_ante >= 8, p.b.death_ante >= 8
+    if a8 then r8A = r8A + 1 end
+    if b8 then r8B = r8B + 1 end
+    if b8 and not a8 then m_ba = m_ba + 1
+    elseif a8 and not b8 then m_ab = m_ab + 1 end
+  end
+  local m_n = m_ba + m_ab
+  local z_m = (m_n > 0) and (math.abs(m_ba - m_ab) - 1) / math.sqrt(m_n) or 0
+  if z_m < 0 then z_m = 0 end
+  local p_m = (m_n > 0) and 2 * (1 - norm_cdf(z_m)) or 1.0
+
   print(string.format("\nMEANS (paired seeds only):"))
   print(string.format("  progress   A %.3f   B %.3f   Δ %+.3f", ampA, ampB, ampB - ampA))
   print(string.format("  death-ante A %.3f   B %.3f   Δ %+.3f   (win counted as 9)", amaA, amaB, amaB - amaA))
@@ -334,6 +353,10 @@ if COMPARE_MODE then
     (p_sign < 0.05) and "   ***" or "   (n.s.)"))
   print(string.format("DEATH-ANTE SHIFT:  %d seeds later (better), %d earlier (worse), %d unchanged",
     later, earlier, same))
+  print(string.format("TAIL REACH (§7):  reach-7 A %d B %d (%+d)   reach-8 A %d B %d (%+d)   wins A %d B %d",
+    r7A, r7B, r7B - r7A, r8A, r8B, r8B - r8A, wA, wB))
+  print(string.format("  reach-8 McNemar:  B-only %d / A-only %d discordant   p ≈ %.4f%s",
+    m_ba, m_ab, p_m, (p_m < 0.05) and "   ***" or "   (n.s.)"))
 
   -- biggest per-seed swings (spot-check what moved)
   table.sort(paired, function(x, y) return x.dprog > y.dprog end)
@@ -348,8 +371,9 @@ if COMPARE_MODE then
   for i = 0, math.min(4, np - 1) do print(seed_line(paired[np - i])) end
 
   print("\n" .. string.rep("=", 64))
-  print("VERDICT RULE: trust the SIGN TEST + paired t together. A ±0.05 death-ante")
-  print("shift that is n.s. here is noise (the graveyard is full of them). Use n≥160.")
+  print("VERDICT RULE: trust the SIGN TEST + paired t together, AND check TAIL REACH (§7) — a")
+  print("change can lift the mean while shedding the reach-8 tail (winning lives there), or vice-")
+  print("versa. A ±0.05 death-ante shift that is n.s. here is noise (graveyard is full). Use n≥160.")
   print(string.rep("=", 64))
   os.exit(0)
 end
