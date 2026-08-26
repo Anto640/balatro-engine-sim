@@ -20,9 +20,20 @@
 --   win       { kind, seed, t, ante, dollars, njokers, jokers[] }  -- cleared ante 8
 
 local Json = require("util.json")
+local Cards = require("util.cards")
 
 local Telemetry = {}
 Telemetry.__index = Telemetry
+
+-- compact per-hand card list {id,label} so a PLAY/DISCARD can be reconstructed by diffing the hand
+-- across frames (cards present before but gone after = the ones played/discarded). 2026-08-26.
+local function hand_cards(gs)
+  local out = {}
+  for _, c in ipairs(gs.hand or {}) do
+    out[#out + 1] = { id = c.id, label = Cards.label(c) }
+  end
+  return out
+end
 
 -- States that mean "the run is over, you lost". Extract.state_name yields these
 -- from G.STATES; kept as a set so it's easy to extend if a version differs.
@@ -87,6 +98,7 @@ function Telemetry.frame_of(gs)
     hand_level_sum = hand_level_sum(gs),
     consumables = #(gs.consumables or {}),
     has_hand = #(gs.hand or {}) > 0,
+    hand = hand_cards(gs),   -- cards currently in hand (for per-hand PLAY/DISCARD reconstruction)
     -- WHICH HANDS THIS RUN ACTUALLY LANDS, and what it has leveled. The 2026-08-12 human
     -- dataset cannot answer "does the winner level the hand they play?" -- the half of the
     -- play-derived commitment that concerns the human is unverifiable without these, and it
@@ -194,6 +206,39 @@ function Telemetry:observe(frame, ctx)
   -- the run died (the death-state snapshot has the blind fields cleared).
   if frame.has_hand and frame.target and frame.target > 0 then
     self.last_play = frame
+  end
+
+  -- PER-HAND PLAY / DISCARD (2026-08-26, for advice-review of the in-blind dig). Reconstruct each
+  -- hand by diffing the hand across frames: cards in prev.hand but gone from frame.hand are the ones
+  -- that LEFT (played or discarded). A hands_left drop => PLAY (and which hand_type incremented); a
+  -- discards_left drop => DISCARD. Emits one `play` record so the play-vs-discard sequence is visible
+  -- (the counts alone hid whether it dug or played weak hands).
+  if self.prev and self.prev.has_hand and frame.has_hand
+     and self.prev.ante == frame.ante and self.prev.blind_type == frame.blind_type then
+    local dhands = (self.prev.hands_left or 0) - (frame.hands_left or 0)
+    local ddisc  = (self.prev.discards_left or 0) - (frame.discards_left or 0)
+    if dhands > 0 or ddisc > 0 then
+      local now = {}
+      for _, c in ipairs(frame.hand or {}) do if c.id ~= nil then now[c.id] = true end end
+      local left = {}
+      for _, c in ipairs(self.prev.hand or {}) do
+        if c.id == nil or not now[c.id] then left[#left + 1] = c.label end
+      end
+      local action = (dhands > 0) and "PLAY" or "DISCARD"
+      local hand_type = nil
+      if action == "PLAY" then
+        local pp, cp = self.prev.hand_type_plays or {}, frame.hand_type_plays or {}
+        for name, n in pairs(cp) do if n > (pp[name] or 0) then hand_type = name; break end end
+      end
+      self.emit({
+        kind = "play", seed = frame.seed, t = self:_now(), ante = frame.ante,
+        blind_type = frame.blind_type, action = action, hand_type = hand_type,
+        cards = Json.array(left),
+        score_delta = (frame.scored or 0) - (self.prev.scored or 0),
+        scored = frame.scored, target = frame.target,
+        hands_left = frame.hands_left, discards_left = frame.discards_left,
+      })
+    end
   end
 
   -- BLIND RESULT (2026-08-12). The live log had no in-blind data at all, so a player who
