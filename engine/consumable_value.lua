@@ -433,26 +433,38 @@ function CV.card_value(gs, set, key, freq, need, rng, samples, hand_ctx)
       return v, 20, "destroy 5 random for +$20"
     end
     if key == "c_hex" or key == "c_ankh" then
-      -- Hex polychromes ONE random joker and DESTROYS all others; Ankh copies one
-      -- and destroys the rest. With a built board that's a disaster, so subtract the
-      -- expected value of the jokers destroyed (one random joker survives).
+      -- Hex polychromes ONE random joker + DESTROYS all others; Ankh copies one + destroys the rest.
+      -- Value the STRATEGIC play: engineer the effect onto your STRONGEST joker by SELLING the weaker
+      -- ones FIRST (then the random pick can only be the best) -- so Ankh = a 2nd copy of your best
+      -- joker (~re-adds its worth, since a duplicate roughly restacks its effect) and Hex = polychrome
+      -- the best (~+50% of its effect). Either destroys the OTHERS, so subtract their worth -- but if
+      -- you sell the weak ones first that cost is small; the net only turns negative when you hold
+      -- several strong jokers worth keeping. (Live run Z9PBGTL2: Ankh was advised at 0 jokers, where
+      -- it copies nothing -- that must be ~0.)
       local jokers = gs.jokers or {}
       local n = #jokers
-      local base = CV.SPECTRAL_BASE[key] or 0.6
       if n == 0 then
-        -- nothing to copy/polychrome: the spectral does NOTHING. It must not be recommended
-        -- (live run Z9PBGTL2: Ankh advised with 0 jokers -> would softlock a self-play run).
         return 0, 0, (key == "c_hex" and "no joker to polychrome" or "no joker to copy — does nothing")
       end
-      if n == 1 then
-        -- one joker: Hex polychromes it / Ankh gives a 2nd copy, destroying 0 others. A real gain.
-        return base, 0, (key == "c_hex" and "polychrome your joker" or "copy your joker")
+      local worths = {}
+      for _, j in ipairs(jokers) do worths[#worths + 1] = CV.joker_worth(gs, j) end
+      table.sort(worths, function(a, b) return a > b end)
+      local strongest = worths[1] or 0
+      local others = 0
+      for i = 2, #worths do others = others + worths[i] end
+      local gain = (key == "c_ankh") and strongest or (strongest * 0.5)  -- 2nd copy vs +x1.5 polychrome
+      local nsell = n - 1
+      local note
+      if key == "c_ankh" then
+        note = (nsell > 0)
+          and string.format("gain a 2nd copy of your best joker — SELL your %d weaker joker(s) FIRST so Ankh doubles the BEST (else it copies a random one)", nsell)
+          or "gain a 2nd copy of your joker"
+      else
+        note = (nsell > 0)
+          and string.format("polychrome your best joker (+x1.5 mult) — but DESTROYS %d other joker(s); sell them first if keeping the best is worth it", nsell)
+          or "polychrome your joker (+x1.5 mult)"
       end
-      local total = 0
-      for _, j in ipairs(jokers) do total = total + CV.joker_worth(gs, j) end
-      local lost = total * (n - 1) / n         -- expected value destroyed (1 survives)
-      return base - lost, 0, string.format("%s but DESTROYS %d of your %d jokers",
-        (key == "c_hex" and "polychrome 1 joker" or "copy 1 joker"), n - 1, n)
+      return gain - others, 0, note
     end
     if key == "c_wraith" then
       -- the free rare joker, MINUS the purchasing power forfeited by zeroing your $.
