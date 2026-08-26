@@ -1,4 +1,25 @@
-# NEXT_SESSION.md — fresh-session handoff (updated 2026-08-25)
+# NEXT_SESSION.md — fresh-session handoff (updated 2026-08-26)
+
+> **🆕🆕🆕 2026-08-26 — THE FRONTIER IS NOW THE MCTS SEARCH BUILD. Read `GRAND_AUDIT.md` then `MCTS_PLAN.md`.**
+> This session closed/bounded EVERY remaining present-state lever family on cheap screens, then scoped and
+> gated the search:
+> - **P1 slots** (correctness keeper, ceiling resource-limited); **P3 scaler-demotion** (null both points,
+>   REVERTED); **P2a interest-horizon** (mechanism fires, winrate-null OOS, KEPT as correctness/overlay);
+>   **P4 product board-scorer** (BOUNDED WEAK — completion-aware damp left the over-buy 264→263; 57% flip
+>   precision); **P5 learned-winprob objective** (BOUNDED WEAK — `capacity` saturates AUC ~0.8).
+> - **Apparatus shipped:** hardened agreement objective (`agreement.py` guards + `replay_fixtures` pipeline,
+>   validated on the 14-win save-folder corpus); tail-weighted verdict (reach-7/8 + McNemar in analyze_runs);
+>   `winprob_headroom.py`, `stream_oracle.lua`, `leaf_value_auc.py`.
+> - **⭐ MCTS re-scoped + GATE PASSED.** `MCTS_PLAN.md` overturns its own 2026-07-14 "supply ceiling / no
+>   policy can manufacture the missing offers" verdict (refuted by human 87.5% on identical inputs + the
+>   ENDOGENOUS offer stream — rerolls/packs/tags/vouchers manufacture offers). **Phase 0a oracle: 70%
+>   baseline / 92% rich of LOST runs were offered ≥2 affordable multiplier keystones and passed them up ⇒
+>   POLICY (assembly) gap, not supply.** Phase 1 de-risked: leaf value V=`pace_margin` (AUC weak early ~0.5 /
+>   strong late 0.89 ⇒ search must reach ante-5 leaves); sim is forkable (deep-copy data + fresh rng).
+> - **▶ IN PROGRESS / NEXT: Phase 2** — `fork()` + a depth-limited search over shop decisions (roll greedy to
+>   ~ante 5, apply V), **screened on the agreement objective BEFORE any sim arm** (`MCTS_PLAN.md` §5).
+> - Live install is CURRENT (P1 + P2a deployed 2026-08-26; backup `%APPDATA%/Balatro/bes_install_backup_20260826`).
+> The 2026-08-25 banner below is retained as the prior checkpoint.
 
 > **🆕🆕 2026-08-25 — READ `GRAND_AUDIT.md` FIRST.** A full re-audit re-derived the project state, scored
 > every section, and produced ranked forward plans. Headlines that change what you do next:

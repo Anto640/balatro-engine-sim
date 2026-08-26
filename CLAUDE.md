@@ -9,7 +9,12 @@ Despite the historical filename, this guide applies equally to Codex and other c
 `balatroenginesim` is a **Balatro decision-assistant mod** (LÖVE2D / Lua, Steamodded
 + Lovely). It reads live game state from the global `G`, evaluates every legal
 action, and overlays a ranked "best move" with a reason. Roadmap M1–M4 is complete
-plus a large correctness/coverage/strategy pass; MCTS is intentionally deferred.
+plus a large correctness/coverage/strategy pass. **MCTS is NO LONGER deferred (2026-08-26):** every
+per-decision / present-state / economy / product-board / learned-objective lever is now closed or bounded
+on a cheap screen, so the frontier is the search build. `MCTS_PLAN.md` is scoped, its Phase 0a gate PASSES
+(70–92% of lost runs were offered the winning pieces and passed them up ⇒ the 2.5% ceiling is a POLICY
+gap, not supply — the old "supply ceiling" verdict is overturned), and Phase 1 is de-risked (leaf value =
+`pace_margin`, forkable sim). Read `GRAND_AUDIT.md` then `MCTS_PLAN.md`.
 
 ## Architecture (one rule: the engine is PURE)
 
