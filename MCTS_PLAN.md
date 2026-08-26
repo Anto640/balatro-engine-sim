@@ -285,6 +285,21 @@ weak early). To break it you need ORDERS more training wins — which needs eith
 winrate ⇒ 40k–400k runs for 10k wins) or a self-play bootstrap (AlphaZero-style, where the value trains itself
 as the policy improves). That is the real frontier, and it is a compute/data problem, not a design one.
 
+### ⛔ OFFLINE VALUE TEST — the data-efficient escape ALSO fails (2026-08-26, `tools/offline_value.py`)
+
+Before spending compute, tested every data-efficient way to beat capacity OOS on EXISTING runs (train
+rich 320/78w → test disjoint rich_oos7 122/37w): aggregate logistic, **supermodular interaction features**
+(copier×xmult, xmult×leveling, money×runway), a **continuous progress target** (denser than sparse win/loss),
+and **TD(0) bootstrapping** (fitted value iteration). **ALL ≤ capacity at antes 3/4/5** (one isolated +0.035 at
+a4). Capacity is a MC score projection that already integrates the board's multiplicative structure, so the
+interactions are redundant and TD only lowers target variance without exceeding the feature ceiling. **⇒ 4th
+confirmation of the P5 bound; capacity IS the achievable cheap-value ceiling on this data.**
+
+**⭐ THE COMPLETE, HONEST TERMINUS OF THE SEARCH INVESTIGATION:** the greedy engine already uses capacity/pacing
+(the best cheap value), so a FEASIBLE search cannot beat it; a BETTER value is either infeasible (rollout,
+42s/decision) or non-generalizing (learned, data wall). The winrate gap is real (Phase 0a) but is **not
+closable by search-with-a-cheap-value.** Remaining options are pure compute/data plays (below), not design.
+
 **⇒ This makes the corrected architecture concrete and feasible:** a learned piece-level eval `V(state)` (an
 NNUE-style linear/small model over {joker multi-hot, deck aggregates, economy, ante}) as the leaf, plugged
 into a SHALLOW EXPECTIMAX (backgammon-style, chance nodes for offers) — NOT the infeasible play-it-out
