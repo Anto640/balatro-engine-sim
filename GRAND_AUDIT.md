@@ -352,12 +352,20 @@ mean-progress objective and the strongest argument for the **agreement objective
 - *Kill:* bundle null at baseline **and** ante-2 $ unmoved → economy is not reachable by shop-policy alone and
   the problem is genuinely the in-blind money-card density (deck-shaping, P4).
 
-### P3 — SCALER-DEMOTION + AMPLIFIER-CREDIT RETUNE (small-med headroom; high tractability)
-- *Mechanism (two parts, both from §31f + this audit):* (1) **demote `scaling_mult` from `BP.is_core`** —
-  winners churn it (80% over-buy, low kept-rate), the engine over-values it (offered-value median 9.34,
-  highest of any role) and protects it as core; (2) on the buy side, **credit conditional
+### P3 — SCALER-DEMOTION + AMPLIFIER-CREDIT RETUNE (part 1 DONE ❌ null; part 2 open)
+- **⛔ PART 1 TESTED → NULL AT BOTH OPERATING POINTS → REVERTED (2026-08-26, commit 0ed6d1b).** Demoted
+  additive scalers (`scaling_mult`/`scaling_chips`) from `BP.is_core` (CORE_KEEP 2.5 → SCORER_KEEP 1.2).
+  Paired n=160 from pinned worktrees: **rich10 +0.020 (p 0.67, 144 tied, wins 38→40); baseline +0.015
+  (p 0.19, 156 tied, wins 4→4)** — trustworthy nulls (MDE ~0.03–0.13). The predicted "high-frequency,
+  fires ~every shop" was WRONG: `is_core` feeds only `keep_bias` (SELL-side), so it moved just 4–16/160
+  seeds. Reverted as a policy change without positive evidence (protect-a-fed-scaler is defensible design,
+  not a provable bug). Extends §31g (buy-side scaler null) with a sell-side null → **scaler per-decision
+  family closed on BOTH sides.** Arms: `sim_out/p3_{ctrl,treat}_{base,rich}.jsonl`.
+- *Mechanism (two parts, both from §31f + this audit):* (1) ~~demote `scaling_mult` from `BP.is_core`~~
+  (done, null — above); (2) **still open — on the buy side, credit conditional
   retriggers/copiers** (Hanging Chad, Sock & Buskin, Photograph, Blueprint) with a forward-product term when
-  the board is core-deficient, so the engine stops rerolling past them on weak boards (D5).
+  the board is core-deficient, so the engine stops rerolling past them on weak boards (D5). This is the
+  *credit* side, distinct from the *keep* side just tested; it overlaps P4's product-scorer and is best folded there.
 - *Expected:* a small autonomous effect (the sim values amplifiers OK already) but a real **overlay/advice**
   improvement on winner deck-states — a type-(B) lever.
 - *Measure:* baseline + **rich10 with mandatory OOS** (this is the class that fails OOS); also score on the

@@ -1,3 +1,10 @@
+# ============================================================================
+#  LIVE PROGRESS WATCH -- run this in the VS Code terminal (from the repo root):
+#
+#      powershell -ExecutionPolicy Bypass -File tools\progress.ps1 -Watch
+#
+#  (or just double-click tools\progress.bat).  Ctrl+C or close the window to stop.
+# ============================================================================
 # tools/progress.ps1 -- show progress of any running sim batch (workers + ETA).
 # A parallel batch (tools/sim_par.sh) writes one shard file per worker named <batch>__p<N>.jsonl
 # and DELETES them once it merges into <batch>.jsonl at the end. So: shard files present = running;
