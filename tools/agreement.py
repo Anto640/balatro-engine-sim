@@ -18,11 +18,16 @@ import json, collections, bisect, re, sys
 
 def load(p):
     out = []
-    for l in open(p, encoding='utf-8'):
-        l = l.strip()
-        if l:
-            try: out.append(json.loads(l))
-            except: pass
+    try:
+        fh = open(p, encoding='utf-8')
+    except OSError:
+        return out            # missing/unreadable -> [] so the empty-input GUARD reports it cleanly
+    with fh:
+        for l in fh:
+            l = l.strip()
+            if l:
+                try: out.append(json.loads(l))
+                except: pass
     return out
 
 def norm(x): return re.sub(r'[^a-z0-9]', '', str(x).lower()).replace('joker', '')
@@ -51,6 +56,15 @@ def main():
         if i + 1 < len(sys.argv): excl |= set(sys.argv[i + 1].split(','))
 
     fixs = load(FX); runs = load(RN); picks_l = load(PK)
+    # GUARD (P5): load() swallows every exception, so a missing/corrupt input silently becomes []
+    # and the whole report reads a clean-looking N=0 everywhere. Fail LOUD instead. Without this the
+    # per-decision objective is untrustworthy (you cannot tell "engine disagrees" from "join broke").
+    _paths = {'fixtures': FX, 'runs': RN, 'picks': PK}
+    for _nm, _d in (('fixtures', fixs), ('runs', runs), ('picks', picks_l)):
+        if not _d:
+            sys.exit('AGREEMENT ERROR: %s loaded 0 records (missing/empty/corrupt: %s).\n'
+                     '  Regenerate picks with: luajit tools/replay_fixtures.lua <fixtures> picks.jsonl'
+                     % (_nm, _paths[_nm]))
     # discover the pool: seeds with fixtures that WON
     fx_seeds = {str(r['seed']) for r in fixs if r.get('kind') == 'state'}
     won = {str(r['seed']) for r in runs if r.get('kind') == 'win'}
@@ -61,6 +75,13 @@ def main():
     rich = {str(r['seed']) for r in runs if r.get('kind') in ('reroll', 'pack_pick')}
 
     picks = {(str(p['seed']), p['idx']): p for p in picks_l if str(p.get('seed')) in pool}
+    # GUARD (P5): if NO engine picks join to the winning pool, every channel below silently zeros.
+    # This is the exact failure the memory flagged (picks.jsonl stale / regenerated on a different
+    # fixtures corpus). Distinguish it from a real disagreement by erroring here.
+    if not picks:
+        sys.exit('AGREEMENT ERROR: 0 engine picks joined to the %d-seed win pool.\n'
+                 '  picks.jsonl seeds/idx do not match these fixtures (stale or wrong corpus).\n'
+                 '  Re-run: luajit tools/replay_fixtures.lua %s picks.jsonl' % (len(pool), FX))
     fixs = [r for r in fixs if str(r.get('seed')) in pool]
     runs = [r for r in runs if str(r.get('seed')) in pool]
 
@@ -150,6 +171,13 @@ def main():
         if k in ('eng_buy_human_save', 'buy_diff') and len(ex['shop']) < 16:
             ex['shop'].append((label[s], r.get('ante'), 'eng %s %s / human %s %s' % (e[0], e[1], h[0], h[1])))
 
+    # GUARD (P5): picks joined but every CHANNEL is empty -> the runs file lacks the decision records
+    # (joker_gain/reroll/pack_pick/play) needed to compare against (e.g. a capture-only fixtures file
+    # was passed as <runs>, or the runs corpus predates rich logging). That is not "0% agreement".
+    if (BL['n'] + PKc['n'] + SH['n']) == 0:
+        sys.exit('AGREEMENT ERROR: %d picks joined but all channels produced 0 decisions.\n'
+                 '  The runs file lacks comparable decision records (joker_gain/reroll/pack_pick/play).\n'
+                 '  Check that <runs> is bes_runs.jsonl (not a fixtures file).' % len(picks))
     print('=' * 66); print('PER-DECISION AGREEMENT — %d winning runs' % len(pool)); print('=' * 66)
     for s in pool: print(f'  {label[s]} = {s}{"  [rich telemetry]" if s in rich else ""}')
     n = BL['n']; sp = BL['play_same'] + BL['play_diff']
