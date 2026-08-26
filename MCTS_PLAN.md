@@ -224,6 +224,36 @@ Concrete findings from wiring the search into the existing sim:
   `rollout` each to ~ante-5 horizon (N samples averaged), argmax; wrap `content.shop_phase` to apply it;
   screen on the agreement objective before any sim arm.
 
+### ⚠️ Phase 2 SEARCH BUILT → ROLLOUT EVALUATOR IS INFEASIBLE (2026-08-26, `sim/search.lua`)
+
+Built the forward-rollout shop search: `Search.policy(run, shop)` enumerates SAVE + a BUY_JOKER per
+affordable offered joker, forks + applies each + `Driver.rollout`s to a late horizon, argmax. Installed via
+`run.probe.policy_fn` (a function → `Driver.fork` drops it → rollouts shop greedily, no recursion; `policy_for`
+wired). **It is CORRECT** — sensible picks (ante 2: BUY the scaler `j_wee` at value 6.07; ante 4 with a weak
+board: SAVE, because every rollout dies before the horizon → value 0, the weak-early-leaf problem in action).
+
+**❌ But the rollout evaluator is COMPUTATIONALLY INFEASIBLE: ~28s/decision (ante 4) to ~72s (ante 2), and
+still ~42s even aggressively pruned (N=1, top-2, horizon-3).** A run has ~15–20 shop decisions ⇒ a single
+searched run is HOURS; a sim batch or the full agreement screen (2336 states) is out. **`BES_MC_CAP` had ZERO
+effect** ⇒ the cost is NOT shop MC sampling but the **in-blind play** (`hand_eval` `best_play` exhaustive
+subset enumeration) that every rolled blind runs. This CONFIRMS the 2026-07-14 hard constraint empirically —
+and shows the Phase-1 leaf did NOT circumvent it: *reaching* the leaf by playing blinds forward IS the cost.
+
+**⭐ THE CORRECTION (reverts to the plan's ORIGINAL architecture point 1/3): the evaluator must be ANALYTIC —
+project the buy-sequence's board → capacity vs the `Mechanics` requirement at each future ante as a SURVIVAL
+PROXY — with NO in-blind play (no `Driver.rollout`).** Building the rollout that plays real blinds was the
+wrong turn. The next build is `Search.evaluate` via an analytic forward projection (cheap: reuse `BP.analyze`
+capacity + `Eval.scaling_projection` + `pacing`), which makes the search feasible.
+
+**⚠ The honest tension this exposes:** the analytic value ≈ `pace_margin` ≈ what the greedy engine ALREADY
+uses, and Phase 1 showed it is weak early (AUC ~0.5 at ante 2–3). So an analytic-forward search may not beat
+greedy on the early decisions that matter — which loops straight back to the **P5 value-function bound**
+(`capacity` saturates discrimination; a learned value adds ~0 on current features). **The real unlock is a
+CHEAP value that BEATS pacing early** — the one thing still genuinely open, and the reason Phase 3's learned
+rollout value (trained on outcomes, positives-rich rich-arm data) is where the leverage now sits, NOT more
+rollout machinery. `sim/search.lua` + `Driver.fork/rollout` remain as the reusable search scaffold for
+whichever evaluator wins.
+
 ## 6. Phase 3 — learned rollout value (only if Phase 2 clears)
 
 Replace the capacity heuristic leaf with a **learned value** trained on sim outcomes — the ONE use the

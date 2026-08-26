@@ -570,7 +570,11 @@ end
 -- The policy resolver used by sim/content.lua. Returns nil when no policy lesion is active.
 function Probe.policy_for(run)
   local p = run and run.probe
-  if not p or not p.policy then return nil end
+  if not p then return nil end
+  -- MCTS: a search installs a direct function policy as run.probe.policy_fn. Driver.fork's deep_copy
+  -- SKIPS functions, so a rollout's fork drops policy_fn and shops greedily -> no infinite recursion.
+  if p.policy_fn then return p.policy_fn end
+  if not p.policy then return nil end
   if p.policy == "expert" then return Probe.expert end
   error("unknown probe policy: " .. tostring(p.policy))
 end
