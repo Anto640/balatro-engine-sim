@@ -648,6 +648,28 @@ return function(t)
     t.eq(r.best.target.key, "c_hermit", "recommends buying the Hermit")
   end
 
+  -- ---- HELD Hermit at max payout: USE it now, don't sit on it (2026-08-26 advice-review #3) ----
+  -- The human held a Hermit all game with >$20 and the engine never suggested using it (it only
+  -- surfaced a held Hermit to FUND a buy). At >=$20 its +$20 is maxed, so holding gains nothing.
+  do
+    local function held_hermit(money)
+      return GS.new{
+        economy = { dollars = money, interest_cap = 5 },
+        consumables = { { set = "Tarot", key = "c_hermit", name = "The Hermit" } },
+        shop = { jokers = {}, vouchers = {}, joker_slots = 5 },
+      }
+    end
+    -- maxed ($25 >= $20): recommend USING it, not sitting on it
+    local r = SA.recommend(held_hermit(25))
+    t.eq(r.best.type, "USE_CONSUMABLE", "held Hermit at $25 (maxed) -> USE it now")
+    t.eq(r.best.target.key, "c_hermit", "...it is the Hermit being used")
+    t.eq(r.best.gain, 20, "...banking the full $20")
+    -- NOT maxed ($6 < $20): holding to let the doubling grow is fine -> do not force the use
+    local r2 = SA.recommend(held_hermit(6))
+    local forced = (r2.best.type == "USE_CONSUMABLE" and r2.best.target.key == "c_hermit")
+    t.ok(not forced, "held Hermit at $6 (not maxed) -> not forced to use it yet")
+  end
+
   -- ---- reroll is situational: weak shop + cheap roll => considered; a strong
   --      current joker is bought instead of rolling ----
   do

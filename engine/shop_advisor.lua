@@ -1043,6 +1043,39 @@ function SA.recommend(gs, opts)
     end
   end)
 
+  -- STANDALONE income-consumable use (2026-08-26 advice-review, #3). The block above only
+  -- surfaces a held Hermit/Temperance when it FUNDS an unaffordable buy -- so the human sat on
+  -- a Hermit all game with >$20 and it was never suggested. But an income consumable at its MAX
+  -- payout has ZERO opportunity cost to holding (the payout can't grow), while holding it risks
+  -- the slot (a pack tarot overwrites it) and, worse, spending FIRST shrinks it (Hermit doubles
+  -- CURRENT money, so buy-then-Hermit nets strictly less than Hermit-then-buy). So once it is
+  -- maxed, recommend using it NOW, before any spend. Valued at the free money it banks
+  -- (gain * DOLLAR_UTIL), which for a maxed Hermit is $20*0.3 = 6.0 -- a strong, top-of-list action.
+  try(function()
+    for _, c in ipairs(gs.consumables or {}) do
+      local gain, future_gain
+      if c.key == "c_hermit" then
+        gain = math.min(math.max(0, dollars(gs)), Tarot.HERMIT_MAX_GAIN)
+        future_gain = Tarot.HERMIT_MAX_GAIN
+      elseif c.key == "c_temperance" then
+        local s = 0
+        for _, j in ipairs(gs.jokers or {}) do s = s + (j.sell_value or 0) end
+        gain = math.min(s, 50)
+        future_gain = 50          -- Temperance grows with your jokers; only "maxed" at the $50 cap
+      end
+      -- fire ONLY when the payout is at its ceiling (holding can gain nothing more)
+      if gain and gain > 0 and gain >= future_gain - 1e-9 then
+        actions[#actions + 1] = {
+          type = "USE_CONSUMABLE", target = c, use_names = { c.key }, kind = "income",
+          gain = gain, value = gain * SA.DOLLAR_UTIL,
+          reason = string.format(
+            "Use %s now (+$%d, free) -- its payout is maxed, so holding it only risks the slot; use it BEFORE you spend.",
+            c.name or c.key, gain),
+        }
+      end
+    end
+  end)
+
   -- SELL_TO_BUY -- fund a wanted-but-unaffordable shop item by selling a low-value
   -- owned joker / held consumable. For each priced item we can't afford, find the
   -- funder whose sale (a) covers the gap (cash + frees the right slot) and (b) gives

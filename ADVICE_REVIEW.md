@@ -131,4 +131,6 @@
 4. Pack-first ordering + Hermit-cash sequencing (§5) · reroll (§8) · deck-shaping/tarot (§6) · play-spiral
 (§1) · 5. UX: "Play blind" + pack-pick target text (§10) · 6. MC-timing (§11).
 Fixes done so far: Ankh(0-jokers)+duplicate-value valuation; overlay cost/size/pick + duplicate
-disambiguation; per-hand PLAY/DISCARD logging (enables §1/§2 diagnosis).
+disambiguation; per-hand PLAY/DISCARD logging (enables §1/§2 diagnosis); **§3 churn** first-pass
+(`SA.TIER_FUNDER_FLOOR` — don't dump a decent joker as a free SELL_TO_BUY funder); **§2 money-dig**
+(`DE.DIG_FOR_MONEY` — with Faceless, dig 3+ face cards for the $5 before playing a locked clear).
