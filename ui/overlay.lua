@@ -56,6 +56,20 @@ function Overlay.set(ranked)
   local what = (a.cards and #a.cards > 0) and cards_str(a.cards)
     or (a.target and (a.target.name or a.target.key)) or ""
   s.move = (what ~= "") and string.format("%s %s", verb, what) or verb
+  -- COST in the BIG line (was only in the small grey reason). For a pack, also its pick-count so
+  -- Normal/Jumbo (pick 1) vs Mega (pick 2) is unmistakable. 2026-08-26 advice-review request.
+  local BUYS = { BUY_PACK = true, BUY_JOKER = true, BUY_CONSUMABLE = true, BUY_VOUCHER = true, SELL_TO_BUY = true }
+  if a.type == "BUY_PACK" and a.target and a.target.key then
+    local ok, P = pcall(require, "engine.packs")
+    if ok and P and P.size_label then
+      local sz = P.size_label(a.target.key)          -- "Mega" / "Jumbo" / "Normal"
+      local pick = (sz == "Mega") and 2 or 1
+      s.move = s.move .. string.format(" [%s, pick %d]", sz, pick)
+    end
+  end
+  if a.cost and a.cost > 0 and BUYS[a.type] then
+    s.move = s.move .. string.format(" — $%d", a.cost)
+  end
   -- The target ("on which cards") is the actionable part of using a Tarot, so put it
   -- in the BIG move line, not just the small reason text below. e.g. the headline
   -- reads "Use Empress — apply to AS, KS" instead of a bare "Use Empress".

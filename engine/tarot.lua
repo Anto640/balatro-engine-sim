@@ -212,13 +212,34 @@ end
 -- you haven't drawn is wrong), so we describe the STRATEGY instead. Pass gs.hand and
 -- it names e.g. "apply to AS, KC"; with no hand it says "apply to your 2 highest-value
 -- cards".
+-- Compact distinguishing feature of a card (edition / enhancement / seal), for disambiguation.
+local ENH_SHORT = { m_steel = "steel", m_glass = "glass", m_gold = "gold", m_bonus = "bonus",
+                    m_mult = "mult", m_wild = "wild", m_lucky = "lucky", m_stone = "stone" }
+local function distinguisher(c)
+  return c.edition or (c.enhancement and ENH_SHORT[c.enhancement]) or (c.seal and (tostring(c.seal):lower() .. "-seal")) or nil
+end
+-- Cards.label is rank+suit only, so a steel Q♥ and a plain Q♥ read identically. When the pool holds
+-- another card with the SAME label but a different modifier, append it -> "Q♥ (steel)" vs "Q♥ (plain)"
+-- (2026-08-26 advice-review: "discard QH" was ambiguous between a steel and a standard Queen of Hearts).
+local function disambig_label(c, pool)
+  local base = Cards.label(c)
+  for _, o in ipairs(pool or {}) do
+    if o ~= c and Cards.label(o) == base and distinguisher(o) ~= distinguisher(c) then
+      local d = distinguisher(c)
+      return base .. (d and (" (" .. d .. ")") or " (plain)")
+    end
+  end
+  return base
+end
+T.disambig_label = disambig_label
+
 function T.target_note(gs, key, pool)
   local name_pool = pool or ((gs.hand and #gs.hand > 0) and gs.hand or nil)
   if name_pool then
     local targets, suit = T.best_targets(gs, key, name_pool)
     if targets and #targets > 0 then
       local labels = {}
-      for _, c in ipairs(targets) do labels[#labels + 1] = Cards.label(c) end
+      for _, c in ipairs(targets) do labels[#labels + 1] = disambig_label(c, name_pool) end
       local list = table.concat(labels, ", ")
       if suit then return string.format("convert %s → %s", list, suit) end
       return "apply to " .. list
