@@ -670,6 +670,28 @@ return function(t)
     t.ok(not forced, "held Hermit at $6 (not maxed) -> not forced to use it yet")
   end
 
+  -- ---- PACK-FIRST sequencing: open an affordable pack BEFORE a shop buy (2026-08-26 review #5) ----
+  -- The human's rule: packs are free info, open them before committing cash. When a shop buy AND a
+  -- positive-value pack both fit this shop, lead with the pack (non-lossy: the buy stays affordable).
+  do
+    local function gs(money)
+      return GS.new{ economy = { dollars = money, interest_cap = 5 },
+        run = { hand_levels = {}, hand_size = 8, joker_slots = 5 },
+        shop = { jokers = { joker{ key = "j_baron", name = "Baron", cost = 5 } },
+          boosters = { { key = "p_buffoon_normal", name = "Buffoon Pack", cost = 4 } },
+          vouchers = {}, joker_slots = 5 } }
+    end
+    -- plenty for BOTH -> lead with the pack, the buy becomes the top alternative
+    local rich = SA.recommend(gs(30))
+    t.eq(rich.best.type, "BUY_PACK", "can afford both -> open the pack first")
+    local buy_is_alt = false
+    for _, a in ipairs(rich.alternatives or {}) do if a.type == "BUY_JOKER" then buy_is_alt = true end end
+    t.ok(buy_is_alt, "...and the shop buy is still on the table as an alternative (never forfeited)")
+    -- can't afford both -> do NOT reorder (the buy must not be foreclosed by opening the pack)
+    local poor = SA.recommend(gs(8))
+    t.eq(poor.best.type, "BUY_JOKER", "can't afford both -> keep the buy first, don't open the pack")
+  end
+
   -- ---- reroll is situational: weak shop + cheap roll => considered; a strong
   --      current joker is bought instead of rolling ----
   do

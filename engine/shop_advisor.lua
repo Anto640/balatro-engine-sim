@@ -1207,6 +1207,35 @@ function SA.recommend(gs, opts)
     local bn = (b.target and (b.target.name or b.target.key)) or ""
     return tostring(an) < tostring(bn)
   end)
+
+  -- PACK-FIRST sequencing (2026-08-26 advice-review #5). The human's rule: open packs BEFORE
+  -- committing cash. If the top pick is a shop BUY but there is ALSO a positive-value pack that
+  -- fits alongside it (both affordable together, so you'll do BOTH this shop anyway), lead with the
+  -- pack: it is non-committal information -- the pick may contain the very joker/consumable that
+  -- makes the buy redundant ("bought Hiker then a Buffoon"), and spending first can shrink a later
+  -- money-tarot's payout. NON-LOSSY by construction: it only ever fires when the buy remains
+  -- affordable after opening the pack, so the buy is never forfeited -- only its ORDER changes.
+  do
+    local top = actions[1]
+    if top and (top.type == "BUY_JOKER" or top.type == "BUY_VOUCHER" or top.type == "BUY_CONSUMABLE") then
+      local buy_cost = top.cost or 0
+      local best_pack, best_idx
+      for i, a in ipairs(actions) do
+        if a.type == "BUY_PACK" and (a.value or 0) > 0
+           and (dollars(gs) - (a.cost or 0) - buy_cost) >= (reserve - credit) then
+          if not best_pack or (a.value or 0) > (best_pack.value or 0) then best_pack, best_idx = a, i end
+        end
+      end
+      if best_pack and best_idx > 1 then
+        table.remove(actions, best_idx)
+        table.insert(actions, 1, best_pack)
+        best_pack.reason = (best_pack.reason or "") .. string.format(
+          "  [Open this BEFORE buying %s — a pack is free info (it may make the buy redundant) and you can afford both.]",
+          (top.target and (top.target.name or top.target.key)) or "the shop item")
+      end
+    end
+  end
+
   local best = actions[1]
   local alternatives = {}
   for i = 2, #actions do alternatives[#alternatives + 1] = actions[i] end

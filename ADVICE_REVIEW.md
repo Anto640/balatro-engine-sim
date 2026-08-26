@@ -68,7 +68,9 @@
 
 - 🔧 **[R2] Buys shop jokers/vouchers BEFORE opening packs.** e.g. bought Hiker then a Buffoon; said buy a
   voucher before opening a pack. Should **open packs first** — the pack may contain the joker/Hermit that
-  makes the buy pointless (Hiker gives no scoring anyway).
+  makes the buy pointless (Hiker gives no scoring anyway). [FIXED: when a shop buy AND a positive-value
+  pack both fit this shop, the shop advisor now leads with the pack (non-lossy reorder — the buy stays an
+  affordable alternative). Advice-sequencing; sim impact bounded (both actions still happen), not A/B'd.]
 - ❓ **[R2] Opening the bigger/more expensive pack first is questionable** — spending down first lowers a
   later Hermit's payout; sequence money-tarots against current cash.
 
