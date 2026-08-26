@@ -339,7 +339,21 @@ mean-progress objective and the strongest argument for the **agreement objective
   OR the premium fires (offers ≥10%) but the arm is baseline-null → capacity valuation isn't the lever.
 
 ### P2 — ECONOMY-GENERATION POLICY BUNDLE (highest headroom; low-med tractability)
-- *Mechanism:* implement the winner's economy policy (`human-economy-policy` memory) as a **co-calibrated
+- **⚖️ P2a TESTED → MECHANISM FIRES, WINRATE NULL OOS → KEPT AS CORRECTNESS (2026-08-26, commit 6db29eb).**
+  Diagnostic REFRAMED the gap: money is not the late constraint — it plateaus at a median **$25–29 idle from
+  ante 5–8** while under-levelled (12 vs 18.6); that idle ~$25 ≈ **8 planet-levels = the leveling gap held in
+  cash** (§30). Root cause: `interest_penalty` used a flat `INTEREST_HORIZON=3`, but interest you won't collect
+  isn't a cost (at ante 8 the run ends on the clear). `SA.interest_horizon(gs)` caps it by rounds-remaining
+  (unchanged ≤ante 5; 2.0/1.0/0.4 at ante 6/7/8 — antes ≤5 untouched, so NOT the refuted ecap §28). Mechanism
+  **confirmed** (ante-8 $29→$26, lvl 12→13) but winrate **null**: baseline in-sample +0.014 sign 10/3 (p 0.096)
+  did NOT replicate OOS → +0.010 sign **5/4 (p 1.00)** — winner's-curse mean on big-win flips. **⇒ §30a
+  GENERALISES: late reserve-conversion is too late; the human's levels compound from antes 3–7.** Kept anyway
+  (undisputable accounting fix + better human overlay + sim-non-negative over 320 seeds — like P4 income_frac).
+  Arms: `sim_out/p2a_{ctrl_base,treat_base,ctrl_b7,treat_b7}.jsonl`.
+- **⇒ P2 economy-by-shop-policy is essentially CLOSED (its own Kill criterion met):** late half (P2a)
+  fires-but-null; early half (ante-2 $1 vs $7) is ecap-refuted (§28) + poverty-trap-structural. The leveling
+  gap must be closed EARLIER (antes 3–7) — that is P4 (product board / compounding), not more economy levers.
+- *Mechanism (original plan, now superseded by the P2a finding):* implement the winner's economy policy (`human-economy-policy` memory) as a **co-calibrated
   bundle**, not single levers (which all failed because the surface is interaction-dominated and baseline
   starves them): (a) **satisfice** — ensure sufficiency for the upcoming 1–2 blinds, then (b) allocate every
   surplus dollar to compounding (money tarots — Hermit/Temperance/Fool; interest to cap; econ jokers), and
