@@ -428,7 +428,12 @@ mean-progress objective and the strongest argument for the **agreement objective
   intentionally deferred) is a different, larger, un-bounded use.
 - **⇒ Tractable frontier exhausted; the one un-bounded direction is the deferred PLANNER/SEARCH (MCTS) with a
   learned rollout value** to price DYNAMIC target-directed play (the residual the agreement screen localized).
-  A multi-session architecture to SCOPE, not a lever.
+  **NOW SCOPED: `MCTS_PLAN.md` (re-scoped 2026-08-26).** It OVERTURNS the 2026-07-14 "supply-ceiling / MCTS
+  dead" verdict (refuted by the human's 87.5% on identical inputs + rich10 24% + the line-finding frame), and
+  gates the whole build on **Phase 0 — a retrospective shop-stream oracle** (do winning lines EXIST in lost
+  runs' actual offer streams?): the cheapest, highest-information step, never run, which alone green-lights or
+  kills the architecture. Phases 1–3: sim-as-environment + capacity leaf value (validated AUC 0.8 this pass) →
+  depth-2 expectimax over the shop stream, screened on the agreement objective → learned rollout value.
 
 ---
 
