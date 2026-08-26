@@ -91,6 +91,8 @@ SA.SELL_NUDGE = { j_gros_michel = 0.8, j_ice_cream = 0.6, j_popcorn = 0.6 }
 -- closest-to-winning deaths (near-win mining) banked $46-49 while "Behind pace" and even SOLD
 -- scoring jokers for pure-economy jokers (capacity 95k->11k). So when ante >= ENDGAME_ANTE and
 -- not on pace, economy is near-worthless: collapse the econ weight and spend cash freely on power.
+SA.TIER_FUNDER_FLOOR = 0.4   -- anti-churn: per tier-above-3, the min "loss" of selling a joker to fund
+                             -- a buy, so a decent non-scoring piece (Burglar) isn't dumped as free funding
 SA.ENDGAME_ANTE = 7
 SA.ENDGAME_ECON_DAMP = 0.1   -- econ weight multiplier when endgame-urgent (~worthless)
 SA.ENDGAME_SPEND = 0.25      -- income_factor multiplier when endgame-urgent (spend, don't bank)
@@ -1058,9 +1060,16 @@ function SA.recommend(gs, opts)
         -- SELL_TO_BUY would fund a purchase by dumping the future core. Add BP.keep_bias to its
         -- loss so the disposable additive filler is chosen as the funder instead. (This is the
         -- path that was actually churning 43% of bought xmult -- the SELL_JOKER guard missed it.)
+        -- ANTI-CHURN (2026-08-26, live run 9UZ3Q5Q5): a NON-SCORING utility joker (Burglar grants
+        -- hands, doesn't score) measures ~0 on joker_marginal_fv, so it looked like free funding and
+        -- got bought then SOLD the SAME shop visit to buy a LOWER-rated joker. Floor the loss by the
+        -- joker's TIER so a decent piece (tier>3) isn't treated as disposable; true filler (tier<=3)
+        -- stays freely sellable. TIER_FUNDER_FLOOR is in the same units as keep_bias/marginal_fv.
+        local tier = (JokerData.resolve(j.key).tier or 0)
+        local floor = math.max(0, tier - 3) * SA.TIER_FUNDER_FLOOR
         funders[#funders + 1] = { kind = "joker", name = j.name or j.key, target = j,
           cash = j.sell_value or 1,
-          loss = (Eval.joker_marginal_fv(gs, i, mopts)) + BuildPlan.keep_bias(j.key, gs) }
+          loss = math.max(Eval.joker_marginal_fv(gs, i, mopts), floor) + BuildPlan.keep_bias(j.key, gs) }
       end
     end
     if #(gs.consumables or {}) > 0 then
