@@ -130,11 +130,28 @@
 
 ---
 
-### Fix order being worked (see the session commits / MCTS is unrelated)
-1. Joker buy-then-sell churn (§3) · 2. Milk spare resources (§2) · 3. Use held consumables (§4) ·
-4. Pack-first ordering + Hermit-cash sequencing (§5) · reroll (§8) · deck-shaping/tarot (§6) · play-spiral
-(§1) · 5. UX: "Play blind" + pack-pick target text (§10) · 6. MC-timing (§11).
-Fixes done so far: Ankh(0-jokers)+duplicate-value valuation; overlay cost/size/pick + duplicate
-disambiguation; per-hand PLAY/DISCARD logging (enables §1/§2 diagnosis); **§3 churn** first-pass
-(`SA.TIER_FUNDER_FLOOR` — don't dump a decent joker as a free SELL_TO_BUY funder); **§2 money-dig**
-(`DE.DIG_FOR_MONEY` — with Faceless, dig 3+ face cards for the $5 before playing a locked clear).
+### Status (see the session commits / MCTS is unrelated)
+
+**✅ SHIPPED + DEPLOYED (this review pass):**
+- **Ankh/Hex valuation** — 0-jokers = 0; else value = duplicating your BEST joker (sell weaker first).
+- **Overlay UX** — cost + pack size + pick-count in the big line; steel/plain duplicate disambiguation.
+- **Per-hand PLAY/DISCARD telemetry** — logs what was actually played/discarded (enabled §1/§2 diagnosis).
+- **§3 churn** (first-pass) — `SA.TIER_FUNDER_FLOOR`: don't dump a decent joker as a free SELL_TO_BUY funder.
+- **§2 money-dig** — `DE.DIG_FOR_MONEY`: with Faceless, dig 3+ face cards for the $5 before playing a locked
+  clear (debuff-aware — a debuffed face doesn't count). Chains through the discards, keeps the clear.
+- **§4 held consumables** — use a maxed income consumable (Hermit ≥$20) now instead of sitting on it.
+- **§10 UX** — "Play blind" at an unskippable boss; pack-pick tarot target card in the big line.
+- **§5 pack-first** — lead with an affordable pack before a shop buy when both fit (non-lossy reorder).
+
+**⏳ REMAINING = the valuation / in-blind-play FRONTIER (each needs paired A/B, not a quick ship):**
+- **§6 deck-shaping / tarot valuation** (Tower-over-Strength, Wheel-over-deathing-a-King) — the documented
+  commitment→valuation lever; must be co-calibrated + A/B'd, never an isolated magnitude change.
+- **§1 play-spiral / line-commitment** — the in-blind engine abandoning a straight/set line under pressure.
+- **§8 reroll discipline** — already heavily tuned; touching it is exactly the risky class.
+- **§9 planets rarely bought**, **§7 skip discipline** — leveling/skip levers, operating-point dependent.
+- **§11 MC-timing** — the expensive sim is ALREADY debounced to the settled hand (main.lua scheduler); the
+  per-card recompute is the CHEAP pass. Needs live profiling before changing, not a blind edit.
+
+**➡ Best next step: a fresh live run** to validate the shipped fixes behaviourally (churn, money-dig,
+Hermit-use, pack-first, UX) and surface the next REAL gap — more informative than speculatively tuning the
+frontier levers without signal.
