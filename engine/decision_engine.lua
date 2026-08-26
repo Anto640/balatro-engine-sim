@@ -459,9 +459,13 @@ function DE.decide(gs, opts)
     -- For a Faceless money-dig, FLOAT face cards to the front so a 3+face discard triggers the
     -- $5 even when only some spare cards are faces (Pareidolia makes every card a face). Ties
     -- and the non-money dig keep the pure cheapest-first ordering.
+    -- A DEBUFFED card counts for nothing -- not even Pareidolia makes it a face for Faceless.
     local pareidolia = owns(gs, "j_pareidolia")
     local face_of = {}
-    for _, s in ipairs(spare) do face_of[s] = (pareidolia or Cards.is_face(s.c)) and true or false end
+    for _, s in ipairs(spare) do
+      local is_face = (pareidolia or Cards.is_face(s.c)) and not HandEval.is_debuffed(gs, s.c)
+      face_of[s] = is_face and true or false
+    end
     table.sort(spare, function(a, b)
       if want_money_dig and face_of[a] ~= face_of[b] then return face_of[a] end   -- faces first
       local ka, kb = DiscardValue.keep_value(a.c), DiscardValue.keep_value(b.c)

@@ -306,6 +306,9 @@ local function is_debuffed(gs, card)
   if be.debuff_suit and Cards.is_suit(card, be.debuff_suit) then return true end
   return false
 end
+-- exposed so other engines can honour the SAME debuff rule (e.g. the money-dig must not
+-- count a debuffed face toward Faceless's "3+ face cards discarded" -- 2026-08-26 review).
+HandEval.is_debuffed = is_debuffed
 
 local function held_cards(gs, played)
   local played_ids = {}

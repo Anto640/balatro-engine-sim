@@ -837,5 +837,12 @@ return function(t)
     local pdug = DE.decide(faceless_state({ joker{ key = "j_faceless" }, joker{ key = "j_pareidolia" } })).best
     t.eq(pdug.type, "DISCARD", "money-dig: Faceless + Pareidolia -> still digs for the $5")
     t.ok(pdug.farms_money, "...still tagged as money-farming")
+
+    -- DEBUFFED faces don't count for Faceless (the human's own reminder). A face-debuff boss
+    -- turns the 3 spare faces into non-faces, so the $5 can't be farmed -> it must NOT dig.
+    local gsd = faceless_state({ joker{ key = "j_faceless" } })
+    gsd.boss_effect = { debuff_faces = true }
+    local ddug = DE.decide(gsd).best
+    t.eq(ddug.type, "PLAY", "money-dig: a face-debuff boss makes Faceless unfarmable -> plays, no false dig")
   end
 end
