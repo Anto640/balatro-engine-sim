@@ -254,7 +254,38 @@ rollout value (trained on outcomes, positives-rich rich-arm data) is where the l
 rollout machinery. `sim/search.lua` + `Driver.fork/rollout` remain as the reusable search scaffold for
 whichever evaluator wins.
 
-## 6. Phase 3 — learned rollout value (only if Phase 2 clears)
+## 6. Phase 3 — learned PIECE-LEVEL value (NOW THE LIVE PATH, evidence below)
+
+### ⭐ THE NNUE PROBE (2026-08-26, `tools/richeval_probe.py`) — piece identities beat capacity EARLY
+
+Prompted by the chess-engine analogy (a cheap STRONG static eval is what lets you avoid rollouts; modern
+chess gets it from NNUE = a net over the exact piece configuration, not summary stats). Tested whether a
+PIECE-LEVEL representation (multi-hot over the SPECIFIC jokers owned) beats `capacity` at predicting
+win-from-here. **Rich arms (78 wins), held-out test-AUC over 6 splits:**
+
+| ante | capacity-only | + joker identities | gain |
+|---|---|---|---|
+| 4 | 0.716 | **0.863** | **+0.147** |
+| 5 | 0.751 | **0.883** | **+0.132** |
+| 6 | 0.804 | 0.825 | +0.021 |
+
+**The piece representation beats capacity by +0.13–0.15 AUC at antes 4–5 — exactly the WEAK-EARLY regime where
+pacing fails and the search needs a value.** Aggregate COUNTS do NOT (they saturate at capacity, matching P5).
+⇒ **P5's "learned value bounded weak" was a REPRESENTATION artifact** — the configuration (which pieces) carries
+the signal, not summary stats (the chess/NNUE lesson). Caveats: overfit-prone (78 wins × ~67 feats; L2=8 +
+repeated held-out splits used, AUC noisy ±~0.05); pooled/late gains smaller (capacity strong late); **needs
+OOS confirmation** before shipping. But this is the first evidence of a CHEAP value that BEATS pacing early —
+the thing the whole search needs.
+
+**⇒ This makes the corrected architecture concrete and feasible:** a learned piece-level eval `V(state)` (an
+NNUE-style linear/small model over {joker multi-hot, deck aggregates, economy, ante}) as the leaf, plugged
+into a SHALLOW EXPECTIMAX (backgammon-style, chance nodes for offers) — NOT the infeasible play-it-out
+rollout. The eval is milliseconds, so the search is feasible AND better-than-greedy where it matters.
+**Build order:** (1) train the piece-level `V` on the arm outcomes with OOS holdout (confirm the +0.13 early
+gain replicates on `BES_SEED_OFF=7` rich arms); (2) expose `V(gs)` as a pure engine fn; (3) swap it into
+`sim/search.lua`'s `evaluate` (drop `Driver.rollout`); (4) screen the search on the agreement objective.
+
+### (superseded framing) Phase 3 — learned rollout value
 
 Replace the capacity heuristic leaf with a **learned value** trained on sim outcomes — the ONE use the
 `winprob_headroom` bound left open (it bounded the learned model as a *standalone objective*, not as a
