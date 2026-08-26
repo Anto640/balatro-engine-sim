@@ -135,6 +135,24 @@ declined-pack contents + rerolls) is the fuller confirmation; 0a alone already g
 - **Calibration check:** V's win-discrimination on held-out arms should match `winprob_headroom` (~0.8
   AUC). If V under-performs capacity-alone, fix V before searching.
 
+### ✅ Phase 1 (leaf value) FOUNDATION RESULT (2026-08-26, `tools/leaf_value_auc.py`)
+
+Measured the win-discrimination (AUC vs eventual win) of every logged leaf signal, by ante:
+- **`pace_margin` ≈ `capacity`** are the two best and near-equivalent (pace_margin edges it at rich, being
+  normalized) — and `pace_margin` is ALREADY computed by `engine/pacing.lua`, so **V is essentially free:
+  V(gs) := pace_margin(gs)** (or a 1-D calibration of it → P(win)). `run_strength` is useless (~0.5), `on_pace`
+  is weaker than pace_margin.
+- **⭐ The value is WEAK EARLY, STRONG LATE:** AUC ante 2–3 ≈ **0.51** baseline (0.69–0.70 rich) → ante 5
+  **0.89** → ante 7 0.83. Calibration @ante 5: `pace_margin > 2.5` → 23% win vs ~0% below 1.4 (monotone,
+  calibratable). So the leaf is trustworthy only in the MID-LATE game.
+- **⭐ Design consequence (shapes Phase 2):** the decisive decisions are EARLY (first multiplier by ante 2–4)
+  but their value only sharpens LATE. A shallow depth-2 search from ante 2–3 evaluates ante-4 leaves where
+  AUC is only ~0.68 — a NOISY signal. ⇒ the search must either (a) reach ante-5+ leaves (more depth / longer
+  rollout of the greedy policy to a late horizon before applying V), or (b) use a LEARNED early value (Phase
+  3) that captures assembly potential — the dynamic residual `capacity` cannot see early. This is the same
+  early-blindness the whole audit found, now quantified inside the value function. Prefer (a) first (cheap:
+  roll the greedy policy forward to ~ante 5 with sampled offers, THEN apply V) before committing to (b).
+
 ## 5. Phase 2 — search over STRATEGIC decisions (not in-blind play)
 
 - **Scope: shop (buy/reroll/save/pack), pack-pick, blind-select (skip/play).** NOT in-blind play — it is
