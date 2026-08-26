@@ -363,9 +363,10 @@ BES._fix = { seed = nil, idx = 0, sig = nil }
 -- CAPTURE-ONLY mode (data collection). When true, BES.tick still logs telemetry + replay fixtures
 -- but SKIPS the Monte-Carlo evaluation -- the expensive per-change work that causes the in-game lag.
 -- The overlay shows nothing (nothing is computed), which is exactly right when the point is to record
--- the HUMAN's decisions for OFFLINE replay under the current engine. Defaults ON in this frozen
--- data-collection build so the human runs are lag-free with no action needed; F10 toggles it.
-BES.capture_only = true
+-- the HUMAN's decisions for OFFLINE replay under the current engine. F10 toggles it in-game.
+-- 2026-08-26: switched back to LIVE mode (false) for interactive advice-review sessions -- the overlay
+-- computes and shows real-time recommendations again. Flip back to true for lag-free data collection.
+BES.capture_only = false
 
 function BES.emit_fixture(gs)
   if not (ReplayFixture and Json and love and love.filesystem) then return end
