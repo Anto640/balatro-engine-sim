@@ -278,9 +278,13 @@ class this apparatus produces. 63% of runs never committed before; now 71%. Feas
 **➡ THE authoritative status is now `GRAND_AUDIT.md`** (2026-08-25) — a ground-up re-derivation +
 section scorecard + ranked forward plans that re-establishes (and in places overturns) the conclusions
 below. **Read it FIRST.** It supersedes the *navigation* role of the docs below but preserves them as the
-audit trail: `WINRATE_V3_PLAN.md` §32 (then §31/§6/§30/§18) is the detailed checkpoint every `GRAND_AUDIT`
-citation resolves into; fresh-session handoff: `NEXT_SESSION.md`; historical audit + roadmap:
-`WINRATE_AUDIT.md`; superseded plans: `docs/archive/`.
+audit trail: `docs/archive/WINRATE_V3_PLAN.md` §32 (then §31/§6/§30/§18) is the detailed checkpoint every
+`GRAND_AUDIT` citation resolves into; fresh-session handoff: `NEXT_SESSION.md`; historical audit + roadmap:
+`docs/archive/WINRATE_AUDIT.md`; superseded plans: `docs/archive/`. (The `WINRATE_*` docs were moved to
+`docs/archive/` on 2026-08-26; a bare `WINRATE_V3_PLAN.md §X` reference elsewhere in this file resolves there.)
+**The MCTS/search investigation is complete — see `MCTS_PLAN.md`: the winrate ceiling is POLICY not supply
+(Phase 0a), but is not closable with the current apparatus — the value function is the wall and it is
+compute/data-bound beyond a few nights of local compute (quadruply confirmed). Consolidated at the ceiling.**
 _Key `GRAND_AUDIT` corrections to the block below: (1) the level_gain "+0.421 rich10" is UNCONFIRMED
 (never OOS-replicated, same profile as the target model that failed OOS) — treat as correctness-only until
 re-run; (2) "converts at rich10 in-sample" is NOT a reliable ship signal (B3 weak-OOS, level_gain untested,

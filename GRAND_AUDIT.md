@@ -1,11 +1,28 @@
 # GRAND_AUDIT.md — the consolidated master audit (2026-08-25)
 
+> **⭐ SESSION TERMINUS (2026-08-26) — read this first.** The forward plans P0–P5 below are all resolved,
+> and the MCTS/search investigation they pointed to is COMPLETE (`MCTS_PLAN.md`). Net result: the 2.5%
+> winrate ceiling is a **POLICY/assembly gap, not supply** (Phase 0a overturned the old supply-ceiling: 70%
+> baseline / 92% rich of lost runs were offered ≥2 affordable multiplier keystones and passed them up), but
+> it is **NOT closable with the current apparatus** — the **value function is the wall**: the greedy engine
+> already uses the best cheap value (`capacity`/`pace_margin`), a feasible search can't beat it, and NO
+> learned value beats it out-of-sample (confirmed **four ways**: P5 CV, NNUE-OOS, interactions-OOS, TD-OOS).
+> Breaking it needs compute/data beyond a few nights of local run time (brute-force ~3–8 nights uncertain, or
+> a multi-week GPU self-play build) — declined by the operator. **Status: consolidated at the ceiling.** The
+> shipped/kept changes (P1 slots, P2a interest-horizon), the refuted supply ceiling, the validated search
+> scaffold, the hardened agreement objective, the tail-weighted verdict, and six diagnostic tools are the
+> durable output. If the objective ever shifts from *autonomous winrate* to *advice-to-a-human quality*
+> (§G1), that is a different, non-compute-bound problem measurable on the agreement objective.
+
 > **What this is.** A ground-up re-derivation of the project's state, written to *distrust* every prior
 > verdict and re-establish it (or overturn it) from the code and data as they exist **today** (HEAD
 > `f74ec56`, engine byte-identical to `f1242bb` — the intervening commits are docs/tools only, verified
 > by `git diff --stat f1242bb..HEAD -- engine/ sim/ core/ model/`). It supersedes the *navigation* role of
 > `WINRATE_V3_PLAN.md`/`WINRATE_AUDIT.md`/`NEXT_SESSION.md` but **preserves them as the audit trail** — every
 > §-number below points back into `WINRATE_V3_PLAN.md`. Read this first, then the plan sections it cites.
+> **📁 Archived 2026-08-26:** the `WINRATE_V3_PLAN.md` / `WINRATE_AUDIT.md` / `WINRATE_AUDIT_v2.md` audit-trail
+> docs moved to **`docs/archive/`** to declutter the top level — every `WINRATE_V3_PLAN.md §X` citation below
+> resolves to `docs/archive/WINRATE_V3_PLAN.md §X`. The current authoritative pair is this file + `MCTS_PLAN.md`.
 >
 > **Method.** Baseline tests green (1046 pass). All numbers below were re-derived from on-disk data
 > (`sim_out/*.jsonl`, `data/*.jsonl`) or freshly run (paired, deterministic, from the pristine HEAD tree).
