@@ -253,6 +253,9 @@ function PO.recommend(gs, opts)
   -- used immediately to LEVEL a hand, a free permanent buff with zero downside -- so a spare pick
   -- should always take one even when it levels a hand you rarely play (value ~0). The engine was
   -- skipping the 2nd pick of a Mega Celestial while starved for scoring (2026-08-27, run MALEJYHW).
+  -- (Caveat, per the user: skipping CAN be right in one rare spot -- keeping your MAIN planet as the
+  -- last-used card so a held Fool copies IT rather than a lesser planet taken after. Too situational
+  -- to model; taking the free level is correct almost always.)
   local want = math.min(p.picks_left or 1, #valued)
   local picks = {}
   for i = 1, want do

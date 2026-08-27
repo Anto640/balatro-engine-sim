@@ -8,6 +8,41 @@
 
 ---
 
+## R3 — MALEJYHW (2026-08-27, died ~ante 2, "playing stupid"): the CHURN run
+
+> A third live run, dominated by one failure mode: **catastrophic joker churn via `SELL_TO_BUY`**.
+> Telemetry proof — every bad sale was a `SELL_TO_BUY`, and the standalone `SELL_JOKER` value said
+> KEEP each time (Cloud 9 at **−12.4**). The user's diagnosis nailed it: *SELL_TO_BUY never reused the
+> SELL_JOKER value* — it recomputed a weak funder loss from **scoring alone**, blind to economy,
+> leveling, and edition value.
+
+- 🔧 **Sold a polychrome Ice Cream for an 8 Ball; Astronomer for an Arcana pack; Cloud 9 (+$4/round)
+  for an Egg.** All `SELL_TO_BUY`. [FIXED: `funder_is_live` — a joker with recurring $/round, a
+  consumable+economy leveling engine, or a non-base edition may only fund a clear JOKER upgrade,
+  never a non-joker or a lateral. Sim-neutral (surgical); ships on mechanism + the live telemetry.]
+- 🔧 **Mega Celestial (pick 2): took one planet, skipped the 2nd** while scoring-starved. [FIXED:
+  a planet is used immediately, never bloats the deck — always take a free level.]
+  *(User caveat: skipping a lesser planet CAN be right to keep your MAIN planet as the Fool's
+  last-used copy target — very rare/situational, so the "take the free level" logic is basically
+  entirely correct. Too niche to model.)*
+- 🔧 **At the ante-1 boss, discarded the non-debuffed Jack over the debuffed one** (low impact).
+  [FIXED: `keep_value` ranks a debuffed card below any live card — pitched first.]
+- 🔧 **Hex → polychrome on Ice Cream over Cryptid.** *(User: it had only ONE joker (Ice Cream) so
+  Hex was GUARANTEED to hit it — the targeting was never the issue. The real problem was that it
+  then SOLD the polychromed joker immediately — pure churn, addressed by the anti-churn fix above.)*
+- 🔧 **Rerolled while nearly broke** with good packs present, then spent down to $1 on a Celestial
+  pack. [NOT FIXED: reroll is heavily tuned — deferred to a proper A/B rather than a blind edit.]
+- 🔧 **In-blind: "pointless discarding around a low straight that wouldn't clear" (a1); at the a2
+  boss, dug away from its own Odd Todd line.** [NOT FIXED: the a2 case was moot — the run was already
+  lost to the churn (no scoring). The play-spiral is the documented frontier, and the per-hand
+  telemetry is currently too lossy (empty `cards`, zero `score_delta`) to diagnose precisely.]
+
+**Sim A/B (n=40, all three fixes vs pre-report baseline): NEUTRAL** — Δ−0.05, p 0.86, death-ante
+shift a balanced 8-later/8-earlier. Expected: the sim's decks rarely hold the econ/leveling/edition
+jokers where the churn fix pays, so it can't see the live benefit. Ships on correctness + mechanism.
+
+---
+
 ## 1. In-blind play & digging (the play engine)
 
 - 🔧 **[R1] Didn't discard a dead low card in a marginal draw.** Opening hand held a 4-diamond flush draw
