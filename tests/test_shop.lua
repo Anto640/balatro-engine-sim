@@ -741,10 +741,11 @@ return function(t)
       "Astronomer is LIVE — a leveling engine (consumable+economy) even with 0 scoring/econ")
     t.ok(SA.funder_is_live(base, { key = "j_ice_cream", edition = "polychrome" }, 0),
       "a polychrome joker is LIVE — the edition is kept value even on a decaying base")
-    t.ok(SA.funder_is_live(base, { key = "j_baron" }, 2.0),
-      "a joker measuring above the keep floor is LIVE")
+    t.ok(not SA.funder_is_live(base, { key = "j_baron" }, 2.0),
+      "a plain scorer (no econ/edition/leveling) is NOT force-protected here — its marginal is " ..
+      "already charged in the funder loss; re-protecting it broadened the gate with no live upside")
     t.ok(not SA.funder_is_live(base, { key = "j_ice_cream" }, 0.1),
-      "a plain low-contribution joker (no econ/edition/leveling) is NOT live -> freely a funder")
+      "a plain (non-edition) Ice Cream is NOT live -> freely a funder")
     t.ok(not SA.funder_is_live(GS.new{ deck = jd(0), run = { hand_levels = {} } }, { key = "j_cloud_9" }, 0),
       "Cloud 9 with ZERO nines earns nothing -> correctly NOT protected (worthless, sellable)")
 
