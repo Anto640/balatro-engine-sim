@@ -717,6 +717,56 @@ return function(t)
       "SAVE", "won't sell a joker-creating Judgement to fund a cheap Standard pack")
   end
 
+  -- 30c. ANTI-CHURN: SELL_TO_BUY must not dump a LIVE joker to fund junk (2026-08-27, run MALEJYHW).
+  -- The funder loss priced only scoring, so it sold Cloud 9 (+$4/round), Astronomer (free
+  -- Celestials — no scoring, no $/round) and a POLYCHROME Ice Cream for an Egg / an Arcana pack /
+  -- an 8 Ball. funder_is_live is the discriminating gate: a joker doing ANY real work (scoring,
+  -- recurring $/round, a leveling engine, or a positive edition) may only fund a clear JOKER
+  -- upgrade, never a non-joker or a lateral/worse joker.
+  do
+    local function jd(deck_nines)              -- deck with `deck_nines` nines (for Cloud 9 econ)
+      local d = {}
+      for _, s in ipairs({ "Spades", "Hearts", "Clubs", "Diamonds" }) do
+        for r = 2, 14 do if r ~= 9 then d[#d + 1] = card{ id = #d + 1, rank_id = r, suit = s } end end
+      end
+      for i = 1, (deck_nines or 4) do d[#d + 1] = card{ id = 900 + i, rank_id = 9, suit = "Spades" } end
+      return d
+    end
+    local base = GS.new{ deck = jd(4), meta = { ante = 2 }, run = { hand_levels = {}, hand_size = 8 } }
+
+    -- the classifier (the discriminating logic), tested directly:
+    t.ok(SA.funder_is_live(base, { key = "j_cloud_9" }, 0),
+      "Cloud 9 is a LIVE funder — it pays $/round (econ), so it is not dumpable filler")
+    t.ok(SA.funder_is_live(base, { key = "j_astronomer" }, 0),
+      "Astronomer is LIVE — a leveling engine (consumable+economy) even with 0 scoring/econ")
+    t.ok(SA.funder_is_live(base, { key = "j_ice_cream", edition = "polychrome" }, 0),
+      "a polychrome joker is LIVE — the edition is kept value even on a decaying base")
+    t.ok(SA.funder_is_live(base, { key = "j_baron" }, 2.0),
+      "a joker measuring above the keep floor is LIVE")
+    t.ok(not SA.funder_is_live(base, { key = "j_ice_cream" }, 0.1),
+      "a plain low-contribution joker (no econ/edition/leveling) is NOT live -> freely a funder")
+    t.ok(not SA.funder_is_live(GS.new{ deck = jd(0), run = { hand_levels = {} } }, { key = "j_cloud_9" }, 0),
+      "Cloud 9 with ZERO nines earns nothing -> correctly NOT protected (worthless, sellable)")
+
+    -- integration: the three real sells are refused (the engine keeps the joker, banks instead)
+    local function keeps(jokers, shop_j, boosters, protect)
+      local r = SA.recommend(GS.new{ economy = { dollars = 2, interest_cap = 5 }, deck = jd(4),
+        meta = { ante = 2 }, run = { hand_levels = {}, hand_size = 8, joker_slots = 5 },
+        jokers = jokers, shop = { jokers = shop_j or {}, boosters = boosters or {}, vouchers = {}, joker_slots = 5 } })
+      for _, a in ipairs({ r.best, table.unpack(r.alternatives or {}) }) do
+        if a.type == "SELL_TO_BUY" and a.target and a.target.key == protect and (a.value or 0) > 0 then return false end
+      end
+      return true
+    end
+    t.ok(keeps({ joker{ key = "j_cloud_9" } }, { joker{ key = "j_egg", cost = 4 } }, {}, "j_cloud_9"),
+      "never sells Cloud 9 to fund an Egg")
+    t.ok(keeps({ joker{ key = "j_astronomer" }, joker{ key = "j_odd_todd" } }, {},
+      { { key = "p_arcana_normal", name = "Arcana Pack", cost = 4 } }, "j_astronomer"),
+      "never sells Astronomer to fund an Arcana pack")
+    t.ok(keeps({ joker{ key = "j_ice_cream", edition = "polychrome" } }, { joker{ key = "j_8_ball", cost = 5 } }, {}, "j_ice_cream"),
+      "never sells a polychrome Ice Cream to fund an 8 Ball")
+  end
+
   -- 30a2. F6: preserve an under-capped Hermit unless its current payout unlocks
   -- a concrete purchase valuable enough to beat the forgone larger payout.
   do

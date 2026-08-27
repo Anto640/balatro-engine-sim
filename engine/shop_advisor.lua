@@ -91,7 +91,10 @@ SA.SELL_NUDGE = { j_gros_michel = 0.8, j_ice_cream = 0.6, j_popcorn = 0.6 }
 -- closest-to-winning deaths (near-win mining) banked $46-49 while "Behind pace" and even SOLD
 -- scoring jokers for pure-economy jokers (capacity 95k->11k). So when ante >= ENDGAME_ANTE and
 -- not on pace, economy is near-worthless: collapse the econ weight and spend cash freely on power.
-SA.TIER_FUNDER_FLOOR = 0.4   -- anti-churn: per tier-above-3, the min "loss" of selling a joker to fund
+SA.TIER_FUNDER_FLOOR = 0.4
+SA.LIVE_KEEP = 0.5   -- FV-point floor above which a SELL_TO_BUY funder counts as a live contributor
+                     -- (a joker doing real work) that may only fund a clear JOKER upgrade, never a
+                     -- non-joker or a lateral/worse joker. See funder_is_live.   -- anti-churn: per tier-above-3, the min "loss" of selling a joker to fund
                              -- a buy, so a decent non-scoring piece (Burglar) isn't dumped as free funding
 SA.ENDGAME_ANTE = 7
 SA.ENDGAME_ECON_DAMP = 0.1   -- econ weight multiplier when endgame-urgent (~worthless)
@@ -373,6 +376,25 @@ SA.synergy_bonus = synergy_bonus
 local function joker_contribution(gs, idx, mopts)
   return (Eval.joker_marginal_fv(gs, idx, mopts))
 end
+
+-- A joker is a LIVE CONTRIBUTOR (not disposable filler) if it does ANY real work, not just
+-- scoring. SELL_TO_BUY used to price a funder by scoring marginal alone, so it dumped an economy
+-- joker (Cloud 9 +$4/round), a leveling engine (Astronomer: free Celestials/planets — econ_value
+-- is 0 for it) and a polychrome scorer (edition value the decay hid) for junk (Egg / an Arcana
+-- pack / an 8 Ball). Each of the four signals below independently marks "keep this":
+--   (1) measured scoring/econ marginal above a small floor, (2) recurring $/round income,
+--   (3) a consumable+economy engine (Astronomer/Satellite make leveling free/paid), (4) any
+--   non-base edition (polychrome/holo/foil/negative is kept value even on a decaying base).
+-- (2026-08-27, live run MALEJYHW.) SA.LIVE_KEEP is in FV-point units, same as joker_contribution.
+local function funder_is_live(gs, j, contribution)
+  if (contribution or 0) > SA.LIVE_KEEP then return true end
+  if Eval.econ_value(gs, j.key) > 0 then return true end
+  if JokerData.has_tag(j.key, "consumable") and JokerData.has_tag(j.key, "economy") then return true end
+  local ed = j.edition
+  if ed and ed ~= "" and ed ~= "base" and ed ~= "none" then return true end
+  return false
+end
+SA.funder_is_live = funder_is_live   -- exposed for tests
 
 -- Estimated dollars generated DURING a blind, from money-making jokers (econ in
 -- joker_data: Golden Joker, Rough Gem, Business, Bull, Rocket, ...) plus gold
@@ -1100,9 +1122,11 @@ function SA.recommend(gs, opts)
         -- stays freely sellable. TIER_FUNDER_FLOOR is in the same units as keep_bias/marginal_fv.
         local tier = (JokerData.resolve(j.key).tier or 0)
         local floor = math.max(0, tier - 3) * SA.TIER_FUNDER_FLOOR
+        local contribution = Eval.joker_marginal_fv(gs, i, mopts)
         funders[#funders + 1] = { kind = "joker", name = j.name or j.key, target = j,
-          cash = j.sell_value or 1,
-          loss = math.max(Eval.joker_marginal_fv(gs, i, mopts), floor) + BuildPlan.keep_bias(j.key, gs) }
+          cash = j.sell_value or 1, idx = i,
+          contribution = contribution, live = funder_is_live(gs, j, contribution),
+          loss = math.max(contribution, floor) + BuildPlan.keep_bias(j.key, gs) }
       end
     end
     if #(gs.consumables or {}) > 0 then
@@ -1142,7 +1166,18 @@ function SA.recommend(gs, opts)
           -- ante 2 with 0 jokers + $0, died). The SELL_JOKER only_scorer guard (B2) didn't
           -- cover this path. A joker-for-joker swap (p.need_jslot) keeps a board, so it's fine.
           local empties_board = f.kind == "joker" and #(gs.jokers or {}) <= 1 and not p.need_jslot
-          if f.target ~= p.target and not empties_board then  -- don't sell the very thing you're buying
+          -- ANTI-CHURN GATE (2026-08-27, live run MALEJYHW): a LIVE joker (funder_is_live) may only
+          -- fund a JOKER buy that CLEARLY upgrades it -- the shop joker's measured add-marginal must
+          -- beat the funder's keep-marginal by SA.UPGRADE_MARGIN (same FV scale, so units are safe).
+          -- It may NEVER fund a non-joker (pack/voucher/tarot), and never a lateral/worse joker.
+          -- This is the standalone SELL_JOKER "only cash-sell a DEAD joker" principle, which this
+          -- funding path silently bypassed -- selling Cloud 9/Astronomer/polychrome Ice Cream for junk.
+          local live_ok = true
+          if f.kind == "joker" and f.live then
+            live_ok = p.need_jslot
+              and (Eval.add_joker_marginal_fv(gs, p.target, mopts) > (f.contribution or 0) + SA.UPGRADE_MARGIN)
+          end
+          if f.target ~= p.target and not empties_board and live_ok then  -- don't sell the very thing you're buying
             local jfree = slots_free + (f.kind == "joker" and 1 or 0)
             local cfree = free_cslots + (f.kind == "consumable" and 1 or 0)
             local slot_ok = (not p.need_jslot or jfree > 0) and (not p.need_cslot or cfree > 0)
