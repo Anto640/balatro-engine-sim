@@ -248,10 +248,18 @@ function PO.recommend(gs, opts)
   end
   table.sort(valued, function(a, b2) return a.v > b2.v end)
 
-  -- choose up to picks_left items with positive value (skip deck-bloating cards)
+  -- choose up to picks_left items. The v>0 gate exists to skip deck-BLOATING cards (a Standard
+  -- pack card you don't want permanently in your deck). But a PLANET never bloats the deck -- it is
+  -- used immediately to LEVEL a hand, a free permanent buff with zero downside -- so a spare pick
+  -- should always take one even when it levels a hand you rarely play (value ~0). The engine was
+  -- skipping the 2nd pick of a Mega Celestial while starved for scoring (2026-08-27, run MALEJYHW).
   local want = math.min(p.picks_left or 1, #valued)
   local picks = {}
-  for i = 1, want do if valued[i].v > 0 then picks[#picks + 1] = valued[i] end end
+  for i = 1, want do
+    local e = valued[i]
+    local free_level = (e.it.set == "Planet")     -- pure upside: never bloats, used on the spot
+    if e.v > 0 or (free_level and e.v >= 0) then picks[#picks + 1] = e end
+  end
 
   if #picks == 0 then
     return { ranked = valued, picks = {}, skip = true,

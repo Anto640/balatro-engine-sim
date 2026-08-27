@@ -373,6 +373,32 @@ return function(t)
     t.ok(r.picks[1].meas, "the pick value was measured")
   end
 
+  -- ---- Mega Celestial: take BOTH free planet levels, never skip a spare pick (2026-08-27) ----
+  -- A planet is used immediately to LEVEL a hand -- it never bloats the deck and costs no slot, so a
+  -- free level is pure upside even when it levels a hand you rarely play (value ~0). On a starved
+  -- board the engine was taking one planet and SKIPPING the second (run MALEJYHW); a thin deck makes
+  -- every planet value ~0, so baseline skipped the WHOLE pack. Both spare picks must now be taken.
+  do
+    local deck = {}
+    for _, s in ipairs({ "Spades", "Clubs" }) do
+      for r = 2, 9 do deck[#deck + 1] = card{ id = #deck + 1, rank_id = r, suit = s } end
+    end
+    local gs = GS.new{ deck = deck, meta = { ante = 2 },
+      run = { hand_levels = {}, hand_size = 8, consumable_slots = 2 },
+      hand = { card{ id = 1, rank = "2", suit = "Spades" }, card{ id = 2, rank = "3", suit = "Clubs" } },
+      pack = { picks_left = 2, items = {
+        { set = "Planet", key = "c_pluto",   name = "Pluto" },
+        { set = "Planet", key = "c_neptune", name = "Neptune" },
+        { set = "Planet", key = "c_venus",   name = "Venus" },
+        { set = "Planet", key = "c_mercury", name = "Mercury" },
+        { set = "Planet", key = "c_mars",    name = "Mars" },
+      } } }
+    local r = PackOpen.recommend(gs)
+    t.ok(not r.skip, "a Celestial pack of free levels is never skipped as 'bloat'")
+    t.eq(#r.picks, 2, "a Mega Celestial (pick 2) takes BOTH free planet levels, not one")
+    for _, pk in ipairs(r.picks) do t.eq(pk.it.set, "Planet", "...and each pick is a planet") end
+  end
+
   -- ---- opened Buffoon pack, joker slots FULL, all-SCORER board -> CORE-PROTECTED (no sell) ----
   -- The pack-swap sell target now excludes compounding cores AND flat scorers (keep_bias > 0):
   -- selling a scorer to slot a pack joker churns the build (the p5_packswap batch lost both wins
