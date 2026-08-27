@@ -134,6 +134,39 @@ return function(t)
     t.eq(r4.economy.dollars, 5, "Faceless + Pareidolia: any 3 discarded cards earn $5")
   end
 
+  -- ---- JOKER_FIDELITY P0: Space Joker (1/4 chance to level the PLAYED hand) ----
+  do
+    local function run_rng(v) return { rng = function() return v end, jokers = { { key = "j_space" } }, hand_levels = {} } end
+    -- roll below 1/4 -> the played hand levels
+    local hit = run_rng(0.1)
+    World._space_joker_level(hit, { hand_type = "Pair" })
+    t.ok((hit.hand_levels.Pair and hit.hand_levels.Pair.level or 1) > 1, "Space: a <1/4 roll levels the played hand")
+    -- roll above 1/4 -> no level
+    local miss = run_rng(0.9)
+    World._space_joker_level(miss, { hand_type = "Pair" })
+    t.ok(not miss.hand_levels.Pair, "Space: a >1/4 roll does not level")
+    -- no Space owned -> never levels (and never consumes rng, so non-Space runs stay identical)
+    local none = { rng = function() error("rng must not be consumed without Space") end,
+                   jokers = { { key = "j_joker" } }, hand_levels = {} }
+    World._space_joker_level(none, { hand_type = "Pair" })
+    t.ok(not none.hand_levels.Pair, "no Space -> no level, and rng untouched")
+  end
+
+  -- ---- JOKER_FIDELITY P0: Mr. Bones prevents death at >=25% of target, then self-destructs ----
+  do
+    -- scored >= 25% of target with Mr. Bones -> saved, and Mr. Bones is consumed
+    local run = { jokers = { { key = "j_mr_bones" } } }
+    t.ok(World._mr_bones_save(run, 300, 1000), "Mr. Bones: 30% of target -> saved")
+    t.eq(#run.jokers, 0, "...and Mr. Bones self-destructed")
+    -- below 25% -> no save, joker kept
+    local run2 = { jokers = { { key = "j_mr_bones" } } }
+    t.ok(not World._mr_bones_save(run2, 200, 1000), "Mr. Bones: 20% of target -> no save")
+    t.eq(#run2.jokers, 1, "...and Mr. Bones is not consumed")
+    -- no Mr. Bones owned -> never saves
+    t.ok(not World._mr_bones_save({ jokers = { { key = "j_joker" } } }, 900, 1000),
+      "no Mr. Bones -> no save even at 90%")
+  end
+
   -- ---- boss min-ante gating + no-repeat (source: balatrowiki Blinds_and_Antes) ----
   do
     t.eq(#World.eligible_bosses(1), 8, "ante 1 has exactly the 8 easy bosses")

@@ -557,6 +557,34 @@ local function discard_econ(run, discarded)
 end
 World._discard_econ = discard_econ   -- exposed for the fidelity tests
 
+-- Space Joker (JOKER_FIDELITY P0, leveling): a 1/4 chance to level up the PLAYED hand, on every play.
+-- The world used to ignore it entirely, so a run leaning on Space accrued none of the levels it earns.
+-- Only consumes RNG when Space is actually owned, so non-Space runs stay byte-identical. -- VERIFY 1/4.
+local function space_joker_level(run, ev)
+  if not ev or not ev.hand_type then return end
+  for _, j in ipairs(run.jokers or {}) do
+    if j.key == "j_space" then
+      if run.rng() < 0.25 then level_hand_world(run, ev.hand_type, 1) end
+      return
+    end
+  end
+end
+World._space_joker_level = space_joker_level   -- exposed for the fidelity tests
+
+-- Mr. Bones (JOKER_FIDELITY P0, survival): prevents death when the score reached at least 25% of the
+-- target, then self-destructs. Returns whether it fired (and removes it from the board). -- VERIFY 25%.
+local function mr_bones_save(run, scored, target)
+  if scored < 0.25 * (target or 0) then return false end
+  for i, j in ipairs(run.jokers or {}) do
+    if j.key == "j_mr_bones" then
+      table.remove(run.jokers, i)   -- self-destructs after saving the run
+      return true
+    end
+  end
+  return false
+end
+World._mr_bones_save = mr_bones_save   -- exposed for the fidelity tests
+
 -- K1/K2: record a played hand's TYPE into the run + blind history AFTER it scores. Supernova's
 -- +1 covers the current play; Card Sharp / Loyalty read the PRE-play history, so we bump the
 -- counters after scoring the current hand (before the NEXT decision sees them).
@@ -736,6 +764,7 @@ function World.play_blind(run, blind)
           local ev = HandEval.score(build_gs(run, b, hand, draw_pile, eff), sel)
           b.scored = b.scored + (ev.score or 0); plays = plays + 1
           JokerTick.on_play(run, ev, sel)   -- A1: accumulate scalers on the played hand
+          space_joker_level(run, ev)        -- Space Joker: 1/4 chance to level the played hand
           post_play_econ(run, ev, sel, eff) -- A7/A8: play-money + The Tooth/Arm penalties
           play_generators(run, ev)          -- Superposition/Vagabond/8 Ball/Seance -> consumables
           track_play(run, b, ev.hand_type)  -- K1/K2: run/blind hand-type history
@@ -773,6 +802,7 @@ function World.play_blind(run, blind)
       local ev = HandEval.score(build_gs(run, b, hand, draw_pile, eff), sel)
       b.scored = b.scored + (ev.score or 0); plays = plays + 1
       JokerTick.on_play(run, ev, sel)   -- A1: accumulate scalers on the played hand
+      space_joker_level(run, ev)        -- Space Joker: 1/4 chance to level the played hand
       post_play_econ(run, ev, sel, eff) -- A7/A8: play-money + The Tooth/Arm penalties
       play_generators(run, ev)          -- Superposition/Vagabond/8 Ball/Seance -> consumables
       track_play(run, b, ev.hand_type or htype)  -- K1/K2: run/blind hand-type history
@@ -794,8 +824,15 @@ function World.play_blind(run, blind)
   end
 
   local cleared = b.scored >= b.target
+  -- Mr. Bones (JOKER_FIDELITY P0, survival): prevents death when you scored at least 25% of the
+  -- target, then self-destructs. Without this the sim under-credits every run that holds it.
+  local mr_bones_saved = false
+  if not cleared then
+    mr_bones_saved = mr_bones_save(run, b.scored, b.target)
+    if mr_bones_saved then cleared = true end
+  end
   return {
-    cleared = cleared, scored = b.scored, target = b.target,
+    cleared = cleared, scored = b.scored, target = b.target, mr_bones_saved = mr_bones_saved,
     hands_used = plays, hands_left = b.hands_left, discards_left = b.discards_left,
     blind_type = b.type, boss_key = b.boss_key,
     plays = b.plays, consumable_uses = b.consumable_uses,  -- telemetry (P1/P4)

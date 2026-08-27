@@ -663,9 +663,17 @@ local function apply_action(run, shop, a, rng)
     end
     return consumed
   elseif tp == "REROLL" then
-    if not can_afford(run, shop.reroll_cost) then return false end
-    spend(run, shop.reroll_cost)
-    run.reroll_cost = (run.reroll_cost or Content.BASE_REROLL) + Content.REROLL_STEP
+    -- Chaos the Clown: the first reroll each shop is FREE and does NOT escalate the price.
+    local free = (run._chaos_free or 0) > 0
+    if not free and not can_afford(run, shop.reroll_cost) then return false end
+    spend(run, free and 0 or shop.reroll_cost)
+    if free then
+      run._chaos_free = run._chaos_free - 1
+      shop.free_rerolls = run._chaos_free
+    else
+      run.reroll_cost = (run.reroll_cost or Content.BASE_REROLL) + Content.REROLL_STEP
+      shop.reroll_cost = run.reroll_cost
+    end
     -- a reroll refreshes the main card slots (jokers + standalone consumables), not packs/voucher.
     -- Overstock's +1 slot applies here too (was the fixed SHOP_SLOTS constant, so the bought
     -- slot silently VANISHED on every reroll -- the voucher's exposure benefit half-broken).
@@ -675,7 +683,6 @@ local function apply_action(run, shop, a, rng)
       if slot and slot.kind == "joker" then shop.jokers[#shop.jokers + 1] = slot.joker
       elseif slot and slot.kind == "consumable" then shop.consumables[#shop.consumables + 1] = slot.item end
     end
-    shop.reroll_cost = run.reroll_cost
     return true
   end
   return false  -- SAVE / unknown -> stop
@@ -847,6 +854,15 @@ function Content.shop_phase(run, opts)
   if run._free_reroll then base_reroll = 0; run._free_reroll = nil end                -- A5: D6 tag -> $0 reroll base (one shop)
   run.reroll_cost = base_reroll
   local shop = Content.gen_shop(run, rng)
+  -- Chaos the Clown (JOKER_FIDELITY P0): ONE free reroll each shop. Grant it and expose free_rerolls
+  -- on the shop so the engine's OwnedSynergy.reroll_free values the roll as free; the free roll does
+  -- not escalate the price (see the REROLL branch of apply_action). -- VERIFY: 1 free/shop (wiki).
+  do
+    local chaos = false
+    for _, j in ipairs(run.jokers or {}) do if j.key == "j_chaos" then chaos = true; break end end
+    run._chaos_free = chaos and 1 or 0
+    shop.free_rerolls = run._chaos_free
+  end
   -- A5: Coupon tag -> the initial jokers & booster packs in THIS shop are free (one shop).
   if run._coupon then
     for _, j in ipairs(shop.jokers) do j.cost = 0 end

@@ -121,6 +121,26 @@ return function(t)
       "the rerolled shop KEEPS the Overstock slot (was the fixed SHOP_SLOTS constant)")
   end
 
+  -- ---- JOKER_FIDELITY P0: Chaos the Clown -- first reroll each shop is FREE, no price escalation ----
+  do
+    local r = World.new_run(11)
+    r.jokers = { { key = "j_chaos" } }
+    r.economy.dollars = 20
+    local rng = World.lcg(3)
+    local shop = Content.gen_shop(r, rng)
+    r.reroll_cost = 5; shop.reroll_cost = 5
+    r._chaos_free = 1; shop.free_rerolls = 1        -- as Content.shop_phase would grant for Chaos
+    -- first reroll: free, and does NOT raise the price
+    Content._apply_action(r, shop, { type = "REROLL" }, rng)
+    t.eq(r.economy.dollars, 20, "Chaos: the first reroll costs $0")
+    t.eq(r._chaos_free, 0, "...the free reroll is consumed")
+    t.eq(shop.reroll_cost, 5, "...and the free reroll does NOT escalate the price")
+    -- second reroll: normal price, and now it escalates
+    Content._apply_action(r, shop, { type = "REROLL" }, rng)
+    t.eq(r.economy.dollars, 15, "Chaos: the second reroll costs the normal $5")
+    t.ok(shop.reroll_cost > 5, "...and the price escalates from the second reroll on")
+  end
+
   -- ---- Telescope: a Celestial pack's first planet is your best (most-leveled) hand's ----
   do
     local r = World.new_run(5)

@@ -35,14 +35,20 @@ Priority = (impact on survival/economy/leveling) × (how often it fires). "Targe
 
 ### P0 — HIGH: materially distorts survival / economy / leveling, fires often
 
-| Joker | Real mechanic | Current sim | Target | Notes |
-|---|---|---|---|---|
-| **Faceless** | +$5 when 3+ face cards discarded at once | flat $3/round | world (discard hook) | the flagship effort-economy case; the money-dig fix depends on it |
-| **Astronomer** | Celestial packs + Planet tarots cost $0 | nothing (econ 0) | content (pack/tarot cost) | a leveling engine the sim treats as inert |
-| **Mr. Bones** | prevents death if score ≥ 25% of target, then self-destructs | nothing | world (blind-result) | **survival** — sim under-credits runs holding it |
-| **Space Joker** | 1/4 chance to level up the played hand | nothing | world (post-play) | **leveling** on every play |
-| **Chaos the Clown** | 1 free reroll each shop | nothing | content (reroll cost) | reroll economy |
-| **Golden Joker** | +$4 at end of round (already FLAT) | flat $4/round | — | **VERIFY only** — flat prior IS the real effect; document & keep |
+| Joker | Real mechanic | Status |
+|---|---|---|
+| **Faceless** | +$5 when 3+ face cards discarded at once | ✅ **DONE** — `discard_econ` hook; excluded from flat sum |
+| **Mr. Bones** | prevents death if score ≥ 25% of target, then self-destructs | ✅ **DONE** — `mr_bones_save` in `play_blind` |
+| **Space Joker** | 1/4 chance to level up the played hand | ✅ **DONE** — `space_joker_level` on every play |
+| **Chaos the Clown** | 1 free reroll each shop | ✅ **DONE** — `shop.free_rerolls`; free roll doesn't escalate |
+| **Astronomer** | Celestial packs + Planet tarots cost $0 | ✅ already realized — `OwnedSynergy.pack_free/consumable_free` zero `a.cost`, which the sim spends. NOT a gap. |
+| **Golden Joker** | +$4 at end of round, FLAT | ✅ already faithful — the flat `econ=4` prior IS the real effect. NOT a gap. |
+
+> **Audit-method correction:** the original grep-of-`sim/`-files method under-counted. A joker is also
+> realized if the ENGINE zeroes/adjusts an action field (`cost`, `credit`, `free_rerolls`) via
+> `OwnedSynergy` and the sim executes that field. That covers Astronomer (free Celestials) and Credit
+> Card. Only OwnedSynergy **valuation bonuses** (`pack_bonus`, `satellite $/planet`, `midas`, `perkeo`)
+> are NOT realized — they nudge the engine's *value* but the real effect never lands. Those stay gaps.
 
 ### P1 — MEDIUM: conditional economy the flat prior mis-credits, or a real scaler/generator
 
@@ -91,3 +97,6 @@ Priority = (impact on survival/economy/leveling) × (how often it fires). "Targe
 ## Status log
 
 - 2026-08-27: audit built (this doc). 102 scoring faithful, 20 value-only realized, **28 gaps**, 0 silent-zeros.
+- 2026-08-27: audit-method correction — Astronomer & Golden are already faithful (cost-zeroing / correct
+  flat prior), so **26 real gaps**. **P0 CLEARED**: Faceless, Mr. Bones, Space, Chaos all implemented +
+  tested (sim suite 561 pass, +1 pre-existing unrelated overflow fail). **22 gaps remain** (P1 + P2).
