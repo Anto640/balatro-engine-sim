@@ -21,6 +21,7 @@ local GS         = require("model.game_state")
 local JokerTick  = require("sim.joker_tick")
 local JokerData  = require("engine.joker_data")
 local JokerFx    = require("engine.joker_effects")
+local Cards      = require("util.cards")
 
 local World = {}
 
@@ -534,6 +535,28 @@ end
 World._post_play_econ = post_play_econ   -- exposed for the A7/A8 tests
 World._arm_level_down = arm_level_down
 
+-- Money earned by a DISCARD (the discard-side mirror of post_play_econ). Effort economy the world
+-- used to collapse to a flat $/round (JOKER_FIDELITY_AUDIT). Faceless pays $5 when 3+ FACE cards are
+-- discarded at once (Pareidolia makes every card count as a face). These jokers are EXCLUDED from the
+-- flat joker_econ_income sum, so their real, effort-gated money is landed HERE and only here -- which
+-- is what finally lets the sim measure the money-dig play fix (DE.DIG_FOR_MONEY). -- VERIFY: wiki $5.
+local function discard_econ(run, discarded)
+  if not run.economy or not discarded or #discarded == 0 then return end
+  local has_faceless, has_pareidolia = false, false
+  for _, j in ipairs(run.jokers or {}) do
+    if j.key == "j_faceless"   then has_faceless   = true end
+    if j.key == "j_pareidolia" then has_pareidolia = true end
+  end
+  if has_faceless then
+    local nface = 0
+    for _, c in ipairs(discarded) do
+      if has_pareidolia or Cards.is_face(c) then nface = nface + 1 end
+    end
+    if nface >= 3 then run.economy.dollars = run.economy.dollars + 5 end   -- Faceless: $5 per event
+  end
+end
+World._discard_econ = discard_econ   -- exposed for the fidelity tests
+
 -- K1/K2: record a played hand's TYPE into the run + blind history AFTER it scores. Supernova's
 -- +1 covers the current play; Card Sharp / Loyalty read the PRE-play history, so we bump the
 -- counters after scoring the current hand (before the NEXT decision sees them).
@@ -695,6 +718,7 @@ function World.play_blind(run, blind)
       hand = remove_cards(hand, action.cards)
       b.discards_left = b.discards_left - 1
       JokerTick.on_discard(run, discarded)   -- A1: Green Joker -1, Ramen decay (may self-destruct)
+      discard_econ(run, discarded)           -- effort economy: Faceless $5 per 3+ face discarded
       log_action("discard", discarded, nil, nil, avail, #draw_pile)
       refill(hand, draw_pile, hand_size)
 
@@ -865,6 +889,10 @@ local JokerData = require("engine.joker_data")
 local ECON_INCOME_EXCLUDE = {
   j_egg = true, j_rough_gem = true,
   j_to_the_moon = true, j_rocket = true,   -- modelled dynamically below
+  -- EFFORT ECONOMY (JOKER_FIDELITY_AUDIT P0/P1): these pay on a DISCARD event, not a flat $/round,
+  -- so their real money is landed in discard_econ (below) and they are excluded here so the flat
+  -- prior never double-counts. Before this the world paid Faceless a free $3/round it never earned.
+  j_faceless = true,   -- +$5 per 3+ face cards discarded at once
 }
 World.TO_THE_MOON_EXTRA = 1   -- extra $ of interest per $5 held -- VERIFY
 World.ROCKET_BASE       = 1   -- $/round -- VERIFY

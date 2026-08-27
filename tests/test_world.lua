@@ -101,6 +101,37 @@ return function(t)
     -- Egg's "econ" is SELL-value growth, not spendable $ -> excluded
     t.eq(World._joker_econ_income({ jokers = { { key = "j_egg" } } }), 0, "Egg (sell-value) pays no round income")
     t.eq(World._joker_econ_income({ jokers = {} }), 0, "no jokers -> no econ income")
+    -- JOKER_FIDELITY P0: Faceless is EFFORT economy, not flat $/round -> excluded from the flat sum
+    t.eq(World._joker_econ_income({ jokers = { { key = "j_faceless" } } }), 0,
+      "Faceless pays no flat round income (its $5 is landed on the discard event instead)")
+  end
+
+  -- ---- JOKER_FIDELITY P0: Faceless discard economy ($5 per 3+ face cards discarded) ----
+  do
+    local card = require("model.game_state").card
+    local function run_with(jokers)
+      return { economy = { dollars = 0 }, jokers = jokers }
+    end
+    local three_faces = { card{ rank = "King", suit = "Hearts" }, card{ rank = "Queen", suit = "Spades" },
+                          card{ rank = "Jack", suit = "Clubs" } }
+    local two_faces   = { card{ rank = "King", suit = "Hearts" }, card{ rank = "Queen", suit = "Spades" },
+                          card{ rank = "3", suit = "Clubs" } }
+    -- owns Faceless, discards 3 face cards -> +$5
+    local r = run_with({ { key = "j_faceless" } })
+    World._discard_econ(r, three_faces)
+    t.eq(r.economy.dollars, 5, "Faceless: discarding 3 face cards earns $5")
+    -- only 2 faces -> nothing
+    local r2 = run_with({ { key = "j_faceless" } })
+    World._discard_econ(r2, two_faces)
+    t.eq(r2.economy.dollars, 0, "Faceless: fewer than 3 faces earns nothing")
+    -- no Faceless -> nothing
+    local r3 = run_with({ { key = "j_joker" } })
+    World._discard_econ(r3, three_faces)
+    t.eq(r3.economy.dollars, 0, "no Faceless -> no discard money")
+    -- Pareidolia makes non-face cards count as faces -> 3 arbitrary cards trigger it
+    local r4 = run_with({ { key = "j_faceless" }, { key = "j_pareidolia" } })
+    World._discard_econ(r4, two_faces)   -- includes a '3', but Pareidolia makes all 3 count
+    t.eq(r4.economy.dollars, 5, "Faceless + Pareidolia: any 3 discarded cards earn $5")
   end
 
   -- ---- boss min-ante gating + no-repeat (source: balatrowiki Blinds_and_Antes) ----
