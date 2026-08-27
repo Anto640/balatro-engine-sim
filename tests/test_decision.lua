@@ -845,4 +845,21 @@ return function(t)
     local ddug = DE.decide(gsd).best
     t.eq(ddug.type, "PLAY", "money-dig: a face-debuff boss makes Faceless unfarmable -> plays, no false dig")
   end
+
+  -- ---- keep_value pitches DEBUFFED cards first (2026-08-27, run MALEJYHW) ----
+  -- A debuffed card scores/holds nothing, so it must rank BELOW any live card for discarding.
+  do
+    local live_jack = card{ id = 1, rank = "Jack", suit = "Hearts" }
+    local dead_jack = card{ id = 2, rank = "Jack", suit = "Spades" }
+    -- a suit-debuff boss debuffs the Spade Jack only (boss_effect is set post-construction, as in-game)
+    local gs2 = GS.new{ hand = { live_jack, dead_jack } }
+    gs2.boss_effect = { debuff_suit = "Spades" }
+    t.ok(DiscardValue.keep_value(dead_jack, gs2) < DiscardValue.keep_value(live_jack, gs2),
+      "a debuffed (Spade) Jack ranks below an identical live (Heart) Jack -> pitched first")
+    -- the per-card debuffed flag works even without gs
+    local flagged = card{ id = 3, rank = "King", suit = "Hearts", debuffed = true }
+    local plain   = card{ id = 4, rank = "2", suit = "Clubs" }
+    t.ok(DiscardValue.keep_value(flagged) < DiscardValue.keep_value(plain),
+      "a per-card-debuffed King ranks below a live 2 -> pitched first (no gs needed)")
+  end
 end

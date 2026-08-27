@@ -452,7 +452,7 @@ function DE.decide(gs, opts)
     -- so sort by it and pitch the cheapest -- plain faces pass, enhanced faces are excluded.
     local spare = {}
     for i, c in ipairs(hand) do
-      if not keep[c] and DiscardValue.keep_value(c) < DE.DIG_MAX_KEEP then
+      if not keep[c] and DiscardValue.keep_value(c, gs) < DE.DIG_MAX_KEEP then
         spare[#spare + 1] = { c = c, i = i }
       end
     end
@@ -468,7 +468,7 @@ function DE.decide(gs, opts)
     end
     table.sort(spare, function(a, b)
       if want_money_dig and face_of[a] ~= face_of[b] then return face_of[a] end   -- faces first
-      local ka, kb = DiscardValue.keep_value(a.c), DiscardValue.keep_value(b.c)
+      local ka, kb = DiscardValue.keep_value(a.c, gs), DiscardValue.keep_value(b.c, gs)
       if ka ~= kb then return ka < kb end
       return a.i < b.i                                  -- stable -> deterministic
     end)

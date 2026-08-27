@@ -17,8 +17,12 @@ local function mc(n) local c = rawget(_G, "BES_MC_CAP"); if c and n > c then ret
 DV.MIN_DECK = 5
 
 -- How much we want to KEEP a card (high = keep, low = discard). Editions and
--- enhancements dominate, then rank.
-local function keep_value(c)
+-- enhancements dominate, then rank. A DEBUFFED card (boss face/suit debuff, or the per-card
+-- flag) scores and is worth nothing, so it should always be pitched FIRST -- give it a value
+-- below any live card (fixes "discarded the non-debuffed Jack over the debuffed one", run MALEJYHW).
+-- `gs` is optional: pass it to honour boss debuffs; without it only the per-card flag is seen.
+local function keep_value(c, gs)
+  if (gs and HandEval.is_debuffed(gs, c)) or c.debuffed then return -1 end
   local v = Cards.chips(c)
   if c.edition == "polychrome" then v = v + 60
   elseif c.edition == "holo" then v = v + 45
@@ -115,7 +119,7 @@ function DV.best(gs, opts)
   -- order cards by keep_value ascending (chaff first)
   local order = {}
   for i, c in ipairs(hand) do order[i] = c end
-  table.sort(order, function(a, b) return keep_value(a) < keep_value(b) end)
+  table.sort(order, function(a, b) return keep_value(a, gs) < keep_value(b, gs) end)
 
   local maxk = math.min(5, #hand - 1)
 
