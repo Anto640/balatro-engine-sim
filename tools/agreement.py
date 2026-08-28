@@ -197,5 +197,20 @@ def main():
     print('--- SHOP over-buy / diff examples ---')
     for e in ex['shop']: print('  ', e)
 
+    # Machine-readable headline summary for the A/B harness (tools/agreement_run.sh). Additive:
+    # only emitted with --json, so the human-readable report above is unchanged.
+    if '--json' in sys.argv:
+        n_bl, sp = BL['n'], BL['play_same'] + BL['play_diff']
+        summary = {
+            'pool': len(pool),
+            'blind_n': n_bl, 'blind_class_agree': BL['class_agree'],
+            'play_shared': sp, 'play_same': BL['play_same'],
+            'pack_n': PKc['n'], 'pack_agree_same': PKc['agree_same'], 'pack_diff': PKc['diff'],
+            'shop_n': SH['n'], 'buy_agree': SH['buy_agree'], 'buy_diff': SH['buy_diff'],
+            'eng_buy_human_save': SH['eng_buy_human_save'],
+            'eng_reroll_human_save': SH['eng_reroll_human_save'], 'agree_save': SH['agree_save'],
+        }
+        print('AGREEMENT_JSON ' + json.dumps(summary))
+
 if __name__ == '__main__':
     main()

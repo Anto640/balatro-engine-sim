@@ -17,3 +17,4 @@ scratch/
 
 # Self-play simulator batch outputs (regenerated; not source)
 sim_out/
+data/agreement_corpus/
