@@ -227,6 +227,36 @@ return function(t)
     t.eq(World._conditional_econ(todo, { played_types = { Pair = true } }), 0, "To Do List: target hand NOT played -> $0")
   end
 
+  -- ---- JOKER_FIDELITY P2: Marble (Stone card) + Certificate (sealed card) at blind select ----
+  do
+    local marble = World.new_run(5)
+    marble.jokers = { { key = "j_marble" } }
+    local before = #marble.deck
+    World._blind_start_generators(marble, World.lcg(1))
+    t.eq(#marble.deck, before + 1, "Marble: a card is added to the deck each blind select")
+    t.eq(marble.deck[#marble.deck].enhancement, "m_stone", "...and it is a Stone card")
+
+    local cert = World.new_run(6)
+    cert.jokers = { { key = "j_certificate" } }
+    local b2 = #cert.deck
+    World._blind_start_generators(cert, World.lcg(2))
+    t.eq(#cert.deck, b2 + 1, "Certificate: a card is added each round")
+    t.ok(cert.deck[#cert.deck].seal ~= nil, "...and it carries a seal")
+
+    -- Riff-Raff: creates 2 Common jokers on blind select, respecting joker slots
+    local rr = World.new_run(7)
+    rr.jokers = { { key = "j_riff_raff" } }
+    rr.joker_slots = 5
+    World._blind_start_generators(rr, World.lcg(3))
+    t.eq(#rr.jokers, 3, "Riff-Raff: 2 Common jokers created (board now 3)")
+    -- respects slots: with only 1 free slot, only 1 is created
+    local rr2 = World.new_run(8)
+    rr2.jokers = { { key = "j_riff_raff" }, { key = "j_joker" }, { key = "j_joker" }, { key = "j_joker" } }
+    rr2.joker_slots = 5
+    World._blind_start_generators(rr2, World.lcg(4))
+    t.eq(#rr2.jokers, 5, "Riff-Raff: only fills the free slot(s) -> board capped at 5")
+  end
+
   -- ---- boss min-ante gating + no-repeat (source: balatrowiki Blinds_and_Antes) ----
   do
     t.eq(#World.eligible_bosses(1), 8, "ante 1 has exactly the 8 easy bosses")

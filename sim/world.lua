@@ -678,15 +678,37 @@ local function blind_start_generators(run, rng)
   for _, j in ipairs(run.jokers or {}) do
     if j.key == "j_cartomancer" then grant_consumable_world(run, rng, "Tarot") end
   end
-  -- JOKER_FIDELITY P1: Mail-In Rebate and To Do List each pick a fresh target every round.
-  for _, j in ipairs(run.jokers or {}) do
+  -- JOKER_FIDELITY P1/P2: per-blind-select effects. Mail/To Do pick a fresh target each round;
+  -- Marble/Certificate add a card to the deck. -- VERIFY (magnitudes/timing, wiki).
+  local Content = require("sim.content")
+  local SUITS = { "Spades", "Hearts", "Clubs", "Diamonds" }
+  local SEALS = { "Gold", "Red", "Blue", "Purple" }
+  -- snapshot the ORIGINAL board so a joker we ADD here (Riff-Raff's commons) is not re-processed.
+  local original = {}
+  for _, j in ipairs(run.jokers or {}) do original[#original + 1] = j end
+  for _, j in ipairs(original) do
     if j.key == "j_mail" then
       run._mail_rank = 2 + math.floor(rng() * 13)             -- a random rank 2..14, $5 per discarded match
     elseif j.key == "j_todo_list" then
       run._todo_hand = TODO_HANDS[1 + math.floor(rng() * #TODO_HANDS)]  -- $4 if this hand is played
+    elseif j.key == "j_marble" then
+      add_card_to_deck(run, GS.card{ id = Content.next_card_id(run), rank = "Ace",
+        rank_id = 14, suit = "Spades", enhancement = "m_stone" })   -- Marble: +1 Stone card / blind
+    elseif j.key == "j_certificate" then
+      add_card_to_deck(run, GS.card{ id = Content.next_card_id(run),
+        rank_id = 2 + math.floor(rng() * 13), suit = SUITS[1 + math.floor(rng() * 4)],
+        seal = SEALS[1 + math.floor(rng() * 4)] })                  -- Certificate: +1 sealed card / round
+    elseif j.key == "j_riff_raff" then
+      local slots = run.joker_slots or 5                            -- Riff-Raff: +2 Common jokers / blind
+      for _ = 1, 2 do
+        if #run.jokers >= slots then break end
+        local nj = Content.gen_common_joker(run, rng)
+        if nj then run.jokers[#run.jokers + 1] = nj end
+      end
     end
   end
 end
+World._blind_start_generators = blind_start_generators   -- exposed for the fidelity tests
 World._blind_start_generators = blind_start_generators   -- exposed for the generator regression tests
 
 -- Post-PLAY generators (fire after a scored play). `ev` is the HandEvaluation of the play. Each

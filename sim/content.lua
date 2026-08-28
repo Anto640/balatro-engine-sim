@@ -267,6 +267,24 @@ function Content.gen_joker(run, rng)
     rarity = d.rarity, ability = { extra = {} } }
 end
 
+-- Riff-Raff (JOKER_FIDELITY P2): a COMMON joker (not rarity-weighted), avoiding a duplicate of one
+-- already owned. Returns a board-ready joker POD (no cost/edition -- it's created free, not bought).
+function Content.gen_common_joker(run, rng)
+  local P = pools()
+  local owned = owned_joker_keys(run)
+  local list = P.Common or {}
+  local key
+  for _ = 1, 6 do
+    local cand = pick_uniform(rng, list)
+    if cand and not owned[cand] then key = cand; break end
+    key = key or cand
+  end
+  if not key then return nil end
+  local d = JokerData.resolve(key)
+  return GS.joker{ key = key, name = d.name or key, sell_value = 1,
+    rarity = "Common", ability = { extra = {} } }
+end
+
 -- A standalone shop consumable (Tarot or Planet) item. Base $3 (Clearance-discounted). -- VERIFY
 function Content.gen_consumable(set, rng, run)
   local key = (set == "Planet") and pick_uniform(rng, Content.planet_pool(run)) or pick_uniform(rng, Content.TAROTS)
