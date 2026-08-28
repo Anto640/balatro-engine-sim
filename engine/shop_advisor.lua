@@ -122,6 +122,19 @@ SA.SWAP_KEEP_SLOPE = 0.5
 -- overwhelming a genuinely strong alternative. Additive; only fires on a scorer-less board.
 SA.FIRST_SCORER_BONUS = 2.0
 
+-- PACK POVERTY DISCIPLINE (2026-08-28, agreement harness). A booster pack is a DISCRETIONARY
+-- gamble on a pool; the winning humans bank toward the interest cap FIRST and open packs
+-- selectively once there -- measured, their pack-buy rate RISES with money (6% when poor -> ~20%
+-- when rich) while the engine's was money-FLAT (~24% everywhere), so the engine over-buys packs
+-- exactly when it is below the cap and should be banking. Damp a speculative pack's POOL value
+-- when below the max-interest bankroll (scaled by how far below), UNLESS survival needs the power
+-- now (urgent). Owned-synergy (sbonus, fires on open regardless) is never damped. This is the ONE
+-- lever that survived the interest-cap investigation: the broad interest_cap unit fix (correct in
+-- isolation) REGRESSED agreement because the human banks PAST the mechanical cap and the engine's
+-- reroll/spend appetite was tuned around the old bug -- so that fix was reverted, and only this
+-- narrow, convention-robust poverty damp (which needs no reserve retune) is kept.
+SA.PACK_POVERTY_DAMP = 0.3   -- floor on a speculative pack's pool value when far below the cap
+
 -- Reroll discipline above the interest cap. Round-2 stopped rerolling THIN bankrolls,
 -- but a rich (above-cap) bankroll still rerolled 5-6x/shop chasing tiny improvements
 -- (and rolled PAST an unopened Celestial pack). A reroll must surface a MEANINGFULLY
@@ -799,7 +812,21 @@ function SA.recommend(gs, opts)
     -- pacing margin) so packs are bought on need, not reflexively; owned-synergy
     -- (sbonus) fires regardless and is left undamped.
     local need, nnote = pack_need(gs, kind, secure, pace, slots_free)
-    local value = w_score * 5 * (pv * need + sbonus) - net_cost(cost) - econ_floor_penalty(gs, cost)
+    -- PACK POVERTY DISCIPLINE (SA.PACK_POVERTY_DAMP): below the max-interest bankroll, bank rather
+    -- than gamble on a pack. `dollar_cap` is the $ that maxes interest, computed convention-robustly
+    -- so it is $25/50/100 on BOTH the live overlay (interest_cap = the dollar threshold) and the sim
+    -- (interest_cap = int-dollars, x5) -- see the reverted interest_cap unit fix. Urgent survival and
+    -- owned-synergy (sbonus) are never damped.
+    local dollar_cap = (cap >= 25) and cap or (cap * 5)
+    local pack_money = 1.0
+    if not (pace and pace.urgent) and dollars(gs) < dollar_cap and dollar_cap > 0 then
+      -- steeper than linear (^1.6): the human buys few packs until NEAR the cap, then ramps up
+      -- (measured 6% poor -> ~20% rich), so the damp must bite hardest well below the cap and
+      -- fade only as the bankroll approaches it.
+      local frac = dollars(gs) / dollar_cap
+      pack_money = clamp(frac ^ 1.6, SA.PACK_POVERTY_DAMP, 1.0)
+    end
+    local value = w_score * 5 * (pv * need * pack_money + sbonus) - net_cost(cost) - econ_floor_penalty(gs, cost)
     local entry = {
       type = "BUY_PACK", target = pk, cost = cost, value = value,
       name = Packs.display_name(pk.key or pk.name, pk.name),
