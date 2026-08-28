@@ -611,6 +611,21 @@ local function discard_effects(run, discarded, is_first, rng)
 end
 World._discard_effects = discard_effects   -- exposed for the fidelity tests
 
+-- First-play-of-round effects (JOKER_FIDELITY P2): DNA adds a permanent copy of the first played card
+-- to the deck when that play is a SINGLE card. -- VERIFY (single-card gate, wiki).
+local function play_effects(run, sel, is_first)
+  if not is_first or not sel then return end
+  for _, j in ipairs(run.jokers or {}) do
+    if j.key == "j_dna" and #sel == 1 then
+      local Content = require("sim.content")
+      local o = sel[1]
+      run.deck[#run.deck + 1] = GS.card{ id = Content.next_card_id(run), rank = o.rank, rank_id = o.rank_id,
+        suit = o.suit, enhancement = o.enhancement, seal = o.seal, edition = o.edition, perma_chips = o.perma_chips }
+    end
+  end
+end
+World._play_effects = play_effects   -- exposed for the fidelity tests
+
 -- Space Joker (JOKER_FIDELITY P0, leveling): a 1/4 chance to level up the PLAYED hand, on every play.
 -- The world used to ignore it entirely, so a run leaning on Space accrued none of the levels it earns.
 -- Only consumes RNG when Space is actually owned, so non-Space runs stay byte-identical. -- VERIFY 1/4.
@@ -855,8 +870,10 @@ function World.play_blind(run, blind)
           local ev = HandEval.score(build_gs(run, b, hand, draw_pile, eff), sel)
           b.scored = b.scored + (ev.score or 0); plays = plays + 1
           JokerTick.on_play(run, ev, sel)   -- A1: accumulate scalers on the played hand
+          local is_first_play = not b._first_play_done; b._first_play_done = true
           space_joker_level(run, ev)        -- Space Joker: 1/4 chance to level the played hand
           post_play_econ(run, ev, sel, eff) -- A7/A8: play-money + The Tooth/Arm penalties
+          play_effects(run, sel, is_first_play)      -- DNA: copy the first single played card
           play_generators(run, ev)          -- Superposition/Vagabond/8 Ball/Seance -> consumables
           track_play(run, b, ev.hand_type)  -- K1/K2: run/blind hand-type history
           pstate.types[ev.hand_type] = true; pstate.first = pstate.first or ev.hand_type
@@ -892,9 +909,11 @@ function World.play_blind(run, blind)
       if not sel then break end  -- no legal play available (e.g. can't make 5 under Psychic)
       local ev = HandEval.score(build_gs(run, b, hand, draw_pile, eff), sel)
       b.scored = b.scored + (ev.score or 0); plays = plays + 1
+      local is_first_play = not b._first_play_done; b._first_play_done = true
       JokerTick.on_play(run, ev, sel)   -- A1: accumulate scalers on the played hand
       space_joker_level(run, ev)        -- Space Joker: 1/4 chance to level the played hand
       post_play_econ(run, ev, sel, eff) -- A7/A8: play-money + The Tooth/Arm penalties
+      play_effects(run, sel, is_first_play)      -- DNA: copy the first single played card
       play_generators(run, ev)          -- Superposition/Vagabond/8 Ball/Seance -> consumables
       track_play(run, b, ev.hand_type or htype)  -- K1/K2: run/blind hand-type history
       pstate.types[ev.hand_type or htype] = true; pstate.first = pstate.first or (ev.hand_type or htype)

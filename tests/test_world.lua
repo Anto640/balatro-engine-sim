@@ -296,6 +296,25 @@ return function(t)
     t.eq(Cards.chips(card{ rank = "King", rank_id = 13, suit = "Spades" }), 10, "no perma bonus -> base chips unchanged")
   end
 
+  -- ---- JOKER_FIDELITY P2: DNA copies the first played card if it is a single card ----
+  do
+    local card = require("model.game_state").card
+    local dna = { jokers = { { key = "j_dna" } }, deck = { card{ rank = "9", rank_id = 9, suit = "Hearts" } } }
+    local before = #dna.deck
+    -- first play, a single card -> a permanent copy is added to the deck
+    World._play_effects(dna, { card{ rank = "Ace", rank_id = 14, suit = "Spades" } }, true)
+    t.eq(#dna.deck, before + 1, "DNA: first single-card play adds a permanent copy to the deck")
+    t.eq(dna.deck[#dna.deck].rank_id, 14, "...a copy of the played Ace")
+    -- a MULTI-card first play -> no copy
+    local dna2 = { jokers = { { key = "j_dna" } }, deck = {} }
+    World._play_effects(dna2, { card{ rank = "2", rank_id = 2, suit = "Clubs" }, card{ rank = "2", rank_id = 2, suit = "Hearts" } }, true)
+    t.eq(#dna2.deck, 0, "DNA: a multi-card first play copies nothing")
+    -- not the first play -> no copy
+    local dna3 = { jokers = { { key = "j_dna" } }, deck = {} }
+    World._play_effects(dna3, { card{ rank = "3", rank_id = 3, suit = "Clubs" } }, false)
+    t.eq(#dna3.deck, 0, "DNA: only the FIRST play of the round copies")
+  end
+
   -- ---- boss min-ante gating + no-repeat (source: balatrowiki Blinds_and_Antes) ----
   do
     t.eq(#World.eligible_bosses(1), 8, "ante 1 has exactly the 8 easy bosses")
