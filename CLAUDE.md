@@ -629,5 +629,7 @@ expect sd ~1.9 (MDE ~0.42 at n=160) for anything touching the shop loop.
 
 ## Git
 
-Active work is on branch `joker-coverage-and-engine-fixes`. Commit/push only when asked.
-Run the test suite before committing.
+Active work is on branch `joker-coverage-and-engine-fixes`. **Commit and push whenever you (the AI
+assistant) judge it appropriate — you do NOT need to wait to be asked** (owner directive, 2026-08-28).
+Use judgement: commit at coherent checkpoints with a clear message, keep the tree green, and don't
+bundle unrelated changes. Run the test suite before committing.

@@ -40,6 +40,16 @@ converts money into builds) but the sim's greedy engine still doesn't convert �
 CONVERSION, not econ generation.** That is the unobstructed frontier: turn farmed money into a directed
 supermodular build (copiers × xmult × the hand being built toward).
 
+**➡ THE CONVERSION FRONTIER NOW HAS A PLAN: `CONVERSION_PLAN.md`.** The load-bearing reframe: every
+prior conversion verdict (oracle_plan §24, additive family §31, target/completion model §32c, product
+board-scorer P4) was rendered on the **ceilinged autonomous-winrate instrument** — NONE on the
+**advice-quality / agreement instrument** (`replay_fixtures.lua` + `agreement.py`). So the target/product
+family is *closed on winrate and OPEN on agreement*. The plan attacks it agreement-first (winrate becomes
+a safety rail, not the target): Phase A = baseline the agreement report (no code); B = resurrect
+`completion_credit` and judge it on agreement not winrate; C = a forward marginal on the committed target
+board (fixes the root cause — `sgain` is a present-board marginal, `shop_advisor.lua:516`,678); D = the
+pack-pick conversion channel (41% agreement, the biggest gap). Start at Phase A.
+
 ## The autonomous-winrate ceiling (UNCHANGED — the audit trail)
 
 The engine is mature and correct; **autonomous** winrate (baseline ~2.5%) is a *policy/assembly* gap
