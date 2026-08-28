@@ -79,17 +79,10 @@ Priority = (impact on survival/economy/leveling) × (how often it fires). "Targe
 | **Burnt Joker** | upgrade the first discarded poker hand's level | ✅ DONE — discard_effects |
 | **Diet Cola** | sell to create a free Double Tag | ✅ DONE — sell_effects |
 | **Showman** | allows duplicate jokers/consumables in the shop | ✅ DONE — owned_joker_keys bypass |
-| **Oops! All 6s** | doubles all listed probabilities | ⛔ **DEFERRED** — see below |
+| **Oops! All 6s** | doubles all listed probabilities | ✅ **DONE** — mods.oops (hand_eval) + World.oops_p |
 
-### ⛔ DEFERRED (2) — genuinely not worth a fragile/risky implementation now
+### ⛔ DEFERRED (1) — genuinely not worth a fragile/risky implementation now
 
-- **Oops! All 6s** — its biggest effect is on Lucky-card SCORING, which `hand_eval` computes as an
-  EXPECTED value (`m_lucky → mult 4`, i.e. 1/5·20). Faithful doubling needs Oops-awareness inside the
-  **golden-tested** `hand_eval` scorer AND at every sim probability roll site (8 Ball, Space,
-  Hallucination, extinction rolls) — a coordinated, invasive change across the FACTS layer for a
-  medium-rare joker. The engine ALREADY values Oops (`Eval.PROB_ECON` doubles the money-probability
-  jokers), so *decisions* account for it; only the sim's *realization* of the doubled odds is missing.
-  Left for a dedicated pass so the golden scorer isn't put at risk casually.
 - **Matador** — `+$8 if the played hand triggers the boss's ability`. The sim models boss *effects*
   (score/resource penalties, play restrictions) but has no granular "the ability TRIGGERED on this hand"
   event to hang the payout on, and it varies per boss. High infrastructure cost for a rare joker; the
