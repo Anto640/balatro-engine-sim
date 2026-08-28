@@ -281,6 +281,21 @@ return function(t)
     t.ok(not has8, "Sixth Sense: a discarded single 8 is destroyed (removed from deck)")
   end
 
+  -- ---- JOKER_FIDELITY P1: Hiker (+5 permanent chips per scored card) ----
+  do
+    local card = require("model.game_state").card
+    local Cards = require("util.cards")
+    local hiker = { jokers = { { key = "j_hiker" } } }
+    local c = card{ rank = "5", rank_id = 5, suit = "Clubs" }
+    local before = Cards.chips(c)
+    World._post_play_econ(hiker, { money = 0, scoring_cards = { c } }, { c }, nil)
+    t.eq(Cards.chips(c), before + 5, "Hiker: a scored card gains +5 perma chips")
+    World._post_play_econ(hiker, { money = 0, scoring_cards = { c } }, { c }, nil)
+    t.eq(Cards.chips(c), before + 10, "Hiker: perma chips accumulate across plays")
+    -- a card with no perma bonus is unchanged (golden-test safety)
+    t.eq(Cards.chips(card{ rank = "King", rank_id = 13, suit = "Spades" }), 10, "no perma bonus -> base chips unchanged")
+  end
+
   -- ---- boss min-ante gating + no-repeat (source: balatrowiki Blinds_and_Antes) ----
   do
     t.eq(#World.eligible_bosses(1), 8, "ante 1 has exactly the 8 easy bosses")

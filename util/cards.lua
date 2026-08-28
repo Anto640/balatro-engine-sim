@@ -25,11 +25,14 @@ end
 -- Base chip value contributed by a played card (before enhancements/jokers).
 -- Stone cards have a fixed 50 chips and no rank.
 function Cards.chips(card)
-  if card.enhancement == "m_stone" then return 50 end
+  -- perma_chips = permanent bonus chips accrued on the card itself (Hiker +5/scored, Stone/Bull, etc.).
+  -- Defaults to 0, so cards that never accrued one are unchanged (golden tests unaffected).
+  local perma = card.perma_chips or 0
+  if card.enhancement == "m_stone" then return 50 + perma end
   local id = Cards.rank_id(card)
-  if id <= 10 then return id end
-  if id == 14 then return 11 end -- Ace
-  return 10                      -- J/Q/K
+  if id <= 10 then return id + perma end
+  if id == 14 then return 11 + perma end -- Ace
+  return 10 + perma                      -- J/Q/K
 end
 
 function Cards.is_stone(card) return card.enhancement == "m_stone" end

@@ -532,10 +532,14 @@ local function post_play_econ(run, ev, sel, eff)
   --   (a permanent deck-mod that then pays $3 held / feeds Golden Ticket). -- VERIFY ($4, wiki).
   do
     local sc = (ev and ev.scoring_cards) or sel or {}
-    local has_ticket, has_midas = false, false
+    local has_ticket, has_midas, has_hiker = false, false, false
     for _, j in ipairs(run.jokers or {}) do
       if j.key == "j_ticket"     then has_ticket = true end
       if j.key == "j_midas_mask" then has_midas  = true end
+      if j.key == "j_hiker"      then has_hiker  = true end
+    end
+    if has_hiker then
+      for _, c in ipairs(sc) do c.perma_chips = (c.perma_chips or 0) + 5 end   -- Hiker: +5 perma chips/scored
     end
     if has_ticket and run.economy then
       local gold = 0
