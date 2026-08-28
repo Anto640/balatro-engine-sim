@@ -1,0 +1,127 @@
+================================================================================
+CONVERSION_PLAN.md — PHASE A BASELINE (agreement instrument, 2026-08-28)
+================================================================================
+The current engine, replayed over the winning-human decision corpus, joined to
+what the winners ACTUALLY did. This is the non-ceilinged advice-quality ruler the
+whole conversion frontier is measured against (CONVERSION_PLAN.md §3, Phase A).
+
+CORPUS
+  fixtures : %APPDATA%/Balatro/bes_fixtures.jsonl   (3841 lines, captured 2026-08-27)
+  runs     : %APPDATA%/Balatro/bes_runs.jsonl       (14 win / 5 death)
+  pool     : 7 winning seeds with decision fixtures
+             run1=2VGCT9W5 run2=6679EKVE* run3=A99H4B4M* run4=BQL2ZTQG
+             run5=F5NHS8A5 run6=KPCZB386* run7=MV9UMYKG*   (* = rich telemetry)
+  decisions: 2567 state (1201 shop / 461 pack / 905 blind); replay = picks.jsonl
+  regenerate:
+    luajit tools/replay_fixtures.lua <fixtures> picks.jsonl
+    python tools/agreement.py <fixtures> <runs> picks.jsonl
+
+================================================================================
+1. PER-DECISION AGREEMENT (tools/agreement.py)
+================================================================================
+BLIND — 799 decisions
+  PLAY/DISCARD class agreement: 430 (54%)
+  of shared PLAYs — SAME cards: 70 (17%)   DIFFERENT: 349 (83%)
+    NOTE: in-blind play was independently verified near-optimal; most of the 83%
+    is "many ways to clear the same blind", not error. NOT a conversion channel.
+    Guard only — a conversion change must not regress this.
+
+PACK — 394 decisions
+  agree_same 84 (21%)   diff 140 (36%)   agree_skip 7 (2%)   eng_skip_human_took 12 (3%)
+  undiffable 151 (38%)   [older runs w/o pack_pick telemetry]
+  => on DIFFABLE picks: 84 / (84+140) = 37.5% agreement (the historically-low channel).
+
+SHOP — 1048 decisions  (older runs w/o reroll+voucher signal: 468)
+  buy_agree            32 ( 3%)   <- engine & human both bought, SAME item
+  buy_diff             77 ( 7%)   <- both bought, DIFFERENT item  (agreement-on-item 29%)
+  agree_save          290 (28%)
+  agree_reroll         19 ( 2%)
+  eng_buy_human_save  264 (25%)   <-- THE OVER-BUY (engine spends, human banks)
+  eng_reroll_human_save 140 (13%) <-- over-reroll (engine spends, human banks)
+  eng_save_human_buy   17 ( 2%)   <-- human rarely buys when engine banks
+  eng_buy_human_reroll 28 ( 3%)
+  eng_reroll_human_buy 14 ( 1%)
+  eng_save_human_reroll 44 ( 4%)
+
+================================================================================
+2. ENGINE BEST-ACTION DISTRIBUTION (what the engine chose, all decisions)
+================================================================================
+SHOP (1201):  SAVE 35% | BUY_PACK 23% | REROLL 15% | BUY_JOKER 12% | SELL_JOKER 10%
+              | BUY_VOUCHER 4% | SELL_TO_BUY 1% | USE_CONSUMABLE 0%
+   => the engine's single most common BUY is a PACK (23%), MORE than jokers (12%).
+      Spend actions (pack+reroll+joker+voucher) = 54% of shops.
+PACK (461):   PICK 95% | SKIP_PACK 5%   => the engine almost never skips an open pack.
+BLIND (905):  PLAY 54% | DISCARD 38% | USE_CONSUMABLE 7%
+
+================================================================================
+3. THE OVER-BUY, DECOMPOSED — engine wanted to BUY; what did the human do?
+   (run-by-run, so it is not a single-run artifact)
+================================================================================
+  engine BUY pack:      234 decisions -> human SAVE/other 82% | buy_joker 11% | voucher 5% | consum 2%
+  engine BUY joker:     121 decisions -> human SAVE/other 66% | buy_joker 31% | voucher 2% | consum 1%
+  engine BUY other:      42 decisions -> human SAVE/other 90%
+
+  per-run engine-BUY -> human-SAVE (the over-buy), by engine bucket:
+    run1: pack=37 other=17 joker=10     run2: pack=36 joker=8  other=2
+    run3: pack=24 joker=19 other=2      run4: pack=30 joker=5  other=1
+    run5: pack=24 joker=17 other=3      run6: pack=26 joker=11 other=5
+    run7: pack=14 joker=10 other=8
+
+  ==> THE #1 CONVERSION DISAGREEMENT IS PACK OVER-BUY. The engine buys a pack; the
+      winning human declines 82% of the time — CONSISTENT ACROSS ALL 7 RUNS, and it
+      holds in the 4 RICH runs (where a human pack-buy WOULD be logged as a pack_pick,
+      so "human SAVE" is trustworthy, not an inference gap). This INVERTS the old
+      2026-08-12 finding that the engine UNDER-opens packs (WINRATE_V3_PLAN §5z): the
+      current post-fidelity/post-econ engine OVER-buys them.
+
+================================================================================
+4. THE CONVERSION PUNCH-LIST — what winners bought instead (shop joker-buys in a
+   window where the engine wanted to buy something else; n=66, 61 via shop)
+================================================================================
+  most-bought human targets:
+    j_scary_face 5  j_chaos 4  j_photograph 4  j_seeing_double 3  j_hanging_chad 3
+    j_gros_michel 3  j_cavendish 3  j_shoot_the_moon 2  j_sly 2  j_smiley 2
+    j_turtle_bean 2  j_juggler 2  j_invisible 2  + a long tail of singletons
+  by ROLE:  xmult 17 | copier 4 | retrigger 3  = MULTIPLIER 24 (36%)
+            flat_mult 13 | utility 9 | flat_chips 8 | economy 7 | scaling 3 | ... = ADDITIVE 42 (64%)
+  => a MIX (64% additive — cheap early scorers), BUT the winners' signature PRODUCT
+     pieces surface exactly as predicted: Photograph (xmult), Seeing Double (xmult),
+     Hanging Chad (retrigger), Invisible/Stencil (copiers). 36% multiplier >> the
+     engine's own buy mix, and these are the pieces that ASSEMBLE the product.
+
+================================================================================
+5. READING — what Phase A established (and how it re-prioritizes Phases B–D)
+================================================================================
+The gap is UPSTREAM of "an additive marginal can't represent the product" (the plan's
+lead hypothesis). The biggest, cleanest, most run-consistent conversion disagreement is
+ECONOMIC DISCIPLINE: the engine dissipates money into diffuse pack/reroll RNG (its top
+spend actions) while winners BANK (interest discipline) and spend selectively on directed
+pieces. This is exactly the `human-economy-policy` spec made measurable ("satisfice
+survival, invest surplus, econ gated by remaining need, interest discipline").
+
+RE-PRIORITIZED PLAN (supersedes the B/C/D order in CONVERSION_PLAN.md §3):
+  B' (NEW #1) — PACK/REROLL SPEND-APPETITE vs BANKING. Why is BUY_PACK the engine's top
+     buy (23%) and why does it never skip (95%)? FIRST check whether this is a REGRESSION
+     from this session's econ/pack-first work (git bisect the pack-appetite over ADVICE
+     commits) — a recent over-correction is a cheap fix. Then, if structural: the pack EV
+     vs the banked-interest value + the "save for a directed keystone" option. Measure on
+     eng_buy_human_save / eng_reroll_human_save falling toward the human's ~2%.
+  C' — the forward marginal on the committed target board (old Phase C): the "which joker"
+     gap (buy-agreement 29%). Still the right representational fix for the 36%-multiplier
+     punch-list, but SECOND now.
+  D' — pack-PICK conversion (old Phase D): once the engine opens fewer/better packs, the
+     37.5% pick agreement — shape/money/level vs enhance.
+  B(completion model) folds into C' (both are "value the product-completing piece").
+
+CAVEATS (do not over-claim):
+  * Window inference: in the 3 NON-rich runs a human pack-buy reads as "SAVE" until opened.
+    The pack over-buy is confirmed in the 4 RICH runs, so it is real — but the exact rate
+    carries inference noise; trust DIRECTION over the point estimate.
+  * This is the CURRENT engine (post-fidelity, post-econ-system, post pack-first-sequencing).
+    The pack over-buy may be partly a 2026-08-28 regression — check before building (B').
+  * n=7 winning runs. In-sample. Any selected constant gets an OOS confirmation
+    (winner's curse is the documented killer — §32c).
+  * Autonomous sim winrate remains the SAFETY RAIL, not the target: a conversion change
+    ships if it moves these agreement numbers toward the human AND is not significantly
+    negative on the paired tail-verdict.
+================================================================================
