@@ -934,6 +934,32 @@ return function(t)
       for _, c in ipairs(tight.cards or {}) do if Cards.rank_id(c) == 13 then broke = true end end
       t.ok(not broke, "one hand left: protect the winner (no aggressive farm through it)")
     end
+
+    -- HOLD CHANNEL (2026-08-28, engine/hold_fuel): Reserved Parking pays for cards HELD, so on a
+    -- trivially-clearing blind the engine should play a MINIMAL hand and HOLD a hand of faces to farm.
+    do
+      local function park_state(jokers)
+        return GS.new{ jokers = jokers,
+          deck = (function() local d = {} for i = 1, 30 do d[i] = card{ id = 100 + i, rank = "King", rank_id = 13, suit = "Hearts" } end return d end)(),
+          run = { hand_levels = {}, hand_size = 8 },
+          hand = {
+            card{ id = 1, rank = "Ace", suit = "Spades" },  -- a high card that can clear a tiny target
+            card{ id = 2, rank = "King", rank_id = 13, suit = "Hearts" }, card{ id = 3, rank = "Queen", rank_id = 12, suit = "Diamonds" },
+            card{ id = 4, rank = "Jack", rank_id = 11, suit = "Clubs" }, card{ id = 5, rank = "King", rank_id = 13, suit = "Spades" },
+          },
+          blind = { target_chips = 25, chips_scored = 0, hands_left = 4, discards_left = 2,
+                    base_hands = 4, base_discards = 4, played_hand_types = {} } }
+      end
+      -- WITHOUT Parking: just play the big pair and bank the hands
+      local plain = DE.decide(park_state({ joker{ key = "j_joker" } })).best
+      t.ok(#(plain.cards or {}) >= 3, "no hold lever: play the strong hand normally")
+      -- WITH Reserved Parking: play a MINIMAL hand, holding the faces for the per-hand $
+      local park = DE.decide(park_state({ joker{ key = "j_reserved_parking" } })).best
+      t.eq(park.type, "PLAY", "Reserved Parking: still a PLAY (a milk play)")
+      t.ok(#(park.cards or {}) < #(plain.cards or {}),
+        "Reserved Parking: plays FEWER cards (holds faces) to farm held money")
+      t.ok(park.milk, "...tagged as a milk (hold-farm) play")
+    end
   end
 
   -- ---- keep_value pitches DEBUFFED cards first (2026-08-27, run MALEJYHW) ----

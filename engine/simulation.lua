@@ -23,6 +23,7 @@
 -- }
 
 local HandEval = require("engine.hand_eval")
+local HoldFuel = require("engine.hold_fuel")
 local Heuristics = require("engine.heuristics")
 local Prob = require("engine.probability")
 local Cards = require("util.cards")
@@ -104,6 +105,11 @@ local function rollout(gs, start_hand, pile, target, chips0, hands, discards, ha
                                            -- separately from chips so survival math is untouched.
   local hands_left = hands
   local discards_left = discards or 0
+  -- HOLD-money channel (HoldFuel): Reserved Parking / gold cards pay for cards HELD at scoring. Credited
+  -- each hand below so the rollout's E[money] reflects a multi-hand "play minimal, hold faces" farm --
+  -- money-only, so survival (frac) is untouched. Skipped when no hold lever is present.
+  local hold_lever = HoldFuel.has_lever(gs)
+  if not hold_lever then for _, c in ipairs(start_hand) do if c.enhancement == "m_gold" then hold_lever = true; break end end end
   local pstate = { types = {}, first = nil } -- boss play-legality cross-hand state
   local restricted = BossEffect.has_play_restriction(eff)
   local filter = restricted and function(sel, ht) return BossEffect.legal_play(eff, sel, ht, pstate) end or nil
@@ -129,6 +135,13 @@ local function rollout(gs, start_hand, pile, target, chips0, hands, discards, ha
   local function after_play(ev, sel)
     pstate.types[ev.hand_type] = true
     pstate.first = pstate.first or ev.hand_type
+    if hold_lever then                       -- $ from cards HELD this hand (Reserved Parking / gold)
+      local played = {}
+      for _, c in ipairs(sel or {}) do played[c] = true end
+      local held = {}
+      for _, c in ipairs(current) do if not played[c] then held[#held + 1] = c end end
+      money = money + HoldFuel.money(gs, held)
+    end
     remove_played(sel)
     if eff and eff.discard_after then hook_discard(eff.discard_after) end
     refill()

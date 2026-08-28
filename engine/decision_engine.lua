@@ -20,6 +20,7 @@ local Search = require("engine.search")
 local Simulation = require("engine.simulation")
 local ScalingFuel = require("engine.scaling_fuel")
 local DiscardFuel = require("engine.discard_fuel")
+local HoldFuel    = require("engine.hold_fuel")
 local Eval = require("engine.eval_function")
 local DeckPlan = require("engine.deck_plan")
 local Cards = require("util.cards")
@@ -588,11 +589,27 @@ function DE.decide(gs, opts)
   -- clear still lands (frac within tol) AND more $ is farmed. See DE.MILK_MONEY note above.
   local milk_action = nil
   if DE.MILK_MONEY and guaranteed and hands_left >= 2 and remaining > 0 and #hand > 0 then
-    -- max-$ play in this hand: remaining=0 makes every subset tier-0, so best_fuel_play ranks by
-    -- the fuel credit (= ev.money) then score -> the highest-$ legal play.
-    local mev, mcards = HandEval.best_fuel_play(gs, hand, 0, function(_, ev) return ev.money or 0 end)
+    -- HELD-money aware (HoldFuel): a play also earns $ from the econ cards it KEEPS BACK (Reserved
+    -- Parking $/held-face, gold $3/held). Crediting E[held $] on the un-played cards is what makes the
+    -- engine play a MINIMAL hand and hold a hand of faces for Parking -- not just play money cards.
+    local hold_on = HoldFuel.has_lever(gs)
+    if not hold_on then for _, c in ipairs(hand) do if c.enhancement == "m_gold" then hold_on = true; break end end end
+    local function milk_money(sel, ev)
+      local m = (ev and ev.money) or 0
+      if hold_on and sel then
+        local played = {}
+        for _, c in ipairs(sel) do played[c] = true end
+        local held = {}
+        for _, c in ipairs(hand) do if not played[c] then held[#held + 1] = c end end
+        m = m + HoldFuel.money(gs, held)
+      end
+      return m
+    end
+    -- max-$ play in this hand: remaining=0 makes every subset tier-0, so best_fuel_play ranks by the
+    -- fuel credit (played $ + held $) then score -> the highest-total-$ legal play (minimal for Parking).
+    local mev, mcards = HandEval.best_fuel_play(gs, hand, 0, milk_money)
     if mev and mcards and not same_cards(mcards, play_cards)
-       and (mev.money or 0) > (play_ev.money or 0) + 1e-9 then
+       and milk_money(mcards, mev) > milk_money(play_cards, play_ev) + 1e-9 then
       local seed = disc_seed(gs)
       -- clear line: play the clear now, finish clear-ASAP.  milk line: play the money hand now,
       -- finish with the MILK policy (defer the clear, cycle more $). CRN (same seed) pairs them.
@@ -611,7 +628,11 @@ function DE.decide(gs, opts)
       -- (each unused hand pays Mechanics.HAND_REWARD). survive_after reports E[banked hands] so the
       -- milk only wins when the $ it cycles beats the hand-rewards it forgoes.
       local hand_cost = ((vc.banked or 0) - (vm.banked or 0)) * Mechanics.HAND_REWARD
-      local net_gain = (vm.money or 0) - (vc.money or 0) - clear_reorder - hand_cost
+      -- the survival rollout's money is PLAYED-only, so credit the held-money advantage of the milk
+      -- play directly: the extra E[$] its held cards earn THIS hand over the clear's (Parking/gold).
+      local hold_delta = milk_money(mcards, mev) - (mev.money or 0)
+        - (milk_money(play_cards, play_ev) - (play_ev.money or 0))
+      local net_gain = (vm.money or 0) - (vc.money or 0) - clear_reorder - hand_cost + hold_delta
       if vm.frac >= vc.frac - DE.MILK_SURV_TOL and net_gain > DE.MILK_MONEY_MARGIN then
         milk_action = {
           type = "PLAY", cards = mcards, hand_type = mev.hand_type,
