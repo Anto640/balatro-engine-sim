@@ -265,8 +265,9 @@ end
 -- Collect the boolean hand-modifier flags contributed by the effective jokers.
 local function joker_mods(effective)
   local m = { splash = false, all_faces = false, four_fingers = false,
-              shortcut = false, smeared = false }
+              shortcut = false, smeared = false, oops = false }
   for _, e in ipairs(effective) do
+    if e.hookj and e.hookj.key == "j_oops" then m.oops = true end   -- Oops! All 6s: doubles listed probabilities
     local impl = e.impl
     if impl then
       if impl.splash then m.splash = true end
@@ -353,12 +354,15 @@ local function joker_edition_post(edition)
   return nil
 end
 
--- Enhancement effect when a card SCORES.
-local function scored_enhancement_effect(enh)
+-- Enhancement effect when a card SCORES. `oops` = Oops! All 6s owned, which DOUBLES every listed
+-- probability -- so a Lucky card's expected +Mult doubles (1/5 -> 2/5 of +20). Only the Lucky branch
+-- is probabilistic; the others are deterministic and unaffected. Gated on `oops`, so a board without
+-- it is byte-identical (the golden hand_eval tests never own Oops).
+local function scored_enhancement_effect(enh, oops)
   if enh == "m_bonus" then return { chips = 30 }
   elseif enh == "m_mult" then return { mult = 4 }
   elseif enh == "m_glass" then return { xmult = 2 }
-  elseif enh == "m_lucky" then return { mult = 4, approx = true } -- expected: 1/5 * 20
+  elseif enh == "m_lucky" then return { mult = oops and 8 or 4, approx = true } -- expected: (1 or 2)/5 * 20
   end
   return nil
 end
@@ -428,7 +432,7 @@ function HandEval.score_with(gs, played, effective, mods)
       local triggers = 1 + ((card.seal == "Red") and 1 or 0) + extra
       for _ = 1, triggers do
         chips, mult = apply(chips, mult, { chips = Cards.chips(card) }, "card:" .. Cards.label(card))
-        chips, mult = apply(chips, mult, scored_enhancement_effect(card.enhancement), "enh:" .. tostring(card.enhancement))
+        chips, mult = apply(chips, mult, scored_enhancement_effect(card.enhancement, mods.oops), "enh:" .. tostring(card.enhancement))
         chips, mult = apply(chips, mult, edition_effect(card.edition), "edition:" .. tostring(card.edition))
         for _, e in ipairs(effective) do
           if e.impl and e.impl.on_card_scored then
@@ -441,7 +445,7 @@ function HandEval.score_with(gs, played, effective, mods)
         -- expected $ ($20 at 1/15) each trigger. This is why a first-card
         -- retrigger (Hanging Chad) on a money card is worth ordering for.
         if card.seal == "Gold" then money = money + 3 end
-        if card.enhancement == "m_lucky" then money = money + 20 / 15 end
+        if card.enhancement == "m_lucky" then money = money + (mods.oops and 40 or 20) / 15 end  -- Oops doubles Lucky's 1/15 $ odds
       end
     end
   end

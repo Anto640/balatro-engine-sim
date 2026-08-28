@@ -319,6 +319,16 @@ local function add_card_to_deck(run, card, hand, draw_pile)
   return card
 end
 
+-- Oops! All 6s DOUBLES every listed probability. `oops_p(run, p)` returns the effective chance for a
+-- base probability p (capped at 1). Used at each sim ROLL site (Space, 8 Ball, Wheel of Fortune,
+-- Hallucination); the scoring side (Lucky cards) is doubled in hand_eval via mods.oops. -- VERIFY.
+local function oops_owned(run)
+  for _, j in ipairs(run.jokers or {}) do if j.key == "j_oops" then return true end end
+  return false
+end
+local function oops_p(run, p) return oops_owned(run) and math.min(1, p * 2) or p end
+World._oops_p = oops_p   -- exposed for the fidelity tests
+
 -- Ankh/Hex destroy every OTHER joker. Returns the surviving joker (or nil).
 local function keep_one_joker(run, idx)
   local keep = run.jokers[idx]
@@ -382,7 +392,7 @@ local function use_consumable(run, action, uses, targets, hand, draw_pile)
             run.consumables[#run.consumables + 1] = { set = last.set, key = last.key, name = last.name }
           end
         elseif key == "c_wheel_of_fortune" then                  -- 1/4: add a random edition to a random joker
-          if rng() < 0.25 and #(run.jokers or {}) > 0 then
+          if rng() < oops_p(run, 0.25) and #(run.jokers or {}) > 0 then
             local j = run.jokers[math.floor(rng() * #run.jokers) + 1]
             if j and not j.edition then j.edition = WOF_EDITIONS[math.floor(rng() * 3) + 1] end
           end
@@ -633,7 +643,7 @@ local function space_joker_level(run, ev)
   if not ev or not ev.hand_type then return end
   for _, j in ipairs(run.jokers or {}) do
     if j.key == "j_space" then
-      if run.rng() < 0.25 then level_hand_world(run, ev.hand_type, 1) end
+      if run.rng() < oops_p(run, 0.25) then level_hand_world(run, ev.hand_type, 1) end
       return
     end
   end
@@ -767,7 +777,7 @@ local function play_generators(run, ev)
       if run.economy and (run.economy.dollars or 0) <= 4 then grant_consumable_world(run, rng, "Tarot") end
     elseif k == "j_8_ball" then                                 -- 1-in-4 PER scored 8 -> Tarot
       for _, c in ipairs(ev.scoring_cards or {}) do
-        if (c.rank_id or 0) == 8 and rng() < 0.25 then grant_consumable_world(run, rng, "Tarot") end
+        if (c.rank_id or 0) == 8 and rng() < oops_p(run, 0.25) then grant_consumable_world(run, rng, "Tarot") end
       end
     elseif k == "j_seance" then                                 -- Straight Flush -> Spectral
       if ev.hand_type == "Straight Flush" then grant_consumable_world(run, rng, "Spectral") end

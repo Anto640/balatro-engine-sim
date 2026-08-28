@@ -552,7 +552,7 @@ local function take_pack(run, pack, rng)
   -- consumes no RNG here and its packs stay byte-identical.
   for _, j in ipairs(run.jokers or {}) do
     if j.key == "j_hallucination" then
-      if run.rng() < 0.5 then require("sim.world").grant_consumable_world(run, run.rng, "Tarot") end
+      if run.rng() < require("sim.world")._oops_p(run, 0.5) then require("sim.world").grant_consumable_world(run, run.rng, "Tarot") end
       break
     end
   end

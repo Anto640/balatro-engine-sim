@@ -330,6 +330,13 @@ return function(t)
     t.eq(none.jokers[1].sell_value, 2, "no Gift -> sell values unchanged")
   end
 
+  -- ---- JOKER_FIDELITY: Oops! All 6s doubles the sim's listed probabilities ----
+  do
+    t.eq(World._oops_p({ jokers = { { key = "j_oops" } } }, 0.25), 0.5, "Oops: a 1/4 roll becomes 1/2")
+    t.eq(World._oops_p({ jokers = { { key = "j_oops" } } }, 0.5), 1.0, "Oops: a 1/2 roll becomes certain (capped)")
+    t.eq(World._oops_p({ jokers = { { key = "j_joker" } } }, 0.25), 0.25, "no Oops: probability unchanged")
+  end
+
   -- ---- boss min-ante gating + no-repeat (source: balatrowiki Blinds_and_Antes) ----
   do
     t.eq(#World.eligible_bosses(1), 8, "ante 1 has exactly the 8 easy bosses")

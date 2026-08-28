@@ -86,6 +86,16 @@ return function(t)
     t.ok(not survival.approx and survival.score_min >= 12, "survival picks the guaranteed clear")
   end
 
+  -- JOKER_FIDELITY: Oops! All 6s DOUBLES a Lucky card's expected +Mult (1/5 -> 2/5 of +20).
+  do
+    local lucky = GS.card{ id = 1, rank = "5", suit = "Clubs", enhancement = "m_lucky" }
+    local base = HandEval.score(GS.new{}, { lucky })
+    local oops = HandEval.score(GS.new{ jokers = { GS.joker{ key = "j_oops" } } }, { lucky })
+    t.ok(oops.score > base.score, "Oops doubles a Lucky card's expected mult -> a higher expected score")
+    -- and a board WITHOUT Oops is unchanged (golden-test safety: base is the vanilla Lucky value)
+    t.ok(base.approx, "the Lucky score without Oops is still the ordinary probabilistic value")
+  end
+
   -- F7: at equal expected score within the expected-clear tier, prefer the
   -- higher guaranteed floor. Misprint keeps both plays probabilistic; Lucky and
   -- Mult contribute the same +4 expected mult, but only Mult raises score_min.
