@@ -165,8 +165,11 @@ DE.DIG_SURPLUS = false      -- probe flag: dig with surplus discards once the cl
 -- Gated on ACTUALLY farming money (owns Faceless AND the pitch has 3+ faces), so it is sim-neutral --
 -- it fires only when the money density the sim lacks is present. Same ship rationale as DE.MILK_MONEY.
 DE.DIG_FOR_MONEY = true
-DE.DIG_AGGRESSIVE = true    -- with a spare hand to re-clear, break the winner to farm faces (survive_after-gated)
-DE.AGGRO_SURV_TOL = 0.03    -- the clear must stay this close to certain (frac >= 1-tol) after an aggressive farm
+DE.DIG_AGGRESSIVE = true    -- with SPARE hands to re-clear, break the winner to farm (survive_after-gated)
+DE.AGGRO_SURV_TOL = 0.01    -- STRICT: the clear must stay >= 99% certain after an aggressive farm (a bad
+                            -- re-draw here kills the run, so the gate is tighter than the passive dig's)
+DE.AGGRO_MIN_HANDS = 3      -- require this many hands left (>= 2 spare after the clear) before breaking it
+DE.AGGRO_SAMPLES = 120      -- sharper survival estimate for the aggressive gate (2x the normal rollout)
 DE.DIG_MIN_HANDS = 1        -- require at least this many hands left (a discard costs no hand)
 DE.DIG_KEEP_GUARANTEE = true -- only pitch cards OUTSIDE the guaranteed play, so it stays guaranteed
 -- Pitch only cards whose DiscardValue.keep_value is below this. Ordering alone is not enough:
@@ -507,28 +510,41 @@ function DE.decide(gs, opts)
         if v > best_v and not harm then pitch, best_v, mode, note = cand, v, "farm", n end
       end
     end
-    -- AGGRESSIVE FARM (user 2026-08-28): no farm from the SPARE alone, but with a spare HAND to
-    -- re-clear it is correct to break the current winner -- pitch faces from the WHOLE hand (incl. the
-    -- clear's own Kings/Queens) to hit a Faceless trigger NOW, then re-make a winner on a later hand.
-    -- ONLY when Simulation.survive_after confirms the clear stays near-certain after the farm (else a
-    -- bad re-draw kills the run). Never bleeds Ramen/Green Joker.
-    if mode == nil and DE.DIG_AGGRESSIVE and want_money_dig and owns(gs, "j_faceless")
-       and not DiscardFuel.bleeds_scaler(gs) and hands_left >= 2 then
-      local all_faces = {}
+    -- AGGRESSIVE FARM (user 2026-08-28): no farm from the SPARE alone, but with SPARE HANDS to re-clear
+    -- it is correct to break the current winner -- pitch the best-value LEVER cards from the WHOLE hand
+    -- (Faceless faces / Mail's rank / Trading single, incl. the clear's own cards) to hit a trigger NOW,
+    -- then re-make a winner later. STRICTLY gated: >= AGGRO_MIN_HANDS hands AND survive_after (at 2x
+    -- samples) shows the clear stays >= 99% certain -- a bad re-draw here kills the run. Never bleeds
+    -- Ramen/Green Joker. (Widened + hardened after a directionally-negative A/B on the Faceless-only,
+    -- 2-hand, 97% version -- the death channel is exactly the re-clear miss.)
+    if mode == nil and DE.DIG_AGGRESSIVE and want_money_dig and not DiscardFuel.bleeds_scaler(gs)
+       and hands_left >= DE.AGGRO_MIN_HANDS then
+      local whole = {}
       for _, c in ipairs(hand) do
-        if is_face(c) and DiscardValue.keep_value(c, gs) < DE.DIG_MAX_KEEP then all_faces[#all_faces + 1] = c end
+        if DiscardValue.keep_value(c, gs) < DE.DIG_MAX_KEEP then whole[#whole + 1] = c end
       end
-      table.sort(all_faces, by_keep)
-      if #all_faces >= 3 then
-        local aggr = {}
-        for i = 1, math.min(5, #all_faces) do aggr[i] = all_faces[i] end
-        local v, _, harm = DiscardFuel.value(gs, aggr)
-        if v > 0 and not harm then
-          local seed = disc_seed(gs)
-          local vs = Simulation.survive_after(gs, { kind = "DISCARD", cards = aggr }, DE.SURV_SAMPLES, lcg(seed), false)
-          if vs and vs.frac and vs.frac >= 1 - DE.AGGRO_SURV_TOL then
-            pitch, mode, note = aggr, "farm", "aggressive: break the winner to farm — a spare hand re-clears"
-          end
+      table.sort(whole, by_keep)
+      local function wpick(pred, cap)
+        local out = {}
+        for _, c in ipairs(whole) do if pred(c) and #out < (cap or 5) then out[#out + 1] = c end end
+        return out
+      end
+      local acands = {}
+      if owns(gs, "j_faceless") then acands[#acands + 1] = wpick(is_face, 5) end
+      if owns(gs, "j_mail") or owns(gs, "j_castle") or owns(gs, "j_yorick") then acands[#acands + 1] = wpick(function() return true end, 5) end
+      if owns(gs, "j_trading") then acands[#acands + 1] = wpick(function() return true end, 1) end
+      -- highest-value non-harmful candidate, then a SINGLE survival check on it
+      local best_aggr, best_v = nil, 0
+      for _, aggr in ipairs(acands) do
+        if #aggr > 0 and #aggr < #hand then
+          local v, _, harm = DiscardFuel.value(gs, aggr)
+          if v > best_v and not harm then best_aggr, best_v = aggr, v end
+        end
+      end
+      if best_aggr then
+        local vs = Simulation.survive_after(gs, { kind = "DISCARD", cards = best_aggr }, DE.AGGRO_SAMPLES, lcg(disc_seed(gs)), false)
+        if vs and vs.frac and vs.frac >= 1 - DE.AGGRO_SURV_TOL then
+          pitch, mode, note = best_aggr, "farm", "aggressive: break the winner to farm — spare hands re-clear"
         end
       end
     end
