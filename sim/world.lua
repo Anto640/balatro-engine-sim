@@ -474,7 +474,10 @@ local function use_consumable(run, action, uses, targets, hand, draw_pile)
         end
 
         -- A1: feed scalers that grow on consumable use (Constellation per planet, Fortune Teller per tarot).
-        if hand_name then JokerTick.on_planet_used(run, 1)
+        if hand_name then
+          JokerTick.on_planet_used(run, 1)
+          run._planets_used = run._planets_used or {}
+          run._planets_used[key] = true        -- Satellite: $1/round per UNIQUE planet used this run
         elseif cset == "Tarot" then JokerTick.on_tarot_used(run, 1) end
         -- track the last tarot/planet used for The Fool (never Fool itself)
         if key ~= "c_fool" and (hand_name or cset == "Tarot") then
@@ -523,6 +526,25 @@ local function post_play_econ(run, ev, sel, eff)
   -- cards for it). Rough Gem is excluded from joker_econ_income so this isn't double-counted.
   if ev and ev.money and ev.money > 0 and run.economy then
     run.economy.dollars = run.economy.dollars + ev.money
+  end
+  -- JOKER_FIDELITY P1 post-play effects, on the SCORED cards (ev.scoring_cards):
+  --   Golden Ticket -> +$4 per scored Gold-enhanced card; Midas Mask -> scored FACE cards become Gold
+  --   (a permanent deck-mod that then pays $3 held / feeds Golden Ticket). -- VERIFY ($4, wiki).
+  do
+    local sc = (ev and ev.scoring_cards) or sel or {}
+    local has_ticket, has_midas = false, false
+    for _, j in ipairs(run.jokers or {}) do
+      if j.key == "j_ticket"     then has_ticket = true end
+      if j.key == "j_midas_mask" then has_midas  = true end
+    end
+    if has_ticket and run.economy then
+      local gold = 0
+      for _, c in ipairs(sc) do if c.enhancement == "m_gold" then gold = gold + 1 end end
+      run.economy.dollars = run.economy.dollars + 4 * gold
+    end
+    if has_midas then
+      for _, c in ipairs(sc) do if Cards.is_face(c) then c.enhancement = "m_gold" end end
+    end
   end
   if not eff then return end
   if eff.money_per_card and sel and run.economy then          -- A7 The Tooth: -$1 per card played (floor $0)
@@ -834,6 +856,7 @@ function World.play_blind(run, blind)
   return {
     cleared = cleared, scored = b.scored, target = b.target, mr_bones_saved = mr_bones_saved,
     hands_used = plays, hands_left = b.hands_left, discards_left = b.discards_left,
+    discards_start = discards,                            -- for Delayed Gratification (no discards used)
     blind_type = b.type, boss_key = b.boss_key,
     plays = b.plays, consumable_uses = b.consumable_uses,  -- telemetry (P1/P4)
   }
@@ -926,10 +949,14 @@ local JokerData = require("engine.joker_data")
 local ECON_INCOME_EXCLUDE = {
   j_egg = true, j_rough_gem = true,
   j_to_the_moon = true, j_rocket = true,   -- modelled dynamically below
-  -- EFFORT ECONOMY (JOKER_FIDELITY_AUDIT P0/P1): these pay on a DISCARD event, not a flat $/round,
-  -- so their real money is landed in discard_econ (below) and they are excluded here so the flat
-  -- prior never double-counts. Before this the world paid Faceless a free $3/round it never earned.
-  j_faceless = true,   -- +$5 per 3+ face cards discarded at once
+  -- EFFORT / CONDITIONAL ECONOMY (JOKER_FIDELITY_AUDIT P0/P1): these do NOT pay a flat $/round -- their
+  -- money is condition-gated (a discard event, an unused-discard tally, planets used). Excluded here so
+  -- the flat prior never double-counts; their real amount is landed in discard_econ / conditional_econ.
+  -- Before this the world paid each a free flat $/round it never actually earns.
+  j_faceless = true,      -- +$5 per 3+ face cards discarded at once           (discard_econ)
+  j_delayed_grat = true,  -- +$2 per discard, ONLY if no discards used         (conditional_econ)
+  j_satellite = true,     -- +$1 per UNIQUE planet used this run, at round end  (conditional_econ)
+  j_ticket = true,        -- +$4 per scored Gold card                          (post_play_econ)
 }
 World.TO_THE_MOON_EXTRA = 1   -- extra $ of interest per $5 held -- VERIFY
 World.ROCKET_BASE       = 1   -- $/round -- VERIFY
@@ -969,11 +996,31 @@ World._rocket_income  = rocket_income
 -- UNUSED hand + interest ($1 per $5 held, capped) + owned econ jokers' avg $/round.
 -- Mechanics.round_income is the decompiled-verified base formula. The Boss's money-penalty
 -- effects (Tooth/Ox) are -- VERIFY and not yet applied here.
+-- Conditional round-end economy (JOKER_FIDELITY P1): the condition-gated $ the flat prior mis-credited.
+-- Excluded from joker_econ_income (above) and paid the REAL amount here. -- VERIFY magnitudes (wiki).
+local function conditional_econ(run, blind_result)
+  local m = 0
+  local function owns(k) for _, j in ipairs(run.jokers or {}) do if j.key == k then return true end end return false end
+  if owns("j_delayed_grat") then
+    -- $2 per discard the blind STARTED with, but only if NONE were used this round
+    local start = blind_result.discards_start or 0
+    if (blind_result.discards_left or 0) >= start then m = m + 2 * start end
+  end
+  if owns("j_satellite") then
+    local n = 0
+    for _ in pairs(run._planets_used or {}) do n = n + 1 end   -- $1 per unique planet used this RUN
+    m = m + n
+  end
+  return m
+end
+World._conditional_econ = conditional_econ   -- exposed for the fidelity tests
+
 function World.award_income(run, blind_result)
   local unused = math.max(0, blind_result.hands_left or 0)
   local income = Mechanics.round_income(blind_result.blind_type, unused,
     run.economy.dollars, run.economy.interest_cap)
   income = income + joker_econ_income(run)   -- econ jokers finally pay their $/round
+  income = income + conditional_econ(run, blind_result)  -- P1: Delayed Grat / Satellite (condition-gated)
   income = income + bonus_interest(run)      -- W-ECON: To the Moon (bankroll-proportional)
   income = income + rocket_income(run)       -- W-ECON: Rocket (grows per boss defeated)
   -- Phase A3 resource lesion: hand the engine unlimited money to test whether ACQUISITION

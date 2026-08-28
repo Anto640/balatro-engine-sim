@@ -52,17 +52,17 @@ Priority = (impact on survival/economy/leveling) × (how often it fires). "Targe
 
 ### P1 — MEDIUM: conditional economy the flat prior mis-credits, or a real scaler/generator
 
-| Joker | Real mechanic | Current sim | Target |
-|---|---|---|---|
-| **Golden Ticket** | Gold cards give +$4 when played & scored | flat $3/round | world (post-play, gold-card count) |
-| **Satellite** | +$1 at round end per UNIQUE planet used this run | flat $4/round | world (track planets-used) |
-| **To Do List** | +$4 if you play a specific poker hand this round | flat $4/round | world (per-round, chosen hand) |
-| **Mail-In Rebate** | +$5 per discarded card of a chosen rank | flat $4/round | world (discard hook) |
-| **Delayed Gratification** | +$2 per discard UNUSED, paid at round end | flat $4/round | world (round-end, discards-left) |
-| **Matador** | +$8 if played hand triggers the boss's ability | flat $4/round | world (boss interaction) |
-| **Hiker** | every scored card gains +5 perma chips | nothing | tick/scoring (perma-chip growth) |
-| **Midas Mask** | played face cards become Gold (→ $3 held) | nothing | world (post-play deck-mod) |
-| **Gift Card** | +$1 sell value to every joker & consumable each round | nothing | tick (sell-value growth) |
+| Joker | Real mechanic | Status |
+|---|---|---|
+| **Golden Ticket** | Gold cards give +$4 when played & scored | ✅ **DONE** — post_play_econ, excluded from flat sum |
+| **Satellite** | +$1 at round end per UNIQUE planet used this run | ✅ **DONE** — conditional_econ + planets-used set |
+| **Delayed Gratification** | +$2 per discard UNUSED (none used), at round end | ✅ **DONE** — conditional_econ + discards_start |
+| **Midas Mask** | played face cards become Gold (→ $3 held / Ticket) | ✅ **DONE** — post_play_econ deck-mod |
+| **Mail-In Rebate** | +$5 per discarded card of a chosen rank | ⬜ TODO — discard_econ (per-round rank) |
+| **To Do List** | +$4 if you play a specific poker hand this round | ⬜ TODO — per-round chosen hand + played tracking |
+| **Hiker** | every scored card gains +5 perma chips | ⬜ TODO — needs hand_eval to read a perma-chip field |
+| **Gift Card** | +$1 sell value to every joker & consumable each round | ⬜ TODO — round-end tick (sell-value growth) |
+| **Matador** | +$8 if played hand triggers the boss's ability | ⬜ TODO — boss interaction (rare) |
 
 ### P2 — LOW: rare / situational / sell-to-trigger effects
 

@@ -167,6 +167,48 @@ return function(t)
       "no Mr. Bones -> no save even at 90%")
   end
 
+  -- ---- JOKER_FIDELITY P1: conditional round-end economy (Delayed Gratification, Satellite) ----
+  do
+    -- excluded from the flat prior (their money is condition-gated, landed in conditional_econ)
+    t.eq(World._joker_econ_income({ jokers = { { key = "j_delayed_grat" } } }), 0,
+      "Delayed Gratification pays no flat round income")
+    t.eq(World._joker_econ_income({ jokers = { { key = "j_satellite" } } }), 0,
+      "Satellite pays no flat round income")
+
+    -- Delayed Gratification: $2 per starting discard IF none were used
+    local dg = { jokers = { { key = "j_delayed_grat" } } }
+    t.eq(World._conditional_econ(dg, { discards_start = 4, discards_left = 4 }), 8,
+      "Delayed Grat: 4 discards, none used -> $8")
+    t.eq(World._conditional_econ(dg, { discards_start = 4, discards_left = 2 }), 0,
+      "Delayed Grat: some discards used -> $0")
+
+    -- Satellite: $1 per UNIQUE planet used this run
+    local sat = { jokers = { { key = "j_satellite" } }, _planets_used = { c_mercury = true, c_venus = true } }
+    t.eq(World._conditional_econ(sat, { discards_left = 0 }), 2, "Satellite: 2 unique planets used -> $2")
+    local sat0 = { jokers = { { key = "j_satellite" } } }
+    t.eq(World._conditional_econ(sat0, { discards_left = 0 }), 0, "Satellite: no planets used yet -> $0")
+  end
+
+  -- ---- JOKER_FIDELITY P1: Golden Ticket ($4/scored Gold card) + Midas Mask (scored faces -> Gold) ----
+  do
+    local card = require("model.game_state").card
+    -- Golden Ticket excluded from the flat prior; pays $4 per scored Gold card
+    t.eq(World._joker_econ_income({ jokers = { { key = "j_ticket" } } }), 0, "Golden Ticket pays no flat income")
+    local gt = { economy = { dollars = 0 }, jokers = { { key = "j_ticket" } } }
+    local scored = { card{ rank = "King", suit = "Hearts", enhancement = "m_gold" },
+                     card{ rank = "2", suit = "Clubs", enhancement = "m_gold" },
+                     card{ rank = "5", suit = "Spades" } }
+    World._post_play_econ(gt, { money = 0, scoring_cards = scored }, scored, nil)
+    t.eq(gt.economy.dollars, 8, "Golden Ticket: 2 scored Gold cards -> $8")
+
+    -- Midas Mask turns scored FACE cards Gold (deck-mod), leaves non-faces alone
+    local mm = { economy = { dollars = 0 }, jokers = { { key = "j_midas_mask" } } }
+    local face, low = card{ rank = "Queen", suit = "Hearts" }, card{ rank = "4", suit = "Clubs" }
+    World._post_play_econ(mm, { money = 0, scoring_cards = { face, low } }, { face, low }, nil)
+    t.eq(face.enhancement, "m_gold", "Midas: a scored face card becomes Gold")
+    t.ok(low.enhancement ~= "m_gold", "Midas: a scored non-face card is unchanged")
+  end
+
   -- ---- boss min-ante gating + no-repeat (source: balatrowiki Blinds_and_Antes) ----
   do
     t.eq(#World.eligible_bosses(1), 8, "ante 1 has exactly the 8 easy bosses")
