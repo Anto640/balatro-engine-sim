@@ -1,5 +1,15 @@
 # GRAND_AUDIT.md — the consolidated master audit (2026-08-25)
 
+> **⭐⭐ SUPERSEDED FRAMING (2026-08-28) — read `NEXT_SESSION.md` first.** This doc is the authoritative
+> record of the *autonomous-winrate ceiling* investigation and remains true on that objective. But two
+> things happened after it: (1) the **objective pivoted to ADVICE QUALITY** (the mod advises a human who
+> wins ~87.5%; a non-compute-bound objective), and (2) the **sim was found to be FLATTERING the engine** —
+> it paid many jokers a flat `econ` $/round they never earn, so pre-2026-08-28 sim winrates are INFLATED.
+> Making the sim faithful (25/26 jokers, `JOKER_FIDELITY_AUDIT.md`) **halved the sim winrate (5.0% →
+> 2.5%)**. So read the "2.5% ceiling" below as *the faithful figure the flattered sim was masking*, and
+> note the new frontier: **CONVERSION** (turn farmed money into a directed supermodular build), with the
+> in-blind econ generation now correct + faithful (`engine/discard_fuel.lua`, `engine/hold_fuel.lua`).
+
 > **⭐ SESSION TERMINUS (2026-08-26) — read this first.** The forward plans P0–P5 below are all resolved,
 > and the MCTS/search investigation they pointed to is COMPLETE (`MCTS_PLAN.md`). Net result: the 2.5%
 > winrate ceiling is a **POLICY/assembly gap, not supply** (Phase 0a overturned the old supply-ceiling: 70%

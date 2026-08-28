@@ -1,17 +1,51 @@
-# NEXT_SESSION.md — fresh-session handoff (2026-08-26)
+# NEXT_SESSION.md — fresh-session handoff (2026-08-28)
 
-> **READ `GRAND_AUDIT.md` FIRST** (authoritative state + section scorecard), then `MCTS_PLAN.md` (the
-> search investigation). This file is the short orientation; the two above hold the detail.
+> **THE OBJECTIVE PIVOTED to ADVICE QUALITY this session** (the pivot the old §"if the objective ever
+> shifts" section below anticipated). The mod advises a *human who wins ~87.5%*; autonomous winrate is
+> ceilinged (below) but advice quality is a different, non-compute-bound objective. Read this top block
+> for the current state; `ADVICE_REVIEW.md` (the human's run observations + fixes) and
+> `JOKER_FIDELITY_AUDIT.md` (the sim-fidelity work) hold the detail. `GRAND_AUDIT.md` + `MCTS_PLAN.md`
+> remain the authoritative record of the *winrate-ceiling* investigation (unchanged, still true).
 
-## Where the project is (one paragraph)
+## CURRENT STATE (2026-08-28) — the advice-quality + sim-fidelity session
 
-The engine is mature and correct; the open problem is **autonomous winrate** (baseline ~2.5%, rich10
-~24%). This session ran a ground-up re-audit (`GRAND_AUDIT.md`) and then a full MCTS/search
-investigation (`MCTS_PLAN.md`), and reached a **well-confirmed ceiling**: the winrate gap is real and is
-a *policy/assembly* gap (not supply — see Phase 0a), but it is **not closable with the current
-apparatus**, because the **value function is the wall** and that wall is **compute/data-bound beyond a
-few nights of local compute** (the operator's stated budget). Further winrate progress needs resources
-that aren't available; the honest status is **consolidated at the ceiling**.
+Three big threads, all shipped/deployed (live install CURRENT, verified byte-identical; 1100 engine +
+604 sim tests pass, the 1 sim fail is a pre-existing unrelated overflow test):
+
+1. **Advice-review fixes** (`ADVICE_REVIEW.md`) — the owner played runs with the overlay live and
+   catalogued every decision. Shipped: the **anti-churn SELL_TO_BUY live-funder gate** (was dumping
+   Cloud 9 / Astronomer / polychrome Ice Cream for junk — the run-killer), the **active money-dig**,
+   **held-consumable use** (Hermit), **pack-first sequencing**, **free-planet picks**, **debuff-first
+   discard**, and UX (Play-blind at a boss, pack-pick target text, cost/size in the big line).
+
+2. **⭐ JOKER SIM-FIDELITY (`JOKER_FIDELITY_AUDIT.md`) — the sim was FLATTERING the engine.** The sim
+   paid many jokers a flat `econ` $/round they never actually earn (Faceless flat $3 vs its real
+   $5-per-3-face-discard, etc.). Audited all 150 jokers; **25 of 26 gaps now faithfully modelled** (only
+   Matador deferred — needs a boss-trigger event bus). **Result, measured: the faithful world HALVED the
+   sim winrate (5.0% → 2.5%)** — proving the old number was inflated. The sim now measures the same
+   reality the overlay faces, which makes future overlay work trustworthy instead of fake.
+
+3. **⭐ IN-BLIND ECON SYSTEM (two channels, `engine/discard_fuel.lua` + `engine/hold_fuel.lua`).**
+   *Discard channel*: farm/feed every applicable joker by discarding — Faceless (faces), Mail-In (rank),
+   Trading (single), Hit the Road/Castle/Yorick (scaler-feed) — with a **harm guard** (hard-refuse to
+   bleed Ramen's xmult; soft-penalise Green Joker). *Hold channel*: farm Reserved Parking / gold by
+   playing a MINIMAL hand and HOLDING econ cards (held money is now credited inside the survival rollout
+   so MILK fires the multi-hand farm). Plus an **aggressive farm** (break the winner to farm when
+   `survive_after` confirms a spare hand re-clears — hardened to a 99% gate / 3-hand min / 2× samples
+   after an early version measured −2 wins; the fix returned it to neutral).
+
+**The measured verdict on the econ work: SAFE + CORRECT + sim-NEUTRAL** (full system vs active-dig
+baseline: 8.3% = 8.3%, wins 4 = 4, only 9/48 seeds touched). It is real value on the *overlay* (the human
+converts money into builds) but the sim's greedy engine still doesn't convert — **the winrate wall is
+CONVERSION, not econ generation.** That is the unobstructed frontier: turn farmed money into a directed
+supermodular build (copiers × xmult × the hand being built toward).
+
+## The autonomous-winrate ceiling (UNCHANGED — the audit trail)
+
+The engine is mature and correct; **autonomous** winrate (baseline ~2.5%) is a *policy/assembly* gap
+(not supply — Phase 0a) that is **not closable with the current apparatus**: the value function is the
+wall, and that wall is compute/data-bound beyond a few nights of local compute. Consolidated at the
+ceiling. Details below + in `GRAND_AUDIT.md` / `MCTS_PLAN.md`.
 
 ## The load-bearing findings (all in GRAND_AUDIT + MCTS_PLAN, with tools)
 

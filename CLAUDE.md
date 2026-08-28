@@ -9,12 +9,30 @@ Despite the historical filename, this guide applies equally to Codex and other c
 `balatroenginesim` is a **Balatro decision-assistant mod** (LÖVE2D / Lua, Steamodded
 + Lovely). It reads live game state from the global `G`, evaluates every legal
 action, and overlays a ranked "best move" with a reason. Roadmap M1–M4 is complete
-plus a large correctness/coverage/strategy pass. **MCTS is NO LONGER deferred (2026-08-26):** every
-per-decision / present-state / economy / product-board / learned-objective lever is now closed or bounded
-on a cheap screen, so the frontier is the search build. `MCTS_PLAN.md` is scoped, its Phase 0a gate PASSES
-(70–92% of lost runs were offered the winning pieces and passed them up ⇒ the 2.5% ceiling is a POLICY
-gap, not supply — the old "supply ceiling" verdict is overturned), and Phase 1 is de-risked (leaf value =
-`pace_margin`, forkable sim). Read `GRAND_AUDIT.md` then `MCTS_PLAN.md`.
+plus a large correctness/coverage/strategy pass.
+
+> ### ⭐ CURRENT FOCUS (2026-08-28): the objective pivoted from AUTONOMOUS WINRATE to ADVICE QUALITY.
+> The mod advises a **human who wins ~87.5%**; autonomous winrate is *ceilinged* (a policy/value-function
+> wall that is compute/data-bound — see below). Advice quality is a **different, non-compute-bound**
+> objective, and the last session's work is all there:
+> - **`ADVICE_REVIEW.md`** — the owner's live-run decision observations + the fixes shipped (anti-churn
+>   SELL_TO_BUY gate, active money-dig, Hermit-use, pack-first, planet-picks, debuff discard, UX).
+> - **`JOKER_FIDELITY_AUDIT.md`** — the sim was **flattering the engine** (paying jokers a flat `econ`
+>   $/round they never earn). 25/26 jokers now faithfully modelled; **the faithful sim HALVED the winrate
+>   5.0% → 2.5%**, proving the old number inflated. The sim now measures what the overlay faces.
+> - **In-blind econ system** — `engine/discard_fuel.lua` (discard channel: Faceless/Mail/Trading + scaler
+>   feed + a Ramen/Green-Joker **harm guard**) and `engine/hold_fuel.lua` (hold channel: Reserved
+>   Parking/gold by playing minimal to HOLD econ cards; held $ credited in the survival rollout), plus an
+>   **aggressive farm** (break the winner when `survive_after` confirms a re-clear). Measured SAFE +
+>   sim-NEUTRAL. **The winrate wall is CONVERSION (money → directed build), not econ generation** — the
+>   open frontier. Read `NEXT_SESSION.md` first for the full handoff.
+
+**The AUTONOMOUS-WINRATE ceiling (historical, still true):** every per-decision / present-state / economy /
+product-board / learned-objective lever is closed or bounded; the MCTS/search investigation (`MCTS_PLAN.md`,
+`GRAND_AUDIT.md`) reached a **well-confirmed ceiling** — the gap is POLICY not supply (Phase 0a: 70–92% of
+lost runs were offered the winning pieces and passed), but the value function is the wall and it is
+compute/data-bound beyond available local compute. Consolidated at the ceiling; the live objective is now
+advice quality (above).
 
 ## Architecture (one rule: the engine is PURE)
 
