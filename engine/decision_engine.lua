@@ -165,6 +165,8 @@ DE.DIG_SURPLUS = false      -- probe flag: dig with surplus discards once the cl
 -- Gated on ACTUALLY farming money (owns Faceless AND the pitch has 3+ faces), so it is sim-neutral --
 -- it fires only when the money density the sim lacks is present. Same ship rationale as DE.MILK_MONEY.
 DE.DIG_FOR_MONEY = true
+DE.DIG_AGGRESSIVE = true    -- with a spare hand to re-clear, break the winner to farm faces (survive_after-gated)
+DE.AGGRO_SURV_TOL = 0.03    -- the clear must stay this close to certain (frac >= 1-tol) after an aggressive farm
 DE.DIG_MIN_HANDS = 1        -- require at least this many hands left (a discard costs no hand)
 DE.DIG_KEEP_GUARANTEE = true -- only pitch cards OUTSIDE the guaranteed play, so it stays guaranteed
 -- Pitch only cards whose DiscardValue.keep_value is below this. Ordering alone is not enough:
@@ -505,6 +507,32 @@ function DE.decide(gs, opts)
         if v > best_v and not harm then pitch, best_v, mode, note = cand, v, "farm", n end
       end
     end
+    -- AGGRESSIVE FARM (user 2026-08-28): no farm from the SPARE alone, but with a spare HAND to
+    -- re-clear it is correct to break the current winner -- pitch faces from the WHOLE hand (incl. the
+    -- clear's own Kings/Queens) to hit a Faceless trigger NOW, then re-make a winner on a later hand.
+    -- ONLY when Simulation.survive_after confirms the clear stays near-certain after the farm (else a
+    -- bad re-draw kills the run). Never bleeds Ramen/Green Joker.
+    if mode == nil and DE.DIG_AGGRESSIVE and want_money_dig and owns(gs, "j_faceless")
+       and not DiscardFuel.bleeds_scaler(gs) and hands_left >= 2 then
+      local all_faces = {}
+      for _, c in ipairs(hand) do
+        if is_face(c) and DiscardValue.keep_value(c, gs) < DE.DIG_MAX_KEEP then all_faces[#all_faces + 1] = c end
+      end
+      table.sort(all_faces, by_keep)
+      if #all_faces >= 3 then
+        local aggr = {}
+        for i = 1, math.min(5, #all_faces) do aggr[i] = all_faces[i] end
+        local v, _, harm = DiscardFuel.value(gs, aggr)
+        if v > 0 and not harm then
+          local seed = disc_seed(gs)
+          local vs = Simulation.survive_after(gs, { kind = "DISCARD", cards = aggr }, DE.SURV_SAMPLES, lcg(seed), false)
+          if vs and vs.frac and vs.frac >= 1 - DE.AGGRO_SURV_TOL then
+            pitch, mode, note = aggr, "farm", "aggressive: break the winner to farm — a spare hand re-clears"
+          end
+        end
+      end
+    end
+
     -- SEARCH (Faceless only): no farm yet, but keep faces and pitch chaff to draw TOWARD a 3-face
     -- trigger. Never when a discard would bleed Ramen/Green Joker.
     if mode == nil and want_money_dig and owns(gs, "j_faceless") and not DiscardFuel.bleeds_scaler(gs)

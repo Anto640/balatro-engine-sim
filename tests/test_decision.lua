@@ -905,6 +905,35 @@ return function(t)
       local ramen = DE.decide(lever_state({ joker{ key = "j_faceless" }, joker{ key = "j_ramen" } })).best
       t.eq(ramen.type, "PLAY", "harm guard: never bleed Ramen's xmult to farm a few dollars -> just clear")
     end
+
+    -- AGGRESSIVE FARM (2026-08-28): with a spare hand to re-clear, break the CURRENT winner to farm
+    -- (survive_after-gated); with only one hand, protect it.
+    do
+      local kingdeck = {}
+      for i = 1, 40 do kingdeck[#kingdeck + 1] = card{ id = 100 + i, rank = "King", rank_id = 13, suit = (i % 2 == 0) and "Hearts" or "Spades" } end
+      local function aggr_state(hands)
+        return GS.new{ jokers = { joker{ key = "j_faceless" } }, deck = kingdeck,
+          run = { hand_levels = {}, hand_size = 8 },
+          hand = {  -- winner = pair of Kings (2 faces), + a spare Queen (face), + low chaff
+            card{ id = 1, rank = "King", rank_id = 13, suit = "Clubs" }, card{ id = 2, rank = "King", rank_id = 13, suit = "Diamonds" },
+            card{ id = 3, rank = "Queen", rank_id = 12, suit = "Hearts" },
+            card{ id = 4, rank = "3", rank_id = 3, suit = "Clubs" }, card{ id = 5, rank = "4", rank_id = 4, suit = "Spades" },
+          },
+          blind = { target_chips = 40, chips_scored = 0, hands_left = hands, discards_left = 3,
+                    base_hands = 4, base_discards = 4, played_hand_types = {} } }
+      end
+      -- abundant hands + a King-rich deck -> break the winner (pitch its Kings) to farm $5
+      local rich = DE.decide(aggr_state(4)).best
+      t.eq(rich.type, "DISCARD", "aggressive farm: with spare hands, dig through the winner to farm")
+      local kings = 0
+      for _, c in ipairs(rich.cards or {}) do if Cards.rank_id(c) == 13 then kings = kings + 1 end end
+      t.ok(kings >= 1, "...it actually breaks the winning pair (pitches a King the clear was using)")
+      -- only ONE hand to clear -> must NOT break the winner (no spare hand to re-clear)
+      local tight = DE.decide(aggr_state(1)).best
+      local broke = false
+      for _, c in ipairs(tight.cards or {}) do if Cards.rank_id(c) == 13 then broke = true end end
+      t.ok(not broke, "one hand left: protect the winner (no aggressive farm through it)")
+    end
   end
 
   -- ---- keep_value pitches DEBUFFED cards first (2026-08-27, run MALEJYHW) ----
