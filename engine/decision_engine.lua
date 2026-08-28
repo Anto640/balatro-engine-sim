@@ -259,6 +259,17 @@ local function owns(gs, key)
   return false
 end
 
+-- Are there enough face cards in the deck to make searching for a Faceless (3-face) discard worthwhile?
+-- Pareidolia makes every card a face, so always yes. Otherwise require >=3 faces to exist at all.
+local function deck_has_faces(gs, pareidolia)
+  if pareidolia then return true end
+  local n = 0
+  for _, c in ipairs(gs.deck or {}) do
+    if Cards.is_face(c) and not HandEval.is_debuffed(gs, c) then n = n + 1; if n >= 3 then return true end end
+  end
+  return false
+end
+
 -- Trading Card: on the FIRST discard of the round, discarding a SINGLE card destroys
 -- it (permanent deck thinning) and pays $3. The generic discard logic only proposes
 -- MULTI-card shape draws, so this once-per-round value is otherwise never surfaced --
@@ -436,8 +447,12 @@ function DE.decide(gs, opts)
   -- spend the surplus discards on a free redraw instead of banking them. Pitches only cards
   -- OUTSIDE the guaranteed play, so the clear survives the discard by construction.
   local dig_action = nil
-  -- MONEY-AWARE dig fires when a discard-payout joker is owned (Faceless); the general probe
-  -- fires unconditionally. Either way we only pitch cards OUTSIDE the guaranteed play.
+  -- ACTIVE money dig (2026-08-28). Once the clear is LOCKED and discards remain, actively WORK a
+  -- discard-payout joker instead of banking the surplus. Faceless pays $5 per 3 face cards discarded
+  -- at once; a spare discard costs nothing (unused DISCARDS pay no round reward) and the clear's cards
+  -- are protected, so this is free money. It FARMS when 3+ faces are already spare, otherwise it
+  -- SEARCHES -- keeping the faces, pitching chaff to draw TOWARD a 3-face trigger. (The engine should
+  -- actively utilise its econ jokers, not only fire on a rare Faceless+Pareidolia hand.)
   local want_money_dig = DE.DIG_FOR_MONEY and owns(gs, "j_faceless")
   if (DE.DIG_SURPLUS or want_money_dig) and guaranteed and discards_left > 0
      and hands_left >= DE.DIG_MIN_HANDS and #hand > 0 then
@@ -445,54 +460,49 @@ function DE.decide(gs, opts)
     if DE.DIG_KEEP_GUARANTEE then
       for _, c in ipairs(play_cards or {}) do keep[c] = true end
     end
-    -- CHAFF-FIRST. v1 pitched the first non-clearing cards in hand order and measured
-    -- -0.150 with money down at EVERY ante: it was throwing away held value (a Gold card
-    -- pays $3 at round end, Steel/Glass carry xmult while held). DiscardValue.keep_value
-    -- already prices exactly this (a plain card is <= ~11, any enhancement/edition >= 25),
-    -- so sort by it and pitch the cheapest -- plain faces pass, enhanced faces are excluded.
-    local spare = {}
-    for i, c in ipairs(hand) do
+    -- DiscardValue.keep_value already prices held value (a plain card <= ~11, any enhancement/edition
+    -- >= 25, a debuffed card < 0), so pitching by it never throws a Gold/Steel/Glass card. Pareidolia
+    -- makes every card a face; a debuffed card counts for nothing even so.
+    local pareidolia = owns(gs, "j_pareidolia")
+    local function is_face(c) return (pareidolia or Cards.is_face(c)) and not HandEval.is_debuffed(gs, c) end
+    local spare_faces, spare_chaff = {}, {}
+    for _, c in ipairs(hand) do
       if not keep[c] and DiscardValue.keep_value(c, gs) < DE.DIG_MAX_KEEP then
-        spare[#spare + 1] = { c = c, i = i }
+        if is_face(c) then spare_faces[#spare_faces + 1] = c else spare_chaff[#spare_chaff + 1] = c end
       end
     end
-    -- For a Faceless money-dig, FLOAT face cards to the front so a 3+face discard triggers the
-    -- $5 even when only some spare cards are faces (Pareidolia makes every card a face). Ties
-    -- and the non-money dig keep the pure cheapest-first ordering.
-    -- A DEBUFFED card counts for nothing -- not even Pareidolia makes it a face for Faceless.
-    local pareidolia = owns(gs, "j_pareidolia")
-    local face_of = {}
-    for _, s in ipairs(spare) do
-      local is_face = (pareidolia or Cards.is_face(s.c)) and not HandEval.is_debuffed(gs, s.c)
-      face_of[s] = is_face and true or false
+    local function by_keep(a, b) return DiscardValue.keep_value(a, gs) < DiscardValue.keep_value(b, gs) end
+    table.sort(spare_faces, by_keep); table.sort(spare_chaff, by_keep)
+    local pitch, dig_money, mode = {}, 0, nil
+    if want_money_dig and #spare_faces >= 3 then
+      for i = 1, math.min(5, #spare_faces) do pitch[i] = spare_faces[i] end   -- FARM: 3+ faces -> $5 now
+      dig_money, mode = 5, "farm"
+    elseif want_money_dig and #spare_chaff > 0 and deck_has_faces(gs, pareidolia) then
+      for i = 1, math.min(5, #spare_chaff) do pitch[i] = spare_chaff[i] end   -- SEARCH: keep faces, pitch chaff
+      mode = "search"
+    elseif DE.DIG_SURPLUS then
+      local all = {}                                                          -- general probe: cheapest chaff
+      for _, c in ipairs(spare_chaff) do all[#all + 1] = c end
+      for _, c in ipairs(spare_faces) do all[#all + 1] = c end
+      table.sort(all, by_keep)
+      for i = 1, math.min(5, #all) do pitch[i] = all[i] end
+      mode = "probe"
     end
-    table.sort(spare, function(a, b)
-      if want_money_dig and face_of[a] ~= face_of[b] then return face_of[a] end   -- faces first
-      local ka, kb = DiscardValue.keep_value(a.c, gs), DiscardValue.keep_value(b.c, gs)
-      if ka ~= kb then return ka < kb end
-      return a.i < b.i                                  -- stable -> deterministic
-    end)
-    local pitch, nface = {}, 0
-    for i = 1, math.min(5, #spare) do
-      pitch[i] = spare[i].c
-      if face_of[spare[i]] then nface = nface + 1 end
-    end
-    -- $ farmed by THIS discard: Faceless pays $5 for discarding 3+ face cards at once.
-    local dig_money = (want_money_dig and nface >= 3) and 5 or 0
-    if #pitch > 0 and (DE.DIG_SURPLUS or dig_money > 0) then
+    if #pitch > 0 and mode then
       dig_action = {
         type = "DISCARD", cards = pitch,
-        -- ranked ABOVE the play: while the clear is locked the play banks nothing extra,
-        -- and the dig is a free roll. It stops firing as soon as the surplus is spent.
+        -- ranked ABOVE the play: while the clear is locked the play banks nothing extra, and the dig
+        -- is a free discard. It stops as soon as discards run out.
         value = (play_action and play_action.value or 0) + 1,
         surplus_dig = true, farms_money = dig_money > 0, banked_money = dig_money,
-        reason = (dig_money > 0)
-          and string.format(
-            "Discard %d face cards to farm $%d from Faceless first — the clear is locked and the cards return to your deck.",
-            nface, dig_money)
+        money_dig = (mode == "farm" or mode == "search"),
+        reason = (mode == "farm") and string.format(
+            "Discard %d face cards to farm $%d from Faceless — the clear is locked and the cards return to your deck.",
+            #pitch, dig_money)
+          or (mode == "search") and
+            "Dig toward Faceless: keep your face cards and pitch chaff to build a 3-face discard for $5 (clear is locked)."
           or string.format(
-            "Dig with a spare discard (%d) — the clear is already locked, so the extra score is wasted.",
-            discards_left),
+            "Dig with a spare discard (%d) — the clear is already locked, so the extra score is wasted.", discards_left),
       }
     end
   end
@@ -651,10 +661,11 @@ function DE.decide(gs, opts)
     -- (the dig keeps the guaranteed play's cards, so the clear cannot be lost); with
     -- DE.MILK_MONEY on we instead play a money-maximal hand now and clear later, but only
     -- when its survival gate passed (milk_action is nil otherwise).
-    -- A money-farming dig wins outright: a spare discard that banks $ (Faceless) keeps the
-    -- clear in hand AND costs no hand-reward, so it strictly dominates milking a hand. It chains
-    -- itself down through the discards (fires again next decision), then milk/play finishes.
-    if dig_action and dig_action.farms_money then
+    -- An active money-dig wins outright: a spare DISCARD costs no hand-reward and keeps the clear in
+    -- hand, so working Faceless (farm 3 faces now, or search toward them) strictly dominates milking a
+    -- HAND. It chains down through the discards (fires again next decision); once discards run out,
+    -- milk uses the spare HANDS, then the clear plays. (Free discards before hands.)
+    if dig_action and dig_action.money_dig then
       best = dig_action
     else
       best = milk_action or dig_action or play_action

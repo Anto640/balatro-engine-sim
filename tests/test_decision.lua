@@ -844,6 +844,44 @@ return function(t)
     gsd.boss_effect = { debuff_faces = true }
     local ddug = DE.decide(gsd).best
     t.eq(ddug.type, "PLAY", "money-dig: a face-debuff boss makes Faceless unfarmable -> plays, no false dig")
+
+    -- ACTIVE SEARCH (2026-08-28): with <3 faces in the spare but a FACE-RICH deck, the engine should
+    -- DIG TOWARD a Faceless trigger -- keep the face(s), pitch the non-face chaff to draw more faces --
+    -- instead of just clearing. It should never pitch a face card or a card the clear needs.
+    do
+      local facedeck = {}
+      for i = 1, 12 do facedeck[#facedeck + 1] = card{ id = 100 + i, rank = "King", rank_id = 13, suit = "Hearts" } end
+      for i = 1, 20 do facedeck[#facedeck + 1] = card{ id = 200 + i, rank = "4", rank_id = 4, suit = "Clubs" } end
+      local gs = GS.new{ jokers = { joker{ key = "j_faceless" } }, deck = facedeck,
+        run = { hand_levels = {}, hand_size = 8 },
+        hand = {
+          card{ id = 1, rank = "Ace", suit = "Spades" }, card{ id = 2, rank = "Ace", suit = "Hearts" },  -- clear pair
+          card{ id = 3, rank = "King", rank_id = 13, suit = "Clubs" },                                    -- 1 spare face
+          card{ id = 4, rank = "7", suit = "Diamonds" }, card{ id = 5, rank = "8", suit = "Spades" },
+          card{ id = 6, rank = "9", suit = "Hearts" },                                                    -- non-face chaff
+        },
+        blind = { target_chips = 30, chips_scored = 0, hands_left = 4, discards_left = 3,
+                  base_hands = 4, base_discards = 4, played_hand_types = {} } }
+      local best = DE.decide(gs).best
+      t.eq(best.type, "DISCARD", "active search: with a face-rich deck it digs toward Faceless, not clears")
+      t.ok(best.money_dig and not best.farms_money, "...tagged as a money-dig in SEARCH mode (no $ yet)")
+      for _, c in ipairs(best.cards or {}) do
+        t.ok(not Cards.is_face(c), "...the search pitches only non-face chaff (keeps the face for the trigger)")
+        t.ok(c.id ~= 1 and c.id ~= 2, "...and never a card the clearing pair needs")
+      end
+      -- but with NO faces in the deck it can't build a trigger -> just play the clear
+      local gs2 = GS.new{ jokers = { joker{ key = "j_faceless" } },
+        deck = (function() local d = {} for i = 1, 30 do d[i] = card{ id = 300 + i, rank = "4", suit = "Clubs" } end return d end)(),
+        run = { hand_levels = {}, hand_size = 8 },
+        hand = {
+          card{ id = 1, rank = "Ace", suit = "Spades" }, card{ id = 2, rank = "Ace", suit = "Hearts" },
+          card{ id = 4, rank = "7", suit = "Diamonds" }, card{ id = 5, rank = "8", suit = "Spades" },
+          card{ id = 6, rank = "9", suit = "Hearts" }, card{ id = 7, rank = "2", suit = "Clubs" },
+        },
+        blind = { target_chips = 30, chips_scored = 0, hands_left = 4, discards_left = 3,
+                  base_hands = 4, base_discards = 4, played_hand_types = {} } }
+      t.eq(DE.decide(gs2).best.type, "PLAY", "no faces reachable -> no pointless search, just clear")
+    end
   end
 
   -- ---- keep_value pitches DEBUFFED cards first (2026-08-27, run MALEJYHW) ----
