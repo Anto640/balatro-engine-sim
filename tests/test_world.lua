@@ -315,6 +315,21 @@ return function(t)
     t.eq(#dna3.deck, 0, "DNA: only the FIRST play of the round copies")
   end
 
+  -- ---- JOKER_FIDELITY P2: Gift Card (+$1 sell value to every joker & consumable each round) ----
+  do
+    local JokerTick = require("sim.joker_tick")
+    local gift = { jokers = { { key = "j_gift", sell_value = 3 }, { key = "j_baron", sell_value = 2 } },
+                   consumables = { { key = "c_hermit", sell_cost = 1 } } }
+    JokerTick.on_round_end(gift, World.lcg(1))
+    t.eq(gift.jokers[1].sell_value, 4, "Gift: +1 to its own sell value")
+    t.eq(gift.jokers[2].sell_value, 3, "Gift: +1 to other jokers' sell value")
+    t.eq(gift.consumables[1].sell_cost, 2, "Gift: +1 to consumables' sell value")
+    -- no Gift -> unchanged
+    local none = { jokers = { { key = "j_baron", sell_value = 2 } }, consumables = {} }
+    JokerTick.on_round_end(none, World.lcg(1))
+    t.eq(none.jokers[1].sell_value, 2, "no Gift -> sell values unchanged")
+  end
+
   -- ---- boss min-ante gating + no-repeat (source: balatrowiki Blinds_and_Antes) ----
   do
     t.eq(#World.eligible_bosses(1), 8, "ante 1 has exactly the 8 easy bosses")

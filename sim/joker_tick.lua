@@ -245,11 +245,18 @@ end
 -- owned, so runs without Gros Michel/Cavendish leave the world RNG stream undisturbed.
 -- Returns destroyed jokers (Popcorn at 0, plus any self-destructs).
 function JokerTick.on_round_end(run, rng)
+  local has_gift = false
   for _, j in ipairs(run.jokers or {}) do
     if j.key == "j_popcorn" then bump(j, "mult", -4, 20)               -- -4 mult per round (starts 20) -- VERIFY
     elseif j.key == "j_turtle_bean" then                              -- +5 hand size, -1 each round, floored at 0 (no self-destruct) -- VERIFY
       local a = ab(j); a.turtle = (a.turtle or 5) - 1; if a.turtle < 0 then a.turtle = 0 end
+    elseif j.key == "j_gift" then has_gift = true                     -- Gift Card (handled after the loop)
     end
+  end
+  -- Gift Card (JOKER_FIDELITY P2): +$1 sell value to EVERY joker and consumable each round. -- VERIFY.
+  if has_gift then
+    for _, jj in ipairs(run.jokers or {}) do jj.sell_value = (jj.sell_value or 0) + 1 end
+    for _, c in ipairs(run.consumables or {}) do c.sell_cost = (c.sell_cost or 0) + 1 end
   end
   local destroyed = destroy_if(run, function(j) return j.key == "j_popcorn" and (ab(j).mult or 20) <= 0 end)
   if rng then
