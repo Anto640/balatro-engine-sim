@@ -453,6 +453,15 @@ function DE.decide(gs, opts)
   -- are protected, so this is free money. It FARMS when 3+ faces are already spare, otherwise it
   -- SEARCHES -- keeping the faces, pitching chaff to draw TOWARD a 3-face trigger. (The engine should
   -- actively utilise its econ jokers, not only fire on a rare Faceless+Pareidolia hand.)
+  --
+  -- FUTURE (resource-aware aggressive farm, user 2026-08-28): today the dig only pitches cards OUTSIDE
+  -- the guaranteed play, protecting the current winner absolutely. But with ABUNDANT resources (spare
+  -- hands AND discards well beyond what the clear needs) it is correct to break up the winner itself --
+  -- discard its face cards to farm Faceless, then simply re-draw and re-make a winning hand on a later
+  -- hand. The clear does not have to be THIS hand when a spare hand can re-clear. The gate that makes
+  -- this safe (not a death) is a survival estimate: Simulation.survive_after must show the clear is
+  -- still near-certain after the aggressive farm (like MILK's frac gate). Relax `keep` from "the whole
+  -- current play" toward "only the minimum a future clear needs" as (hands_left+discards_left) grows.
   local want_money_dig = DE.DIG_FOR_MONEY and owns(gs, "j_faceless")
   if (DE.DIG_SURPLUS or want_money_dig) and guaranteed and discards_left > 0
      and hands_left >= DE.DIG_MIN_HANDS and #hand > 0 then
