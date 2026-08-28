@@ -58,45 +58,63 @@ Priority = (impact on survival/economy/leveling) × (how often it fires). "Targe
 | **Satellite** | +$1 at round end per UNIQUE planet used this run | ✅ **DONE** — conditional_econ + planets-used set |
 | **Delayed Gratification** | +$2 per discard UNUSED (none used), at round end | ✅ **DONE** — conditional_econ + discards_start |
 | **Midas Mask** | played face cards become Gold (→ $3 held / Ticket) | ✅ **DONE** — post_play_econ deck-mod |
-| **Mail-In Rebate** | +$5 per discarded card of a chosen rank | ⬜ TODO — discard_econ (per-round rank) |
-| **To Do List** | +$4 if you play a specific poker hand this round | ⬜ TODO — per-round chosen hand + played tracking |
-| **Hiker** | every scored card gains +5 perma chips | ⬜ TODO — needs hand_eval to read a perma-chip field |
-| **Gift Card** | +$1 sell value to every joker & consumable each round | ⬜ TODO — round-end tick (sell-value growth) |
-| **Matador** | +$8 if played hand triggers the boss's ability | ⬜ TODO — boss interaction (rare) |
+| **Mail-In Rebate** | +$5 per discarded card of a chosen rank | ✅ **DONE** — discard_econ + per-round rank |
+| **To Do List** | +$4 if you play a specific poker hand this round | ✅ **DONE** — conditional_econ + per-round hand |
+| **Hiker** | every scored card gains +5 perma chips | ✅ **DONE** — Cards.chips perma_chips (golden-safe) |
+| **Gift Card** | +$1 sell value to every joker & consumable each round | ✅ **DONE** — on_round_end sell-value tick |
+| **Matador** | +$8 if played hand triggers the boss's ability | ⛔ **DEFERRED** — see below |
 
 ### P2 — LOW: rare / situational / sell-to-trigger effects
 
-| Joker | Real mechanic | Target |
+| Joker | Real mechanic | Status |
 |---|---|---|
-| **Marble Joker** | adds 1 Stone card to deck on blind select | world (blind-select deck-mod) |
-| **DNA** | first played card of round: add a copy to deck & hand | world (post-play deck-mod) |
-| **Certificate** | round start: add a random playing card with a random seal | world (round-start deck-mod) |
-| **Sixth Sense** | first discard of a single 8 → destroy it, create a Spectral | world (discard hook) |
-| **Riff-Raff** | blind select: create 2 Common jokers (slots permitting) | world (blind-select gen) |
-| **Perkeo** | shop exit: create a Negative copy of 1 held consumable | content (shop-exit gen) |
-| **Luchador** | sell to disable the current boss blind | world (sell effect) |
-| **Invisible Joker** | after 3 rounds, sell to duplicate a random joker | tick+world (counter + sell) |
-| **Burnt Joker** | upgrade the first discarded poker hand's level | world (discard hook, level) |
-| **Diet Cola** | sell to create a free Double Tag | world (sell effect) |
-| **Showman** | allows duplicate jokers/consumables to appear in the shop | content (generation pool) |
-| **Oops! All 6s** | doubles all listed probabilities | world (probability jokers) — engine already models in `Eval` |
+| **Marble Joker** | adds 1 Stone card to deck on blind select | ✅ DONE — blind_start_generators |
+| **DNA** | first played card of round: add a copy to deck | ✅ DONE — play_effects (first single play) |
+| **Certificate** | round start: add a random card with a random seal | ✅ DONE — blind_start_generators |
+| **Sixth Sense** | first discard of a single 8 → destroy it, create a Spectral | ✅ DONE — discard_effects |
+| **Riff-Raff** | blind select: create 2 Common jokers (slots permitting) | ✅ DONE — Content.gen_common_joker |
+| **Perkeo** | shop exit: create a Negative copy of 1 held consumable | ✅ DONE — shop_phase exit |
+| **Luchador** | sell to disable the current boss blind | ✅ DONE — sell_effects + play_blind |
+| **Invisible Joker** | sell to duplicate a random joker | ✅ DONE — sell_effects (3-round gate approximated) |
+| **Burnt Joker** | upgrade the first discarded poker hand's level | ✅ DONE — discard_effects |
+| **Diet Cola** | sell to create a free Double Tag | ✅ DONE — sell_effects |
+| **Showman** | allows duplicate jokers/consumables in the shop | ✅ DONE — owned_joker_keys bypass |
+| **Oops! All 6s** | doubles all listed probabilities | ⛔ **DEFERRED** — see below |
+
+### ⛔ DEFERRED (2) — genuinely not worth a fragile/risky implementation now
+
+- **Oops! All 6s** — its biggest effect is on Lucky-card SCORING, which `hand_eval` computes as an
+  EXPECTED value (`m_lucky → mult 4`, i.e. 1/5·20). Faithful doubling needs Oops-awareness inside the
+  **golden-tested** `hand_eval` scorer AND at every sim probability roll site (8 Ball, Space,
+  Hallucination, extinction rolls) — a coordinated, invasive change across the FACTS layer for a
+  medium-rare joker. The engine ALREADY values Oops (`Eval.PROB_ECON` doubles the money-probability
+  jokers), so *decisions* account for it; only the sim's *realization* of the doubled odds is missing.
+  Left for a dedicated pass so the golden scorer isn't put at risk casually.
+- **Matador** — `+$8 if the played hand triggers the boss's ability`. The sim models boss *effects*
+  (score/resource penalties, play restrictions) but has no granular "the ability TRIGGERED on this hand"
+  event to hang the payout on, and it varies per boss. High infrastructure cost for a rare joker; the
+  flat prior is excluded-worthy but the real condition is unmodellable without a boss-trigger event bus.
 
 ## Implementation plan
 
-1. **Build the hooks the sim lacks** (once), so each mechanic has a place to live:
-   - a per-DISCARD hook (Faceless, Mail, Sixth Sense, Burnt) — the sim currently models plays, not discards;
-   - a planets-used-this-run counter (Satellite) and a bosses/round context already present;
-   - blind-select and round-start deck-mod hooks (Marble, Certificate, Riff-Raff).
-2. **Implement P0 → P1 → P2**, one joker per commit, each with: the mechanic in the right layer,
-   `-- VERIFY`-tagged magnitudes, a headless test, and (for the economy ones) exclusion from the flat
-   `joker_econ_income` sum so it is never double-counted.
-3. **Re-measure.** After P0, re-run the churn/paced A/B against the *old* world to confirm the sim is now
-   harsher on economy (the anti-churn / money-dig fixes should finally register), and recalibrate the
-   world against the real `bes_runs` death-ante distribution so fidelity is preserved, not drifted.
+1. **Build the hooks the sim lacks** (DONE): per-DISCARD hook (Faceless/Mail/Sixth Sense/Burnt), a
+   planets-used set (Satellite), blind-select + round-start deck/gen hooks (Marble/Certificate/Riff-Raff),
+   first-play/first-discard-of-round flags (DNA/Burnt/Sixth Sense), a sell-effects hook (Luchador/Diet
+   Cola/Invisible), and a perma-chip field on cards (Hiker).
+2. **Implemented P0 → P1 → P2**, batched by hook, each with `-- VERIFY`-tagged magnitudes, a headless
+   test, and (for economy jokers) exclusion from the flat `joker_econ_income` sum.
+3. **Re-measure (NEXT):** re-run the churn/money-dig A/B against the *old* world to confirm the sim is now
+   harsher on economy (the anti-churn / money-dig fixes should finally register), then **recalibrate the
+   world against the real `bes_runs` death-ante distribution** so fidelity is preserved, not drifted.
 
 ## Status log
 
-- 2026-08-27: audit built (this doc). 102 scoring faithful, 20 value-only realized, **28 gaps**, 0 silent-zeros.
-- 2026-08-27: audit-method correction — Astronomer & Golden are already faithful (cost-zeroing / correct
-  flat prior), so **26 real gaps**. **P0 CLEARED**: Faceless, Mr. Bones, Space, Chaos all implemented +
-  tested (sim suite 561 pass, +1 pre-existing unrelated overflow fail). **22 gaps remain** (P1 + P2).
+- 2026-08-27: audit built. 102 scoring faithful, 20 value-only realized, 28 gaps, 0 silent-zeros.
+- 2026-08-27: audit-method correction — Astronomer & Golden already faithful → **26 real gaps**.
+- 2026-08-27/28: **24 of 26 implemented + tested** (sim suite 601 pass, +1 pre-existing unrelated overflow
+  fail; engine suite 1079 pass). Done: Faceless, Mr. Bones, Space, Chaos, Delayed Grat, Satellite, Golden
+  Ticket, Midas, Mail, To Do List, Hiker, Gift, Marble, Certificate, Riff-Raff, Burnt, Sixth Sense,
+  Showman, DNA, Perkeo, Luchador, Invisible, Diet Cola (+ Astronomer/Golden already-faithful). **2
+  DEFERRED** (Oops — golden-scorer-invasive; Matador — needs a boss-trigger event bus).
+- ⚠ **NEXT:** the world is now more faithful but the death-ante calibration may have SHIFTED — re-validate
+  against real `bes_runs` before trusting sim A/B verdicts, and re-run the anti-churn / money-dig A/Bs.
