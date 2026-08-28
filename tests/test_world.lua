@@ -209,6 +209,24 @@ return function(t)
     t.ok(low.enhancement ~= "m_gold", "Midas: a scored non-face card is unchanged")
   end
 
+  -- ---- JOKER_FIDELITY P1: Mail-In Rebate ($5/discarded rank) + To Do List ($4/target hand) ----
+  do
+    local card = require("model.game_state").card
+    t.eq(World._joker_econ_income({ jokers = { { key = "j_mail" } } }), 0, "Mail pays no flat income")
+    t.eq(World._joker_econ_income({ jokers = { { key = "j_todo_list" } } }), 0, "To Do List pays no flat income")
+
+    -- Mail: $5 per discarded card matching the round's rank (Kings = rank_id 13)
+    local mail = { economy = { dollars = 0 }, jokers = { { key = "j_mail" } }, _mail_rank = 13 }
+    World._discard_econ(mail, { card{ rank = "King", suit = "Hearts" }, card{ rank = "King", suit = "Spades" },
+                               card{ rank = "5", suit = "Clubs" } })
+    t.eq(mail.economy.dollars, 10, "Mail: 2 discarded Kings at the King rank -> $10")
+
+    -- To Do List: $4 at round end IF the target hand was played this round
+    local todo = { jokers = { { key = "j_todo_list" } }, _todo_hand = "Flush" }
+    t.eq(World._conditional_econ(todo, { played_types = { Flush = true } }), 4, "To Do List: target hand played -> $4")
+    t.eq(World._conditional_econ(todo, { played_types = { Pair = true } }), 0, "To Do List: target hand NOT played -> $0")
+  end
+
   -- ---- boss min-ante gating + no-repeat (source: balatrowiki Blinds_and_Antes) ----
   do
     t.eq(#World.eligible_bosses(1), 8, "ante 1 has exactly the 8 easy bosses")

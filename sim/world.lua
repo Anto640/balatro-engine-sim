@@ -576,6 +576,16 @@ local function discard_econ(run, discarded)
     end
     if nface >= 3 then run.economy.dollars = run.economy.dollars + 5 end   -- Faceless: $5 per event
   end
+  -- Mail-In Rebate: $5 per discarded card of THIS round's rank (run._mail_rank, set at blind start).
+  if run._mail_rank then
+    local owns_mail = false
+    for _, j in ipairs(run.jokers or {}) do if j.key == "j_mail" then owns_mail = true; break end end
+    if owns_mail then
+      local n = 0
+      for _, c in ipairs(discarded) do if Cards.rank_id(c) == run._mail_rank then n = n + 1 end end
+      run.economy.dollars = run.economy.dollars + 5 * n
+    end
+  end
 end
 World._discard_econ = discard_econ   -- exposed for the fidelity tests
 
@@ -660,9 +670,21 @@ end
 
 -- Blind-SELECT generators (fire once at blind start, before any play). Cartomancer -> a Tarot.
 -- OWNERSHIP-GATED + run.rng, so a run without these jokers consumes no RNG (byte-identical stream).
+-- Poker hands To Do List can target (never High Card). -- VERIFY set (wiki).
+local TODO_HANDS = { "Pair", "Two Pair", "Three of a Kind", "Straight", "Flush",
+                     "Full House", "Four of a Kind", "Straight Flush" }
+
 local function blind_start_generators(run, rng)
   for _, j in ipairs(run.jokers or {}) do
     if j.key == "j_cartomancer" then grant_consumable_world(run, rng, "Tarot") end
+  end
+  -- JOKER_FIDELITY P1: Mail-In Rebate and To Do List each pick a fresh target every round.
+  for _, j in ipairs(run.jokers or {}) do
+    if j.key == "j_mail" then
+      run._mail_rank = 2 + math.floor(rng() * 13)             -- a random rank 2..14, $5 per discarded match
+    elseif j.key == "j_todo_list" then
+      run._todo_hand = TODO_HANDS[1 + math.floor(rng() * #TODO_HANDS)]  -- $4 if this hand is played
+    end
   end
 end
 World._blind_start_generators = blind_start_generators   -- exposed for the generator regression tests
@@ -857,6 +879,7 @@ function World.play_blind(run, blind)
     cleared = cleared, scored = b.scored, target = b.target, mr_bones_saved = mr_bones_saved,
     hands_used = plays, hands_left = b.hands_left, discards_left = b.discards_left,
     discards_start = discards,                            -- for Delayed Gratification (no discards used)
+    played_types = b.played_types,                        -- for To Do List (was the target hand played?)
     blind_type = b.type, boss_key = b.boss_key,
     plays = b.plays, consumable_uses = b.consumable_uses,  -- telemetry (P1/P4)
   }
@@ -957,6 +980,8 @@ local ECON_INCOME_EXCLUDE = {
   j_delayed_grat = true,  -- +$2 per discard, ONLY if no discards used         (conditional_econ)
   j_satellite = true,     -- +$1 per UNIQUE planet used this run, at round end  (conditional_econ)
   j_ticket = true,        -- +$4 per scored Gold card                          (post_play_econ)
+  j_mail = true,          -- +$5 per discarded card of the round's rank        (discard_econ)
+  j_todo_list = true,     -- +$4 if the round's target hand is played          (conditional_econ)
 }
 World.TO_THE_MOON_EXTRA = 1   -- extra $ of interest per $5 held -- VERIFY
 World.ROCKET_BASE       = 1   -- $/round -- VERIFY
@@ -1010,6 +1035,10 @@ local function conditional_econ(run, blind_result)
     local n = 0
     for _ in pairs(run._planets_used or {}) do n = n + 1 end   -- $1 per unique planet used this RUN
     m = m + n
+  end
+  if owns("j_todo_list") and run._todo_hand and blind_result.played_types
+     and blind_result.played_types[run._todo_hand] then
+    m = m + 4                                                   -- To Do List: $4 if the target hand was played
   end
   return m
 end
