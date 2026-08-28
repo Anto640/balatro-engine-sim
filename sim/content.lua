@@ -614,6 +614,27 @@ end
 Content._take_pack = take_pack   -- exposed for the Hallucination pack-open regression test
 
 -- Apply one shop action; returns true if it changed state (so the loop continues).
+-- Sell-triggered effects (JOKER_FIDELITY P2): fire when the joker is SOLD. -- VERIFY (wiki).
+--   Luchador  -> disable the next Boss Blind's effect (applied in World.play_blind).
+--   Diet Cola -> create a free Double Tag.
+--   Invisible -> duplicate a random OTHER owned joker (the 3-round gate is approximated away).
+local function sell_effects(run, j, rng)
+  if j.key == "j_luchador" then
+    run._disable_next_boss = true
+  elseif j.key == "j_diet_cola" then
+    run.tags = run.tags or {}; run.tags[#run.tags + 1] = "tag_double"
+  elseif j.key == "j_invisible" then
+    if #(run.jokers or {}) > 0 and #run.jokers < (run.joker_slots or 5) then
+      local pick = run.jokers[1 + math.floor((rng and rng() or 0) * #run.jokers)]
+      if pick then
+        run.jokers[#run.jokers + 1] = { key = pick.key, name = pick.name, sell_value = 1,
+          rarity = pick.rarity, ability = { extra = {} } }
+      end
+    end
+  end
+end
+Content._sell_effects = sell_effects   -- exposed for the fidelity tests
+
 local function apply_action(run, shop, a, rng)
   local tp = a.type
   if tp == "BUY_JOKER" and a.target then
@@ -652,6 +673,7 @@ local function apply_action(run, shop, a, rng)
   elseif tp == "SELL_JOKER" and a.target then
     for i, j in ipairs(run.jokers) do
       if j == a.target then
+        sell_effects(run, j, rng)    -- Luchador/Diet Cola/Invisible: sell-triggered effects
         run.economy.dollars = run.economy.dollars + (j.sell_value or 1); table.remove(run.jokers, i)
         note_negative_loss(run, j)   -- E-11: a sold negative joker takes its +1 slot with it
         JokerTick.on_joker_sold(run) -- Campfire +0.25x per joker sold
@@ -663,6 +685,7 @@ local function apply_action(run, shop, a, rng)
     -- sell the funder, then re-roll the loop so the now-affordable buy is taken next pass
     for i, j in ipairs(run.jokers) do
       if j == a.target then
+        sell_effects(run, j, rng)    -- Luchador/Diet Cola/Invisible: sell-triggered effects
         run.economy.dollars = run.economy.dollars + (j.sell_value or 1); table.remove(run.jokers, i)
         note_negative_loss(run, j)   -- E-11: a sold negative joker takes its +1 slot with it
         JokerTick.on_joker_sold(run) -- Campfire +0.25x per joker sold
@@ -952,6 +975,20 @@ function Content.shop_phase(run, opts)
     if sig ~= last_sig then emit_shop(run, shop, ranked); last_sig = sig end
     if ranked.best.type == "SAVE" then break end
     if not apply_action(run, shop, ranked.best, rng) then break end
+  end
+  -- Perkeo (JOKER_FIDELITY P2): on shop exit, create a Negative copy of a random held consumable.
+  -- Negative consumables take no slot, so grant a matching +1 consumable slot. -- VERIFY (1 copy, wiki).
+  do
+    local has_perkeo = false
+    for _, j in ipairs(run.jokers or {}) do if j.key == "j_perkeo" then has_perkeo = true; break end end
+    if has_perkeo and #(run.consumables or {}) > 0 then
+      local pick = run.consumables[1 + math.floor(rng() * #run.consumables)]
+      local copy = {}
+      for k, v in pairs(pick) do copy[k] = v end
+      copy.edition = "negative"
+      run.consumables[#run.consumables + 1] = copy
+      run.consumable_slots = (run.consumable_slots or 2) + 1
+    end
   end
   run._shop = nil; run._emit = nil
 end

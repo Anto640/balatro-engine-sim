@@ -788,6 +788,8 @@ function World.play_blind(run, blind)
   -- nulling eff before blind_resources also removes Needle/Water/Manacle resource penalties.
   if eff then
     for _, j in ipairs(run.jokers or {}) do if j.key == "j_chicot" then eff = nil; break end end
+    -- Luchador (JOKER_FIDELITY P2): a Luchador SOLD in the prior shop disables this Boss's effect.
+    if run._disable_next_boss then eff = nil; run._disable_next_boss = nil end
   end
 
   -- per-blind resources: base -> boss adjustments (Needle 1 hand / Water 0 discards / Manacle

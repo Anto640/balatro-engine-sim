@@ -141,6 +141,28 @@ return function(t)
     t.ok(shop.reroll_cost > 5, "...and the price escalates from the second reroll on")
   end
 
+  -- ---- JOKER_FIDELITY P2: sell-triggered effects (Luchador, Diet Cola, Invisible) ----
+  do
+    local rng = World.lcg(1)
+    -- Luchador: selling it flags the next boss to be disabled
+    local a = { jokers = {} }
+    Content._sell_effects(a, { key = "j_luchador" }, rng)
+    t.ok(a._disable_next_boss, "Luchador: selling it disables the next boss")
+    -- Diet Cola: selling it grants a free Double Tag
+    local b = { jokers = {}, tags = {} }
+    Content._sell_effects(b, { key = "j_diet_cola" }, rng)
+    t.ok(#b.tags == 1 and b.tags[1] == "tag_double", "Diet Cola: selling it grants a Double Tag")
+    -- Invisible: selling it duplicates a random owned joker (room permitting)
+    local c = { jokers = { { key = "j_baron", name = "Baron" } }, joker_slots = 5 }
+    Content._sell_effects(c, { key = "j_invisible" }, rng)
+    t.eq(#c.jokers, 2, "Invisible: selling it duplicates an owned joker")
+    t.eq(c.jokers[2].key, "j_baron", "...a copy of the owned joker")
+    -- ...but not when the board is full
+    local d = { jokers = { { key = "j_baron" }, { key = "j_baron" } }, joker_slots = 2 }
+    Content._sell_effects(d, { key = "j_invisible" }, rng)
+    t.eq(#d.jokers, 2, "Invisible: no duplicate when the board is full")
+  end
+
   -- ---- Telescope: a Celestial pack's first planet is your best (most-leveled) hand's ----
   do
     local r = World.new_run(5)
