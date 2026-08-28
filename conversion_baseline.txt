@@ -125,3 +125,42 @@ CAVEATS (do not over-claim):
     ships if it moves these agreement numbers toward the human AND is not significantly
     negative on the paired tail-verdict.
 ================================================================================
+
+================================================================================
+B' EXECUTED (2026-08-29) — pack/reroll spend-appetite vs banking
+================================================================================
+HYPOTHESIS (owner): "engine buys packs too much when poor, not enough when rich."
+CONFIRMED in money-bucketed data (rich runs, engine vs human pack-buy rate):
+  $5-9 poor      engine 17%  human 6%      below cap   engine 16-27%  human 10-11%
+  at cap $25-39  engine 20%  human 18%     rich $40+   engine 25-27%  human 17-20%
+  => engine pack appetite is money-FLAT; the human's RISES with money (banks poor, spends rich).
+
+ROOT CAUSE FOUND (and reverted): an interest_cap UNIT MISMATCH. The engine's economy model
+uses interest_cap in INTEREST-DOLLARS (5/10/20; M.RESERVE = cap*5); the sim honors it, but the
+LIVE G.GAME.interest_cap is the DOLLAR threshold (25/50/100 — confirmed in fixtures) and
+state_extraction copied it RAW. So the live overlay computed reserve targets 5x too high and
+over-charged the interest cost of spending when rich. FIXING it (Mechanics.norm_interest_cap at
+the POD boundary) was CORRECT but measured a large agreement REGRESSION on the harness:
+  after (interest fix only): eng_reroll_human_save +10.9pp, agree_save -11.4pp.
+WHY: the winners bank PAST the mechanical interest cap (option-value for a directed keystone,
+not interest optimization), and the OLD reroll/spend appetite was tuned around the bug (its
+5x-too-high reserve accidentally reproduced the human's over-banking). Four option-value-banking
+variants (bank_target reroll gate; pack damp; bankroll hold-target; reroll discipline) each
+recovered ~1.5pp but NONE beat base (after..after4: reroll +10.9 -> +9.5 -> +7.7 -> +6.4).
+=> the interest fix + banking thread was REVERTED (git reset to the harness commit). The finding
+stands as future work: shipping the correct interest math requires a validated option-value
+banking model (bank a war chest, taper in the endgame), tuned on a larger corpus with OOS
+confirmation, NOT on n=7.
+
+SHIPPED (the one clean lever, 20c146c, deployed live): PACK-POVERTY DISCIPLINE. Damp a
+speculative pack's POOL value below the max-interest bankroll (steeper-than-linear ^1.6, floor
+0.3), never when urgent, never the owned-synergy term. Dollar threshold is convention-robust
+((cap>=25)?cap:cap*5 = $25/50/100 on BOTH live and sim), so no broad interest change needed.
+  agreement (7-win corpus): eng_buy_human_save 264->258, NO channel regressed (agree_save +0.3).
+  winrate rail (paired n=48 vs clean base): Δ -0.042 progress (p 0.87 n.s.), wins 3=3, tail n.s.
+  => SAFE + advice-positive (the econ-work profile). Modest but correct-direction and no harm.
+CAVEAT: agreement gain is small and in-sample (n=7); the change is DIRECTION-motivated (human
+buys fewer poor packs, a robust measured fact) not a magnitude fit. Rail is a coarse n=48 safety
+screen (MDE ~0.74) — sufficient to rule out a large regression, not a small one.
+
+NEXT (unchanged): C' forward marginal (the 29% which-joker gap); D' pack-PICK conversion (37.5%).
