@@ -882,6 +882,29 @@ return function(t)
                   base_hands = 4, base_discards = 4, played_hand_types = {} } }
       t.eq(DE.decide(gs2).best.type, "PLAY", "no faces reachable -> no pointless search, just clear")
     end
+
+    -- GENERALIZED to every discard lever + a HARM GUARD (2026-08-28, engine/discard_fuel).
+    do
+      local function lever_state(jokers)
+        return GS.new{ jokers = jokers,
+          deck = (function() local d = {} for i = 1, 30 do d[i] = card{ id = 100 + i, rank = "7", suit = "Spades" } end return d end)(),
+          run = { hand_levels = {}, hand_size = 8 },
+          hand = {
+            card{ id = 1, rank = "Ace", suit = "Spades" }, card{ id = 2, rank = "Ace", suit = "Hearts" },  -- clear
+            card{ id = 3, rank = "King", rank_id = 13, suit = "Clubs" }, card{ id = 4, rank = "Queen", rank_id = 12, suit = "Diamonds" },
+            card{ id = 5, rank = "Jack", rank_id = 11, suit = "Spades" }, card{ id = 6, rank = "9", rank_id = 9, suit = "Hearts" },
+          },
+          blind = { target_chips = 30, chips_scored = 0, hands_left = 4, discards_left = 3,
+                    base_hands = 4, base_discards = 4, played_hand_types = {} } }
+      end
+      -- Mail-In Rebate: farms $ by discarding cards of its rank (generalized beyond Faceless)
+      local mail = DE.decide(lever_state({ joker{ key = "j_mail", ability = { extra = { rank = 13 } } } })).best
+      t.eq(mail.type, "DISCARD", "generalized dig: Mail-In farms its rank, not just Faceless")
+      t.ok(mail.farms_money, "...and it banks money")
+      -- HARM GUARD: owning Ramen (a persistent xmult that self-destructs) must BLOCK the money dig
+      local ramen = DE.decide(lever_state({ joker{ key = "j_faceless" }, joker{ key = "j_ramen" } })).best
+      t.eq(ramen.type, "PLAY", "harm guard: never bleed Ramen's xmult to farm a few dollars -> just clear")
+    end
   end
 
   -- ---- keep_value pitches DEBUFFED cards first (2026-08-27, run MALEJYHW) ----

@@ -177,10 +177,14 @@ end
 -- This is what lets the engine reason about e.g. "discard 7s for money".
 function H.discard_econ(gs, cards)
   local d, notes = 0, {}
-  -- Faceless Joker: $5 if 3+ face cards discarded at once
+  -- Faceless Joker: $5 if 3+ face cards discarded at once. Pareidolia makes EVERY card count as a
+  -- face; a debuffed card counts for nothing (both were previously ignored here).
   if has_joker(gs, "j_faceless") then
+    local pareidolia = has_joker(gs, "j_pareidolia")
     local faces = 0
-    for _, c in ipairs(cards) do if Cards.is_face(c) then faces = faces + 1 end end
+    for _, c in ipairs(cards) do
+      if (pareidolia or Cards.is_face(c)) and not HandEval.is_debuffed(gs, c) then faces = faces + 1 end
+    end
     if faces >= 3 then d = d + 5; notes[#notes + 1] = "Faceless +$5" end
   end
   -- Trading Card: $3 when the first discard is a single card

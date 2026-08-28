@@ -19,6 +19,7 @@ local Tarot = require("engine.tarot")
 local Search = require("engine.search")
 local Simulation = require("engine.simulation")
 local ScalingFuel = require("engine.scaling_fuel")
+local DiscardFuel = require("engine.discard_fuel")
 local Eval = require("engine.eval_function")
 local DeckPlan = require("engine.deck_plan")
 local Cards = require("util.cards")
@@ -462,52 +463,73 @@ function DE.decide(gs, opts)
   -- this safe (not a death) is a survival estimate: Simulation.survive_after must show the clear is
   -- still near-certain after the aggressive farm (like MILK's frac gate). Relax `keep` from "the whole
   -- current play" toward "only the minimum a future clear needs" as (hands_left+discards_left) grows.
-  local want_money_dig = DE.DIG_FOR_MONEY and owns(gs, "j_faceless")
+  -- GENERAL: any owned discard lever (Faceless/Mail/Trading money, or a discard-fed scaler) -- valued
+  -- and harm-guarded by engine/discard_fuel, so the dig works every applicable joker and refuses to
+  -- BLEED a loser (Ramen/Green Joker) for less than it earns.
+  local want_money_dig = DE.DIG_FOR_MONEY and DiscardFuel.has_lever(gs)
   if (DE.DIG_SURPLUS or want_money_dig) and guaranteed and discards_left > 0
      and hands_left >= DE.DIG_MIN_HANDS and #hand > 0 then
     local keep = {}
     if DE.DIG_KEEP_GUARANTEE then
       for _, c in ipairs(play_cards or {}) do keep[c] = true end
     end
-    -- DiscardValue.keep_value already prices held value (a plain card <= ~11, any enhancement/edition
-    -- >= 25, a debuffed card < 0), so pitching by it never throws a Gold/Steel/Glass card. Pareidolia
-    -- makes every card a face; a debuffed card counts for nothing even so.
-    local pareidolia = owns(gs, "j_pareidolia")
-    local function is_face(c) return (pareidolia or Cards.is_face(c)) and not HandEval.is_debuffed(gs, c) end
-    local spare_faces, spare_chaff = {}, {}
+    -- DiscardValue.keep_value prices held value (a plain card <= ~11, any enhancement/edition >= 25, a
+    -- debuffed card < 0), so pitching by it never throws a Gold/Steel/Glass card.
+    local spare = {}
     for _, c in ipairs(hand) do
-      if not keep[c] and DiscardValue.keep_value(c, gs) < DE.DIG_MAX_KEEP then
-        if is_face(c) then spare_faces[#spare_faces + 1] = c else spare_chaff[#spare_chaff + 1] = c end
-      end
+      if not keep[c] and DiscardValue.keep_value(c, gs) < DE.DIG_MAX_KEEP then spare[#spare + 1] = c end
     end
     local function by_keep(a, b) return DiscardValue.keep_value(a, gs) < DiscardValue.keep_value(b, gs) end
-    table.sort(spare_faces, by_keep); table.sort(spare_chaff, by_keep)
-    local pitch, dig_money, mode = {}, 0, nil
-    if want_money_dig and #spare_faces >= 3 then
-      for i = 1, math.min(5, #spare_faces) do pitch[i] = spare_faces[i] end   -- FARM: 3+ faces -> $5 now
-      dig_money, mode = 5, "farm"
-    elseif want_money_dig and #spare_chaff > 0 and deck_has_faces(gs, pareidolia) then
-      for i = 1, math.min(5, #spare_chaff) do pitch[i] = spare_chaff[i] end   -- SEARCH: keep faces, pitch chaff
-      mode = "search"
-    elseif DE.DIG_SURPLUS then
-      local all = {}                                                          -- general probe: cheapest chaff
-      for _, c in ipairs(spare_chaff) do all[#all + 1] = c end
-      for _, c in ipairs(spare_faces) do all[#all + 1] = c end
-      table.sort(all, by_keep)
-      for i = 1, math.min(5, #all) do pitch[i] = all[i] end
+    table.sort(spare, by_keep)                                    -- cheapest chaff first
+    local pareidolia = owns(gs, "j_pareidolia")
+    local function is_face(c) return (pareidolia or Cards.is_face(c)) and not HandEval.is_debuffed(gs, c) end
+    -- candidate pitches, one per lever family (cheapest matching spare cards):
+    local function pick(pred, cap)
+      local out = {}
+      for _, c in ipairs(spare) do if pred(c) and #out < (cap or 5) then out[#out + 1] = c end end
+      return out
+    end
+    local cands = {}
+    if want_money_dig then
+      cands[#cands + 1] = pick(is_face, 5)                        -- Faceless (3+ faces) / Hit the Road (Jacks)
+      if owns(gs, "j_mail") or owns(gs, "j_castle") or owns(gs, "j_yorick") then
+        cands[#cands + 1] = pick(function() return true end, 5)   -- Mail (rank) / Castle (suit) / Yorick (any)
+      end
+      if owns(gs, "j_trading") then cands[#cands + 1] = pick(function() return true end, 1) end  -- Trading (single)
+    end
+    -- FARM: the highest-value, non-harmful lever pitch (DiscardFuel prices $ + scaler feed - harm).
+    local pitch, mode, note, best_v = {}, nil, nil, 0
+    for _, cand in ipairs(cands) do
+      if #cand > 0 then
+        local v, n, harm = DiscardFuel.value(gs, cand)
+        if v > best_v and not harm then pitch, best_v, mode, note = cand, v, "farm", n end
+      end
+    end
+    -- SEARCH (Faceless only): no farm yet, but keep faces and pitch chaff to draw TOWARD a 3-face
+    -- trigger. Never when a discard would bleed Ramen/Green Joker.
+    if mode == nil and want_money_dig and owns(gs, "j_faceless") and not DiscardFuel.bleeds_scaler(gs)
+       and deck_has_faces(gs, pareidolia) then
+      local chaff = pick(function(c) return not is_face(c) end, 5)
+      if #chaff > 0 then pitch, mode = chaff, "search" end
+    end
+    -- general free-redraw probe (DE.DIG_SURPLUS), unrelated to jokers
+    if mode == nil and DE.DIG_SURPLUS then
+      for i = 1, math.min(5, #spare) do pitch[i] = spare[i] end
       mode = "probe"
     end
     if #pitch > 0 and mode then
+      local money = (select(1, Heuristics.discard_econ(gs, pitch)))
       dig_action = {
         type = "DISCARD", cards = pitch,
-        -- ranked ABOVE the play: while the clear is locked the play banks nothing extra, and the dig
-        -- is a free discard. It stops as soon as discards run out.
+        -- ranked ABOVE the play: while the clear is locked the play banks nothing extra, and a spare
+        -- discard is free. It stops as soon as discards run out.
         value = (play_action and play_action.value or 0) + 1,
-        surplus_dig = true, farms_money = dig_money > 0, banked_money = dig_money,
+        surplus_dig = true, farms_money = money > 0, banked_money = money,
         money_dig = (mode == "farm" or mode == "search"),
-        reason = (mode == "farm") and string.format(
-            "Discard %d face cards to farm $%d from Faceless — the clear is locked and the cards return to your deck.",
-            #pitch, dig_money)
+        reason = (mode == "farm") and (money > 0
+            and string.format("Discard %d to farm $%d (%s) — the clear is locked, the cards return to your deck.",
+                  #pitch, money, note or "econ joker")
+            or string.format("Discard %d to work your econ joker (%s) — the clear is locked.", #pitch, note or ""))
           or (mode == "search") and
             "Dig toward Faceless: keep your face cards and pitch chaff to build a 3-face discard for $5 (clear is locked)."
           or string.format(
