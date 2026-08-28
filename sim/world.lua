@@ -589,6 +589,24 @@ local function discard_econ(run, discarded)
 end
 World._discard_econ = discard_econ   -- exposed for the fidelity tests
 
+-- First-discard-of-round effects (JOKER_FIDELITY P2): Burnt upgrades the LEVEL of the first discarded
+-- poker hand; Sixth Sense turns a first discard of a SINGLE 8 into a Spectral (destroying the 8).
+local function discard_effects(run, discarded, is_first, rng)
+  if not is_first or not discarded or #discarded == 0 then return end
+  for _, j in ipairs(run.jokers or {}) do
+    if j.key == "j_burnt" then
+      local ht = HandEval.analyze(discarded, {})
+      if ht then level_hand_world(run, ht, 1) end               -- Burnt: +1 level to the discarded hand
+    elseif j.key == "j_sixth_sense" then
+      if #discarded == 1 and Cards.rank_id(discarded[1]) == 8 then
+        for i = #run.deck, 1, -1 do if run.deck[i] == discarded[1] then table.remove(run.deck, i); break end end
+        grant_consumable_world(run, rng, "Spectral")            -- Sixth Sense: destroy the 8 -> a Spectral
+      end
+    end
+  end
+end
+World._discard_effects = discard_effects   -- exposed for the fidelity tests
+
 -- Space Joker (JOKER_FIDELITY P0, leveling): a 1/4 chance to level up the PLAYED hand, on every play.
 -- The world used to ignore it entirely, so a run leaning on Space accrued none of the levels it earns.
 -- Only consumes RNG when Space is actually owned, so non-Space runs stay byte-identical. -- VERIFY 1/4.
@@ -809,10 +827,13 @@ function World.play_blind(run, blind)
     if action.type == "DISCARD" and b.discards_left > 0 then
       local discarded = action.cards
       local avail = #hand
+      local is_first_discard = not b._first_discard_done
+      b._first_discard_done = true
       hand = remove_cards(hand, action.cards)
       b.discards_left = b.discards_left - 1
       JokerTick.on_discard(run, discarded)   -- A1: Green Joker -1, Ramen decay (may self-destruct)
       discard_econ(run, discarded)           -- effort economy: Faceless $5 per 3+ face discarded
+      discard_effects(run, discarded, is_first_discard, rng)  -- Burnt (level) / Sixth Sense (spectral)
       log_action("discard", discarded, nil, nil, avail, #draw_pile)
       refill(hand, draw_pile, hand_size)
 

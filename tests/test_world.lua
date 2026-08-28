@@ -257,6 +257,30 @@ return function(t)
     t.eq(#rr2.jokers, 5, "Riff-Raff: only fills the free slot(s) -> board capped at 5")
   end
 
+  -- ---- JOKER_FIDELITY P2: Burnt (level first discarded hand) + Sixth Sense (single-8 -> spectral) ----
+  do
+    local card = require("model.game_state").card
+    -- Burnt: the FIRST discard's poker hand is leveled
+    local burnt = { jokers = { { key = "j_burnt" } }, hand_levels = {} }
+    local pair = { card{ rank = "King", rank_id = 13, suit = "Hearts" },
+                   card{ rank = "King", rank_id = 13, suit = "Spades" } }
+    World._discard_effects(burnt, pair, true, World.lcg(1))
+    t.ok((burnt.hand_levels.Pair and burnt.hand_levels.Pair.level or 1) > 1, "Burnt: first discarded Pair is leveled")
+    -- only the FIRST discard, not later ones
+    local burnt2 = { jokers = { { key = "j_burnt" } }, hand_levels = {} }
+    World._discard_effects(burnt2, pair, false, World.lcg(1))
+    t.ok(not burnt2.hand_levels.Pair, "Burnt: only the first discard of the round levels")
+
+    -- Sixth Sense: a first discard of a single 8 destroys it (removed from deck). slots=0 -> no spectral gen.
+    local eight = card{ rank = "8", rank_id = 8, suit = "Clubs" }
+    local ss = { jokers = { { key = "j_sixth_sense" } }, deck = { eight, card{ rank = "2", rank_id = 2, suit = "Spades" } },
+                 consumables = {}, consumable_slots = 0 }
+    World._discard_effects(ss, { eight }, true, World.lcg(1))
+    local has8 = false
+    for _, c in ipairs(ss.deck) do if c == eight then has8 = true end end
+    t.ok(not has8, "Sixth Sense: a discarded single 8 is destroyed (removed from deck)")
+  end
+
   -- ---- boss min-ante gating + no-repeat (source: balatrowiki Blinds_and_Antes) ----
   do
     t.eq(#World.eligible_bosses(1), 8, "ante 1 has exactly the 8 easy bosses")

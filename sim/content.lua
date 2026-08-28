@@ -189,7 +189,12 @@ end
 
 local function owned_joker_keys(run)
   local set = {}
-  for _, j in ipairs(run.jokers or {}) do set[j.key] = true end
+  -- Showman (JOKER_FIDELITY P2): allows DUPLICATE jokers/consumables/cards to be generated, so the
+  -- dup-avoidance filter is disabled while it is owned -- an empty owned-set lets duplicates through.
+  for _, j in ipairs(run.jokers or {}) do
+    if j.key == "j_ring_master" then return {} end
+    set[j.key] = true
+  end
   return set
 end
 
