@@ -22,7 +22,8 @@
 -- Everything pcall'd + logged to bes_autoplay.log (the in-game logger only print()s). Defaults OFF.
 
 local Autoplay = { enabled = false, locked_until = 0, last_sig = nil,
-                   STABLE_HOLD = 0.6, pending_id = nil, pending_since = 0 }
+                   STABLE_HOLD = 0.6, pending_id = nil, pending_since = 0,
+                   MAX_WAIT = 3.0, wait_sig = nil, wait_since = 0 }
 
 local function now() return (love and love.timer and love.timer.getTime()) or 0 end
 local function flog(msg)
@@ -411,6 +412,8 @@ function Autoplay.tick(last, logger)
   if not ch then return end
   local s = sig(G, ch)
   if s == Autoplay.last_sig then return end
+  -- how long we've been on THIS state without acting (drives the deadlock-breaker below)
+  if s ~= Autoplay.wait_sig then Autoplay.wait_sig = s; Autoplay.wait_since = now() end
 
   -- Dump each screen type ONCE per session so booster/pack/cash-out mechanisms are captured automatically.
   Autoplay._dumped = Autoplay._dumped or {}
@@ -427,17 +430,31 @@ function Autoplay.tick(last, logger)
   local best = last and last.ranked and last.ranked.best
   if not best then return end
   if not type_ok(ch, best.type) then return end
-  if not fresh(G, last.gs, ch) then return end
+  local isfresh = fresh(G, last.gs, ch)
+  -- diagnostic (once per state): what the engine wants + whether the decision matches the live state,
+  -- so a stall is explainable from the log rather than guessed.
+  if s ~= Autoplay._diag_sig then
+    Autoplay._diag_sig = s
+    flog("[tick] " .. ch .. " best=" .. tostring(best.type)
+      .. " tgt=" .. tostring(best.target and (best.target.key or best.target.name))
+      .. " fresh=" .. tostring(isfresh))
+  end
+  if not isfresh then return end
 
   -- DECISION-STABILITY GATE: the engine's Monte-Carlo refine can CHANGE the recommendation a couple of
   -- seconds after the cheap pass, so acting instantly risks executing a decision it's about to revise.
-  -- Require the (state + action) to hold UNCHANGED for STABLE_HOLD before committing. Resets on change.
+  -- Require the (state + action) to hold UNCHANGED for STABLE_HOLD before committing.
+  -- DEADLOCK-BREAKER: if the top action flickers so the gate never settles, don't wait forever — after
+  -- MAX_WAIT on the SAME state, act on the current best anyway (this was the "stuck on SAVE" stall).
+  local forced = (now() - (Autoplay.wait_since or now())) > Autoplay.MAX_WAIT
   local act_id = s .. "|" .. tostring(best.type) .. "|"
     .. tostring(best.target and (best.target.key or best.target.name) or (best.cards and #best.cards) or "")
-  if act_id ~= Autoplay.pending_id then
-    Autoplay.pending_id = act_id; Autoplay.pending_since = now(); return   -- new/changed -> start the timer
+  if not forced then
+    if act_id ~= Autoplay.pending_id then
+      Autoplay.pending_id = act_id; Autoplay.pending_since = now(); return   -- new/changed -> start the timer
+    end
+    if now() - (Autoplay.pending_since or 0) < Autoplay.STABLE_HOLD then return end   -- not stable yet
   end
-  if now() - (Autoplay.pending_since or 0) < Autoplay.STABLE_HOLD then return end   -- not stable yet
 
   -- PHASE 0 — JOKER REORDER. The engine attaches the optimal joker order to a PLAY (best.reorder); apply
   -- it BEFORE selecting/playing so the hand scores what the engine intends (order is a real score swing).
