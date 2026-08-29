@@ -35,6 +35,18 @@ T.RANK = { c_strength = true, c_death = true }
 T.THIN = { c_hanged_man = 2 }
 T.THIN_CREDIT = 0.05   -- future-value credit per thinned card (as a fraction of the base play)
 
+-- SPECTRALS that target ONE selected card: a SEAL (Talisman gold / Deja Vu red / Trance blue /
+-- Medium purple) or an EDITION (Aura foil/holo/poly). Best applied to the highest-value card without
+-- that modifier already. (Ectoplasm/Familiar/Grim/Incantation act on RANDOM cards -> no selection;
+-- Ouija/Sigil/Cryptid convert ALL cards -> no selection; Hex/Ankh target JOKERS, handled elsewhere.)
+T.SPECTRAL_TARGET = {
+  c_talisman = { kind = "seal",    n = 1 },  -- Gold Seal
+  c_deja_vu  = { kind = "seal",    n = 1 },  -- Red Seal (retrigger)
+  c_trance   = { kind = "seal",    n = 1 },  -- Blue Seal (makes a Planet)
+  c_medium   = { kind = "seal",    n = 1 },  -- Purple Seal (makes a Tarot)
+  c_aura     = { kind = "edition", n = 1 },  -- Foil / Holographic / Polychrome
+}
+
 -- F6 timing. Hermit's payout grows with bankroll up to +$20, so preserve that
 -- option until it is maxed (the shop advisor may still cash it early to unlock a
 -- concrete high-value purchase). Temperance has no in-blind growth mechanism, so
@@ -199,6 +211,44 @@ function T.best_targets(gs, key, pool)
     if #out == 0 then return nil end
     return out, suit
   end
+  -- helper: the N highest-value cards from `pool` matching `ok(c)` (chips desc, id tiebreak).
+  local function top_n(ok, n)
+    local cand = {}
+    for _, c in ipairs(pool) do if not Cards.is_stone(c) and ok(c) then cand[#cand + 1] = c end end
+    table.sort(cand, function(a, b)
+      local ca, cb = Cards.chips(a), Cards.chips(b)
+      if ca ~= cb then return ca > cb end
+      return (a.id or 0) < (b.id or 0)
+    end)
+    local out = {}
+    for k = 1, math.min(n, #cand) do out[k] = cand[k] end
+    return out
+  end
+  -- RANK — Strength: +1 rank to the 2 highest NON-ACE cards (Ace would wrap). Mirrors apply_to_hand.
+  if key == "c_strength" then
+    local out = top_n(function(c) return (Cards.rank_id(c) or 0) < 14 end, 2)
+    return (#out > 0) and out or nil
+  end
+  -- RANK — Death: select the 2 highest; the lower becomes a copy of the higher (a pair). Both are chosen.
+  if key == "c_death" then
+    local out = top_n(function() return true end, 2)
+    if #out < 2 or Cards.rank_id(out[1]) == Cards.rank_id(out[2]) then return nil end
+    return out
+  end
+  -- THIN — Hanged Man etc.: DESTROY the n WEAKEST cards (same order the sim world uses).
+  if T.THIN[key] then
+    local t = T.thin_targets(pool, T.THIN[key])
+    return (#t > 0) and t or nil
+  end
+  -- SPECTRAL — a seal/edition on 1 card: the highest-value card that doesn't already have one.
+  local sp = T.SPECTRAL_TARGET[key]
+  if sp then
+    local out = top_n(function(c)
+      return not ((sp.kind == "seal" and c.seal ~= nil) or (sp.kind == "edition" and c.edition ~= nil))
+    end, sp.n)
+    if #out == 0 then out = top_n(function() return true end, sp.n) end   -- all have one -> take the best
+    return (#out > 0) and out or nil
+  end
   return nil
 end
 
@@ -295,17 +345,19 @@ function T.best_use(gs, base_ev, remaining, dollar_value)
         -- Hanged Man: destroy the worst chaff cards (permanent thinning). Only worth it when
         -- removing them does NOT hurt this hand's best play (delete cards outside it), so
         -- scoring is preserved and every FUTURE draw improves. Credit the permanent thinning.
-        local dead = {}
-        for _, tc in ipairs(T.thin_targets(hand, T.THIN[c.key])) do dead[tc] = true end
+        local deadlist = T.thin_targets(hand, T.THIN[c.key])
+        local dead, tcards = {}, {}
+        for _, tc in ipairs(deadlist) do dead[tc] = true; tcards[#tcards + 1] = { id = tc.id } end
         local kept = {}
         for _, cc in ipairs(hand) do if not dead[cc] then kept[#kept + 1] = cc end end
         if #kept >= 5 then
           local ev2, cards2 = HandEval.best_play_target(with_hand(gs, kept), kept, remaining)
           local ndel = #hand - #kept
           if ev2 and ev2.score >= base * 0.98 and ndel > 0 then
-            consider({ type = "USE_CONSUMABLE", target = { name = name }, kind = "score",
+            consider({ type = "USE_CONSUMABLE", target = { name = name, key = c.key }, kind = "score",
               play_cards = cards2, hand_type = ev2.hand_type, score = ev2.score,
               value = ev2.score + T.THIN_CREDIT * ndel * math.max(base, 1),
+              target_cards = tcards, use_keys = { c.key },
               reason = string.format("Use %s to thin %d weak card(s) (permanent), then play %s.",
                 name, ndel, ev2.hand_type or "") })
           end
