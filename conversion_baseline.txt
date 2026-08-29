@@ -228,3 +228,34 @@ OPTION-VALUE BANKING model (bank a war chest past the mechanical cap, taper in t
 paired with the (correct) interest_cap unit fix so the two co-calibrate instead of fighting.
 The durable asset is tools/agreement_run.sh — every future economy change gets a clean
 before/after against the winners.
+
+================================================================================
+THE 4 ENGINE-FOLLOWED LOSSES (2026-08-29) — the smoking gun: UNDER-LEVELING
+================================================================================
+Owner clarification: the 7 wins were the owner playing overlay-HIDDEN (their own line);
+the 4 losses were the owner FOLLOWING THE ENGINE + commenting. So the 4 losses are the
+ENGINE'S OWN failures. Replayed the current engine over all 4 (tools/decision_review.lua):
+
+  seed      died   score/need     hand-lv  board at death
+  45SHRPEF  a4     4508/10000     +0       egg, hanging_chad, HOLOGRAM, CAVENDISH(xmult), marble
+  9UZ3Q5Q5  a3     2410/3000(80%) +0       hiker, faceless, crazy, 8ball, satellite (econ-heavy)
+  Z9PBGTL2  a3     7352/8000(92%) +0       smiley, drunkard, ice_cream, CONSTELLATION(xmult), golden
+  MALEJYHW  a2     1520/3200      +0       odd_todd, egg  (died to the CHURN fixed this session)
+
+3 of 4 died with hand-lv ~0 and an xmult core multiplying a LEVEL-1 base (the exact failure
+the docs name). 2 were NEAR-MISSES (80%, 92%) a little leveling would have cleared. What the
+owner actually leveled while following the engine: 45SHRPEF 4x TAROTS + 0 planets; 9UZ3Q5Q5
+1 tarot; MALEJYHW 1 planet; Z9PBGTL2 none — ~1 planet across 4 runs. The engine steered to
+tarots (card tweaks), essentially never leveling. Current-engine Celestial valuation is
+partly improved (level_gain fix: 45SHRPEF Celestial 5.6/3.9) but inconsistent (9UZ3Q5Q5 0.8),
+and leveling loses to joker/tarot buys so it never concentrates.
+
+=> THE CONVERSION GAP, MADE CONCRETE, IS A LEVELING GAP: the engine converts money into
+   jokers/econ but NOT into hand LEVELS (the power axis). Winners level hard (15-18 hand-lv by
+   ante 8, 70% after ante 4); the engine's followed runs die at ~0. This is the one channel §5s
+   says engine+winner AGREE on (planets, 0 discordant) but §5z says the engine UNDER-BUYS
+   (Celestial 6.3%). The lever: make the engine ACQUIRE + CONCENTRATE leveling mid-late game
+   with a core, and not let a tarot/joker out-rank it. ⚠ CHECK: the shipped pack-poverty damp
+   also damps CELESTIAL packs when poor — leveling is a DIRECTED build action, not a speculative
+   gamble, so it likely should be EXEMPT. Measure any leveling change on tools/agreement_run.sh
+   (does it match the winners' leveling) + the winrate rail.
