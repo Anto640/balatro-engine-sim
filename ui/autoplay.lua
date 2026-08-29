@@ -32,11 +32,60 @@ end
 local function log(logger, msg) if logger then logger("[autoplay] " .. msg) end flog(msg) end
 Autoplay.flog = flog
 
+-- One-shot structural dump of the LIVE UI, to bes_autoplay.log — so we can see where Balatro actually
+-- keeps its buttons (my first guesses at G.I.UIBOX / .nodes / config.button found nothing). Runs on each
+-- F11-ON so it can be triggered at different screens (blind select, shop, pack) to map every button.
+function Autoplay.dump_ui(G)
+  flog("--- UI DUMP (state=" .. tostring(G.STATE) .. ") ---")
+  local gk = {}
+  for k, v in pairs(G) do if type(v) == "table" then gk[#gk + 1] = tostring(k) end end
+  table.sort(gk); flog("G tables: " .. table.concat(gk, ", "))
+  for _, name in ipairs({ "I", "OVERLAY_MENU", "HUD", "blind_select", "shop", "buttons", "STAGE_OBJECTS", "MID" }) do
+    local v = G[name]
+    if v == nil then flog("G." .. name .. " = nil")
+    elseif type(v) == "table" then
+      local kk = {}; for k2 in pairs(v) do kk[#kk + 1] = tostring(k2) end; table.sort(kk)
+      flog("G." .. name .. " keys: " .. table.concat(kk, ", "):sub(1, 400))
+    else flog("G." .. name .. " = " .. type(v)) end
+  end
+  if type(G.I) == "table" then
+    for k, v in pairs(G.I) do if type(v) == "table" then
+      local n = 0; for _ in pairs(v) do n = n + 1 end; flog("  G.I." .. tostring(k) .. " (#" .. n .. ")")
+    end end
+  end
+  -- generic bounded walk over the on-screen UI containers: find config.button/func and the child field name
+  local found, seen, count, childfields = {}, {}, 0, {}
+  local function walk(node, depth)
+    if count > 40000 or type(node) ~= "table" or depth > 22 or seen[node] then return end
+    seen[node] = true; count = count + 1
+    local cfg = node.config
+    if type(cfg) == "table" then
+      if cfg.button then found["btn:" .. tostring(cfg.button)] = true end
+      if cfg.func then found["func:" .. tostring(cfg.func)] = true end
+    end
+    for k, v in pairs(node) do
+      if type(v) == "table" and k ~= "config" and k ~= "parent" and k ~= "UIBox" then
+        if (k == "nodes" or k == "children" or k == "UIRoot") then childfields[tostring(k)] = true end
+        walk(v, depth + 1)
+      end
+    end
+  end
+  pcall(function()
+    for _, r in ipairs({ G.OVERLAY_MENU, G.HUD, G.blind_select, G.shop, G.STAGE_OBJECTS, G.I }) do walk(r, 0) end
+  end)
+  local list = {}; for k in pairs(found) do list[#list + 1] = k end; table.sort(list)
+  local cf = {}; for k in pairs(childfields) do cf[#cf + 1] = k end
+  flog("child-fields seen: [" .. table.concat(cf, ", ") .. "]  visited " .. count)
+  flog("buttons/funcs (generic walk): [" .. table.concat(list, ", ") .. "]")
+  flog("--- END UI DUMP ---")
+end
+
 function Autoplay.toggle()
   Autoplay.enabled = not Autoplay.enabled
   Autoplay.locked_until = now() + 1.0
   Autoplay.last_sig = nil
   flog("==== AUTO-PLAY " .. (Autoplay.enabled and "ON" or "OFF") .. " ====")
+  if Autoplay.enabled then pcall(Autoplay.dump_ui, _G.G) end
   return Autoplay.enabled
 end
 
