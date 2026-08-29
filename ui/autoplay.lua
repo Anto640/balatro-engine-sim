@@ -351,6 +351,9 @@ local function do_shop(G, best, logger)
     log(logger, "buy (click card) " .. tostring(ckey(card) or (best.target and best.target.name)))
     local ok = pcall(function() card:click() end)
     if not ok then log(logger, "card:click() failed") end
+    -- capture the shop AFTER selecting the pack, so we can see the open/buy button it exposes.
+    if not Autoplay._dumped_postpack then Autoplay._dumped_postpack = true
+      flog("(post-pack-click dump follows)"); pcall(Autoplay.dump_ui, G) end
     return ok
   end
   return false
@@ -381,14 +384,15 @@ function Autoplay.tick(last, logger)
   local s = sig(G, ch)
   if s == Autoplay.last_sig then return end
 
+  -- Dump each screen type ONCE per session so booster/pack/cash-out mechanisms are captured automatically.
+  Autoplay._dumped = Autoplay._dumped or {}
+  if not Autoplay._dumped[ch] then Autoplay._dumped[ch] = true; pcall(Autoplay.dump_ui, G) end
+
   if ch == "cash_out" then
     Autoplay.locked_until = now() + 1.0
-    if click(G, "cash_out", logger) then Autoplay.last_sig = s
-    else
-      -- cash_out button not where expected; capture this screen's structure ONCE so we can map it.
-      if not Autoplay._dumped_cash then Autoplay._dumped_cash = true; pcall(Autoplay.dump_ui, G) end
-      Autoplay.last_sig = s
-    end
+    -- do NOT set last_sig on failure — retrying until the cash-out button is clickable is what makes it
+    -- work (it succeeded before this guard was added).
+    if click(G, "cash_out", logger) then Autoplay.last_sig = s end
     return
   end
 
