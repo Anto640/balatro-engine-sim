@@ -192,3 +192,39 @@ the thin CURRENT board (a forward-marginal fix). Two scoping steps killed it:
    directed joker buy 39% of the time (Phase A §3), i.e. the SAME spend-discipline gap as
    B'. The conversion frontier collapses toward ECONOMY/SPEND DISCIPLINE (B', partially
    shipped as pack-poverty) and the pack-PICK channel (D'), NOT joker valuation (C').
+
+================================================================================
+D' SCOPED (2026-08-29) — pack-PICK is within-category (which tarot / which hand)
+================================================================================
+Rich-run pack picks with a diffable human pick: 149 (same 30%). The disagreements are
+~90% WITHIN category, NOT the old "enhance vs shape/money/level" story (§5s):
+  engine tarot  -> human tarot  : 48   (a DIFFERENT tarot — hard-to-value utility)
+  engine planet -> human planet : 30   (a DIFFERENT hand to LEVEL)
+  engine joker  -> human joker  :  6
+  enhance/skip/tarot cross-picks: a handful
+The PLANET disagreements are "which hand to level" — the human levels their COMMITTED
+hand (run MV9UMYKG repeatedly takes c_earth / c_eris = Full House / Flush Five) while the
+engine levels a different one. That is the COMMITMENT / build-direction problem (BP.commitment /
+planet_credit), which archetype planning (§24 oracle_plan) already measured NULL. The tarot
+disagreements are fine-grained utility valuation. Data is thin (dominated by one run).
+=> D' is fine-grained and tied to the hard commitment problem — NOT a clean shippable lever.
+
+================================================================================
+CONVERSION INVESTIGATION — OVERALL CONCLUSION (2026-08-29)
+================================================================================
+Measured on the AGREEMENT instrument (the non-ceilinged advice-quality ruler), the
+conversion gap is NOT what CONVERSION_PLAN.md hypothesized:
+  * NOT product-scoring / target-modeling (§32 target model already OOS-failed; not re-opened).
+  * NOT joker VALUATION (C' REFUTED — engine ranks the human's multiplier #1 91% of the time).
+  * NOT pack-PICK card choice (D' is within-category + tied to the hard commitment problem).
+The gap is ECONOMY / SPEND DISCIPLINE: the engine dissipates money on packs/rerolls where the
+winners BANK (option-value, past the mechanical interest cap) and buy DIRECTED pieces. This is
+consistent across Phase A (#1 gap = pack over-buy), B' (the interest-cap unit bug + the
+option-value banking finding) and C'/D' (which collapse back into it).
+SHIPPED: pack-poverty discipline (bank toward the cap before gambling on a pack) — safe +
+advice-positive, the clean slice of the economy lever.
+OPEN (future, needs a BIGGER corpus + OOS discipline — winner's-curse risk on n=7): the full
+OPTION-VALUE BANKING model (bank a war chest past the mechanical cap, taper in the endgame),
+paired with the (correct) interest_cap unit fix so the two co-calibrate instead of fighting.
+The durable asset is tools/agreement_run.sh — every future economy change gets a clean
+before/after against the winners.
