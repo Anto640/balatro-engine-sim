@@ -449,6 +449,30 @@ function Autoplay.tick(last, logger)
     return
   end
 
+  -- SELL (owned joker/consumable) is two-phase: there is NO persistent sell button — you SELECT the
+  -- owned card (click it, its sell_card button then appears), then click sell.
+  if ch == "shop" and best.type and best.type:find("^SELL") then
+    local card = find_card({ G.jokers, G.consumeables }, best.target)
+    if not card then log(logger, "SELL: owned card not found (" .. tostring(best.target and best.target.key) .. ")"); Autoplay.last_sig = s; return end
+    if not card.highlighted then
+      log(logger, "select to sell " .. tostring(ckey(card))
+        .. (best.reason and ("  | ENGINE REASON: " .. tostring(best.reason):sub(1, 160)) or ""))
+      pcall(function() card:click() end)
+      if not Autoplay._dumped_sell then Autoplay._dumped_sell = true; flog("(post-sell-select dump)"); pcall(Autoplay.dump_ui, G) end
+      Autoplay.locked_until = now() + 0.4
+      return
+    end
+    log(logger, "confirm sell " .. tostring(ckey(card)))
+    Autoplay.locked_until = now() + 1.5
+    if click(G, "sell_card", logger, best.target) then Autoplay.last_sig = s; Autoplay.pending_id = nil end
+    return
+  end
+
+  -- log the engine's reason for a BUY so a churn (buy-then-sell) is diagnosable from the log.
+  if ch == "shop" and best.type and best.type:find("^BUY") and best.reason then
+    flog("  ENGINE REASON: " .. tostring(best.reason):sub(1, 160))
+  end
+
   Autoplay.locked_until = now() + 1.5
   local issued = false
   if ch == "hand" then issued = do_hand(G, best, logger)
