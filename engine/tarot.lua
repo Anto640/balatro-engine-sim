@@ -320,11 +320,16 @@ function T.best_use(gs, base_ev, remaining, dollar_value)
           local material = (not card_tarot) or gain >= need * T.CARD_USE_MIN_FRAC
           if ev2 and gain > 0 and material then
             local tn = T.target_note(gs, c.key, hand)   -- name the hand card(s) to target
+            -- machine-readable target card ids (for the auto-play actuator to select), from the SAME
+            -- best_targets that produced the note. nil for non-targeting tarots.
+            local tcards
+            local tg = card_tarot and T.best_targets(gs, c.key, hand) or nil
+            if tg and #tg > 0 then tcards = {}; for _, t in ipairs(tg) do tcards[#tcards + 1] = { id = t.id } end end
             local credit = card_tarot and need * T.CARD_PERM_CREDIT or 0
-            consider({ type = "USE_CONSUMABLE", target = { name = name }, kind = "score",
+            consider({ type = "USE_CONSUMABLE", target = { name = name, key = c.key }, kind = "score",
               play_cards = cards2, hand_type = ev2.hand_type, score = ev2.score,
               value = ev2.score + credit, permanence_credit = credit,
-              target_note = tn,
+              target_note = tn, target_cards = tcards, use_keys = { c.key },
               reason = string.format("Use %s%s, then play %s — %d vs %d.",
                 name, tn and (" (" .. tn .. ")") or "", ev2.hand_type, ev2.score, base) })
           end
