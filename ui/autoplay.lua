@@ -21,7 +21,8 @@
 --    execution; positions/indices never used.
 -- Everything pcall'd + logged to bes_autoplay.log (the in-game logger only print()s). Defaults OFF.
 
-local Autoplay = { enabled = false, locked_until = 0, last_sig = nil }
+local Autoplay = { enabled = false, locked_until = 0, last_sig = nil,
+                   STABLE_HOLD = 0.6, pending_id = nil, pending_since = 0 }
 
 local function now() return (love and love.timer and love.timer.getTime()) or 0 end
 local function flog(msg)
@@ -53,30 +54,37 @@ function Autoplay.dump_ui(G)
       local n = 0; for _ in pairs(v) do n = n + 1 end; flog("  G.I." .. tostring(k) .. " (#" .. n .. ")")
     end end
   end
-  -- generic bounded walk over the on-screen UI containers: find config.button/func and the child field name
-  local found, seen, count, childfields = {}, {}, 0, {}
+  -- Generic bounded walk over the on-screen UI: collect every config.button / config.func and the
+  -- ref_table key it carries. (Roots are APPENDED, skipping nils — a constructor {G.OVERLAY_MENU=nil,..}
+  -- truncates at the first nil, which is why this dumped nothing before.)
+  local found, seen, count = {}, {}, 0
+  local function refkey(cfg)
+    local r = cfg.ref_table
+    if type(r) ~= "table" then return "" end
+    local k = (r.config and r.config.center and r.config.center.key) or r.key or r.sort_id or r.unique_val
+    return k and ("=" .. tostring(k)) or "=<ref>"
+  end
   local function walk(node, depth)
-    if count > 40000 or type(node) ~= "table" or depth > 22 or seen[node] then return end
+    if count > 60000 or type(node) ~= "table" or depth > 30 or seen[node] then return end
     seen[node] = true; count = count + 1
     local cfg = node.config
     if type(cfg) == "table" then
-      if cfg.button then found["btn:" .. tostring(cfg.button)] = true end
-      if cfg.func then found["func:" .. tostring(cfg.func)] = true end
+      if cfg.button then found["btn:" .. tostring(cfg.button) .. refkey(cfg)] = true end
+      if type(cfg.func) == "string" then found["func:" .. cfg.func] = true end
     end
-    for k, v in pairs(node) do
-      if type(v) == "table" and k ~= "config" and k ~= "parent" and k ~= "UIBox" then
-        if (k == "nodes" or k == "children" or k == "UIRoot") then childfields[tostring(k)] = true end
-        walk(v, depth + 1)
-      end
+    if node.UIRoot then walk(node.UIRoot, depth + 1) end
+    for _, kf in ipairs({ "children", "nodes" }) do
+      if type(node[kf]) == "table" then for _, ch in pairs(node[kf]) do walk(ch, depth + 1) end end
     end
   end
-  pcall(function()
-    for _, r in ipairs({ G.OVERLAY_MENU, G.HUD, G.blind_select, G.shop, G.STAGE_OBJECTS, G.I }) do walk(r, 0) end
-  end)
+  local roots = {}
+  if G.I and G.I.UIBOX then for _, ub in pairs(G.I.UIBOX) do roots[#roots + 1] = ub end end
+  for _, r in ipairs({ G.HUD, G.blind_select, G.shop, G.STAGE_OBJECTS[1], G.STAGE_OBJECTS[2], G.STAGE_OBJECTS[3] }) do
+    roots[#roots + 1] = r
+  end
+  pcall(function() for _, r in ipairs(roots) do walk(r, 0) end end)
   local list = {}; for k in pairs(found) do list[#list + 1] = k end; table.sort(list)
-  local cf = {}; for k in pairs(childfields) do cf[#cf + 1] = k end
-  flog("child-fields seen: [" .. table.concat(cf, ", ") .. "]  visited " .. count)
-  flog("buttons/funcs (generic walk): [" .. table.concat(list, ", ") .. "]")
+  flog("BUTTONS+FUNCS (visited " .. count .. ", " .. #roots .. " roots): [" .. table.concat(list, ", ") .. "]")
   flog("--- END UI DUMP ---")
 end
 
@@ -362,13 +370,27 @@ function Autoplay.tick(last, logger)
   if not type_ok(ch, best.type) then return end
   if not fresh(G, last.gs, ch) then return end
 
+  -- DECISION-STABILITY GATE: the engine's Monte-Carlo refine can CHANGE the recommendation a couple of
+  -- seconds after the cheap pass, so acting instantly risks executing a decision it's about to revise.
+  -- Require the (state + action) to hold UNCHANGED for STABLE_HOLD before committing. Resets on change.
+  local act_id = s .. "|" .. tostring(best.type) .. "|"
+    .. tostring(best.target and (best.target.key or best.target.name) or (best.cards and #best.cards) or "")
+  if act_id ~= Autoplay.pending_id then
+    Autoplay.pending_id = act_id; Autoplay.pending_since = now(); return   -- new/changed -> start the timer
+  end
+  if now() - (Autoplay.pending_since or 0) < Autoplay.STABLE_HOLD then return end   -- not stable yet
+
   Autoplay.locked_until = now() + 1.5
   local issued = false
   if ch == "hand" then issued = do_hand(G, best, logger)
   elseif ch == "shop" then issued = do_shop(G, best, logger)
   elseif ch == "pack" then issued = do_pack(G, best, logger)
   elseif ch == "blind_select" then issued = do_blind_select(G, best, logger) end
-  if issued then Autoplay.last_sig = s end
+  -- Mark this decision done whether or not it issued: a repeated FAILED action (e.g. a not-yet-mapped
+  -- button) must not spam the log every 1.5s. It re-attempts only once the state genuinely changes
+  -- (new sig) — success advances the state, a wrong button name shows once and waits.
+  Autoplay.last_sig = s
+  Autoplay.pending_id = nil
 end
 
 return Autoplay
