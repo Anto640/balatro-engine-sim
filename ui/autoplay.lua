@@ -130,54 +130,72 @@ local function find_card(areas, target)
 end
 
 -- ---- REAL-button invocation (the crash fix) ---------------------------------
--- Recursively find a live UI node whose config.button == `name` (and, if `ref` given, whose
--- config.ref_table == ref — the specific card's button). Returns the node (which HAS .UIBox + .config).
-local function find_button(G, name, ref)
-  local found
+-- Traverse the live UI tree. Balatro nodes hold children in `.children` (keyed OR array) and the UIBox
+-- root in `.UIRoot`; `.nodes` also appears in some defs. `visit(node)` returns true to stop.
+local function ui_roots(G)
+  local roots = {}
+  pcall(function() if G.I and G.I.UIBOX then for _, ub in pairs(G.I.UIBOX) do roots[#roots + 1] = ub end end end)
+  roots[#roots + 1] = G.HUD; roots[#roots + 1] = G.blind_select; roots[#roots + 1] = G.shop
+  roots[#roots + 1] = G.OVERLAY_MENU
+  return roots
+end
+local function deep_walk(G, visit)
   local seen = {}
   local function walk(node, depth)
-    if found or type(node) ~= "table" or depth > 80 or seen[node] then return end
+    if type(node) ~= "table" or depth > 60 or seen[node] then return false end
     seen[node] = true
-    local cfg = node.config
-    if type(cfg) == "table" and cfg.button == name then
-      if (ref == nil) or (cfg.ref_table == ref) then found = node; return end
-    end
-    local kids = node.nodes
-    if type(kids) == "table" then for _, ch in ipairs(kids) do walk(ch, depth + 1) end end
-    if node.UIRoot then walk(node.UIRoot, depth + 1) end
+    if visit(node) then return true end
+    if node.UIRoot and walk(node.UIRoot, depth + 1) then return true end
+    local kids = node.children
+    if type(kids) == "table" then for _, ch in pairs(kids) do if walk(ch, depth + 1) then return true end end end
+    kids = node.nodes
+    if type(kids) == "table" then for _, ch in pairs(kids) do if walk(ch, depth + 1) then return true end end end
+    return false
   end
-  pcall(function()
-    local roots = {}
-    if G.I and G.I.UIBOX then for _, ub in pairs(G.I.UIBOX) do roots[#roots + 1] = ub end end
-    roots[#roots + 1] = G.OVERLAY_MENU; roots[#roots + 1] = G.HUD
-    roots[#roots + 1] = G.blind_select; roots[#roots + 1] = G.shop; roots[#roots + 1] = G.buttons
-    for _, r in ipairs(roots) do walk(r, 0); if found then break end end
+  for _, r in ipairs(ui_roots(G)) do if walk(r, 0) then return true end end
+  return false
+end
+
+-- Find a live button node whose config.button == `name`. For a card action, `ref` is the target card
+-- and we match the button's config.ref_table by KEY/ID (object identity is unreliable across wrappers).
+local function ref_matches(cfg_ref, ref)
+  if ref == nil then return true end
+  if cfg_ref == nil then return false end
+  if cfg_ref == ref then return true end
+  if ref.key and ckey(cfg_ref) == ref.key then return true end
+  if ref.id ~= nil and cid(cfg_ref) == ref.id then return true end
+  return false
+end
+local function find_button(G, name, ref)
+  local found
+  deep_walk(G, function(node)
+    local cfg = node.config
+    if type(cfg) == "table" and cfg.button == name and ref_matches(cfg.ref_table, ref) then
+      found = node; return true
+    end
+    return false
   end)
   return found
 end
 
 -- Collect the distinct config.button names present in the live UI tree — so a "not found" logs the REAL
--- names available and we learn the correct one in a single run.
-local function list_buttons(G)
-  local names, seen = {}, {}
-  local function walk(node, depth)
-    if type(node) ~= "table" or depth > 80 or seen[node] then return end
-    seen[node] = true
+-- names available. If `for_name` is given, also list the ref_table KEYS of buttons with that name (to
+-- diagnose ref-matching failures — e.g. which cards' buy buttons exist).
+local function list_buttons(G, for_name)
+  local names, refs = {}, {}
+  deep_walk(G, function(node)
     local cfg = node.config
-    if type(cfg) == "table" and cfg.button then names[tostring(cfg.button)] = true end
-    if type(node.nodes) == "table" then for _, ch in ipairs(node.nodes) do walk(ch, depth + 1) end end
-    if node.UIRoot then walk(node.UIRoot, depth + 1) end
-  end
-  pcall(function()
-    local roots = {}
-    if G.I and G.I.UIBOX then for _, ub in pairs(G.I.UIBOX) do roots[#roots + 1] = ub end end
-    roots[#roots + 1] = G.OVERLAY_MENU; roots[#roots + 1] = G.HUD
-    roots[#roots + 1] = G.blind_select; roots[#roots + 1] = G.shop; roots[#roots + 1] = G.buttons
-    for _, r in ipairs(roots) do walk(r, 0) end
+    if type(cfg) == "table" and cfg.button then
+      names[tostring(cfg.button)] = true
+      if for_name and cfg.button == for_name then
+        refs[tostring((cfg.ref_table and ckey(cfg.ref_table)) or (cfg.ref_table and cid(cfg.ref_table)) or "no-ref")] = true
+      end
+    end
+    return false
   end)
-  local out = {}
-  for k in pairs(names) do out[#out + 1] = k end
-  table.sort(out); return table.concat(out, ", ")
+  local out = {}; for k in pairs(names) do out[#out + 1] = k end; table.sort(out)
+  local rout = {}; for k in pairs(refs) do rout[#rout + 1] = k end; table.sort(rout)
+  return table.concat(out, ", "), table.concat(rout, ", ")
 end
 Autoplay.list_buttons = list_buttons
 
@@ -194,8 +212,11 @@ local function click(G, name, logger, ref, nil_fallback)
       if not ok then log(logger, "G.FUNCS." .. name .. "(nil) error: " .. tostring(err)) end
       return ok
     end
-    log(logger, "button not found: " .. name .. (ref and " (for target card)" or "")
-      .. "  | available buttons: [" .. list_buttons(G) .. "]")
+    local names, refs = list_buttons(G, name)
+    log(logger, "button not found: " .. name
+      .. (ref and ("  | wanted ref key=" .. tostring(ref.key) .. " id=" .. tostring(ref.id)
+        .. "; " .. name .. " ref-keys present: [" .. refs .. "]") or "")
+      .. "  | all buttons: [" .. names .. "]")
     return false
   end
   local ok, err = pcall(fn, node)
@@ -275,7 +296,7 @@ local function do_hand(G, best, logger)
     local card = find_card({ G.consumeables }, best.target)
     if not card then log(logger, "USE: consumable not found"); return false end
     if best.cards and #best.cards > 0 then highlight(G, best.cards) end
-    log(logger, "USE " .. tostring(ckey(card))); return click(G, "use_card", logger, card)
+    log(logger, "USE " .. tostring(ckey(card))); return click(G, "use_card", logger, best.target)
   end
   local n = highlight(G, best.cards)
   if n == 0 then log(logger, best.type .. ": no live card matched"); return false end
@@ -290,16 +311,16 @@ local function do_shop(G, best, logger)
   elseif t and t:find("^SELL") then
     local card = find_card({ G.jokers, G.consumeables }, best.target)
     if not card then log(logger, "SELL: card not found"); return false end
-    log(logger, "sell " .. tostring(ckey(card))); return click(G, "sell_card", logger, card)
+    log(logger, "sell " .. tostring(ckey(card))); return click(G, "sell_card", logger, best.target)
   elseif t == "USE_CONSUMABLE" then
     local card = find_card({ G.consumeables }, best.target)
     if not card then log(logger, "USE(shop): not found"); return false end
-    log(logger, "use " .. tostring(ckey(card))); return click(G, "use_card", logger, card)
+    log(logger, "use " .. tostring(ckey(card))); return click(G, "use_card", logger, best.target)
   elseif t and t:find("^BUY") then
     local card = find_card({ G.shop_jokers, G.shop_booster, G.shop_vouchers }, best.target)
     if not card then log(logger, t .. ": shop item not found (" .. tostring(best.target and (best.target.key or best.target.name)) .. ")"); return false end
     log(logger, "buy " .. tostring(ckey(card) or (best.target and best.target.name)))
-    return click(G, "buy_from_shop", logger, card)
+    return click(G, "buy_from_shop", logger, best.target)
   end
   return false
 end
@@ -311,7 +332,7 @@ local function do_pack(G, best, logger)
   local card = find_card({ G.pack_cards }, target)
   if not card then log(logger, "pack pick not found (" .. tostring(target.key or target.name) .. ")"); return false end
   if best.cards and #best.cards > 0 then highlight(G, best.cards) end
-  log(logger, "pack pick " .. tostring(ckey(card) or target.key)); return click(G, "use_card", logger, card)
+  log(logger, "pack pick " .. tostring(ckey(card) or target.key)); return click(G, "use_card", logger, target)
 end
 local function do_blind_select(G, best, logger)
   if best and best.type == "SKIP" then log(logger, "skip blind"); return click(G, "skip_blind", logger) end
