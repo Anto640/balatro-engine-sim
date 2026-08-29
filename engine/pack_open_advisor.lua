@@ -69,10 +69,17 @@ local function order_prio(key) return ORDER_PRIO[key] or 2 end
 -- slot, a consumable (Tarot/Planet) needs a free Consumable slot. With no room the
 -- creation OVERFLOWS and is lost, so a pick must weigh free slots -- and what it'd
 -- take to free one (use a held consumable, or sell a joker).
+-- `room_credit`: how much of the output's value survives when room must be MADE (no free slot). For a
+-- JOKER generator that means SELLING a joker you chose to keep — only worth it if what's created beats
+-- what you sacrifice. A RANDOM joker (Judgement) rarely does, so making room for it is a bad trade
+-- (low credit); a Legendary (Soul) almost always does (high). Consumable generators make room by USING
+-- a held consumable (you get its value anyway), a cheap trade, so they keep the neutral default.
+-- Owner-reported: "it says take Judgement when it doesn't have any free joker slots" — the old flat 0.5
+-- over-valued exactly this.
 local GEN = {
-  c_judgement      = { out = "joker",      n = 1 },  -- a random Joker
-  c_soul           = { out = "joker",      n = 1 },  -- a Legendary Joker
-  c_wraith         = { out = "joker",      n = 1 },  -- a Rare Joker
+  c_judgement      = { out = "joker",      n = 1, room_credit = 0.1 },  -- a RANDOM Joker: rarely worth selling a kept joker for
+  c_soul           = { out = "joker",      n = 1, room_credit = 0.6 },  -- a Legendary Joker: worth making room
+  c_wraith         = { out = "joker",      n = 1, room_credit = 0.3 },  -- a Rare Joker (and zeroes your money)
   c_emperor        = { out = "consumable", n = 2 },  -- 2 random Tarots
   c_high_priestess = { out = "consumable", n = 2 },  -- 2 random Planets
   c_fool           = { out = "consumable", n = 1 },  -- a copy of your last Tarot/Planet
@@ -87,9 +94,10 @@ local GEN_ROOM_DISCOUNT = 0.5
 local function gen_fit(meta, free, roomable)
   local n = meta.n
   if n <= 0 then return 1 end
+  local credit = meta.room_credit or GEN_ROOM_DISCOUNT   -- output-quality-aware (see GEN)
   local landed = math.min(free, n)
   local made = math.min(math.max(0, n - free), math.max(0, roomable))
-  return (landed + GEN_ROOM_DISCOUNT * made) / n
+  return (landed + credit * made) / n
 end
 
 -- value a single revealed item -> value(fraction), measured(bool)

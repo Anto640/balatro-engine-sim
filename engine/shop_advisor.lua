@@ -71,6 +71,9 @@ SA.JOKER_SCORE_WEIGHT = VU.FRAC_UTIL -- the ONE frac->utility bridge: jokers, pa
 -- JOKER scale is now applied by the shared bridge on every consumable path, so this table no
 -- longer carries the scale -- only the created-joker measurement.)
 SA.CREATES_JOKER = { c_judgement = true }
+-- Value of a RANDOM created joker (Judgement) when the board is FULL: making room means selling a kept
+-- joker for a random one, a poor trade, so credit it low. Full value applies only with a free slot.
+SA.CREATE_FULL_BOARD_CREDIT = 0.1
 -- Proactive-sell nudge (future-value units) for jokers that DECAY to nothing or
 -- carry a downside, so converting them to cash/another joker before they expire
 -- is often right. Heuristic + extensible; joker-destruction interactions
@@ -731,12 +734,15 @@ function SA.recommend(gs, opts)
         + BuildPlan.planet_credit(gs, hand)
     end
     -- a consumable that CREATES a joker (Judgement) has its OUTPUT measured deck-aware
-    -- (expected random joker), floored at the flat prior -- "Calculated, not static". A full
-    -- board is no barrier: sell your worst to make room, and a weak creation sells for cash,
-    -- so it is NOT slot-gated. (B1: the x5 JOKER-scale is now applied by the base path below,
-    -- so this no longer pre-multiplies -- that was the band-aid for the missing x5.)
+    -- (expected random joker), floored at the flat prior -- "Calculated, not static". (B1: the x5
+    -- JOKER-scale is now applied by the base path below, so this no longer pre-multiplies.)
+    -- ⚠ A FULL board IS a barrier for a RANDOM joker: making room means SELLING a joker you chose to
+    -- keep, and a random creation rarely beats it -- a poor trade (owner: "it says take Judgement when
+    -- it doesn't have any free joker slots"). So credit the creation LOW when no joker slot is free
+    -- (mirrors pack_open_advisor's output-quality room_credit). A free slot keeps full value.
     if SA.CREATES_JOKER[it.key] then
       local created = Packs.expected_shop_joker(gs, 1, { rng = rng, samples = 4 }) or 0
+      if (slots_free or 0) <= 0 then created = created * SA.CREATE_FULL_BOARD_CREDIT end
       vfrac = math.max(vfrac, created)
     end
     local sbonus, snote = OwnedSynergy.consumable_bonus(gs, it.set) -- Constellation/Satellite/Perkeo
