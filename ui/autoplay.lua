@@ -342,8 +342,16 @@ local function do_shop(G, best, logger)
   elseif t and t:find("^BUY") then
     local card = find_card({ G.shop_jokers, G.shop_booster, G.shop_vouchers }, best.target)
     if not card then log(logger, t .. ": shop item not found (" .. tostring(best.target and (best.target.key or best.target.name)) .. ")"); return false end
-    log(logger, "buy " .. tostring(ckey(card) or (best.target and best.target.name)))
-    return click(G, "buy_from_shop", logger, best.target)
+    -- jokers/consumables/vouchers have a buy_from_shop BUTTON; booster PACKS do not — Balatro buys+opens
+    -- a pack when you CLICK the pack card. So use the real buy button when there is one, else click the card.
+    if find_button(G, "buy_from_shop", best.target) then
+      log(logger, "buy " .. tostring(ckey(card) or (best.target and best.target.name)))
+      return click(G, "buy_from_shop", logger, best.target)
+    end
+    log(logger, "buy (click card) " .. tostring(ckey(card) or (best.target and best.target.name)))
+    local ok = pcall(function() card:click() end)
+    if not ok then log(logger, "card:click() failed") end
+    return ok
   end
   return false
 end
@@ -375,7 +383,12 @@ function Autoplay.tick(last, logger)
 
   if ch == "cash_out" then
     Autoplay.locked_until = now() + 1.0
-    if click(G, "cash_out", logger) then Autoplay.last_sig = s end
+    if click(G, "cash_out", logger) then Autoplay.last_sig = s
+    else
+      -- cash_out button not where expected; capture this screen's structure ONCE so we can map it.
+      if not Autoplay._dumped_cash then Autoplay._dumped_cash = true; pcall(Autoplay.dump_ui, G) end
+      Autoplay.last_sig = s
+    end
     return
   end
 
