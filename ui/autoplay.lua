@@ -490,7 +490,7 @@ function Autoplay.tick(last, logger)
     if not pack_selected(G, target) then
       log(logger, "select pack card " .. tostring(ckey(card) or target.key))
       pcall(function() card:click() end)                     -- select the inner card
-      Autoplay.locked_until = now() + 0.4
+      Autoplay.locked_until = now() + 0.7                     -- let the use_card button appear
       return                                                  -- confirm next pass
     end
     -- a card-tarot from the pack (Magician, Strength, ...) enhances SELECTED hand cards — its use button
@@ -499,17 +499,18 @@ function Autoplay.tick(last, logger)
     if tgt and #tgt > 0 and not highlighted_matches(G, tgt) then
       local n = highlight(G, tgt)
       log(logger, "target " .. n .. " hand card(s) for " .. tostring(target.key))
-      Autoplay.locked_until = now() + 0.4
+      Autoplay.locked_until = now() + 0.5
       return
     end
     log(logger, "confirm pack pick " .. tostring(ckey(card) or target.key))
-    Autoplay.locked_until = now() + 1.5
+    Autoplay.locked_until = now() + 1.0
     if click(G, "use_card", logger, target) then Autoplay.last_sig = s; Autoplay.pending_id = nil
-    else
-      -- couldn't use (e.g. a card-tarot whose targets we couldn't provide): don't spin — SKIP the pack
-      -- so the run continues rather than getting stuck on this pick.
-      log(logger, "cannot use pick -> skip pack"); click(G, "skip_booster", logger); Autoplay.last_sig = s
+    elseif (now() - (Autoplay.wait_since or now())) > 6.0 then
+      -- genuinely stuck on this pick after several seconds of retries -> skip the pack so the run
+      -- continues (e.g. a card-tarot whose targets we couldn't provide).
+      log(logger, "pick unusable after retries -> skip pack"); click(G, "skip_booster", logger); Autoplay.last_sig = s
     end
+    -- else: the use button just isn't ready yet (appears a moment after selecting) -> retry next pass
     return
   end
 
