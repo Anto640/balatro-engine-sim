@@ -55,6 +55,7 @@ local SkipAdvisor = try_require("engine.skip_advisor")
 local PackOpenAdvisor = try_require("engine.pack_open_advisor")
 local Overlay  = try_require("ui.overlay")
 local HUDInject = try_require("ui.hud_inject")
+local Autoplay = try_require("ui.autoplay")   -- F11: translate the engine's decision into real inputs
 -- Phase 0 self-play instrumentation (SELFPLAY_PLAN.md): record real runs to JSONL
 -- so we can confirm the "behind on pace by ante 2-3" hypothesis with numbers.
 local Telemetry = try_require("core.run_telemetry")
@@ -705,6 +706,17 @@ if _G.G and _G.SMODS then
           and "ON  (fast: logs decisions, NO evaluation -> no lag)"
           or  "OFF (full evaluation + live recommendations)"))
       end
+      if key == "f11" and Autoplay then
+        local on = Autoplay.toggle()
+        -- auto-play needs live recommendations, so force full evaluation ON
+        if on and BES.capture_only then
+          BES.capture_only = false
+          Log.info("BES capture-only OFF (auto-play needs live evaluation)")
+        end
+        Log.info("BES AUTO-PLAY " .. (on
+          and "ON  (blind PLAY/DISCARD only — the engine now plays hands itself)"
+          or  "OFF (you control the game)"))
+      end
       if prev then return prev(key, ...) end
     end
 
@@ -717,6 +729,9 @@ if _G.G and _G.SMODS then
       -- advance any in-flight background job a few ms EVERY frame (cheap when idle)
       -- so the expensive Monte-Carlo / pack measurement never blocks rendering.
       pcall(BES.pump_job, BES_SIM_BUDGET)
+      -- AUTO-PLAY (F11): if enabled, translate the latest recommendation into real inputs. Gated on
+      -- SELECTING_HAND + settled + once-per-hand inside Autoplay.tick, so this is a cheap no-op otherwise.
+      if Autoplay and Autoplay.enabled then pcall(Autoplay.tick, BES.last, Log and Log.info) end
       acc = acc + (dt or 0)
       if acc >= 0.25 then
         acc = 0
@@ -730,7 +745,7 @@ if _G.G and _G.SMODS then
 
   BES.telemetry_instance()  -- create the run log up front so its path is logged on load
   Log.info("Balatro Engine Sim loaded. F7 = dump jokers, F8 = evaluate, F9 = toggle overlay, "
-    .. "F10 = capture-only toggle."
+    .. "F10 = capture-only toggle, F11 = AUTO-PLAY toggle (blind PLAY/DISCARD)."
     .. "  CAPTURE-ONLY is " .. (BES.capture_only and "ON (data-collection: no lag, logs decisions to "
       .. BES_FIXLOG .. "; press F10 for live recommendations)" or "OFF")
     .. "  Run telemetry -> " .. BES_RUNLOG .. " (analyze with tools/analyze_runs.lua).")
