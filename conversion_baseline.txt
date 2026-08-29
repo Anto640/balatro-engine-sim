@@ -164,3 +164,31 @@ buys fewer poor packs, a robust measured fact) not a magnitude fit. Rail is a co
 screen (MDE ~0.74) — sufficient to rule out a large regression, not a small one.
 
 NEXT (unchanged): C' forward marginal (the 29% which-joker gap); D' pack-PICK conversion (37.5%).
+
+================================================================================
+C' SCOPED -> REFUTED (2026-08-29) — joker VALUATION is not the gap
+================================================================================
+C' hypothesized the engine under-picks multiplier keystones because it values them on
+the thin CURRENT board (a forward-marginal fix). Two scoping steps killed it:
+
+1. ANTE DATA refutes the naive forward projection. The human buys multipliers LATE
+   (antes 5-6 = 10 of 14; antes 1-2 = 1, with 15 additive) — confirming §5o "winners are
+   xmult-POOR early". A forward projection boosts multipliers EARLY (long runway) = the
+   LOSING pattern. Refuted before building (the §31d rule).
+
+2. RANKED-VALUATION DIAGNOSTIC (tools/cprime_diag.lua) refutes the valuation gap itself.
+   Of 60 decisions where the human bought a joker AND the engine ranked it:
+     AGREE (human's joker = engine's rank-1 JOKER): 47 (78%)
+     MULTIPLIER human-picks: 21/23 AGREE (91%)   ADDITIVE: 26/37 agree
+     UNDER-MEASURED (valued <=0 or below tier): 0
+   The engine ranks the human's multiplier #1 (Photograph 25, Hanging Chad 20, Cavendish
+   19, Blueprint 2648, ...) — it does NOT under-value multipliers. The earlier "engine
+   picks additive 100% over multiplier" was an ARTIFACT of comparing the engine's overall
+   BEST action (often a pack) instead of its joker ranking.
+
+=> C' is REFUTED. Relative joker pricing is directionally correct (confirms §5s / the
+   divergence mine, now on the AGREEMENT instrument). The "which-joker" gap (29% buy-agree
+   from Phase A) is NOT valuation — it is the engine preferring a PACK over the human's
+   directed joker buy 39% of the time (Phase A §3), i.e. the SAME spend-discipline gap as
+   B'. The conversion frontier collapses toward ECONOMY/SPEND DISCIPLINE (B', partially
+   shipped as pack-poverty) and the pack-PICK channel (D'), NOT joker valuation (C').
