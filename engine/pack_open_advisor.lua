@@ -431,8 +431,16 @@ function PO.recommend(gs, opts)
   -- can put it in the BIG line, not just the grey reason -- matching owned/shop tarots
   -- (2026-08-26 advice-review #10: Empress inside a pack had no main-line target text).
   local best_target_note = ordered[1] and Tarot.target_note(gs, ordered[1].key) or nil
+  -- machine-readable target HAND cards for a card-tarot pick (Magician/Strength/...): the drawn hand is
+  -- present during pack-open, and the tarot's use button won't appear until they are selected, so the
+  -- auto-play actuator needs their ids. nil for non-targeting picks (jokers/planets/money tarots).
+  local best_target_cards
+  if ordered[1] and gs.hand and #gs.hand > 0 then
+    local tg = Tarot.best_targets(gs, ordered[1].key, gs.hand)
+    if tg and #tg > 0 then best_target_cards = {}; for _, t in ipairs(tg) do best_target_cards[#best_target_cards + 1] = { id = t.id } end end
+  end
   return { ranked = valued, picks = ordered, best = ordered[1].it, reason = reason, sell = sell,
-           target_note = best_target_note }
+           target_note = best_target_note, target_cards = best_target_cards }
 end
 
 return PO

@@ -232,6 +232,7 @@ function BES.apply_pack(gs, po)
     -- name alone is a display string that won't match a center key (ui/autoplay.lua).
     target = pick and { name = pick.name or pick.key, key = pick.key, id = pick.id } or nil,
     target_note = po.target_note,          -- "apply to AS, KS" in the BIG line (#10)
+    target_cards = po.target_cards,        -- machine-readable target hand-card ids (auto-play selects them)
     reason = po.reason, confidence = 0.75,
   }
   BES.last = { gs = gs, ranked = { best = action }, pack = true }

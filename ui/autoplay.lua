@@ -473,14 +473,26 @@ function Autoplay.tick(last, logger)
     if not pack_selected(G, target) then
       log(logger, "select pack card " .. tostring(ckey(card) or target.key))
       pcall(function() card:click() end)                     -- select the inner card
-      if not Autoplay._dumped_innerpick then Autoplay._dumped_innerpick = true
-        flog("(post-inner-select dump)"); pcall(Autoplay.dump_ui, G) end
       Autoplay.locked_until = now() + 0.4
       return                                                  -- confirm next pass
     end
+    -- a card-tarot from the pack (Magician, Strength, ...) enhances SELECTED hand cards — its use button
+    -- won't appear until the target cards are highlighted. Select them first (from best.target_cards).
+    local tgt = best.target_cards
+    if tgt and #tgt > 0 and not highlighted_matches(G, tgt) then
+      local n = highlight(G, tgt)
+      log(logger, "target " .. n .. " hand card(s) for " .. tostring(target.key))
+      Autoplay.locked_until = now() + 0.4
+      return
+    end
     log(logger, "confirm pack pick " .. tostring(ckey(card) or target.key))
     Autoplay.locked_until = now() + 1.5
-    if click(G, "use_card", logger, target) then Autoplay.last_sig = s; Autoplay.pending_id = nil end
+    if click(G, "use_card", logger, target) then Autoplay.last_sig = s; Autoplay.pending_id = nil
+    else
+      -- couldn't use (e.g. a card-tarot whose targets we couldn't provide): don't spin — SKIP the pack
+      -- so the run continues rather than getting stuck on this pick.
+      log(logger, "cannot use pick -> skip pack"); click(G, "skip_booster", logger); Autoplay.last_sig = s
+    end
     return
   end
 
