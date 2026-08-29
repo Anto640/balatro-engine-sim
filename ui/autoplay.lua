@@ -79,9 +79,9 @@ function Autoplay.dump_ui(G)
   end
   local roots = {}
   if G.I and G.I.UIBOX then for _, ub in pairs(G.I.UIBOX) do roots[#roots + 1] = ub end end
-  for _, r in ipairs({ G.HUD, G.blind_select, G.shop, G.STAGE_OBJECTS[1], G.STAGE_OBJECTS[2], G.STAGE_OBJECTS[3] }) do
-    roots[#roots + 1] = r
-  end
+  -- pairs (not ipairs) so a nil entry doesn't truncate the list
+  for _, r in pairs({ G.HUD, G.blind_select, G.shop }) do roots[#roots + 1] = r end
+  if type(G.STAGE_OBJECTS) == "table" then for _, r in pairs(G.STAGE_OBJECTS) do if type(r) == "table" then roots[#roots + 1] = r end end end
   pcall(function() for _, r in ipairs(roots) do walk(r, 0) end end)
   local list = {}; for k in pairs(found) do list[#list + 1] = k end; table.sort(list)
   flog("BUTTONS+FUNCS (visited " .. count .. ", " .. #roots .. " roots): [" .. table.concat(list, ", ") .. "]")
