@@ -342,19 +342,14 @@ local function do_shop(G, best, logger)
   elseif t and t:find("^BUY") then
     local card = find_card({ G.shop_jokers, G.shop_booster, G.shop_vouchers }, best.target)
     if not card then log(logger, t .. ": shop item not found (" .. tostring(best.target and (best.target.key or best.target.name)) .. ")"); return false end
-    -- jokers/consumables/vouchers have a buy_from_shop BUTTON; booster PACKS do not — Balatro buys+opens
-    -- a pack when you CLICK the pack card. So use the real buy button when there is one, else click the card.
+    -- jokers/consumables/vouchers use the buy_from_shop button; booster PACKS use the use_card button
+    -- (confirmed: btn:use_card=p_buffoon_normal_2 / p_celestial_normal_2), which buys AND opens the pack.
     if find_button(G, "buy_from_shop", best.target) then
       log(logger, "buy " .. tostring(ckey(card) or (best.target and best.target.name)))
       return click(G, "buy_from_shop", logger, best.target)
     end
-    log(logger, "buy (click card) " .. tostring(ckey(card) or (best.target and best.target.name)))
-    local ok = pcall(function() card:click() end)
-    if not ok then log(logger, "card:click() failed") end
-    -- capture the shop AFTER selecting the pack, so we can see the open/buy button it exposes.
-    if not Autoplay._dumped_postpack then Autoplay._dumped_postpack = true
-      flog("(post-pack-click dump follows)"); pcall(Autoplay.dump_ui, G) end
-    return ok
+    log(logger, "open pack " .. tostring(ckey(card) or (best.target and best.target.name)))
+    return click(G, "use_card", logger, best.target)
   end
   return false
 end
