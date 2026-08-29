@@ -258,6 +258,27 @@ local function highlighted_matches(G, cards_pod)
   for k in pairs(have) do if not want[k] then return false end end
   return next(want) ~= nil   -- must be non-empty and exactly equal
 end
+-- Reorder the live joker row to the engine's recommended order (best.reorder.joker_order). Jokers score
+-- left->right, so order can be a big swing (a +mult LEFT of an xmult vs wasted RIGHT of it). There is no
+-- reorder BUTTON in Balatro (it's drag-only), so we reorder G.jokers.cards directly (by id) and re-align.
+-- Guarded: aborts unless every recommended joker maps to a live joker, and no-ops if already in order.
+local function reorder_jokers(G, joker_order)
+  if not (G.jokers and G.jokers.cards) or not joker_order or #joker_order < 2 then return false end
+  local live = G.jokers.cards
+  local byid = {}
+  for _, c in ipairs(live) do byid[cid(c)] = c end
+  local new = {}
+  for _, pod in ipairs(joker_order) do local c = pod.id ~= nil and byid[pod.id]; if c then new[#new + 1] = c end end
+  if #new ~= #live then return false end                 -- couldn't map all -> don't touch the row
+  local same = true
+  for i = 1, #live do if live[i] ~= new[i] then same = false; break end end
+  if same then return false end
+  for i = 1, #new do live[i] = new[i] end                -- reorder the scoring array
+  pcall(function() if G.jokers.set_ranks then G.jokers:set_ranks() end end)
+  pcall(function() if G.jokers.align_cards then G.jokers:align_cards() end end)
+  return true
+end
+
 -- Is the target inner pack card currently selected/highlighted in G.pack_cards?
 local function pack_selected(G, target)
   if not (G.pack_cards and G.pack_cards.highlighted) then return false end
@@ -413,6 +434,16 @@ function Autoplay.tick(last, logger)
     Autoplay.pending_id = act_id; Autoplay.pending_since = now(); return   -- new/changed -> start the timer
   end
   if now() - (Autoplay.pending_since or 0) < Autoplay.STABLE_HOLD then return end   -- not stable yet
+
+  -- PHASE 0 — JOKER REORDER. The engine attaches the optimal joker order to a PLAY (best.reorder); apply
+  -- it BEFORE selecting/playing so the hand scores what the engine intends (order is a real score swing).
+  if ch == "hand" and best.type == "PLAY" and best.reorder and best.reorder.joker_changed then
+    if reorder_jokers(G, best.reorder.joker_order) then
+      log(logger, "reorder jokers (+" .. tostring(math.floor((best.reorder.gain or 0))) .. " score)")
+      Autoplay.locked_until = now() + 0.4
+      return                                  -- re-enter next pass to select + play in the new order
+    end
+  end
 
   -- PHASE 1 — SELECT THEN ACT ON SEPARATE FRAMES. Clicking Play/Discard/Use in the SAME frame the cards
   -- are highlighted fails, because Balatro's can_play/can_discard haven't registered the selection yet
