@@ -246,6 +246,18 @@ local function highlight(G, cards_pod)
   end
   return n
 end
+-- Are EXACTLY the wanted cards currently highlighted? (used to phase highlight -> click across frames)
+local function wanted_ids(cards_pod)
+  local s = {}; for _, p in ipairs(cards_pod or {}) do if p.id ~= nil then s[p.id] = true end end; return s
+end
+local function highlighted_matches(G, cards_pod)
+  local want = wanted_ids(cards_pod)
+  local have = {}
+  if G.hand and G.hand.highlighted then for _, c in ipairs(G.hand.highlighted) do have[cid(c)] = true end end
+  for k in pairs(want) do if not have[k] then return false end end
+  for k in pairs(have) do if not want[k] then return false end end
+  return next(want) ~= nil   -- must be non-empty and exactly equal
+end
 
 -- ---- settled / channel / freshness (lag guards) -----------------------------
 local function input_locked(G)
@@ -304,18 +316,16 @@ local function sig(G, ch)
 end
 
 -- ---- executors (return true if an action was ISSUED) ------------------------
+-- NOTE: cards are already highlighted by the tick's phase-1 (a frame earlier), so Balatro's
+-- can_play/can_discard have registered the selection — these just click the button.
 local function do_hand(G, best, logger)
   if best.type == "USE_CONSUMABLE" then
-    local card = find_card({ G.consumeables }, best.target)
-    if not card then log(logger, "USE: consumable not found"); return false end
-    if best.cards and #best.cards > 0 then highlight(G, best.cards) end
-    log(logger, "USE " .. tostring(ckey(card))); return click(G, "use_card", logger, best.target)
+    log(logger, "USE " .. tostring(best.target and (best.target.key or best.target.name)))
+    return click(G, "use_card", logger, best.target)
   end
-  local n = highlight(G, best.cards)
-  if n == 0 then log(logger, best.type .. ": no live card matched"); return false end
-  log(logger, best.type .. " " .. n .. (n == 1 and " card" or " cards") .. " (" .. tostring(best.hand_type or "") .. ")")
+  log(logger, best.type .. " " .. tostring(best.cards and #best.cards) .. " cards (" .. tostring(best.hand_type or "") .. ")")
   local fn = best.type == "PLAY" and "play_cards_from_highlighted" or "discard_cards_from_highlighted"
-  return click(G, fn, logger)   -- strict: find the real button (no fabricated event -> no crash)
+  return click(G, fn, logger)
 end
 local function do_shop(G, best, logger)
   local t = best.type
@@ -344,7 +354,6 @@ local function do_pack(G, best, logger)
   local target = best.target or best
   local card = find_card({ G.pack_cards }, target)
   if not card then log(logger, "pack pick not found (" .. tostring(target.key or target.name) .. ")"); return false end
-  if best.cards and #best.cards > 0 then highlight(G, best.cards) end
   log(logger, "pack pick " .. tostring(ckey(card) or target.key)); return click(G, "use_card", logger, target)
 end
 local function do_blind_select(G, best, logger)
@@ -384,6 +393,20 @@ function Autoplay.tick(last, logger)
     Autoplay.pending_id = act_id; Autoplay.pending_since = now(); return   -- new/changed -> start the timer
   end
   if now() - (Autoplay.pending_since or 0) < Autoplay.STABLE_HOLD then return end   -- not stable yet
+
+  -- PHASE 1 — SELECT THEN ACT ON SEPARATE FRAMES. Clicking Play/Discard/Use in the SAME frame the cards
+  -- are highlighted fails, because Balatro's can_play/can_discard haven't registered the selection yet
+  -- (that was the "highlights but won't play until F11 twice" bug). If a card action's target cards are
+  -- not yet EXACTLY highlighted, highlight them, brief lockout, and return — the click happens next pass.
+  local target_cards
+  if ch == "hand" and (best.type == "PLAY" or best.type == "DISCARD") then target_cards = best.cards
+  elseif (best.type == "USE_CONSUMABLE" or best.type == "PICK") and best.cards and #best.cards > 0 then target_cards = best.cards end
+  if target_cards and not highlighted_matches(G, target_cards) then
+    local n = highlight(G, target_cards)
+    log(logger, "select " .. n .. " card" .. (n == 1 and "" or "s") .. " (" .. tostring(best.hand_type or best.type) .. ")")
+    Autoplay.locked_until = now() + 0.4    -- let the selection register before we click next pass
+    return                                  -- do NOT set last_sig: re-enter next tick to click
+  end
 
   Autoplay.locked_until = now() + 1.5
   local issued = false
