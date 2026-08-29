@@ -258,6 +258,14 @@ local function highlighted_matches(G, cards_pod)
   for k in pairs(have) do if not want[k] then return false end end
   return next(want) ~= nil   -- must be non-empty and exactly equal
 end
+-- Is the target inner pack card currently selected/highlighted in G.pack_cards?
+local function pack_selected(G, target)
+  if not (G.pack_cards and G.pack_cards.highlighted) then return false end
+  for _, c in ipairs(G.pack_cards.highlighted) do
+    if (target.key and ckey(c) == target.key) or (target.id ~= nil and cid(c) == target.id) then return true end
+  end
+  return false
+end
 
 -- ---- settled / channel / freshness (lag guards) -----------------------------
 local function input_locked(G)
@@ -418,6 +426,27 @@ function Autoplay.tick(last, logger)
     log(logger, "select " .. n .. " card" .. (n == 1 and "" or "s") .. " (" .. tostring(best.hand_type or best.type) .. ")")
     Autoplay.locked_until = now() + 0.4    -- let the selection register before we click next pass
     return                                  -- do NOT set last_sig: re-enter next tick to click
+  end
+
+  -- PACK PICK is also two-phase, but the inner card lives in G.pack_cards and has NO use_card button
+  -- until it is SELECTED: phase 1 clicks the inner card to select it (its use_card button then appears),
+  -- phase 2 clicks that button. (Confirmed: an open Buffoon pack showed no use_card for the inner joker.)
+  if ch == "pack" and best.type ~= "SKIP" and best.type ~= "SKIP_PACK" then
+    local target = best.target or best
+    local card = find_card({ G.pack_cards }, target)
+    if not card then log(logger, "pack pick not found (" .. tostring(target.key or target.name) .. ")"); Autoplay.last_sig = s; return end
+    if not pack_selected(G, target) then
+      log(logger, "select pack card " .. tostring(ckey(card) or target.key))
+      pcall(function() card:click() end)                     -- select the inner card
+      if not Autoplay._dumped_innerpick then Autoplay._dumped_innerpick = true
+        flog("(post-inner-select dump)"); pcall(Autoplay.dump_ui, G) end
+      Autoplay.locked_until = now() + 0.4
+      return                                                  -- confirm next pass
+    end
+    log(logger, "confirm pack pick " .. tostring(ckey(card) or target.key))
+    Autoplay.locked_until = now() + 1.5
+    if click(G, "use_card", logger, target) then Autoplay.last_sig = s; Autoplay.pending_id = nil end
+    return
   end
 
   Autoplay.locked_until = now() + 1.5
