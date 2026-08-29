@@ -24,12 +24,25 @@
 local Autoplay = { enabled = false, locked_until = 0, last_sig = nil }
 
 local function now() return (love and love.timer and love.timer.getTime()) or 0 end
-local function log(logger, msg) if logger then logger("[autoplay] " .. msg) end end
+-- Persist every action/failure to a file in the LÖVE save folder (same place as bes_joker_dump.txt),
+-- because the in-game logger only print()s — which isn't visible without a console. Send me
+-- bes_autoplay.log to iterate on which G.FUNCS need correcting.
+local function flog(msg)
+  pcall(function()
+    if love and love.filesystem then love.filesystem.append("bes_autoplay.log", os.date("%H:%M:%S ") .. msg .. "\n") end
+  end)
+end
+local function log(logger, msg)
+  if logger then logger("[autoplay] " .. msg) end
+  flog(msg)
+end
+Autoplay.flog = flog
 
 function Autoplay.toggle()
   Autoplay.enabled = not Autoplay.enabled
   Autoplay.locked_until = now() + 1.0
   Autoplay.last_sig = nil
+  flog("==== AUTO-PLAY " .. (Autoplay.enabled and "ON" or "OFF") .. " ====")
   return Autoplay.enabled
 end
 
