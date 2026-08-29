@@ -329,11 +329,15 @@ local function fresh(G, gs, ch)
   return true
 end
 local function sig(G, ch)
+  -- include consumable + joker COUNTS so an in-place action that consumes one (use a held planet, sell a
+  -- joker) changes the signature and the NEXT decision on the same hand/shop isn't blocked.
+  local nc = (G.consumeables and G.consumeables.cards and #G.consumeables.cards) or 0
+  local nj = (G.jokers and G.jokers.cards and #G.jokers.cards) or 0
   if ch == "hand" then
     local cr = (G.GAME and G.GAME.current_round) or {}
-    return "hand:" .. ids_of_area(G.hand) .. "|h" .. tostring(cr.hands_left or 0) .. "|d" .. tostring(cr.discards_left or 0)
+    return "hand:" .. ids_of_area(G.hand) .. "|h" .. tostring(cr.hands_left or 0) .. "|d" .. tostring(cr.discards_left or 0) .. "|c" .. nc .. "|j" .. nj
   elseif ch == "shop" then
-    return "shop:" .. tostring((G.GAME and G.GAME.dollars) or 0) .. "|" .. ids_of_area(G.shop_jokers) .. "|" .. ids_of_area(G.shop_booster)
+    return "shop:" .. tostring((G.GAME and G.GAME.dollars) or 0) .. "|" .. ids_of_area(G.shop_jokers) .. "|" .. ids_of_area(G.shop_booster) .. "|c" .. nc .. "|j" .. nj
   elseif ch == "pack" then
     return "pack:" .. keys_of_area(G.pack_cards)
   elseif ch == "cash_out" then
@@ -496,6 +500,46 @@ function Autoplay.tick(last, logger)
     log(logger, "confirm sell " .. tostring(ckey(card)))
     Autoplay.locked_until = now() + 1.5
     if click(G, "sell_card", logger, best.target) then Autoplay.last_sig = s; Autoplay.pending_id = nil end
+    return
+  end
+
+  -- USE_CONSUMABLE (held planet/tarot/spectral): SELECT the consumable in the consumables area (its
+  -- use_card button then appears), then use it — two-phase. `use_keys` lists the consumable(s) to use in
+  -- order; each is consumed in turn (the sig includes the consumable count, so the next one/the play is
+  -- not blocked). A card-tarot ALSO needs its TARGET hand cards highlighted first (tarot targeting).
+  if best.type == "USE_CONSUMABLE" then
+    -- (a) tarot targeting: if the engine named target hand cards, highlight them before using the tarot.
+    local tgt = best.target_cards or best.cards
+    if tgt and #tgt > 0 and not highlighted_matches(G, tgt) then
+      local n = highlight(G, tgt)
+      log(logger, "target " .. n .. " card(s) for " .. tostring(best.target and best.target.name))
+      Autoplay.locked_until = now() + 0.4
+      return
+    end
+    -- (b) select then use the next held consumable named by use_keys (fallback: target.key/name).
+    local keys = best.use_keys
+    if not keys or #keys == 0 then keys = { best.target and (best.target.key or best.target.name) } end
+    local card, kk
+    for _, k in ipairs(keys) do
+      local c = k and find_card({ G.consumeables }, { key = k })
+      if not c and k and G.consumeables and G.consumeables.cards then   -- fallback: match by display name
+        for _, cc in ipairs(G.consumeables.cards) do if cc.ability and cc.ability.name == k then c = cc; break end end
+      end
+      if c then card, kk = c, k; break end
+    end
+    if not card then Autoplay.last_sig = s; return end       -- all used / none found -> done
+    if not card.highlighted then
+      log(logger, "select consumable " .. tostring(ckey(card) or kk))
+      pcall(function() card:click() end)
+      Autoplay.locked_until = now() + 0.4
+      return                                                  -- confirm next pass (no last_sig)
+    end
+    log(logger, "use consumable " .. tostring(ckey(card) or kk))
+    Autoplay.locked_until = now() + 1.2
+    click(G, "use_card", logger, { key = ckey(card), id = cid(card) })
+    -- if it worked the consumable is gone -> sig changes -> we re-enter (next consumable / the play);
+    -- if it failed the sig is unchanged -> last_sig stops it (no loop).
+    Autoplay.last_sig = s; Autoplay.pending_id = nil
     return
   end
 

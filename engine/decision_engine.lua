@@ -201,14 +201,15 @@ local function planet_use(gs, base_ev, remaining, held, gs2)
   if not held or #held == 0 or not base_ev then return nil end
   local ev2, cards2 = HandEval.best_play_target(gs2, gs.hand or {}, remaining, boss_filter(gs))
   if not ev2 then ev2, cards2 = base_ev, gs.hand end
-  local used = {}
-  for _, p in ipairs(held) do used[#used + 1] = p.name end
+  local used, used_keys = {}, {}
+  for _, p in ipairs(held) do used[#used + 1] = p.name; if p.key then used_keys[#used_keys + 1] = p.key end end
   local credit = Mechanics.boss_per_hand_need(gs) * DE.LEVEL_USE_CREDIT
   local boost = math.max(0, (ev2.score or 0) - (base_ev.score or 0))   -- this-turn boost, if any
   return {
+    -- use_keys: machine-readable consumable keys the actuator/auto-play uses (target.name is display-only)
     type = "USE_CONSUMABLE", target = { name = table.concat(used, " + ") }, kind = "score",
     play_cards = cards2, hand_type = ev2.hand_type,
-    score = ev2.score, value = (base_ev.score or 0) + boost + credit, use_names = used,
+    score = ev2.score, value = (base_ev.score or 0) + boost + credit, use_names = used, use_keys = used_keys,
     reason = string.format("Use %s to level %s first (free, permanent), then play %s.",
       table.concat(used, " + "), ev2.hand_type or "", ev2.hand_type or ""),
   }
@@ -243,7 +244,7 @@ local function generator_use(gs)
         local val = spec.v * need
         if not best or val > best.value then
           local name = c.name or c.key
-          best = { type = "USE_CONSUMABLE", target = { name = name }, use_names = { c.key },
+          best = { type = "USE_CONSUMABLE", target = { name = name, key = c.key }, use_names = { c.key }, use_keys = { c.key },
             kind = "generate", value = val, score = val,
             reason = string.format("Use %s — free value from a held consumable.", name) }
         end
