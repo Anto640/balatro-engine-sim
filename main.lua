@@ -228,7 +228,9 @@ function BES.apply_pack(gs, po)
   local pick = po.best
   local action = {
     type = po.skip and "SKIP" or "PICK",
-    target = pick and { name = pick.name or pick.key } or nil,
+    -- carry the center key (+ id when present) so the auto-play actuator can match the live pack card;
+    -- name alone is a display string that won't match a center key (ui/autoplay.lua).
+    target = pick and { name = pick.name or pick.key, key = pick.key, id = pick.id } or nil,
     target_note = po.target_note,          -- "apply to AS, KS" in the BIG line (#10)
     reason = po.reason, confidence = 0.75,
   }
