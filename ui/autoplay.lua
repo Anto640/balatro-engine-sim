@@ -145,6 +145,11 @@ local function ui_roots(G)
   pcall(function() if G.I and G.I.UIBOX then for _, ub in pairs(G.I.UIBOX) do roots[#roots + 1] = ub end end end)
   roots[#roots + 1] = G.HUD; roots[#roots + 1] = G.blind_select; roots[#roots + 1] = G.shop
   roots[#roots + 1] = G.OVERLAY_MENU
+  -- the in-blind Play/Discard buttons live under G.STAGE_OBJECTS (confirmed by the UI dump), not in
+  -- G.I.UIBOX / HUD — include them so find_button reaches them.
+  if type(G.STAGE_OBJECTS) == "table" then
+    for _, r in pairs(G.STAGE_OBJECTS) do if type(r) == "table" then roots[#roots + 1] = r end end
+  end
   return roots
 end
 local function deep_walk(G, visit)
