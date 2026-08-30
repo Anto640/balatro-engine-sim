@@ -432,22 +432,34 @@ function Autoplay.tick(last, logger)
   if not best then return end
   if not type_ok(ch, best.type) then return end
   local isfresh = fresh(G, last.gs, ch)
+  -- NON-TARGETED actions (leave shop / reroll / continue / skip a blind or pack) don't act on a
+  -- specific card, so exact dollar/item parity between the decision snapshot and live G is irrelevant --
+  -- being in the right STATE is enough. Requiring strict freshness here was a DEADLOCK: a persistent
+  -- shop freshness false-negative (a no-joker shop where the $/item-count parity never re-synced) left
+  -- SAVE blocked forever, and the deadlock-breaker below was unreachable behind the freshness `return`.
+  local nontargeted = best.type == "SAVE" or best.type == "REROLL" or best.type == "CONTINUE"
+    or best.type == "SKIP" or best.type == "SKIP_PACK"
+  if nontargeted then isfresh = true end
+  -- DEADLOCK-BREAKER, promoted ABOVE the freshness gate so it can rescue ANY freshness false-negative
+  -- (targeted included): after MAX_WAIT stuck on the SAME state, proceed even if not fresh (a targeted
+  -- action still resolves by stable id/key at execution, or logs "not found" -- never a wrong-card).
+  local forced = (now() - (Autoplay.wait_since or now())) > Autoplay.MAX_WAIT
   -- diagnostic (once per state): what the engine wants + whether the decision matches the live state,
   -- so a stall is explainable from the log rather than guessed.
   if s ~= Autoplay._diag_sig then
     Autoplay._diag_sig = s
     flog("[tick] " .. ch .. " best=" .. tostring(best.type)
       .. " tgt=" .. tostring(best.target and (best.target.key or best.target.name))
-      .. " fresh=" .. tostring(isfresh))
+      .. " fresh=" .. tostring(isfresh) .. (forced and " FORCED" or ""))
   end
-  if not isfresh then return end
+  if not isfresh and not forced then return end
 
   -- DECISION-STABILITY GATE: the engine's Monte-Carlo refine can CHANGE the recommendation a couple of
   -- seconds after the cheap pass, so acting instantly risks executing a decision it's about to revise.
   -- Require the (state + action) to hold UNCHANGED for STABLE_HOLD before committing.
   -- DEADLOCK-BREAKER: if the top action flickers so the gate never settles, don't wait forever — after
   -- MAX_WAIT on the SAME state, act on the current best anyway (this was the "stuck on SAVE" stall).
-  local forced = (now() - (Autoplay.wait_since or now())) > Autoplay.MAX_WAIT
+  -- `forced` is computed above (promoted over the freshness gate) so both gates share the one clock.
   local act_id = s .. "|" .. tostring(best.type) .. "|"
     .. tostring(best.target and (best.target.key or best.target.name) or (best.cards and #best.cards) or "")
   if not forced then
