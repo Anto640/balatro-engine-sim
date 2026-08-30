@@ -199,6 +199,17 @@ end
 
 local function dollars(gs) return (gs.economy and gs.economy.dollars) or 0 end
 local function interest_cap(gs) return (gs.economy and gs.economy.interest_cap) or 5 end
+-- interest_cap NORMALIZED to the engine's unit (INT-dollars). The LIVE game feeds it in DOLLARS
+-- (25/50/100 — confirmed in fixtures); the sim/tests feed INT-dollars (5/10/20). The economy math
+-- multiplies the cap by 5 (`cap*5` = the max-interest bankroll), which only holds for int-dollars, so
+-- live it 5x-over-states the cap ($25 read as a $125 bankroll) and over-charges the interest cost of
+-- spending. Same normalization as the pack-poverty damp's dollar_cap. Values >=25 are the live DOLLAR
+-- form; <25 are already int-dollars.
+local function cap_int_of(gs)
+  local raw = interest_cap(gs)
+  return (raw >= 25) and math.floor(raw / 5) or raw
+end
+SA.cap_int_of = cap_int_of
 
 -- Interest dollars earned next round at a given bankroll ($1 per $5 up to cap).
 -- This is a STEP function: only crossing a $5 boundary changes it, so the curve
@@ -592,7 +603,7 @@ function SA.recommend(gs, opts)
   actions[#actions + 1] = {
     type = "SAVE", cost = 0, value = 0,
     reason = string.format("Bank $%d for interest (+$%d/round).%s",
-      dollars(gs), interest_at(dollars(gs), interest_cap(gs)),
+      dollars(gs), interest_at(dollars(gs), cap_int_of(gs)),   -- true cap, not the 5x-over-stated live value
       plan.budget > 0 and string.format(" $%d is interest-free — free to spend.", plan.budget) or ""),
   }
 
@@ -645,6 +656,24 @@ function SA.recommend(gs, opts)
   -- planned free budget (the budget portion is discounted), scaled by the income
   -- you earn back this blind.
   local function net_cost(c) return income_factor * (interest_penalty(gs, c) + spend_power_cost(c, plan.budget)) end
+
+  -- CORRECTED interest cost for DIRECTED VALUE-BUYS (jokers / consumables / vouchers), using the
+  -- NORMALIZED cap so genuine SURPLUS above the true interest cap ($25/50/100) is free to spend on
+  -- directed value. The raw interest math 5x-over-charges live (cap read as $125), which made the engine
+  -- hoard and pass up cheap good offers when already rich (owner report 2026-08-30: Chaos/Emperor left on
+  -- the shelf at $30+). SCOPED to value-buys on purpose: correcting the cap for REROLLS/PACKS globally
+  -- regressed agreement (winners bank past the cap for option-value on GAMBLES; conversion_baseline.txt),
+  -- so those keep net_cost(). This gives the human/self-player the cheap-good-buy behavior asked for
+  -- without re-opening the reroll/pack over-spend.
+  local cap_int = cap_int_of(gs)
+  local real_cap_d = cap_int * 5                       -- the true max-interest bankroll, in dollars
+  local function interest_penalty_c(c)
+    return (interest_at(dollars(gs), cap_int) - interest_at(dollars(gs) - c, cap_int)) * SA.interest_horizon(gs)
+  end
+  -- free budget = surplus above the true cap (never below the survival reserve). Telescopes across a
+  -- multi-buy visit because recommend() re-runs with fewer dollars after each buy.
+  local budget_c = math.max(0, dollars(gs) - math.max(real_cap_d, math.min(reserve, dollars(gs))))
+  local function net_cost_c(c) return income_factor * (interest_penalty_c(c) + spend_power_cost(c, budget_c)) end
 
   -- Real shop data is messier than test fixtures (modded items, unexpected nils).
   -- Run each candidate category in its own pcall so one bad item degrades to
@@ -699,7 +728,7 @@ function SA.recommend(gs, opts)
     local down = Eval.joker_downside(gs, sj)
     local fit, fnote = BuildPlan.fit(gs, sj, build, invest)  -- planning: build the core / avoid dilution
     local value = w_score * (sgain * 5 + syn + fit + first_scorer) + w_econ * econ - w_score * down
-      - net_cost(cost) - econ_floor_penalty(gs, cost)
+      - net_cost_c(cost) - econ_floor_penalty(gs, cost)
     local why = note and (" — " .. note)
       or (fnote and (" — " .. fnote))
       or (down > 0 and " — but has a situational downside")
@@ -768,7 +797,7 @@ function SA.recommend(gs, opts)
         + VU.income_frac(gs, gain) * SA.JOKER_SCORE_WEIGHT - cost * SA.DOLLAR_UTIL  -- net money
       verb = "Buy & use"
     else
-      value = w_score * SA.JOKER_SCORE_WEIGHT * (vfrac + sbonus) - net_cost(cost)
+      value = w_score * SA.JOKER_SCORE_WEIGHT * (vfrac + sbonus) - net_cost_c(cost)
       verb = "Buy & hold"   -- keep in a consumable slot for the optimal moment
     end
     local tnote = Tarot.target_note(gs, it.key)   -- which deck card(s) to apply it to
@@ -795,7 +824,7 @@ function SA.recommend(gs, opts)
     local cost = v.cost or 10
     local vval, vecon, vname, vnote = Vouchers.value(gs, v.key,
       { rng = rng, cache = mopts.cache, samples = 6, at_risk = not secure })
-    local value = w_score * vval + w_econ * vecon - net_cost(cost)
+    local value = w_score * vval + w_econ * vecon - net_cost_c(cost)
     local entry = {
       type = "BUY_VOUCHER", target = v, cost = cost, value = value, name = vname,
       reason = string.format("Buy %s ($%d) — %s.", vname, cost, vnote or "permanent upgrade"),
