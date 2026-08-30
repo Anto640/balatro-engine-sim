@@ -448,6 +448,25 @@ function PO.recommend(gs, opts)
     end
   end
 
+  -- SKIP-FED joker feed: Red Card gains +3 Mult PERMANENTLY every time a Booster Pack is SKIPPED. The
+  -- engine could never express that, so it never fed Red Card (owner report 2026-08-30). When a pack's
+  -- best pick is WEAK, skipping it to grow Red Card is worth more than the pick. Board-amplified (a flat
+  -- +mult is worth more behind an xmult) and BOUNDED so it only tips a MARGINAL pack -- a real
+  -- joker/planet pick (~0.3+) always wins. Gated on owning Red Card (rare), so it can't broadly regress.
+  if not skip_full and ordered[1] then
+    local owns_red = false
+    for _, j in ipairs(gs.jokers or {}) do if j.key == "j_red_card" then owns_red = true; break end end
+    if owns_red then
+      local amp = (BuildPlan.level_amplifier and BuildPlan.level_amplifier(gs)) or 1.0
+      local skip_credit = math.min(0.15, 0.05 * amp)   -- per-skip frac for +3 permanent mult (heuristic)
+      if (ordered[1].v or 0) <= skip_credit then
+        skip_full = true
+        reason = string.format("Skip to feed Red Card (+3 Mult, permanent) — the best pick (%s) is worth less.",
+          ordered[1].name or "this card")
+      end
+    end
+  end
+
   -- Surface the TOP pick's target ("apply to which card") as a dedicated field so the overlay
   -- can put it in the BIG line, not just the grey reason -- matching owned/shop tarots
   -- (2026-08-26 advice-review #10: Empress inside a pack had no main-line target text).
