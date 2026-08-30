@@ -200,6 +200,18 @@ function JokerData.resolve(key)
   return (key and D[key]) or DEFAULT
 end
 
+-- Genuinely UNMODELLED jokers: the engine has no faithful model of WHEN they pay or HOW to trigger
+-- them, so it can neither value them nor tell you (or the self-player) how to use them -- its tier/econ
+-- prior is a blind guess. It must NOT recommend spending money / a pack pick to ACQUIRE one (owner
+-- directive 2026-08-30: "it spends money on it and has no clue how to utilise it"). This gates
+-- ACQUISITION only; an already-owned one is still valued normally for keep/sell. Extend this list
+-- rather than special-casing call sites. Currently only Matador (needs a boss-blind-ability trigger
+-- event bus the sim lacks -- see JOKER_FIDELITY_AUDIT.md).
+JokerData.UNMODELLED = {
+  j_matador = "pays only when your played hand triggers the boss blind's ability — the engine has no boss-trigger model, so it can't value it or play to use it",
+}
+function JokerData.is_unmodelled(key) return key ~= nil and JokerData.UNMODELLED[key] ~= nil end
+
 function JokerData.has_tag(key, tag)
   local e = D[key]
   if not e then return false end

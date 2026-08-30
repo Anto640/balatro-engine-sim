@@ -707,6 +707,10 @@ function SA.recommend(gs, opts)
   -- per-ITEM pcall: a single odd joker can't drop the whole buy list (which is
   -- what made Abstract/Acrobat vanish when one shop joker threw).
   for _, sj in ipairs(shop.jokers or {}) do try(function()
+    -- UNMODELLED joker: the engine can't value it or tell you how to use it, so never recommend
+    -- SPENDING to acquire it (skip it entirely -- not even as a SELL_TO_BUY funding target). Owner
+    -- directive 2026-08-30; currently only Matador (JokerData.UNMODELLED).
+    if JokerData.is_unmodelled(sj.key) then return end
     local cost = sj.cost or 0
     local sgain = scoring_gain(gs, sj, rng, pace)       -- measured (or prior); pace damps scaler projection
     local econ = JokerData.resolve(sj.key).econ or 0    -- $/round it generates

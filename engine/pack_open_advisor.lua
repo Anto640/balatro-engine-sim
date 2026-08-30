@@ -109,6 +109,9 @@ end
 -- 1.4-19x -- and this is the FREE leveling channel, where that matters most.
 local function value_item(gs, it, need, freq, base, rng, cheap, hctx)
   if it.set == "Joker" and it.joker then
+    -- UNMODELLED joker (Matador): the engine can't value it or tell you how to use it, so don't take it
+    -- into a slot -- value it below the pick threshold so another pick or SKIP wins (owner directive).
+    if JokerData.is_unmodelled(it.key) then return -1, false end
     if not cheap then
       -- SAME basis as the shop buy: max(measured, analytic conditional-xmult, tier-prior floor)/need,
       -- so a Trio/Tribe/Duo picked from a Buffoon pack is valued for the core it is, not the ~0 its
