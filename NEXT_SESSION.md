@@ -1,5 +1,22 @@
 # NEXT_SESSION.md — fresh-session handoff (2026-08-30)
 
+## ⭐ OPEN OBSERVATIONS from live self-player runs (2026-08-30, owner "note these for now")
+Three advice-quality gaps seen while watching the self-player, NOT yet fixed (owner asked to note them):
+1. **Banner** — rewards UNUSED discards (30 chips each, `joker_effects.lua:189`, modelled). But the
+   discard-econ system (`discard_fuel`) spends discards and zeros it. FIX: the discard valuation must
+   charge Banner's chip loss when Banner is owned (like the Ramen/Green-Joker harm guard).
+2. **Red Card** — a `scaling_mult` that grows +mult on BOOSTER SKIPS (a shop/pack decision, not
+   in-blind). The skip/shop logic doesn't FEED it, so it stagnates. FIX: value skipping a booster
+   higher when Red Card is owned (a generators/skip-side scaler-feed, mirroring in-blind scaling_fuel).
+3. **Over-skipping** — the self-player skipped a lot. May EASE now that the interest-cap hoarding bug is
+   fixed (`4007b36` — less reason to skip to preserve money); re-watch a run before chasing separately.
+
+Shipped this session AFTER the block below: the "stuck on SAVE" freshness-deadlock fix (`44826dc`),
+atomic one-action-per-recommendation (Jupiter+Saturn + pack make-room, `318d146`), pack "never take a
+joker into a full board" demote-or-skip (`e48e6d2`), the **interest-cap unit fix scoped to value-buys**
+(`4007b36` — see the `interest-cap-unit-fix-scoped` memory: do NOT revert as conversion_baseline's
+"reverted" one), and **don't-acquire-unmodelled-joker (Matador)** (`c70447c`, `JokerData.UNMODELLED`).
+
 ## ⭐ CURRENT STATE (2026-08-30) — the IN-GAME SELF-PLAYER + the autonomous review loop
 
 **A working in-game self-player was built** (`ui/autoplay.lua`, toggle **F11**, default OFF). It
