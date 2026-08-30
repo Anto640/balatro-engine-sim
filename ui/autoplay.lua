@@ -358,6 +358,7 @@ local function do_hand(G, best, logger)
     return click(G, "use_card", logger, best.target)
   end
   log(logger, best.type .. " " .. tostring(best.cards and #best.cards) .. " cards (" .. tostring(best.hand_type or "") .. ")")
+  if best.reason then flog("  play-reason: " .. tostring(best.reason):gsub("%s+", " "):sub(1, 220)) end
   local fn = best.type == "PLAY" and "play_cards_from_highlighted" or "discard_cards_from_highlighted"
   return click(G, fn, logger)
 end
