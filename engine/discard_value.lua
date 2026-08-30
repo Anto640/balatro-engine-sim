@@ -78,13 +78,28 @@ function DV.measured(gs, discard, opts)
   for _, c in ipairs(hand) do if not drop[c] then keep[#keep + 1] = c end end
   local ndraw = #discard
 
+  -- Score the redraw as the POST-DISCARD play: a discard ACTION spends ONE discard, so the hand it
+  -- sets up is played with discards_left-1. Scoring it on the ORIGINAL gs credits the discard as if it
+  -- were free, which over-values it exactly for discards_left-dependent jokers -- Banner (+30 chips per
+  -- REMAINING discard) and Castle over-credit the redraw, so the engine discards away Banner's own
+  -- chips (owner: "after the first few blinds it wasn't using Banner"); Mystic Summit (+15 mult at 0
+  -- discards) is under-credited. A no-op for every deck without such a joker (nothing else reads it).
+  local gs_after = gs
+  local b = gs.blind
+  if b and (b.discards_left or 0) > 0 then
+    local nb = {}; for k, v in pairs(b) do nb[k] = v end
+    nb.discards_left = b.discards_left - 1
+    gs_after = {}; for k, v in pairs(gs) do gs_after[k] = v end
+    gs_after.blind = nb
+  end
+
   local total = 0
   for _ = 1, samples do
     local s = shuffled(pile, rng)
     local nh = {}
     for i = 1, #keep do nh[i] = keep[i] end
     for i = 1, math.min(ndraw, #s) do nh[#nh + 1] = s[i] end
-    local ev = HandEval.best_play(gs, nh)
+    local ev = HandEval.best_play(gs_after, nh)
     total = total + (ev and ev.score or 0)
   end
   return total / samples
