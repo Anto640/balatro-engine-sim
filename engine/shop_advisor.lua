@@ -74,6 +74,13 @@ SA.CREATES_JOKER = { c_judgement = true }
 -- Value of a RANDOM created joker (Judgement) when the board is FULL: making room means selling a kept
 -- joker for a random one, a poor trade, so credit it low. Full value applies only with a free slot.
 SA.CREATE_FULL_BOARD_CREDIT = 0.1
+-- Per-blind joker GENERATORS: they spawn a Joker at blind start ONLY if a slot is free, so on a full
+-- board the spawn overflows and is WASTED. Owning one makes an OPEN slot recurring value -> sell a
+-- disposable common to reopen a slot and farm the generator (a common to cash each blind + a shot at a
+-- keeper). SLOT_FARM_JOKER is the FV value of one reopened slot; FARM_MAX_CONTRIB gates it to genuinely
+-- low-value jokers so a working board is never disturbed. (Owner-reported: Riff-Raff run.)
+SA.SLOT_FARM_JOKER = { j_riff_raff = 0.5 }
+SA.FARM_MAX_CONTRIB = 0.3
 -- Proactive-sell nudge (future-value units) for jokers that DECAY to nothing or
 -- carry a downside, so converting them to cash/another joker before they expire
 -- is often right. Heuristic + extensible; joker-destruction interactions
@@ -1024,14 +1031,22 @@ function SA.recommend(gs, opts)
       end
       local nudge = SA.SELL_NUDGE[j.key] or 0      -- decay/downside proactive credit
       local sbonus, sbnote = OwnedSynergy.sell_bonus(gs) -- Campfire etc: selling itself is valuable
+      -- RIFF-RAFF SLOT FARMING (SA.SLOT_FARM_JOKER): on a FULL board, selling a disposable common reopens
+      -- a slot so an owned per-blind generator can spawn again. Only when slots are full AND the weakest
+      -- joker is genuinely low-value, so a working board is never disturbed.
+      local farm = 0
+      if slots_free <= 0 and worst_c <= SA.FARM_MAX_CONTRIB then
+        for _, jk in ipairs(gs.jokers) do farm = farm + (SA.SLOT_FARM_JOKER[jk.key] or 0) end
+      end
       local value
       if upgrade > 0 then
-        value = money_w * eff_cash + SA.W_FV * (upgrade + nudge + sbonus)   -- keep already charged in `upgrade`
+        value = money_w * eff_cash + SA.W_FV * (upgrade + nudge + sbonus + farm)   -- keep already charged in `upgrade`
       else
-        value = money_w * eff_cash + SA.W_FV * (nudge + sbonus - worst_c)   -- pure sale: charge lost value once
+        value = money_w * eff_cash + SA.W_FV * (nudge + sbonus + farm - worst_c)   -- pure sale: charge lost value once
       end
       local why
-      if upgrade > 0 then why = "frees a slot for " .. (up_name or "a better joker")
+      if farm > 0 and upgrade <= 0 then why = "frees a slot for your Joker-spawner (e.g. Riff-Raff) to farm next blind"
+      elseif upgrade > 0 then why = "frees a slot for " .. (up_name or "a better joker")
       elseif sbonus > 0 then why = sbnote
       elseif nudge > 0 then why = "decaying/temporary — bank it before it expires"
       elseif owns_slot_synergy and worst_c <= 0.05 then
