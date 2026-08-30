@@ -1,15 +1,18 @@
 # NEXT_SESSION.md — fresh-session handoff (2026-08-30)
 
-## ⭐ OPEN OBSERVATIONS from live self-player runs (2026-08-30, owner "note these for now")
-Three advice-quality gaps seen while watching the self-player, NOT yet fixed (owner asked to note them):
-1. **Banner** — rewards UNUSED discards (30 chips each, `joker_effects.lua:189`, modelled). But the
-   discard-econ system (`discard_fuel`) spends discards and zeros it. FIX: the discard valuation must
-   charge Banner's chip loss when Banner is owned (like the Ramen/Green-Joker harm guard).
-2. **Red Card** — a `scaling_mult` that grows +mult on BOOSTER SKIPS (a shop/pack decision, not
-   in-blind). The skip/shop logic doesn't FEED it, so it stagnates. FIX: value skipping a booster
-   higher when Red Card is owned (a generators/skip-side scaler-feed, mirroring in-blind scaling_fuel).
-3. **Over-skipping** — the self-player skipped a lot. May EASE now that the interest-cap hoarding bug is
-   fixed (`4007b36` — less reason to skip to preserve money); re-watch a run before chasing separately.
+## ⭐ THREE LIVE-RUN OBSERVATIONS — now FIXED (2026-08-30)
+1. **Banner** (`e693975`) — `DV.measured` scored the redraw on the original gs, crediting the discard as
+   free; for discards_left jokers (Banner +30 chips/remaining discard) that over-valued discarding, so
+   the engine discarded away Banner's chips. Now scores the redraw with `discards_left-1`. No-op for any
+   deck without Banner/Mystic Summit (the only readers).
+2. **Red Card** (`63d41f1`) — `scaling_mult` that grows +3 Mult per BOOSTER SKIP; the engine couldn't
+   express feeding it. `pack_open_advisor` now skips a WEAK pack to feed Red Card (board-amplified,
+   bounded ≤0.15 frac so a real pick always wins; gated on owning Red Card).
+3. **Over-skipping** (`6249773`) — `blind_select_value` priced only on-select generators, ignoring the
+   in-blind value only PLAYING realizes (scalers grow, Faceless/Mail/Trading farm). Now credited, so a
+   scaler/farm board skips less. NOTE: the early strong-tag skips seen (Rare/Negative/Buffoon/Orbital)
+   are mostly JUSTIFIED; if over-skipping persists in a fresh run, the lever is a MEASURED
+   `SK.SKIP_MARGIN` adjustment (skip fires 100% of blind-selects — the one high-firing class worth a sim A/B).
 
 Shipped this session AFTER the block below: the "stuck on SAVE" freshness-deadlock fix (`44826dc`),
 atomic one-action-per-recommendation (Jupiter+Saturn + pack make-room, `318d146`), pack "never take a
