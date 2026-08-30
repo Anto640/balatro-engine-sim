@@ -11,10 +11,15 @@ Despite the historical filename, this guide applies equally to Codex and other c
 action, and overlays a ranked "best move" with a reason. Roadmap M1–M4 is complete
 plus a large correctness/coverage/strategy pass.
 
-> ### ⭐ CURRENT FOCUS (2026-08-28): the objective pivoted from AUTONOMOUS WINRATE to ADVICE QUALITY.
-> The mod advises a **human who wins ~87.5%**; autonomous winrate is *ceilinged* (a policy/value-function
-> wall that is compute/data-bound — see below). Advice quality is a **different, non-compute-bound**
-> objective, and the last session's work is all there:
+> ### ⭐ CURRENT FOCUS (2026-08-30): ADVICE QUALITY, now driven by an IN-GAME SELF-PLAYER + a review loop.
+> **NEW: an in-game self-player** (`ui/autoplay.lua`, **F11**) translates the engine's live advice into REAL
+> Balatro inputs and plays whole runs unattended — a real-game, unlimited-sample bug-finder for the overlay
+> (no sim-fidelity doubt). **The review loop is CLAUDE's job, not the owner's:** for decision quality I run
+> the headless sim myself (same engine) or read the self-player's `bes_autoplay.log` + `bes_runs.jsonl`,
+> analyse, fix, re-measure. First loop run DEBUNKED the joker-churn hypothesis (harm was a run-length
+> confound). **Read `NEXT_SESSION.md` top block FIRST.** The mod advises a **human who wins ~87.5%**;
+> autonomous winrate is *ceilinged* (compute/data-bound — see below). Advice quality is a **different,
+> non-compute-bound** objective, and the prior session's work is all there:
 > - **`ADVICE_REVIEW.md`** — the owner's live-run decision observations + the fixes shipped (anti-churn
 >   SELL_TO_BUY gate, active money-dig, Hermit-use, pack-first, planet-picks, debuff discard, UX).
 > - **`JOKER_FIDELITY_AUDIT.md`** — the sim was **flattering the engine** (paying jokers a flat `econ`
@@ -57,7 +62,9 @@ thing **headless-testable**. See the Layout section in `README.md` for the per-f
   files there or the game won't see them. Green tests ≠ works in-game.
 - **In-game debug keys:** `F7` dump owned jokers' live `ability` tables (to the console
   and to `bes_joker_dump.txt` in the LÖVE save folder, each tagged
-  `scored`/`value-only`/`UNCOVERED`); `F8` force a re-evaluation; `F9` toggle the overlay.
+  `scored`/`value-only`/`UNCOVERED`); `F8` force a re-evaluation; `F9` toggle the overlay;
+  `F10` capture-only toggle (log decisions, no eval); **`F11` AUTO-PLAY toggle** (the self-player,
+  `ui/autoplay.lua`, default OFF — plays whole runs; logs to `bes_autoplay.log`).
 
 ## Self-play simulator & data-driven tuning (THE current workflow — read this)
 

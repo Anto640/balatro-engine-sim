@@ -1,4 +1,42 @@
-# NEXT_SESSION.md — fresh-session handoff (2026-08-28)
+# NEXT_SESSION.md — fresh-session handoff (2026-08-30)
+
+## ⭐ CURRENT STATE (2026-08-30) — the IN-GAME SELF-PLAYER + the autonomous review loop
+
+**A working in-game self-player was built** (`ui/autoplay.lua`, toggle **F11**, default OFF). It
+translates the engine's live recommendation into REAL Balatro inputs — it plays whole runs unattended
+(blind select/skip · play/discard with joker **reorder** · cash-out · shop buy/sell/reroll/leave ·
+buy+open packs · pick from packs incl. **card-tarot targeting** · use held consumables · use card-tarots
+with target selection). It completed a full run (ante-4 death). **Point of it:** a real-game,
+unlimited-sample bug-finder for the OVERLAY's advice — no sim-fidelity doubt, no tiny-corpus limit. Actuation
+notes (learned the hard way): invoke the REAL UI button node (found via `config.button`), never a fabricated
+event (crashes on `e.UIBox`); Play/Discard live under `G.STAGE_OBJECTS`; boosters buy via `use_card`; SELECT
+and CLICK must be on SEPARATE frames (`can_play`/`can_use` lag a frame); a deadlock-breaker acts after 3s if
+the decision flickers. Logs to `bes_autoplay.log` in the save folder (the in-game logger only print()s).
+
+**The autonomous review loop (owner directive): CLAUDE does the analysis, not the owner.** The owner
+generates in-game runs (I can't drive Balatro), OR — for DECISION quality — I run the **headless sim myself**
+(same engine, same decisions; only outcomes are modelled) and analyse the traces. First loop run
+(`sim_out/churn0.jsonl`, n=48) DEBUNKED the joker-churn hypothesis: churn is real (2.4 bought-then-sold/run,
+driven by SELL_JOKER upgrades) but its harm is a **run-length CONFOUND** — raw corr(churn,reach)=+0.61 but
+corr(#shops,reach)=+0.934 and de-confounded corr(churn-per-shop,reach)=**+0.074 (flat)**. So the n=1
+`XAXGTK5S` impression ("churn killed it") did NOT survive scale — **no churn fix**; it died with the right
+pieces one blind too late (the conversion wall). The loop caught a spurious fix before shipping it.
+
+**Engine fixes shipped this session** (deployed, 1100 tests pass): Judgement/generator make-room now
+output-quality-aware (don't take a RANDOM joker into a full board); Riff-Raff slot-farming (sell a
+disposable common to reopen a spawner slot — mechanism-justified, outcome-unproven); `best_targets` covers
+ALL card-targeting tarots + spectrals (Strength/Death/Hanged-Man/seals/Aura); the pack-poverty damp
+(bank toward the interest cap before gambling on a pack — SAFE + advice-positive). Reverted: the
+`interest_cap` unit fix (correct but regressed agreement — winners over-bank; see `conversion_baseline.txt`).
+
+**Advice-quality A/B harness** (`tools/agreement_run.sh`): replay the frozen 7-win corpus under the current
+engine → per-decision agreement diff. **Conversion investigation** (`CONVERSION_PLAN.md` +
+`conversion_baseline.txt`): the gap is ECONOMY/SPEND discipline, not valuation (C' refuted: engine ranks the
+human's multiplier #1 91% of the time) — the frontier is assembly TIMING (core lands ante 4 not ante 2-3).
+
+---
+
+# (previous handoff) 2026-08-28 — the advice-quality + sim-fidelity session
 
 > **THE OBJECTIVE PIVOTED to ADVICE QUALITY this session** (the pivot the old §"if the objective ever
 > shifts" section below anticipated). The mod advises a *human who wins ~87.5%*; autonomous winrate is
