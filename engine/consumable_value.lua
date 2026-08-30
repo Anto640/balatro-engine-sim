@@ -264,7 +264,28 @@ function CV.card_add_value(gs, card, opts)
   gs_with.deck = with
   local withv = JokerValue.avg_score(gs_with, { samples = samples, rng = opts.rng }) or 0
 
-  return (withv - base) / need + CV.card_econ_value(gs, card, opts.rng)
+  return (withv - base) / need + CV.card_econ_value(gs, card, opts.rng) + CV.add_card_feed(gs, base, need)
+end
+
+-- Extra value of ADDING a playing card to the deck when you own a joker FED by deck size. The measured
+-- delta above MISSES this: avg_score reads a scaler's CURRENT counter, and adding a card doesn't bump
+-- that counter inside the measurement. Hologram gains +0.1 xmult PER CARD ADDED (permanent), so the
+-- engine valued Standard-pack cards at only their raw deck contribution and never fed it (owner report
+-- 2026-08-30: "Hologram was bought first shop and wasn't scaled a single time"). Blue Joker gains +2
+-- chips per deck card. (Erosion is the OPPOSITE -- fed by REMOVING cards -- so it is NOT credited.)
+-- Board-scaled (Hologram's +0.1 is ~10% of the current per-hand score) and bounded so one card can't
+-- dominate a focused pick.
+function CV.add_card_feed(gs, base, need)
+  local credit = 0
+  need = (need and need > 0) and need or 1
+  for _, j in ipairs(gs.jokers or {}) do
+    if j.key == "j_hologram" then
+      credit = credit + math.min(0.40, 0.25 * ((base or 0) / need))  -- +X0.25 permanent xmult per card
+    elseif j.key == "j_blue_joker" then
+      credit = credit + math.min(0.05, 2 / need)                     -- +2 permanent chips per card
+    end
+  end
+  return credit
 end
 
 -- The deck's measured baseline (for reuse when valuing several cards).
