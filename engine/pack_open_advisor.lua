@@ -396,12 +396,15 @@ function PO.recommend(gs, opts)
     end
   end
 
-  -- Joker slots full: you CAN'T take a joker pick without first selling one (the
-  -- game blocks it), so name the joker to drop. The pack joker and your owned jokers
-  -- are valued in the SAME FV currency (econ + downside included), so a value-only
-  -- econ joker no longer looks unbeatable. Endorse the swap when the best pick beats
-  -- your weakest; otherwise say plainly it's not an upgrade (take only for sell-cash).
+  -- Joker slots full: you CAN'T take a joker pick without first selling one (the game blocks it). Three
+  -- outcomes, and we NEVER leave "Take <joker>" standing on a full board (the actuator can't execute it
+  -- and take-to-immediately-sell isn't worth a slot):
+  --   (a) a worthwhile SWAP exists -> the SELL becomes the primary action ("Sell X to make room for Y");
+  --   (b) no swap, but a non-joker pick FITS (a Tarot/Planet used on the spot) -> take THAT instead;
+  --   (c) nothing fits -> SKIP, and say plainly why.
+  -- The pack joker and owned jokers are valued in the SAME FV currency (econ + downside included).
   local sell = nil
+  local skip_full = false
   local jcap = (gs.run and gs.run.joker_slots) or 5
   if #(gs.jokers or {}) >= jcap then
     -- best pack joker by FV (what you'd actually slot), not just use-order first.
@@ -412,23 +415,32 @@ function PO.recommend(gs, opts)
         if not jpick or fv > jpick_fv then jpick, jpick_fv = pk, fv end
       end
     end
-    if jpick then
-      local wi, wname, wfv = weakest_owned_joker(gs, mopts)
-      if wi then
-        if jpick_fv > wfv then
-          -- carry the make-room joker's IDENTITY (key/id) + what it makes room FOR, so the overlay
-          -- can promote the SELL to its OWN primary action ("Sell X to make room for Y") and the
-          -- auto-play actuator can address the live joker -- instead of burying it in the grey reason
-          -- under "Take Y" (which the actuator can't execute: a joker can't be taken into a full board).
-          local wj = gs.jokers[wi]
-          sell = { name = wname, index = wi, key = wj and wj.key, id = wj and wj.id,
-                   for_name = jpick.name, for_key = jpick.key }
-          reason = reason .. string.format(" — Joker slots full: sell %s (your weakest) to make room for %s.",
-            wname, jpick.name)
-        else
-          reason = reason .. string.format(" — Joker slots full: %s doesn't beat your weakest (%s) — keep your board, or take it only to sell for cash.",
-            jpick.name, wname)
-        end
+    local wi, wname, wfv = weakest_owned_joker(gs, mopts)
+    if jpick and wi and jpick_fv > wfv then
+      -- (a) carry the make-room joker's IDENTITY (key/id) + what it makes room FOR, so the overlay can
+      -- promote the SELL to its OWN primary action and the actuator can address the live joker.
+      local wj = gs.jokers[wi]
+      sell = { name = wname, index = wi, key = wj and wj.key, id = wj and wj.id,
+               for_name = jpick.name, for_key = jpick.key }
+      reason = reason .. string.format(" — Joker slots full: sell %s (your weakest) to make room for %s.",
+        wname, jpick.name)
+    elseif ordered[1] and ordered[1].it.set == "Joker" then
+      -- The recommended pick is a joker but the board is full and no swap is worth it (jpick doesn't beat
+      -- the weakest, or every owned joker is a protected keeper). Demote to the best FITTING pick, else SKIP.
+      local wtxt = wname and (" (" .. wname .. ")") or " (your board is all keepers)"
+      local fit
+      for _, pk in ipairs(ordered) do
+        if pk.it.set ~= "Joker" and pk.v and pk.v > 0 then fit = pk; break end
+      end
+      if fit then
+        for i, pk in ipairs(ordered) do if pk == fit then table.remove(ordered, i); break end end
+        table.insert(ordered, 1, fit)
+        reason = string.format("Take %s — Joker slots full and %s doesn't beat your weakest%s, so keep your board.",
+          fit.name, (jpick and jpick.name) or "the joker", wtxt)
+      else
+        skip_full = true
+        reason = string.format("Skip — Joker slots full and %s doesn't beat your weakest%s; keep your board.",
+          (jpick and jpick.name) or "the pack joker", wtxt)
       end
     end
   end
@@ -446,6 +458,7 @@ function PO.recommend(gs, opts)
     if tg and #tg > 0 then best_target_cards = {}; for _, t in ipairs(tg) do best_target_cards[#best_target_cards + 1] = { id = t.id } end end
   end
   return { ranked = valued, picks = ordered, best = ordered[1].it, reason = reason, sell = sell,
+           skip = skip_full or nil,   -- full board + no worthwhile joker swap -> skip, don't recommend "take"
            target_note = best_target_note, target_cards = best_target_cards }
 end
 
