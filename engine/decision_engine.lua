@@ -93,7 +93,10 @@ local function held_planet_hands(gs)
   local held = {}
   for _, c in ipairs(gs.consumables or {}) do
     local h = ConsumableValue.PLANET_KEY_HAND[c.key]
-    if h then held[#held + 1] = { hand = h, name = c.name or c.key } end
+    -- carry the KEY: planet_use / the auto-play actuator address the consumable by center key
+    -- (target.name is display-only). Without it use_keys was empty and the actuator fell back to a
+    -- non-existent "Jupiter + Saturn" name -> hard stall.
+    if h then held[#held + 1] = { hand = h, name = c.name or c.key, key = c.key } end
   end
   return held
 end
@@ -197,21 +200,42 @@ DE.MILK_MONEY = true        -- SHIPPED ON (2026-08-21): correct play (milk a loc
 DE.MILK_SURV_TOL = 0.02     -- max survival-frac the milk play may cost vs the straight clear
 DE.MILK_MONEY_MARGIN = 2    -- min extra $ (E[money]) the milk must farm to justify deferring
 
+-- ATOMIC single-planet recommendation. Using held planets is free permanent value, so the engine
+-- proposes it before playing -- but ONE at a time: after this planet is used the engine re-evaluates
+-- and surfaces the next. The old code bundled every held planet into one "Jupiter + Saturn" action,
+-- which (a) the auto-play actuator can't execute (no consumable has that name) and (b) reads wrong to a
+-- human (it claimed both level the hand you're about to PLAY -- unrelated to what each planet levels).
+-- We pick the planet with the biggest THIS-TURN boost first (immediate benefit), then the rest.
 local function planet_use(gs, base_ev, remaining, held, gs2)
   if not held or #held == 0 or not base_ev then return nil end
-  local ev2, cards2 = HandEval.best_play_target(gs2, gs.hand or {}, remaining, boss_filter(gs))
-  if not ev2 then ev2, cards2 = base_ev, gs.hand end
-  local used, used_keys = {}, {}
-  for _, p in ipairs(held) do used[#used + 1] = p.name; if p.key then used_keys[#used_keys + 1] = p.key end end
   local credit = Mechanics.boss_per_hand_need(gs) * DE.LEVEL_USE_CREDIT
-  local boost = math.max(0, (ev2.score or 0) - (base_ev.score or 0))   -- this-turn boost, if any
+  local best_p, best_boost, best_cards, best_ht
+  for _, p in ipairs(held) do
+    local gsi = leveled_gs(gs, { p })
+    local evi, cardsi = HandEval.best_play_target(gsi, gs.hand or {}, remaining, boss_filter(gs))
+    local boost = evi and math.max(0, (evi.score or 0) - (base_ev.score or 0)) or 0
+    -- max boost wins; deterministic tie-break by key so the pick never flickers between ticks.
+    if not best_p or boost > best_boost
+       or (boost == best_boost and tostring(p.key or p.name) < tostring(best_p.key or best_p.name)) then
+      best_p, best_boost, best_cards, best_ht = p, boost, cardsi, evi and evi.hand_type
+    end
+  end
+  if not best_p then return nil end
+  -- honest reason: name the hand THIS planet levels; only mention the play when this planet boosts it.
+  local reason
+  if best_boost > 0 and best_ht then
+    reason = string.format("Use %s to level %s (free, permanent) — strengthens your %s this turn.",
+      best_p.name, best_p.hand or "", best_ht)
+  else
+    reason = string.format("Use %s to level %s (free, permanent).", best_p.name, best_p.hand or "")
+  end
   return {
-    -- use_keys: machine-readable consumable keys the actuator/auto-play uses (target.name is display-only)
-    type = "USE_CONSUMABLE", target = { name = table.concat(used, " + ") }, kind = "score",
-    play_cards = cards2, hand_type = ev2.hand_type,
-    score = ev2.score, value = (base_ev.score or 0) + boost + credit, use_names = used, use_keys = used_keys,
-    reason = string.format("Use %s to level %s first (free, permanent), then play %s.",
-      table.concat(used, " + "), ev2.hand_type or "", ev2.hand_type or ""),
+    -- use_keys/target.key: the machine-readable center key the actuator uses (target.name is display-only)
+    type = "USE_CONSUMABLE", target = { name = best_p.name, key = best_p.key }, kind = "score",
+    play_cards = best_cards, hand_type = best_ht,
+    score = (base_ev.score or 0) + best_boost, value = (base_ev.score or 0) + best_boost + credit,
+    use_names = { best_p.name }, use_keys = { best_p.key },
+    reason = reason,
   }
 end
 

@@ -226,15 +226,32 @@ BES.job = nil            -- in-flight background job: { thread, gs, sig, finish 
 -- instant pass and the measured background refine).
 function BES.apply_pack(gs, po)
   local pick = po.best
-  local action = {
-    type = po.skip and "SKIP" or "PICK",
-    -- carry the center key (+ id when present) so the auto-play actuator can match the live pack card;
-    -- name alone is a display string that won't match a center key (ui/autoplay.lua).
-    target = pick and { name = pick.name or pick.key, key = pick.key, id = pick.id } or nil,
-    target_note = po.target_note,          -- "apply to AS, KS" in the BIG line (#10)
-    target_cards = po.target_cards,        -- machine-readable target hand-card ids (auto-play selects them)
-    reason = po.reason, confidence = 0.75,
-  }
+  local action
+  if po.sell and po.sell.key and not po.skip then
+    -- MAKE ROOM IS ITS OWN STEP (owner request 2026-08-30). A joker pick into a FULL board can't be
+    -- taken until a joker is sold, so the PRIMARY recommendation is the SELL ("Sell X to make room for
+    -- Y") -- its own header line, not a grey note under "Take Y". After the sell the re-evaluation frees
+    -- a slot and surfaces the pick. One atomic step per overlay line (both for the human and the
+    -- self-player, which can only actuate one action at a time).
+    action = {
+      type = "SELL_JOKER",
+      target = { name = po.sell.name, key = po.sell.key, id = po.sell.id },
+      make_room_for = po.sell.for_name,
+      reason = string.format("Sell %s to make room for %s, then take it.",
+        po.sell.name, po.sell.for_name or (pick and (pick.name or pick.key)) or "the pick"),
+      confidence = 0.7,
+    }
+  else
+    action = {
+      type = po.skip and "SKIP" or "PICK",
+      -- carry the center key (+ id when present) so the auto-play actuator can match the live pack card;
+      -- name alone is a display string that won't match a center key (ui/autoplay.lua).
+      target = pick and { name = pick.name or pick.key, key = pick.key, id = pick.id } or nil,
+      target_note = po.target_note,          -- "apply to AS, KS" in the BIG line (#10)
+      target_cards = po.target_cards,        -- machine-readable target hand-card ids (auto-play selects them)
+      reason = po.reason, confidence = 0.75,
+    }
+  end
   BES.last = { gs = gs, ranked = { best = action }, pack = true }
   if Overlay then Overlay.set({ best = action }) end
   Log.info("PACK: " .. (po.reason or ""))

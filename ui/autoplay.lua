@@ -311,7 +311,9 @@ end
 local function type_ok(ch, t)
   if ch == "hand" then return t == "PLAY" or t == "DISCARD" or t == "USE_CONSUMABLE" end
   if ch == "shop" then return t == "SAVE" or t == "REROLL" or t == "USE_CONSUMABLE" or (t and (t:find("^BUY") or t:find("^SELL"))) end
-  if ch == "pack" then return t == "PICK" or t == "SKIP" or t == "SKIP_PACK" end
+  -- SELL_JOKER is allowed in a pack: a joker pick into a FULL board needs room made first, and you
+  -- CAN sell jokers while a booster is open (the make-room sell the engine now recommends as its own step).
+  if ch == "pack" then return t == "PICK" or t == "SKIP" or t == "SKIP_PACK" or (t and t:find("^SELL")) end
   if ch == "blind_select" then return t == "CONTINUE" or t == "SKIP" or t == "PLAY" end
   return true
 end
@@ -340,7 +342,9 @@ local function sig(G, ch)
   elseif ch == "shop" then
     return "shop:" .. tostring((G.GAME and G.GAME.dollars) or 0) .. "|" .. ids_of_area(G.shop_jokers) .. "|" .. ids_of_area(G.shop_booster) .. "|c" .. nc .. "|j" .. nj
   elseif ch == "pack" then
-    return "pack:" .. keys_of_area(G.pack_cards)
+    -- include the joker count so a MAKE-ROOM sell (board full -> sell a joker to take a pack joker)
+    -- changes the signature and the follow-up PICK isn't blocked by last_sig on the unchanged pack cards.
+    return "pack:" .. keys_of_area(G.pack_cards) .. "|j" .. nj
   elseif ch == "cash_out" then
     return "cash:" .. tostring((G.GAME and G.GAME.round) or 0)
   elseif ch == "blind_select" then
@@ -496,7 +500,7 @@ function Autoplay.tick(last, logger)
   -- PACK PICK is also two-phase, but the inner card lives in G.pack_cards and has NO use_card button
   -- until it is SELECTED: phase 1 clicks the inner card to select it (its use_card button then appears),
   -- phase 2 clicks that button. (Confirmed: an open Buffoon pack showed no use_card for the inner joker.)
-  if ch == "pack" and best.type ~= "SKIP" and best.type ~= "SKIP_PACK" then
+  if ch == "pack" and best.type == "PICK" then
     local target = best.target or best
     local card = find_card({ G.pack_cards }, target)
     if not card then log(logger, "pack pick not found (" .. tostring(target.key or target.name) .. ")"); Autoplay.last_sig = s; return end
@@ -528,12 +532,21 @@ function Autoplay.tick(last, logger)
   end
 
   -- SELL (owned joker/consumable) is two-phase: there is NO persistent sell button — you SELECT the
-  -- owned card (click it, its sell_card button then appears), then click sell.
-  if ch == "shop" and best.type and best.type:find("^SELL") then
+  -- owned card (click it, its sell_card button then appears), then click sell. Also fires in the PACK
+  -- channel for a MAKE-ROOM sell (board full, engine wants a joker from the pack): you can sell jokers
+  -- while a booster is open. If the make-room sell can't actuate (a blind-select tag pack where the
+  -- joker row isn't sellable), fall back to skipping the pack so the run never stalls.
+  if (ch == "shop" or ch == "pack") and best.type and best.type:find("^SELL") then
     local card = find_card({ G.jokers, G.consumeables }, best.target)
-    if not card then log(logger, "SELL: owned card not found (" .. tostring(best.target and best.target.key) .. ")"); Autoplay.last_sig = s; return end
+    if not card then
+      -- already sold (slot now free) or not found: in a pack, re-enter so the pick surfaces; in the
+      -- shop just mark done. Don't spin.
+      log(logger, "SELL: owned card not found (" .. tostring(best.target and best.target.key) .. ")")
+      Autoplay.last_sig = s; return
+    end
     if not card.highlighted then
       log(logger, "select to sell " .. tostring(ckey(card))
+        .. (best.make_room_for and ("  | make room for " .. tostring(best.make_room_for)) or "")
         .. (best.reason and ("  | ENGINE REASON: " .. tostring(best.reason):sub(1, 160)) or ""))
       pcall(function() card:click() end)
       if not Autoplay._dumped_sell then Autoplay._dumped_sell = true; flog("(post-sell-select dump)"); pcall(Autoplay.dump_ui, G) end
@@ -542,7 +555,12 @@ function Autoplay.tick(last, logger)
     end
     log(logger, "confirm sell " .. tostring(ckey(card)))
     Autoplay.locked_until = now() + 1.5
-    if click(G, "sell_card", logger, best.target) then Autoplay.last_sig = s; Autoplay.pending_id = nil end
+    if click(G, "sell_card", logger, best.target) then Autoplay.last_sig = s; Autoplay.pending_id = nil
+    elseif ch == "pack" and (now() - (Autoplay.wait_since or now())) > 6.0 then
+      -- can't make room in this pack context after retries -> skip so the run continues.
+      log(logger, "make-room sell unusable in pack after retries -> skip pack")
+      click(G, "skip_booster", logger); Autoplay.last_sig = s
+    end
     return
   end
 

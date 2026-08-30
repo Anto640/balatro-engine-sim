@@ -416,7 +416,13 @@ function PO.recommend(gs, opts)
       local wi, wname, wfv = weakest_owned_joker(gs, mopts)
       if wi then
         if jpick_fv > wfv then
-          sell = { name = wname, index = wi }
+          -- carry the make-room joker's IDENTITY (key/id) + what it makes room FOR, so the overlay
+          -- can promote the SELL to its OWN primary action ("Sell X to make room for Y") and the
+          -- auto-play actuator can address the live joker -- instead of burying it in the grey reason
+          -- under "Take Y" (which the actuator can't execute: a joker can't be taken into a full board).
+          local wj = gs.jokers[wi]
+          sell = { name = wname, index = wi, key = wj and wj.key, id = wj and wj.id,
+                   for_name = jpick.name, for_key = jpick.key }
           reason = reason .. string.format(" — Joker slots full: sell %s (your weakest) to make room for %s.",
             wname, jpick.name)
         else
