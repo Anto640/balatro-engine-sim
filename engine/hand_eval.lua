@@ -624,11 +624,34 @@ function HandEval.top_plays(gs, cards, n)
   return out
 end
 
+-- RETENTION tie-break (owner 2026-08-31): among selections that SCORE THE SAME, keep the more valuable
+-- cards in hand. Playing a card the hand doesn't need (a face KICKER in a low 2-pair, an unused 5th card)
+-- SPENDS it for no score gain -- and in a build that card ("a face it needed to win") is exactly what you
+-- want to hold for a real hand. Lower spent-keep = spends fewer / lower-value cards. Only ever breaks an
+-- EXACT score tie, so it never trades points away -- pure upside.
+local function card_keep(c)
+  local v = Cards.chips(c) or 0
+  if c.edition == "polychrome" then v = v + 60
+  elseif c.edition == "holo" then v = v + 45
+  elseif c.edition == "foil" then v = v + 25 end
+  if c.enhancement then v = v + 25 end
+  if c.seal then v = v + 15 end
+  return v
+end
+local function spent_keep(sel)
+  local s = 0
+  for _, c in ipairs(sel or {}) do s = s + card_keep(c) end
+  return s
+end
+
 -- Highest-scoring play (vanity max). Used for measurement / accumulation.
 function HandEval.best_play(gs, cards)
-  local best, best_sel
+  local best, best_sel, bsk
   each_subset(gs, cards, function(ev, sel, copy)
-    if not best or ev.score > best.score then best = ev; best_sel = copy(sel) end
+    if not best or ev.score > best.score
+       or (ev.score == best.score and spent_keep(sel) < bsk) then
+      best = ev; best_sel = copy(sel); bsk = spent_keep(sel)
+    end
   end)
   return best, best_sel
 end
@@ -656,7 +679,7 @@ end
 -- tier 1, equal expected scores prefer the higher guaranteed floor (F7).
 function HandEval.best_play_target(gs, cards, remaining, filter)
   remaining = remaining or 0
-  local best, best_sel, bt, be, bs, bmin
+  local best, best_sel, bt, be, bs, bmin, bsk
   each_subset(gs, cards, function(ev, sel, copy)
     local tier = 0
     if remaining > 0 then
@@ -664,16 +687,23 @@ function HandEval.best_play_target(gs, cards, remaining, filter)
       elseif ev.score >= remaining then tier = 1 end
     end
     local econ = (tier == 2) and HandEval.play_econ(gs, ev, sel) or 0
+    local floor = (ev.score_min or ev.score)
+    local sk = spent_keep(sel)
     local better
     if not best then better = true
     elseif tier ~= bt then better = tier > bt
     elseif tier == 2 and econ ~= be then better = econ > be
     elseif ev.score ~= bs then better = ev.score > bs
-    elseif tier == 1 then better = (ev.score_min or ev.score) > bmin
+    elseif tier == 1 and floor ~= bmin then better = floor > bmin
+    -- RETENTION tie-break (tier<2 only): among plays that don't clear yet, equal score -> KEEP the more
+    -- valuable cards (don't spend a face kicker the hand doesn't need this blind). Only within an unbeaten
+    -- blind: once you CLEAR (tier 2) the round ends and the full deck returns, so a spent card isn't lost,
+    -- and the tier-2 econ/overkill + milk/hold-fuel logic owns card count there. Breaks an exact tie only,
+    -- so it never sacrifices score/survival.
+    elseif tier < 2 and sk ~= bsk then better = sk < bsk
     else better = false end
     if better then
-      best, best_sel, bt, be, bs, bmin = ev, copy(sel), tier, econ, ev.score,
-        (ev.score_min or ev.score)
+      best, best_sel, bt, be, bs, bmin, bsk = ev, copy(sel), tier, econ, ev.score, floor, sk
     end
   end, filter)
   return best, best_sel
