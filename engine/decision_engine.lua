@@ -696,9 +696,16 @@ function DE.decide(gs, opts)
       { samples = 10, rng = rng,
         extra_discards = (d and d.cards and #d.cards > 0) and { d.cards } or nil })
     if md and #md.cards > 0 then
-      cands[#cands + 1] = { cards = md.cards, value = md.value, measured = true,
-        reason = string.format("Discard %d (keep your strong cards) to build a stronger hand (~%d expected).",
-          #md.cards, math.floor(md.value)) }
+      -- CREDIT the money the pitched cards EARN (Faceless $5/3-faces, Mail/Trading), on the SAME frac
+      -- scale as md.value. The measured discard scores the REDRAW only, so a hand-improving discard that
+      -- ALSO dumps 3 faces was under-valued by $5 and Faceless under-fired (owner: "had Faceless but
+      -- didn't dig/use it"). Now a discard that improves the hand AND triggers an econ joker is valued
+      -- for both -- without proposing a face-dump that hurts the build (md's score already prices that).
+      local mmoney = select(1, Heuristics.discard_econ(gs, md.cards)) or 0
+      cands[#cands + 1] = { cards = md.cards, value = md.value + mmoney * Heuristics.DOLLAR_VALUE,
+        measured = true, farms_money = mmoney > 0, banked_money = mmoney,
+        reason = string.format("Discard %d (keep your strong cards) to build a stronger hand (~%d expected)%s.",
+          #md.cards, math.floor(md.value), mmoney > 0 and string.format(" + $%d", mmoney) or "") }
       -- keep the heuristic ONLY for the money discard the score-based measure can't
       -- value (Faceless/Mail-In dump cards for $).
       if d and #d.cards > 0 and d.target == "economy" then
