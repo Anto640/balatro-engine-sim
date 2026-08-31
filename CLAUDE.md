@@ -11,13 +11,18 @@ Despite the historical filename, this guide applies equally to Codex and other c
 action, and overlays a ranked "best move" with a reason. Roadmap M1–M4 is complete
 plus a large correctness/coverage/strategy pass.
 
-> ### ⭐ CURRENT FOCUS (2026-08-30): ADVICE QUALITY, now driven by an IN-GAME SELF-PLAYER + a review loop.
-> **NEW: an in-game self-player** (`ui/autoplay.lua`, **F11**) translates the engine's live advice into REAL
-> Balatro inputs and plays whole runs unattended — a real-game, unlimited-sample bug-finder for the overlay
-> (no sim-fidelity doubt). **The review loop is CLAUDE's job, not the owner's:** for decision quality I run
-> the headless sim myself (same engine) or read the self-player's `bes_autoplay.log` + `bes_runs.jsonl`,
-> analyse, fix, re-measure. First loop run DEBUNKED the joker-churn hypothesis (harm was a run-length
-> confound). **Read `NEXT_SESSION.md` top block FIRST.** The mod advises a **human who wins ~87.5%**;
+> ### ⭐ CURRENT FOCUS (2026-08-31): ADVICE QUALITY, driven by the IN-GAME SELF-PLAYER + owner review + the AGREEMENT A/B.
+> **The in-game self-player** (`ui/autoplay.lua`, **F11**) translates the engine's live advice into REAL
+> Balatro inputs and plays whole runs unattended — a real-game bug-finder for the overlay. The owner watches
+> its runs and reports misplays; I fix them and, for economy/valuation changes, **MEASURE on the frozen 7-win
+> agreement corpus** (`tools/agreement_run.sh`) before keeping — the durable, non-ceilinged ruler. **Read
+> `NEXT_SESSION.md` top block FIRST** (2026-08-31: in-blind play fixes + Hologram feed + joker-model audit +
+> the ante-aware econ floor). ⭐ TWO lessons from this loop: (1) the winners DIG hard (discard 57% vs the
+> engine's 41%) — but a uniform dig bias was REFUTED by the corpus (it digs where the human PLAYED; the gap
+> is SITUATIONAL commit-to-a-line, the build-commitment wall). (2) the ante-aware econ floor (hold the
+> interest buffer, stop the single-digit spiral) was CONFIRMED (agree_save +20). **A live-run misplay is a
+> hypothesis; the corpus says keep or revert.** Earlier: the first loop DEBUNKED the joker-churn hypothesis
+> (run-length confound). The mod advises a **human who wins ~87.5%**;
 > autonomous winrate is *ceilinged* (compute/data-bound — see below). Advice quality is a **different,
 > non-compute-bound** objective, and the prior session's work is all there:
 > - **`ADVICE_REVIEW.md`** — the owner's live-run decision observations + the fixes shipped (anti-churn
