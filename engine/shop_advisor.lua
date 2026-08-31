@@ -106,10 +106,27 @@ SA.TIER_FUNDER_FLOOR = 0.4   -- anti-churn: per tier-above-3, the min "loss" of 
 SA.ENDGAME_ANTE = 7
 SA.ENDGAME_ECON_DAMP = 0.1   -- econ weight multiplier when endgame-urgent (~worthless)
 SA.ENDGAME_SPEND = 0.25      -- income_factor multiplier when endgame-urgent (spend, don't bank)
-SA.ECON_FLOOR = 10        -- keep ~2 interest dollars working
+SA.ECON_FLOOR = 10        -- keep ~2 interest dollars working (early-game base; see SA.econ_floor)
 SA.ECON_FLOOR_RATE = 0.5  -- FV charged per dollar pushed below the floor (tunable:
                           -- raise to curb the spend-to-$0 spiral harder, lower if it
                           -- gets too stingy on a genuinely strong cheap buy)
+-- ANTE-AWARE econ floor (2026-08-31, human-validated). The 7 winning runs BUILD to ~$40 by ante 3-4 and
+-- HOLD $34-40 through the endgame -- never single digits mid/late -- while the engine spends to single
+-- digits (owner report). A FLAT $10 floor lets it. Ramp the floor from a low early base (ante 1 the human
+-- holds only ~$6, spending on its first jokers -- must not block that) up to the max-interest bankroll
+-- ($25/50/100) mid/late, so the engine preserves the interest-earning BUFFER. Surplus ABOVE the cap stays
+-- free to spend (the interest-cap value-buy fix), so good vouchers/jokers are unaffected; only sub-cap
+-- dip-to-poverty buys are damped. Capped at the real interest cap: holding PAST it is option-value banking
+-- (a separate, unsolved lever -- conversion_baseline.txt), not attempted here.
+SA.ECON_FLOOR_STEP = 5    -- $ the floor rises per ante over the base
+function SA.econ_floor(gs)
+  local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
+  -- real interest cap in DOLLARS (self-contained -- cap_int_of is declared later in the file):
+  -- live G feeds 25/50/100; the sim feeds 5/10/20 (x5 -> the same dollars).
+  local raw = (gs and gs.economy and gs.economy.interest_cap) or 5
+  local cap_d = (raw >= 25) and raw or (raw * 5)
+  return math.min(cap_d, SA.ECON_FLOOR + SA.ECON_FLOOR_STEP * (ante - 1))
+end
 
 -- Upgrade-swap hysteresis. On a FULL board the advisor sells the weakest joker to buy
 -- a shop one whenever the shop joker's marginal merely EXCEEDS the weakest's. With no
@@ -240,7 +257,7 @@ SA.free_spend = free_spend
 -- this never touches a strong buy from a full wallet, only the spend-to-$0 churn.
 local function econ_floor_penalty(gs, cost)
   local d = math.max(0, dollars(gs))
-  local floor = SA.ECON_FLOOR
+  local floor = SA.econ_floor(gs)   -- ante-aware: low early, up to the interest cap mid/late
   local before = math.max(0, floor - d)
   local after = math.max(0, floor - math.max(0, d - (cost or 0)))
   return (after - before) * SA.ECON_FLOOR_RATE
