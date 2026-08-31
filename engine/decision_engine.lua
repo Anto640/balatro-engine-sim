@@ -843,6 +843,35 @@ function DE.decide(gs, opts)
         -- (the Trading Card trade is exempt: the rollout can't see its $3 + thinning)
       end
     end
+
+    -- DIG-PLAY when OUT OF DISCARDS (owner 2026-08-31). With no discards, hands to spare, and no clear,
+    -- the best-SCORING play spends your build cards on a hand that doesn't clear -- often worse than
+    -- PLAYING YOUR CHAFF to cycle (a play removes+redraws its cards just like a discard) while KEEPING
+    -- your build cards for a real hand ("play a 2-pair of 7s/4s and don't even play the spare face in a
+    -- face build" was the exact complaint). DiscardValue.best is joker-aware (it measures the redraw
+    -- through the full pipeline), so its "discard set" is the chaff that keeps build-relevant cards.
+    -- Arbitrate by E[frac] over the remaining hands, same rollout as the discard branch; only overrides
+    -- on a clear margin, so a play that IS near enough still just plays.
+    if not can_search and discards_left == 0 and hands_left >= 2 and best.type == "PLAY"
+       and play_action.cards and #play_action.cards > 0 then
+      local md = DiscardValue.best(gs_eval, { samples = 10, rng = rng })
+      if md and md.cards and #md.cards > 0 and not same_cards(md.cards, play_action.cards) then
+        local seed = disc_seed(gs)
+        local vp = Simulation.survive_after(gs, { kind = "PLAY", sel = play_action.cards },
+          DE.SURV_SAMPLES, lcg(seed))
+        local vdig = Simulation.survive_after(gs, { kind = "PLAY", sel = md.cards },
+          DE.SURV_SAMPLES, lcg(seed))
+        if vdig.frac > vp.frac + DE.SURV_MARGIN then
+          local dev = HandEval.score(gs, md.cards)
+          best = { type = "PLAY", cards = md.cards, dig_play = true, plan = true,
+            hand_type = (dev and dev.hand_type) or "High Card",
+            score = (dev and dev.score) or 0, value = play_action.value,
+            reason = string.format(
+              "No discards left and this hand can't clear — play your chaff (%d) to cycle for a better hand, keeping your build cards.",
+              #md.cards) }
+        end
+      end
+    end
   end
 
   -- order alternatives by comparable value, excluding the chosen one
