@@ -28,6 +28,30 @@ return function(t)
     t.eq(#decide("bl_psychic").cards, 5, "Psychic (min 5) -> engine recommends a legal 5-card play")
   end
 
+  -- The Mouth (single hand type all round) -- the CROSS-HAND lock that was silently inert in the
+  -- live game because state_extraction never populated blind.played_hand_types (2026-08-31 loss:
+  -- played Straight, then Two Pair / Pair / Pair, all scoring 0, and died). Once the field is
+  -- populated with the first-played type, the engine must only recommend THAT type. Here a Two Pair
+  -- (AAKK) is the greedy best, but the round is locked to Pair -> the engine must play a Pair.
+  do
+    local h = {
+      card{ id = 1, rank = "Ace", suit = "Spades" }, card{ id = 2, rank = "Ace", suit = "Hearts" },
+      card{ id = 3, rank = "King", suit = "Clubs" }, card{ id = 4, rank = "King", suit = "Diamonds" },
+      card{ id = 5, rank = "2", suit = "Spades" },
+    }
+    local function decide(locked)
+      local gs = GS.new{ hand = h, run = { hand_levels = {}, hand_size = 5 },
+        blind = { target_chips = 40, chips_scored = 0, hands_left = 1, discards_left = 0,
+          boss = true, boss_effect_key = "bl_mouth",
+          played_hand_types = locked and { [locked] = 1 } or {} } }
+      return DE.decide(gs).best
+    end
+    -- control: not yet locked (empty set) -> the greedy Two Pair is legal and chosen
+    t.eq(decide(nil).hand_type, "Two Pair", "Mouth not yet locked -> greedy Two Pair is legal")
+    -- locked to Pair by a prior hand -> Two Pair is now ILLEGAL (would score 0); play a Pair
+    t.eq(decide("Pair").hand_type, "Pair", "Mouth locked to Pair -> engine plays a Pair, not the 0-scoring Two Pair")
+  end
+
   -- measured discard keeps high-value cards (a polychrome) and pitches chaff
   do
     local deck = {}

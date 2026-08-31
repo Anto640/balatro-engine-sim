@@ -109,11 +109,23 @@ function Extract.snapshot()
   -- earned-direction credit would have been silently dead in the actual mod while working in
   -- every batch. Same shape as sim/world.lua's `run.hand_type_plays`.  -- VERIFY field
   local hand_levels, hand_type_plays, hands_played = {}, {}, 0
+  -- played_hand_types: the set of hand types played THIS BLIND (not the whole run). The boss
+  -- play-legality filter (The Mouth: one hand type all round; The Eye: no repeats) needs it, and
+  -- WITHOUT it the filter was silently INERT in the live game -- it only ever worked in the sim,
+  -- which threads the state itself. The engine happily recommended a Two Pair after a Straight
+  -- under The Mouth (both scoring 0 after the first) and lost the run (owner report 2026-08-31).
+  -- Source is GAME.hands[name].played_this_round -- the exact field The Mouth's own debuff reads,
+  -- reset by the game each round.  -- VERIFY field
+  local played_hand_types = nil
   for name, h in pairs(GAME.hands or {}) do
     hand_levels[name] = { level = h.level, chips = h.chips, mult = h.mult }
     if (h.played or 0) > 0 then
       hand_type_plays[name] = h.played
       hands_played = hands_played + h.played
+    end
+    if (h.played_this_round or 0) > 0 then
+      played_hand_types = played_hand_types or {}
+      played_hand_types[name] = h.played_this_round
     end
   end
 
@@ -222,6 +234,7 @@ function Extract.snapshot()
       blind_type = GAME.blind_on_deck,       -- "Small"|"Big"|"Boss"  -- VERIFY
       skip_tag = skip_tag,                    -- offered skip tag key  -- VERIFY
       boss_effect_key = blind.config and blind.config.blind and blind.config.blind.key,
+      played_hand_types = played_hand_types,  -- hand types played THIS blind (Mouth/Eye legality)
       hands_left = cur.hands_left or 0,
       discards_left = cur.discards_left or 0,
       base_hands = resets.hands or 0,
