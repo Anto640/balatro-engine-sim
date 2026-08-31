@@ -41,6 +41,33 @@ return function(t)
       "the refill costs strictly more than the sale raises (the whole point)")
   end
 
+  -- ---- ANTI-CHURN: SELL_TO_BUY funder rule (owner's "first shop buys a joker then sells it") ---
+  -- Reproduces the exact log churn: Clever Joker (keep-marginal ~2.0, "73% of a boss hand") was sold
+  -- to fund Mystic Summit ("72%", a LATERAL joker). The rule must block a functional joker from being
+  -- sold for a lateral/worse joker or ANY non-joker, while still allowing a clear upgrade and still
+  -- letting dead filler fund freely. Pure-arithmetic gate -> no Monte-Carlo fragility.
+  do
+    local C = 2.0                       -- a functional plain scorer's keep-marginal (Clever)
+    -- (a) lateral joker swap: buy barely edges the funder -> BLOCKED (this is the reported churn)
+    t.ok(not SA.stb_funder_allowed(C, C + 0.1, true, false),
+      "functional scorer NOT sold to fund a lateral joker (Clever->Mystic churn blocked)")
+    -- (b) a genuine upgrade clears the hysteresis margin -> ALLOWED
+    t.ok(SA.stb_funder_allowed(C, C + SA.UPGRADE_MARGIN + 0.5, true, false),
+      "functional scorer MAY be sold to fund a clearly better joker")
+    -- (c) a functional joker may NEVER fund a non-joker (pack/voucher/tarot), even a great one
+    t.ok(not SA.stb_funder_allowed(C, 999, false, false),
+      "functional scorer NOT sold to fund a non-joker (sold Chaos for a Celestial pack)")
+    -- (d) dead filler funds anything (the standalone 'only cash-sell a DEAD joker' principle)
+    t.ok(SA.stb_funder_allowed(SA.DEAD_FUNDER_FV, 0, false, false),
+      "a DEAD joker still funds a non-joker freely")
+    -- (e) an econ/edition-LIVE joker is never treated as 'dead' even at ~0 scoring contribution,
+    -- so it can't be dumped for a non-joker on the strength of a tiny scoring marginal
+    t.ok(not SA.stb_funder_allowed(0, 999, false, true),
+      "a live econ/edition joker (contribution ~0) is NOT freely dumped for a non-joker")
+    t.ok(not SA.stb_funder_allowed(0, 0.5, true, true),
+      "a live joker still needs a clear upgrade margin to be swapped")
+  end
+
   local function shop_state(o)
     return GS.new{
       jokers = o.jokers or {},

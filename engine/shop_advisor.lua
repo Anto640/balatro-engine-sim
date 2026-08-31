@@ -135,6 +135,12 @@ end
 -- died. Require the new joker to beat the sold one by this much FUTURE-VALUE before a
 -- swap is credited, so only a CLEAR upgrade disrupts a working board.
 SA.UPGRADE_MARGIN = 1.2
+-- A funder joker is "dead" (freely sellable to fund anything) only when it contributes at or
+-- below this FV -- the SAME threshold the SELL_JOKER path uses for its `dead` decision (worst_c
+-- <= 0.1). Anything above it is a FUNCTIONAL joker and may only be sold to fund a CLEARLY better
+-- joker (see SA.stb_funder_allowed), which is what stops the "buy a joker then sell it next shop
+-- for a lateral one" churn the owner has reported every run.
+SA.DEAD_FUNDER_FV = 0.1
 -- Strength-proportional swap protection (coupled with W3). Swapping away a joker contributing C
 -- (its measured board FV) costs C*(1 + SWAP_KEEP_SLOPE*C) to give up -- replacing the old FLAT
 -- double-charge (uniform 2*C, which blocked good filler->keystone swaps AND under-protected strong
@@ -443,6 +449,28 @@ local function funder_is_live(gs, j, contribution)
   return false
 end
 SA.funder_is_live = funder_is_live   -- exposed for tests
+
+-- ANTI-CHURN, generalised (2026-08-31, owner's repeated "first shop buys a joker then sells it").
+-- The old SELL_TO_BUY gate only demanded a real upgrade margin when the funder was `funder_is_live`
+-- (econ / edition / consumable-econ). A PLAIN SCORER (Clever Joker, Mystic Summit) is not "live",
+-- so it fell straight through the gate and got sold to fund a LATERAL or even WORSE joker -- the log
+-- caught Clever ("73% of a boss hand") sold to buy Mystic Summit ("72%"), then Mystic sold to buy
+-- Bloodstone the very next shop. Ironically the "live" protection PUSHED the churn onto the scorer:
+-- an econ funder was shielded, so the scorer was always the cheapest-loss funder to dump.
+--
+-- The rule, for a joker funder (consumable funders are unaffected -- kind ~= "joker"):
+--   * a DEAD joker (contributes <= DEAD_FUNDER_FV and is not econ/edition-live) may fund anything;
+--   * a FUNCTIONAL joker may fund ONLY a joker buy (need_jslot) that CLEARLY upgrades it
+--     (the buy's add-marginal beats the funder's keep-marginal by SA.UPGRADE_MARGIN) -- it may
+--     never be dumped for a pack / voucher / tarot, and never for a lateral/worse joker.
+-- Pure arithmetic so it is unit-testable without Monte-Carlo (test_shop covers the table); the
+-- inline call passes the real measured contribution / add-marginal.
+function SA.stb_funder_allowed(contribution, buy_add_marginal, need_jslot, live)
+  local dead = (not live) and (contribution or 0) <= SA.DEAD_FUNDER_FV
+  if dead then return true end                     -- disposable filler: fund anything
+  if not need_jslot then return false end          -- a working joker never funds a non-joker
+  return (buy_add_marginal or 0) > (contribution or 0) + SA.UPGRADE_MARGIN  -- only a clear upgrade
+end
 
 -- Estimated dollars generated DURING a blind, from money-making jokers (econ in
 -- joker_data: Golden Joker, Rough Gem, Business, Bull, Rocket, ...) plus gold
@@ -1261,16 +1289,18 @@ function SA.recommend(gs, opts)
           -- ante 2 with 0 jokers + $0, died). The SELL_JOKER only_scorer guard (B2) didn't
           -- cover this path. A joker-for-joker swap (p.need_jslot) keeps a board, so it's fine.
           local empties_board = f.kind == "joker" and #(gs.jokers or {}) <= 1 and not p.need_jslot
-          -- ANTI-CHURN GATE (2026-08-27, live run MALEJYHW): a LIVE joker (funder_is_live) may only
-          -- fund a JOKER buy that CLEARLY upgrades it -- the shop joker's measured add-marginal must
-          -- beat the funder's keep-marginal by SA.UPGRADE_MARGIN (same FV scale, so units are safe).
-          -- It may NEVER fund a non-joker (pack/voucher/tarot), and never a lateral/worse joker.
-          -- This is the standalone SELL_JOKER "only cash-sell a DEAD joker" principle, which this
-          -- funding path silently bypassed -- selling Cloud 9/Astronomer/polychrome Ice Cream for junk.
+          -- ANTI-CHURN GATE (2026-08-27 MALEJYHW; GENERALISED 2026-08-31). A joker funder may only
+          -- be sold to fund a JOKER buy that CLEARLY upgrades it (add-marginal beats keep-marginal by
+          -- SA.UPGRADE_MARGIN), and may NEVER fund a non-joker -- UNLESS it is DEAD (disposable filler).
+          -- Originally this only applied to `funder_is_live` (econ/edition) jokers, so plain scorers
+          -- fell through and got churned lateral/worse (Clever->Mystic->Bloodstone across three shops).
+          -- SA.stb_funder_allowed now applies it to every functional joker. `dead` scorers still fund
+          -- freely (the standalone "only cash-sell a DEAD joker" principle). Add-marginal is measured
+          -- only when the buy needs a joker slot (the only case where it can be a legal upgrade).
           local live_ok = true
-          if f.kind == "joker" and f.live then
-            live_ok = p.need_jslot
-              and (Eval.add_joker_marginal_fv(gs, p.target, mopts) > (f.contribution or 0) + SA.UPGRADE_MARGIN)
+          if f.kind == "joker" then
+            local add_m = p.need_jslot and Eval.add_joker_marginal_fv(gs, p.target, mopts) or 0
+            live_ok = SA.stb_funder_allowed(f.contribution, add_m, p.need_jslot, f.live)
           end
           if f.target ~= p.target and not empties_board and live_ok then  -- don't sell the very thing you're buying
             local jfree = slots_free + (f.kind == "joker" and 1 or 0)
