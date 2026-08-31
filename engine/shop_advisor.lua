@@ -62,6 +62,15 @@ SA.FREE_SPEND_DISCOUNT = 0.4 -- purchasing-power cost charged for INTEREST-FREE 
 SA.REROLL_DISCOUNT = 0.5  -- a reroll is speculative (one noisy roll) AND a fresh shop
                           -- comes FREE next round, so rerolling only buys the better
                           -- joker slightly earlier -- discount that marginal benefit
+-- REROLL COST ESCALATION (2026-08-31, owner: rerolled ~9x in ONE shop to reroll_cost $14, bled ~$85,
+-- then had to churn a joker). The per-reroll value already subtracts the CURRENT cost, but it judges
+-- each roll MYOPICALLY -- so while every marginal roll is barely +EV the engine runs a whole spree,
+-- when a human rerolls a FEW times then stops (the cost climbs +$1 each, but a fresh shop next round
+-- rerolls from the $5 base for free). Damp the reroll appetite by base/rcost as the cost escalates:
+-- ~1x at the base, falling toward the floor as the spree deepens, so a couple of rolls stay fine and
+-- a 9-roll spree does not. A magnitude lever -- measured on the agreement corpus before keeping.
+SA.REROLL_BASE_COST = 5      -- standard first-reroll price; escalation is judged relative to this
+SA.REROLL_ESCALATION_FLOOR = 0.25  -- never fully zero a reroll's appetite on cost alone (rich/at-risk)
 SA.JOKER_SCORE_WEIGHT = VU.FRAC_UTIL -- the ONE frac->utility bridge: jokers, packs, reroll
                           -- AND (B1) standalone consumables all weight a boss-hand fraction
                           -- by this. Defined in value_units beside DOLLAR_UTIL, because the
@@ -969,7 +978,11 @@ function SA.recommend(gs, opts)
     -- buy a scorer). A FREE reroll keeps any positive edge. rbonus (Flash Card) always applies.
     local eff_improvement = improvement
     if rcost > 0 and improvement < SA.REROLL_MIN_IMPROVEMENT then eff_improvement = 0 end
-    local value = appetite * realizable * SA.REROLL_DISCOUNT * w_score * 5 * eff_improvement
+    -- escalation damp: discourage a DEEP reroll spree (rcost climbs +$1/roll) -- 1x at the base,
+    -- decaying toward the floor as the cost rises. A free reroll (rcost 0) is exempt (appetite 1).
+    local escalation = (rcost <= 0) and 1
+      or clamp(SA.REROLL_BASE_COST / rcost, SA.REROLL_ESCALATION_FLOOR, 1)
+    local value = appetite * escalation * realizable * SA.REROLL_DISCOUNT * w_score * 5 * eff_improvement
       + w_score * 5 * rbonus - net_cost(rcost) - econ_floor_penalty(gs, rcost)
     local gate = (rcost == 0 and "free reroll") or (above_cap and "above interest cap")
       or (not secure and "at risk -- need a better joker") or "below cap & safe -- hold"
