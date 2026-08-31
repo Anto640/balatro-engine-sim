@@ -70,10 +70,14 @@ jokers where the churn fix pays, so it can't see the live benefit. Ships on corr
 > - 🔧 **Orbital tag skipped-for, leveling FOUR OF A KIND on a non-shaped deck** (rarely drawn; never
 >   played all run). Plus a Mars planet also leveled Four of a Kind. Leveling value must weight the DECK's
 >   frequency of the tag/planet's hand, not credit an unreachable hand. [new — see planned fix]
-> - 🔧 **Reroll discipline (§8 recurring, now with a mechanism):** a6 had $100+, low on scoring, a scaled-
->   only-3× Runner — and *barely rerolled*; then in a later shop **rerolled ~8× in ONE shop down to $25**
->   taking little. Log CONFIRMS 8 consecutive rerolls (~$68: cost climbs +$1 each but RESETS to $5 next
->   shop). Deep rerolls in one shop are cost-inefficient; spread them / cap by escalating cost. [§8]
+> - ✅ **Reroll discipline (§8) — FIXED + MEASURED (`96b56b1`).** a6 had $100+ and *barely rerolled*; a
+>   later shop **rerolled ~9× to reroll_cost $14** (telemetry: at that shop the engine ranked REROLL 1.05 >
+>   SAVE 0.00 and rolled again), bleeding ~$85 to $26 — the money-bleed that forced the joker churn and
+>   killed the run. Root: the per-reroll value subtracts the current cost but judges each roll MYOPICALLY,
+>   so a spree runs. Fix: damp reroll appetite by base/reroll_cost (~1× at $5, ~0.36× at $14; free rerolls
+>   exempt). **Agreement corpus: eng_reroll_human_save 120→109 (−11 over-rerolls), agree_save 300→310, all
+>   else byte-identical — a measured win on the target metric.** ⇐ this was the through-line of the whole
+>   "sold Fibonacci" investigation: the reroll spree was the CAUSE, the churn the symptom.
 > - 🔧 **"Sold its only +mult Fibonacci for a Hiker."** ⚠ INVESTIGATED FROM THE REAL TELEMETRY (owner
 >   pushed for exact-state repro, not a synthetic board — the right call). The state fixture shows the
 >   board ALSO held **Cavendish (xmult)**, so Fibonacci was never the *sole* mult source, only the sole
