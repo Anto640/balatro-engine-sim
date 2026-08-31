@@ -144,6 +144,12 @@ DE.SURV_MARGIN  = 0.06
 -- human PLAYED. So the engine doesn't under-dig UNIFORMLY; it under-digs in the specific commit-to-a-line
 -- situations the human recognises (the build-commitment wall), which a blanket bias can't target.
 DE.DIG_BIAS = 0.0
+-- When a held 0-discard joker (Mystic Summit) makes digging out the discards worth a big scoring
+-- uplift (defer_uplift), the survive_after rollout MIS-JUDGES it: its greedy continuation is Mystic-
+-- blind (it never digs to 0 for the +15), so it reports playing-now as just as safe and flips the dig
+-- back to a play. Keep the intended dig unless playing now is genuinely MUCH safer than digging by
+-- this frac -- the rollout under-credits the dig line, so demand a large real survival gap to abandon it.
+DE.DEFER_SURV_TOL = 0.15
 
 -- ---- SURPLUS DIG (probe, 2026-08-12) ----------------------------------------------------
 -- The engine only ever CONSIDERS discarding when the play does not clear (`not clears`
@@ -767,6 +773,27 @@ function DE.decide(gs, opts)
     end
   end
 
+  -- HOLD-CONDITIONAL PLAY TIMING (2026-08-31, owner: with Mystic Summit "use all its discards before
+  -- playing"). Mystic Summit gives +15 mult ONLY at 0 discards, so a SCORING play lands FAR bigger once
+  -- the discards are spent (a Flush's mult ~quintuples). While we still hold discards and the play does
+  -- NOT clear, playing an accumulate hand NOW forfeits that uplift. Re-score the best play as if at 0
+  -- discards -- the real scorer arms Mystic / any 0-discard effect -- and credit the positive delta to
+  -- DIGGING (spend the discards out first, then play at 0 discards). Fully GENERAL, no joker hardcoded:
+  --  * an ordinary board's score is discard-independent  -> delta 0, no behaviour change;
+  --  * Banner (+30 chips per discard REMAINING) scores LESS at 0 discards -> delta <= 0, so it is NOT
+  --    deferred -- correctly, since Banner wants to play WITH discards in hand. The owner's "what if you
+  --    hold both?" is thus resolved by the NET score delta, not a special case.
+  local defer_uplift = 0
+  if discards_left > 0 and not clears and discard_action then
+    local gs0 = {}
+    for k, v in pairs(gs) do gs0[k] = v end
+    gs0.blind = {}
+    for k, v in pairs(b) do gs0.blind[k] = v end
+    gs0.blind.discards_left = 0
+    local ev0 = HandEval.best_play_target(gs0, hand, remaining, boss_filter(gs0))
+    if ev0 and ev0.score > play_ev.score then defer_uplift = ev0.score - play_ev.score end
+  end
+
   -- ---- choose + rank ----
   local candidates = { play_action }
   if discard_action then candidates[#candidates + 1] = discard_action end
@@ -782,7 +809,9 @@ function DE.decide(gs, opts)
   --   hands", which also keeps more money.
   local HAND_ECON = Mechanics.HAND_REWARD * Heuristics.DOLLAR_VALUE
   local function greedy_choice()
-    if discard_action and (discard_action.value + HAND_ECON) > play_action.value then
+    -- + defer_uplift: digging out the discards preserves the option to play at 0 discards, where a
+    -- held Mystic Summit (etc.) makes the scoring play far bigger. 0 for an ordinary board.
+    if discard_action and (discard_action.value + HAND_ECON + defer_uplift) > play_action.value then
       return discard_action
     end
     return play_action
@@ -854,8 +883,11 @@ function DE.decide(gs, opts)
       local vdf = vd.frac + DE.DIG_BIAS
       if vdf > vp.frac + DE.SURV_MARGIN and best.type ~= "DISCARD" then
         best = discard_action; best.plan = true        -- survival: discard to set up
-      elseif vp.frac > vdf + DE.SURV_MARGIN and best.type == "DISCARD" and not best.trade then
-        best = play_action                              -- survival: just play now
+      elseif vp.frac > vdf + DE.SURV_MARGIN and best.type == "DISCARD" and not best.trade
+             and (defer_uplift <= 0 or vp.frac > vd.frac + DE.DEFER_SURV_TOL) then
+        best = play_action                              -- survival: just play now (but keep a Mystic
+                                                        -- dig unless play is MUCH safer -- rollout is
+                                                        -- blind to the 0-discard uplift)
         -- (the Trading Card trade is exempt: the rollout can't see its $3 + thinning)
       end
     end

@@ -52,6 +52,39 @@ return function(t)
     t.eq(decide("Pair").hand_type, "Pair", "Mouth locked to Pair -> engine plays a Pair, not the 0-scoring Two Pair")
   end
 
+  -- HOLD-CONDITIONAL PLAY TIMING: Mystic Summit (+15 mult at 0 discards) makes a scoring play land far
+  -- bigger once the discards are spent, so with discards still in hand the engine must DIG them out first
+  -- (owner 2026-08-31: "use all its discards before playing" -- it was playing the flush at 2 discards
+  -- and forfeiting the mult). The SAME board without Mystic just plays; Banner (wants discards INTACT)
+  -- is NOT deferred -- both proven by the net 0-discard score delta, no joker hardcoded.
+  do
+    local deck = {}
+    for i = 1, 52 do deck[#deck + 1] = card{ id = 1000 + i, rank_id = ((i - 1) % 13) + 2,
+      suit = ({ "Spades", "Hearts", "Clubs", "Diamonds" })[((i - 1) % 4) + 1] } end
+    local function hand()
+      return {
+        card{ id = 1, rank = "Ace", suit = "Hearts" }, card{ id = 2, rank = "King", suit = "Hearts" },
+        card{ id = 3, rank = "9", suit = "Hearts" }, card{ id = 4, rank = "6", suit = "Hearts" },
+        card{ id = 5, rank = "3", suit = "Hearts" },                 -- a made Flush that does NOT clear
+        card{ id = 6, rank = "2", suit = "Spades" }, card{ id = 7, rank = "4", suit = "Clubs" },
+        card{ id = 8, rank = "7", suit = "Diamonds" },               -- chaff to pitch
+      }
+    end
+    local function rng() local s = 7; return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end end
+    local function decide(jk)
+      local gs = GS.new{ deck = deck, hand = hand(), remaining = deck, jokers = jk,
+        run = { hand_levels = {}, hand_size = 8, joker_slots = 5 },
+        blind = { target_chips = 340, chips_scored = 0, hands_left = 3, discards_left = 2, boss = false } }
+      return DE.decide(gs, { rng = rng(), samples = 16 }).best
+    end
+    t.eq(decide({}).type, "PLAY",
+      "no 0-discard joker -> play the accumulate flush (unchanged)")
+    t.eq(decide({ joker{ key = "j_mystic_summit", name = "Mystic Summit" } }).type, "DISCARD",
+      "Mystic Summit -> DIG the discards out first, then play at 0 discards for the +15 mult")
+    t.eq(decide({ joker{ key = "j_banner", name = "Banner" } }).type, "PLAY",
+      "Banner wants discards INTACT (scores LESS at 0) -> NOT deferred, plays now")
+  end
+
   -- measured discard keeps high-value cards (a polychrome) and pitches chaff
   do
     local deck = {}
