@@ -138,6 +138,12 @@ DE.LEVEL_USE_CREDIT = 0.15   -- lasting-leveling credit, as a fraction of a boss
 -- choice (so we don't flip on Monte-Carlo noise, and defer to the rich heuristics on ~ties).
 DE.SURV_SAMPLES = 60
 DE.SURV_MARGIN  = 0.06
+-- DIG BIAS (2026-08-31): REFUTED + reverted (kept 0 for the audit trail). The human DISCARDS 57% of
+-- in-blind decisions vs the engine's 41%, but a uniform +0.05 dig credit moved the engine only to 42%
+-- AND lowered blind class-agreement (430->424 on the corpus) -- the ~8 switches it made dug where the
+-- human PLAYED. So the engine doesn't under-dig UNIFORMLY; it under-digs in the specific commit-to-a-line
+-- situations the human recognises (the build-commitment wall), which a blanket bias can't target.
+DE.DIG_BIAS = 0.0
 
 -- ---- SURPLUS DIG (probe, 2026-08-12) ----------------------------------------------------
 -- The engine only ever CONSIDERS discarding when the play does not clear (`not clears`
@@ -843,9 +849,12 @@ function DE.decide(gs, opts)
         DE.SURV_SAMPLES, lcg(seed))
       local vd = Simulation.survive_after(gs, { kind = "DISCARD", cards = discard_action.cards },
         DE.SURV_SAMPLES, lcg(seed))
-      if vd.frac > vp.frac + DE.SURV_MARGIN and best.type ~= "DISCARD" then
+      -- DIG_BIAS credits the discard branch to offset the rollout's under-digging greedy continuation
+      -- (see DE.DIG_BIAS) -- easier to switch TO a set-up discard, harder to switch away from one.
+      local vdf = vd.frac + DE.DIG_BIAS
+      if vdf > vp.frac + DE.SURV_MARGIN and best.type ~= "DISCARD" then
         best = discard_action; best.plan = true        -- survival: discard to set up
-      elseif vp.frac > vd.frac + DE.SURV_MARGIN and best.type == "DISCARD" and not best.trade then
+      elseif vp.frac > vdf + DE.SURV_MARGIN and best.type == "DISCARD" and not best.trade then
         best = play_action                              -- survival: just play now
         -- (the Trading Card trade is exempt: the rollout can't see its $3 + thinning)
       end
