@@ -43,6 +43,60 @@ jokers where the churn fix pays, so it can't see the live benefit. Ships on corr
 
 ---
 
+## R4 — self-player run (2026-08-31, "same in-blind + shop issues every time"), reached ante 7
+
+> The BEST self-player run so far (reached ante 7) but "carried by Cavendish" + 2 early Runner scales.
+> Owner's read, with the run log (bes_autoplay.log, 23:25 session) used to ground-truth. Most notes are
+> the SAME recurring classes already in §1 (dig/commit) and §8 (reroll) — this run is fresh evidence, not
+> new bugs. Legend as above.
+>
+> **THE DOMINANT THEME — in-blind: play the first clearing hand instead of DIGGING for the build/scaler
+> (§1).** Repeated all run and it caused the death:
+> - 🔧 First blind cleared in 3 hands, banked $2 fewer (should be tighter with dig-play). [§1, R1 echo]
+> - 🔧 **Big blind: played the spade FLUSH just because it cleared, instead of using its 3 discards to
+>   find another STRAIGHT and scale Runner.** [§1 + scaling-fuel: only feeds Runner when out of discards]
+> - 🔧 **Boss: had a full STRAIGHT ready, wasted its discards / didn't play it; a3 boss DISCARDED a made
+>   straight** — the exact scaler-feeding hand thrown away. Runner scaled only ~3× in 7 antes. [§1]
+> - 🔧 **a2 small: played a 9s/10s Two Pair with many discards to spare** instead of digging for face
+>   cards (Midas Mask) or a straight (Runner). [§1]
+> - 🔧 **a3 small: over-conservative retention** — held gold face cards but played a suboptimal hand; could
+>   have played the non-gold Kings or dug for more face cards / a straight. (Made a little $, still wrong.)
+> - 🔧 **Endgame: stopped digging with its HANDS too** — played bare pairs / high-cards of the very face
+>   cards it needed to ACCUMULATE for the face build. [§1]
+> - 🔧 **DNA held all run, never used** — could copy a strong enhanced face card and raise Four-of-a-Kind
+>   odds (a hand it had LEVELED but never played/dug for). [new: DNA use never triggered]
+>
+> **SHOP / ECONOMY:**
+> - 🔧 **Orbital tag skipped-for, leveling FOUR OF A KIND on a non-shaped deck** (rarely drawn; never
+>   played all run). Plus a Mars planet also leveled Four of a Kind. Leveling value must weight the DECK's
+>   frequency of the tag/planet's hand, not credit an unreachable hand. [new — see planned fix]
+> - 🔧 **Reroll discipline (§8 recurring, now with a mechanism):** a6 had $100+, low on scoring, a scaled-
+>   only-3× Runner — and *barely rerolled*; then in a later shop **rerolled ~8× in ONE shop down to $25**
+>   taking little. Log CONFIRMS 8 consecutive rerolls (~$68: cost climbs +$1 each but RESETS to $5 next
+>   shop). Deep rerolls in one shop are cost-inefficient; spread them / cap by escalating cost. [§8]
+> - 🔧 **"Sold its only +mult Fibonacci for a Hiker."** ⚠ INVESTIGATED FROM THE REAL TELEMETRY (owner
+>   pushed for exact-state repro, not a synthetic board — the right call). The state fixture shows the
+>   board ALSO held **Cavendish (xmult)**, so Fibonacci was never the *sole* mult source, only the sole
+>   *additive* one. Reconstructed the exact pre-sale board (real 52-card deck, real levels, $26,
+>   {runner, hanging_chad, cavendish, dna, fibonacci}) and replayed: **the current engine SAVEs — it does
+>   NOT churn Fibonacci.** No reproducing bug; the live sale was a slightly-different tick I can't recover
+>   bit-exactly (no fixture captures a *shop* moment — only blind states carry the `gs`, and Fibonacci
+>   lived only between blinds). A "don't sell your only mult for chips" guard was built then REVERTED
+>   (misdiagnosis: Cavendish was present). LESSON: reconstruct from telemetry, don't guess a board.
+> - 🔧 **Hermit picked FROM A PACK into FULL consumable slots → never used** (the a4 shop-BUY Hermit WAS
+>   bought+used correctly — §4 works there; the gap is pack-picked / full-slot Hermit). Also **skipped a
+>   Hermit in-shop at $26 with full slots** — should buy+use immediately (instant $), full slots is not a
+>   reason to skip an instant-use consumable. [§4 gap]
+> - 🔧 **a4: held $20, bought a Mega Celestial** (fine) — the Hermit money point above is the real note.
+> - 🔧 **a5: hoarded** past strong Arcana/Planet packs in the first shop (took stuff in the second).
+> - 🔧 **Skipped tarots (The Fool, The Magician).** [§6 deck-shaping/tarot valuation, documented frontier]
+>
+> ✅ **a7 reached — the deepest run yet.** Straights WERE played early (Runner fed ~3×); Hermit bought+used
+> at a4; the Gros Michel→Cavendish death-swap found the carry. The wall is the SAME: dig-for-build (§1) +
+> reroll discipline (§8) + not leveling toward a REACHABLE hand.
+
+---
+
 ## 1. In-blind play & digging (the play engine)
 
 - 🔧 **[R1] Didn't discard a dead low card in a marginal draw.** Opening hand held a 4-diamond flush draw
