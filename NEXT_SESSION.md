@@ -26,10 +26,12 @@ dig bias was **REFUTED** (`b5f2165`): discard rate moved only 41→42% and blind
 430→424 (it dug where the human PLAYED). ⇒ the engine under-digs SITUATIONALLY (commit-to-a-line
 judgment = the build-commitment wall), not uniformly. **Econ ground truth:** winners build to ~$40 by
 ante 3-4 and HOLD **$34-40** through the endgame (never single digits mid/late). The engine dropping to
-single digits is the gap; the lever is a higher mid/late econ hold (toward the interest cap + buffer),
-but it's a magnitude change that interacts with the shipped interest-cap fix — **NEXT: a measured
-econ-floor/hold A/B on the agreement corpus**, not a speculative bump (the refuted dig bias is the
-cautionary precedent).
+single digits is the gap. **FIXED + MEASURED (`e170265`): an ante-aware econ floor** (`SA.econ_floor`)
+ramps $10->$25 (interest cap) over antes 1-4, preserving the buffer while leaving surplus-above-cap free.
+Agreement A/B (shop): agree_save 278->298 (+20), eng_buy_human_save 281->276, eng_reroll_human_save
+136->120 -- ~21 over-spend buys/rerolls flipped to SAVE, ~20 matching the human (flips the RIGHT
+decisions, unlike the refuted dig bias). Holding PAST the cap (the human's $34-40) is option-value
+banking -- the remaining unsolved econ lever.
 
 ## ⭐ THREE LIVE-RUN OBSERVATIONS — now FIXED (2026-08-30)
 1. **Banner** (`e693975`) — `DV.measured` scored the redraw on the original gs, crediting the discard as
