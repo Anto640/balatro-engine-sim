@@ -1,5 +1,36 @@
 # NEXT_SESSION.md — fresh-session handoff (2026-08-30)
 
+## ⭐ IN-BLIND PLAY + HOLOGRAM + JOKER AUDIT (2026-08-31) — from more live self-player runs
+**Joker-model audit (owner flagged a 0.1-vs-0.25 error).** It was a typo in NEW credit code, NOT the
+model: `sim/joker_tick.lua` had Hologram correct at ×0.25. Swept all scoring constants (joker_effects)
+and growth increments (joker_tick) vs the real game — ALL correct. Models are trustworthy.
+
+**Hologram never scaled** (`2cee18b`) — `card_add_value` measured a card's deck contribution via
+avg_score, which reads a scaler's CURRENT counter, so the deck-size scalers' gain was invisible and
+Standard cards stayed ~0.05. Added `CV.add_card_feed`: Hologram +×0.25/card (board-scaled, capped),
+Blue Joker +2 chips/card; Erosion (fed by REMOVING) excluded.
+
+**In-blind play fixes** (owner: plays best hand even when it can't clear; spends build cards):
+- **Dig-play out of discards** (`7168a99`) — with no discards + no clear, play CHAFF to cycle (keep
+  build cards), arbitrated by survive_after E[frac]. Safe/narrow.
+- **Retention tie-break** (`1374909`, `hand_eval`) — among EQUAL-score plays, keep the more valuable
+  cards (don't spend a face as a useless kicker). Gated tier<2 (pre-clear only; a spent card returns
+  after a clear). Fixed "played a face it needed as a 2-pair kicker with chaff available."
+- **Faceless econ credit** (`1a2e3f1`) — the measured discard now includes the discard_econ money its
+  pitched cards earn, so a hand-improving discard that also dumps 3 faces isn't under-valued.
+
+**⭐ HUMAN-VALIDATED FINDING (mined the 7 winning runs, `data/agreement_corpus/runs.jsonl`):** the
+winning in-blind style is **dig hard, play one big hand** — humans DISCARD **57%** of decisions
+(~2.9/blind, often clear in 1 play); the engine discards **41%** on those same states. A uniform +0.05
+dig bias was **REFUTED** (`b5f2165`): discard rate moved only 41→42% and blind class-agreement FELL
+430→424 (it dug where the human PLAYED). ⇒ the engine under-digs SITUATIONALLY (commit-to-a-line
+judgment = the build-commitment wall), not uniformly. **Econ ground truth:** winners build to ~$40 by
+ante 3-4 and HOLD **$34-40** through the endgame (never single digits mid/late). The engine dropping to
+single digits is the gap; the lever is a higher mid/late econ hold (toward the interest cap + buffer),
+but it's a magnitude change that interacts with the shipped interest-cap fix — **NEXT: a measured
+econ-floor/hold A/B on the agreement corpus**, not a speculative bump (the refuted dig bias is the
+cautionary precedent).
+
 ## ⭐ THREE LIVE-RUN OBSERVATIONS — now FIXED (2026-08-30)
 1. **Banner** (`e693975`) — `DV.measured` scored the redraw on the original gs, crediting the discard as
    free; for discards_left jokers (Banner +30 chips/remaining discard) that over-valued discarding, so
