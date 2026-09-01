@@ -144,6 +144,15 @@ DE.SURV_MARGIN  = 0.06
 -- human PLAYED. So the engine doesn't under-dig UNIFORMLY; it under-digs in the specific commit-to-a-line
 -- situations the human recognises (the build-commitment wall), which a blanket bias can't target.
 DE.DIG_BIAS = 0.0
+-- Under The Mouth (one hand type all round) the FIRST play LOCKS the round to that type. A "one-time"
+-- hand consumes scarce specific cards -- 4+ of a rank, or a 3+2 -- so you cannot RELOCK it each hand;
+-- locking into it dooms every later hand to 0. The repeatable hands (High Card/Pair/Two Pair/Three of a
+-- Kind/Straight/Flush) can be remade, so the Mouth first-play re-pick steps DOWN to the best of those
+-- when the greedy pick is one-time and doesn't clear outright.
+DE.ONE_TIME_HAND = {
+  ["Four of a Kind"] = true, ["Five of a Kind"] = true, ["Full House"] = true,
+  ["Straight Flush"] = true, ["Flush House"] = true, ["Flush Five"] = true,
+}
 -- When a held 0-discard joker (Mystic Summit) makes digging out the discards worth a big scoring
 -- uplift (defer_uplift), the survive_after rollout MIS-JUDGES it: its greedy continuation is Mystic-
 -- blind (it never digs to 0 for the +15), so it reports playing-now as just as safe and flips the dig
@@ -394,6 +403,33 @@ function DE.decide(gs, opts)
   local clears = play_ev.score >= remaining and remaining > 0
   local guaranteed = (play_ev.score_min or play_ev.score) >= remaining and remaining > 0
   local forced_play = (hands_left <= 1) -- last hand: must play
+
+  -- ---- MOUTH first-play repeatability (owner 2026-09-01: "died to the mouth ... playing repeat hand
+  -- types") -----------------------------------------------------------------------------------------
+  -- Under single_hand_type the FIRST play locks the round to that hand type. The greedy max-score pick
+  -- here was a one-time Four of a Kind (all four Jacks) that does NOT clear a 10000 target -- locking a
+  -- hand the deck can't remake, so the next 3 hands scored 0 and the run died. survive_after re-picks a
+  -- repeatable type in the SAMPLED path, but the CHEAP overlay pass (no samples) does not, and the
+  -- self-player acts on it. Re-pick among REPEATABLE types (make-frequency >= threshold) when the greedy
+  -- first play is a one-time hand that doesn't clear. Only fires on the Mouth, first play, multi-hand.
+  do
+    local bb = gs.blind or {}
+    local eff = bb.boss_effect_key and BossEffect.of(bb.boss_effect_key) or nil
+    local locked = bb.played_hand_types and next(bb.played_hand_types) ~= nil
+    -- one-time hands consume scarce specific cards (4+ of a rank, or a 3+2), so you can't RELOCK them
+    -- each hand; the repeatable hands (High Card/Pair/Two Pair/Trips/Straight/Flush) can be remade.
+    if eff and eff.single_hand_type and not locked and not clears and hands_left >= 2
+       and DE.ONE_TIME_HAND[play_ev.hand_type] then
+      local rev, rcards = HandEval.best_play_target(gs, hand, remaining, function(sel, ht)
+        return (not DE.ONE_TIME_HAND[ht]) and (not pfilter or pfilter(sel, ht))
+      end)
+      if rev and rcards then
+        play_ev, play_cards = rev, rcards
+        clears = play_ev.score >= remaining and remaining > 0
+        guaranteed = (play_ev.score_min or play_ev.score) >= remaining and remaining > 0
+      end
+    end
+  end
 
   -- ---- scaling FUEL: feed an owned conditional scaler when it's SAFE ----------
   -- Some scalers only grow on a specific played hand (Runner on a Straight, Square
