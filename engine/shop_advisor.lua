@@ -457,6 +457,10 @@ end
 local function funder_is_live(gs, j, contribution)
   if Eval.econ_value(gs, j.key) > 0 then return true end
   if JokerData.has_tag(j.key, "consumable") and JokerData.has_tag(j.key, "economy") then return true end
+  -- (4) a CARD-GENERATION joker (Vagabond/Cartomancer: makes Tarots/Planets each qualifying hand) holds
+  -- its value in its OUTPUT, so its scoring marginal reads ~0 and it looks "dead" -- but dumping it after
+  -- one round is churn (owner 2026-09-01: sold Vagabond after a single round without milking it).
+  if (JokerData.resolve(j.key) or {}).cat == "card_generation" then return true end
   local ed = j.edition
   if ed and ed ~= "" and ed ~= "base" and ed ~= "none" then return true end
   return false
@@ -1063,7 +1067,9 @@ function SA.recommend(gs, opts)
       -- shop into an EMPTY board (full-board cash-sell of a contributing joker). Selling a
       -- working joker for cash never buys survival (cash doesn't score); a genuine "sell to
       -- afford a specific buy" is handled by SELL_TO_BUY. So cash matters ONLY when dead.
-      local dead = worst_c <= 0.1
+      -- a "live" value joker (recurring $/round, a card-generation engine like Vagabond, or a non-base
+      -- edition) is NOT dead even though its scoring marginal reads ~0 -- don't cash-sell it as junk.
+      local dead = worst_c <= 0.1 and not funder_is_live(gs, j)
       local cash_matters = dead
       -- cash is worth more when at risk or nearly broke (can't score your way out)
       local money_w = cash_matters and (SA.DOLLAR_UTIL * (secure and 0.6 or 1.2)) or 0
