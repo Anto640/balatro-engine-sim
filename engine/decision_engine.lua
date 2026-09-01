@@ -631,6 +631,18 @@ function DE.decide(gs, opts)
     -- engine play a MINIMAL hand and hold a hand of faces for Parking -- not just play money cards.
     local hold_on = HoldFuel.has_lever(gs)
     if not hold_on then for _, c in ipairs(hand) do if c.enhancement == "m_gold" then hold_on = true; break end end end
+    -- The guaranteed clear's SCORING cards (the poker hand itself, not its kickers). These matter twice:
+    -- (1) the milk may only spend cards OUTSIDE them, so the clearing hand survives for a later turn;
+    -- (2) their one-time m_gold round-end value is ILLUSORY for a milk that holds them -- you must play
+    -- them to clear, forfeiting the $3. Both come from the live round-6 bug: a trivially-clearing Flush
+    -- was DEFERRED to "hold" its own gold hearts, and the flush degraded away, nearly dying.
+    local in_clear = {}
+    do
+      local _, scoring_set = HandEval.analyze(play_cards or {})
+      for i, c in ipairs(play_cards or {}) do
+        if (not scoring_set) or scoring_set[i] then in_clear[c] = true end  -- keep scoring cards; kickers are free
+      end
+    end
     local function milk_money(sel, ev)
       local m = (ev and ev.money) or 0
       if hold_on and sel then
@@ -638,13 +650,16 @@ function DE.decide(gs, opts)
         for _, c in ipairs(sel) do played[c] = true end
         local held = {}
         for _, c in ipairs(hand) do if not played[c] then held[#held + 1] = c end end
-        m = m + HoldFuel.money(gs, held)
+        m = m + HoldFuel.money(gs, held, in_clear)   -- clear's gold cards don't count as held $ (illusory)
       end
       return m
     end
     -- max-$ play in this hand: remaining=0 makes every subset tier-0, so best_fuel_play ranks by the
     -- fuel credit (played $ + held $) then score -> the highest-total-$ legal play (minimal for Parking).
-    local mev, mcards = HandEval.best_fuel_play(gs, hand, 0, milk_money)
+    local milk_pool = {}
+    for _, c in ipairs(hand) do if not in_clear[c] then milk_pool[#milk_pool + 1] = c end end
+    local mev, mcards
+    if #milk_pool > 0 then mev, mcards = HandEval.best_fuel_play(gs, milk_pool, 0, milk_money) end
     if mev and mcards and not same_cards(mcards, play_cards)
        and milk_money(mcards, mev) > milk_money(play_cards, play_ev) + 1e-9 then
       local seed = disc_seed(gs)

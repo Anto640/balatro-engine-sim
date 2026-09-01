@@ -23,7 +23,13 @@ local function owns(gs, key)
 end
 
 -- Expected $ from HOLDING `held` cards this hand. (A debuffed card counts for nothing.)
-function HF.money(gs, held)
+-- `gold_exclude` (optional set, keyed by card) suppresses the one-time m_gold round-end credit for
+-- cards that will be PLAYED anyway -- e.g. a gold card that is one of the guaranteed clear's scoring
+-- cards. Holding it looks like +$3, but you forfeit that the moment you play the clear, so crediting it
+-- makes the engine DEFER a trivial clear to "hold" cards it must play (the live round-6 Midas/Flush bug).
+-- Reserved Parking is NOT excluded: it pays for EACH hand the card is held, which is real across the
+-- milk hands before the clear.
+function HF.money(gs, held, gold_exclude)
   if not held or #held == 0 then return 0 end
   local d = 0
   if owns(gs, "j_reserved_parking") then
@@ -33,7 +39,8 @@ function HF.money(gs, held)
     end
   end
   for _, c in ipairs(held) do
-    if c.enhancement == "m_gold" and not HandEval.is_debuffed(gs, c) then d = d + 3 end  -- $3 held at round end
+    if c.enhancement == "m_gold" and not HandEval.is_debuffed(gs, c)
+       and not (gold_exclude and gold_exclude[c]) then d = d + 3 end  -- $3 held at round end
   end
   return d
 end
