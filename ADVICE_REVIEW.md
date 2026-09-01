@@ -98,6 +98,14 @@ jokers where the churn fix pays, so it can't see the live benefit. Ships on corr
 > ✅ **a7 reached — the deepest run yet.** Straights WERE played early (Runner fed ~3×); Hermit bought+used
 > at a4; the Gros Michel→Cavendish death-swap found the carry. The wall is the SAME: dig-for-build (§1) +
 > reroll discipline (§8) + not leveling toward a REACHABLE hand.
+>
+> ✅ **NEWEST-RUN in-blind mistakes FOUND + FIXED (2026-09-01, `71dedb3`).** Reconstructed the states and
+> replayed: ante-3 round-6 the MILK deferred a **3300 Flush that trivially cleared 2000**, playing High Card
+> ×4 to "hold" the flush's own gold hearts for Midas $ — illusory (you forfeit the gold when you play the
+> clear). Fixed (gold-exclusion in HoldFuel + milk preserves the clear's scoring cards); round 6 now plays
+> the Flush. This IS the "digging with hands / score-opt by discards after the first hand" complaint. The
+> ante-2 round-4 "played a Two Pair first instead of digging" was checked and is NOT a bug — it's an
+> accumulate play (dig-vs-accumulate = the §1 build-commitment wall; uniform dig bias already refuted).
 
 ---
 
