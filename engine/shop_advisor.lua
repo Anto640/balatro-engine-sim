@@ -71,6 +71,10 @@ SA.REROLL_DISCOUNT = 0.5  -- a reroll is speculative (one noisy roll) AND a fres
 -- a 9-roll spree does not. A magnitude lever -- measured on the agreement corpus before keeping.
 SA.REROLL_BASE_COST = 5      -- standard first-reroll price; escalation is judged relative to this
 SA.REROLL_ESCALATION_FLOOR = 0.25  -- never fully zero a reroll's appetite on cost alone (rich/at-risk)
+-- make-frequency at/above which a planet's flat "level SOMETHING" nudge (BP.level_need) applies in full.
+-- A planet for a hand the deck rarely makes (Mars/Four-of-a-Kind on a standard deck) should NOT get the
+-- nudge -- owner 2026-09-01: leveled Four of a Kind to level 5 (freq 0.000) and never played it.
+SA.PLANET_LEVEL_FREQ = 0.30
 SA.JOKER_SCORE_WEIGHT = VU.FRAC_UTIL -- the ONE frac->utility bridge: jokers, packs, reroll
                           -- AND (B1) standalone consumables all weight a boss-hand fraction
                           -- by this. Defined in value_units beside DOLLAR_UTIL, because the
@@ -824,7 +828,14 @@ function SA.recommend(gs, opts)
     -- Planet's value by the board's core (1.0 with no xmult -> no early over-buy).
     if it.set == "Planet" then
       local hand = ConsumableValue.PLANET_KEY_HAND[it.key]
-      vfrac = vfrac * BuildPlan.level_amplifier(gs) + BuildPlan.level_need(gs)
+      -- level_need is a flat "you should level SOMETHING" nudge (fires when you have an xmult core but
+      -- low total levels). Steer it to a hand you actually MAKE: gate by this planet's make-frequency so
+      -- a Mars/Four-of-a-Kind planet on a deck that never makes it (freq 0) gets NO nudge, while a
+      -- Pluto/Pair planet on a pair-heavy deck (freq ~0.9) keeps the full nudge. planet_credit already
+      -- gates to the committed hand (the "building toward it" case); vfrac is already freq-based.
+      local hfreq = (cfreq and cfreq[hand]) or 0
+      local freq_gate = math.min(1, hfreq / SA.PLANET_LEVEL_FREQ)
+      vfrac = vfrac * BuildPlan.level_amplifier(gs) + BuildPlan.level_need(gs) * freq_gate
         + BuildPlan.planet_credit(gs, hand)
     end
     -- a consumable that CREATES a joker (Judgement) has its OUTPUT measured deck-aware
