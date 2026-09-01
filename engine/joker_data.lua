@@ -97,6 +97,11 @@ D.j_card_sharp       = J("Card Sharp", "Uncommon", 6, "xmult", 7, 0, { "xmult" }
 D.j_red_card         = J("Red Card", "Common", 5, "scaling_mult", 5, 0, { "scaling" })
 D.j_madness          = J("Madness", "Uncommon", 7, "xmult_scaling", 6, 0, { "xmult", "scaling" })
 D.j_madness.growth   = 0  -- scales by DESTROYING your jokers: growth isn't free value, so don't project it (Downside prices the self-harm)
+-- RESETTING scaler config (engine/eval_function scaler_marginal): the counter ZEROES on a "miss", so it
+-- sits at a LOW equilibrium instead of accumulating. Valued analytically (measured per-unit x geometric
+-- equilibrium), NOT by the tier floor -- the fix for Ride the Bus being priced above Runner off tier 7.
+-- inc = raw per-trigger counter gain; reset_on = what resets it.
+D.j_ride_the_bus.inc = 1; D.j_ride_the_bus.reset_on = "face"   -- +1 mult per face-FREE hand, resets on a scored face
 D.j_square           = J("Square Joker", "Common", 4, "scaling_chips", 5, 0, { "scaling" })
 D.j_seance           = J("Séance", "Uncommon", 6, "card_generation", 4, 0, { "consumable", "handtype:flush", "handtype:straight" })
 D.j_riff_raff        = J("Riff-Raff", "Common", 6, "card_generation", 4, 0, {})

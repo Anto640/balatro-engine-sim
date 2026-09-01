@@ -93,6 +93,30 @@ return function(t)
     t.ok(pare <= 1.001, "Ride the Bus never grows under Pareidolia (every card is a face)")
   end
 
+  -- MEASURED scaler value (owner 2026-09-01: measure scalers, don't price them off the tier floor).
+  -- Ride the Bus is a RESETTING scaler valued at its low equilibrium (measured), NOT tier 7 -- so its
+  -- buy value must be tiny (below a basic Joker) and ~0 under Pareidolia, while an ACCUMULATING scaler
+  -- (Runner) is UNCHANGED. Needs a deck to measure.
+  do
+    local Eval = require("engine.eval_function")
+    local GSm = require("model.game_state")
+    local function lcg(s) s = s % 2147483647; if s <= 0 then s = s + 2147483646 end
+      return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end end
+    local deck = {}
+    for i = 1, 52 do deck[#deck + 1] = card{ id = i, rank_id = ((i - 1) % 13) + 2,
+      suit = ({ "Spades", "Hearts", "Clubs", "Diamonds" })[((i - 1) % 4) + 1] } end
+    local function fv(jks, buy)
+      local gs = GSm.new{ deck = deck, meta = { ante = 3 }, jokers = jks,
+        run = { hand_levels = {}, joker_slots = 5 }, blind = { target_chips = 800 } }
+      return Eval.add_joker_marginal_fv(gs, GSm.joker{ key = buy }, { rng = lcg(7), samples = 16 })
+    end
+    local rbus  = fv({}, "j_ride_the_bus")
+    local jokr  = fv({}, "j_joker")
+    local rbpar = fv({ GSm.joker{ key = "j_pareidolia" } }, "j_ride_the_bus")
+    t.ok(rbus < jokr, "Ride the Bus (measured, resetting) is valued BELOW a basic Joker -- not tier 7")
+    t.ok(rbpar <= rbus + 1e-6, "Ride the Bus is worth ~0 with Pareidolia (never grows)")
+  end
+
   local function shop_state(o)
     return GS.new{
       jokers = o.jokers or {},

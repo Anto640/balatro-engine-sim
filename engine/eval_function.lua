@@ -91,6 +91,48 @@ local function ride_the_bus_factor(gs)
   end
   return f
 end
+
+-- ===== MEASURED scaler valuation (owner 2026-09-01: tiers should be a LEGACY FALLBACK; measure scalers,
+-- drop the tier floor). A RESETTING scaler's counter zeroes on a miss, so it sits at a LOW geometric
+-- EQUILIBRIUM rather than growing -- so we value it as (measured score per unit of counter) x (equilibrium
+-- counter), fully deck-aware, and skip the static tier floor entirely (see jp_from_measure). ==============
+
+-- P a SCORED hand is face-FREE, so Ride the Bus survives and grows. ~0 when you own a face-scoring joker
+-- (you deliberately play faces to feed it) or Pareidolia (every card is a face) -- the anti-synergy falls
+-- straight out of the probability, no special case.
+local function face_free_prob(gs)
+  for _, j in ipairs(gs.jokers or {}) do
+    local a = RIDE_BUS_ANTISYN[j.key]
+    if a ~= nil then return (j.key == "j_pareidolia") and 0 or 0.05 end
+  end
+  local faces, n = 0, 0
+  for _, c in ipairs(gs.deck or {}) do
+    if not Cards.is_stone(c) then n = n + 1; if Cards.is_face(c) then faces = faces + 1 end end
+  end
+  if n == 0 then return 0.25 end
+  return (1 - faces / n) ^ 5   -- 5 scored cards, none a face
+end
+
+-- Score value of ONE unit of a scaler's counter (measured deck-aware by injecting a reference counter).
+local function scaler_spu(gs, key, opts)
+  local cat = (JokerData.resolve(key) or {}).cat
+  local ref = 10
+  local ability = (cat == "scaling_chips") and { extra = { chips = ref } } or { mult = ref }
+  local m = JokerValue.score_delta(gs, { key = key, ability = ability },
+    { samples = (opts and opts.samples) or 6, rng = opts and opts.rng, cache = opts and opts.cache })
+  return (m or 0) / ref
+end
+
+-- Analytic raw score marginal (per hand) of a RESETTING scaler at its geometric equilibrium, or nil if the
+-- joker is not a modelled resetting scaler (falls through to the normal measured/tier path).
+local function scaler_marginal(gs, key, opts)
+  local e = JokerData.resolve(key)
+  if not (e and e.inc and e.reset_on == "face") then return nil end
+  local p = face_free_prob(gs)
+  if p <= 0 then return 0 end
+  local avg_counter = e.inc * p / (1 - p)              -- geometric equilibrium of a reset-on-miss counter
+  return avg_counter * scaler_spu(gs, key, opts)
+end
 local function scale_trigger_factor(gs, key, freq)
   if key == "j_ride_the_bus" then return ride_the_bus_factor(gs) end
   local hands = JokerData.scale_trigger_hands(key)
@@ -212,6 +254,16 @@ local function jp_from_measure(gs, key, edition, m, opts, owned)
   local proj = Eval.scaling_projection(gs, key, freq)
   if not m then
     return (e.tier or 3) * 0.5 * proj + edition_jp(edition, true), false
+  end
+  -- RESETTING scaler (Ride the Bus): a fresh one measures 0, so the tier FLOOR used to decide its value
+  -- (tier 7 -> priced above Runner). Instead value it MEASURED at its low geometric equilibrium and skip
+  -- the tier floor entirely. No proj: a reset-on-miss counter is steady at equilibrium, not accumulating.
+  -- (First piece of the measured-scaler system; accumulating scalers still use the proj+floor path below.)
+  if e.reset_on then
+    local sm = scaler_marginal(gs, key, opts)
+    if sm then
+      return (sm / Mechanics.boss_per_hand_need(gs)) * JP_PER_FRAC + edition_jp(edition, false), true
+    end
   end
   -- Analytic floor for hand-conditional xmults: the noisy 6-sample delta reads ~0 when the
   -- trigger hand is rare in-sample, so the engine skips a core that multiplies every trigger
