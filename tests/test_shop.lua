@@ -68,6 +68,31 @@ return function(t)
       "a live joker still needs a clear upgrade margin to be swapped")
   end
 
+  -- Card-generation jokers (Vagabond/Cartomancer) hold their value in the consumables they MAKE, so
+  -- their scoring marginal reads ~0 -- but they are NOT dead, they must be churn-protected (owner:
+  -- "sold Vagabond after one round"). funder_is_live recognises the card_generation category.
+  do
+    local GSm = require("model.game_state")
+    t.ok(SA.funder_is_live(GSm.new{ jokers = { GSm.joker{ key = "j_vagabond" } } }, GSm.joker{ key = "j_vagabond" }),
+      "Vagabond (card_generation) is a LIVE value joker, protected from churn")
+    t.ok(not SA.funder_is_live(GSm.new{ jokers = { GSm.joker{ key = "j_joker" } } }, GSm.joker{ key = "j_joker" }),
+      "a plain scorer is NOT 'live' (its marginal is already charged)")
+  end
+
+  -- Ride the Bus grows only on face-FREE hands and RESETS on a scored face, so it anti-synergizes with
+  -- any face-scoring joker (owner: "Ride the Bus ... turned off by Sock and Buskin"). Its scaling
+  -- projection must be damped when such a joker is on board, and zeroed under Pareidolia (all faces).
+  do
+    local Eval = require("engine.eval_function")
+    local GSm = require("model.game_state")
+    local function proj(jks) return Eval.scaling_projection(GSm.new{ meta = { ante = 3 }, jokers = jks, run = { hand_levels = {} } }, "j_ride_the_bus") end
+    local alone = proj({ GSm.joker{ key = "j_ride_the_bus" } })
+    local sock  = proj({ GSm.joker{ key = "j_ride_the_bus" }, GSm.joker{ key = "j_sock_and_buskin" } })
+    local pare  = proj({ GSm.joker{ key = "j_ride_the_bus" }, GSm.joker{ key = "j_pareidolia" } })
+    t.ok(sock < alone, "Ride the Bus projection is damped by a face-scoring joker (Sock and Buskin)")
+    t.ok(pare <= 1.001, "Ride the Bus never grows under Pareidolia (every card is a face)")
+  end
+
   local function shop_state(o)
     return GS.new{
       jokers = o.jokers or {},

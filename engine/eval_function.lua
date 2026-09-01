@@ -73,7 +73,26 @@ end
 local SCALE_GATE_TARGET = 0.30  -- trigger freq at/above which growth is fully realised
 local SCALE_GATE_FLOOR  = 0.20  -- never zero the growth entirely: rare triggers still
                                 -- accrue, and play can be shaped toward the fuel hand
+-- Ride the Bus grows +1 mult per hand with NO SCORED FACE and RESETS the instant a face is scored. So
+-- (a) even alone it does not grow every hand (a scored face turns up often), and (b) it ANTI-SYNERGIZES
+-- with any joker that pays for SCORING faces -- you deliberately play faces to feed those, resetting it
+-- every hand (owner 2026-09-01: bought Ride the Bus onto a Sock & Buskin board; it never scaled). Damp
+-- its projected growth by that reset. Pareidolia is terminal -- every card counts as a face, so it resets
+-- every hand and never grows. Keyed by the RESETTING joker so the list is easy to extend.
+local RIDE_BUS_ANTISYN = {
+  j_pareidolia = 0.0, j_sock_and_buskin = 0.15, j_photograph = 0.15,
+  j_smiley = 0.15, j_scary_face = 0.15, j_midas_mask = 0.15,
+}
+local function ride_the_bus_factor(gs)
+  local f = 0.5  -- base: a scored face resets it often enough that undamped full growth over-values it
+  for _, j in ipairs(gs.jokers or {}) do
+    local a = RIDE_BUS_ANTISYN[j.key]
+    if a and a < f then f = a end
+  end
+  return f
+end
 local function scale_trigger_factor(gs, key, freq)
+  if key == "j_ride_the_bus" then return ride_the_bus_factor(gs) end
   local hands = JokerData.scale_trigger_hands(key)
   if not hands or not freq then return 1 end
   local realized = 0
