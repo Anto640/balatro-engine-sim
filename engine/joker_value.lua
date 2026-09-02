@@ -224,4 +224,39 @@ function JV.avg_score(gs, opts)
   return result
 end
 
+-- Measured score delta per unit of a UNIFORM per-card chip buff (a DECK-BUFF spu), used to value
+-- Hiker (+chips per scored card, permanent) and any other deck-chip buffer. Adds `ref` perma_chips to
+-- each card of the sampled hand and scores the CURRENT board on both the base and buffed hand, paired
+-- per hand (so the delta is purely the buff). Buffing only the drawn hand is equivalent to buffing the
+-- whole deck for best_play (only scored cards pay, and a uniform buff doesn't change which cards score),
+-- and pairs cleanly. Returns (mean per-hand score delta)/ref -- i.e. score per +1 chip on a scored card,
+-- which already folds in the s scored cards and the board's mult/retriggers. nil with no deck to sample.
+function JV.deck_buff_delta(gs, ref, opts)
+  opts = opts or {}
+  ref = ref or 10
+  local rng = opts.rng or math.random
+  local samples = mc(opts.samples or 8)
+  local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
+  if not deck or #deck < JV.MIN_DECK then return nil end
+  local hs = math.min((gs.run and gs.run.hand_size) or 8, #deck)
+  local board = clone_with_jokers(gs, gs.jokers or {})
+  local total = 0
+  for _ = 1, samples do
+    local s = shuffled(deck, rng)
+    local hand, bhand = {}, {}
+    for i = 1, hs do
+      local c = s[i]
+      hand[i] = c
+      local bc = {}
+      for k, v in pairs(c) do bc[k] = v end
+      bc.perma_chips = (bc.perma_chips or 0) + ref
+      bhand[i] = bc
+    end
+    local a = HandEval.best_play(board, hand)
+    local b = HandEval.best_play(board, bhand)
+    total = total + ((b and b.score or 0) - (a and a.score or 0))
+  end
+  return (total / samples) / ref
+end
+
 return JV

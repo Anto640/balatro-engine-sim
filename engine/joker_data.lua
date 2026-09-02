@@ -208,6 +208,15 @@ D.j_supernova.inc   = 1;   D.j_supernova.scale_rate = 0.16   -- +1 mult per play
 D.j_supernova.head_start = "hand_type_plays"                 -- reads run's cumulative plays -> starts high if bought late
 D.j_green_joker.inc = 1;   D.j_green_joker.scale_rate = 0.10 -- +1/hand -1/discard: discards gut it, esp. red deck (worst)
 
+-- DECK-BUFF scaler (Hiker): it has NO joker counter to inject -- it permanently adds chips to the CARDS
+-- when scored, so it's valued by a DECK-BUFF spu (buff the deck, measure the score delta) x the chips it
+-- projects to add over the run. deck_buff = raw +chips per scored card; buff_rate = re-score
+-- CONCENTRATION (how much a committed build cycles the same cards, so its buff compounds): a scattered
+-- deck spreads +5s thinly (each card rarely re-scored -> its bonus seldom pays), a concentrated build
+-- re-scores its core cards so the bonus stacks. Middle-ground default (owner-calibratable, and the SIM is
+-- the ruler). See engine/eval_function deck_buff_scaler_marginal.
+D.j_hiker.deck_buff = 5;   D.j_hiker.buff_rate  = 0.4       -- +5 chips/scored card; moderate re-score concentration
+
 -- ===================== lookups =====================
 
 local DEFAULT = { name = "Joker", rarity = "Common", cost = 4, cat = "flat_mult",

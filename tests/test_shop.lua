@@ -117,6 +117,31 @@ return function(t)
     t.ok(rbpar <= rbus + 1e-6, "Ride the Bus is worth ~0 with Pareidolia (never grows)")
   end
 
+  -- Hiker is a DECK-BUFF scaler (+5 chips/scored card, permanent) with NO joker counter -- it must be
+  -- valued MEASURED via its deck-buff spu, NOT off its tier-5 floor (which priced it absurdly high at
+  -- ~10.5). Measured it lands among the modelled scalers (a slow, unconditional chip accumulator), well
+  -- below its tier prior, and it PROJECTS DOWN as blinds run out (an ante-1 buy accrues all run).
+  do
+    local Eval = require("engine.eval_function")
+    local GSm = require("model.game_state")
+    local function lcg(s) s = s % 2147483647; if s <= 0 then s = s + 2147483646 end
+      return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end end
+    local deck = {}
+    for i = 1, 52 do deck[#deck + 1] = card{ id = i, rank_id = ((i - 1) % 13) + 2,
+      suit = ({ "Spades", "Hearts", "Clubs", "Diamonds" })[((i - 1) % 4) + 1] } end
+    local function fv(ante, tgt, buy)
+      local gs = GSm.new{ deck = deck, meta = { ante = ante }, jokers = {},
+        run = { hand_levels = {}, joker_slots = 5, hand_type_plays = {} }, blind = { target_chips = tgt } }
+      return Eval.add_joker_marginal_fv(gs, GSm.joker{ key = buy }, { rng = lcg(7), samples = 24 })
+    end
+    local hiker3 = fv(3, 800, "j_hiker")
+    local hiker5 = fv(5, 2800, "j_hiker")
+    local rbus3  = fv(3, 800, "j_ride_the_bus")
+    t.ok(hiker3 < 3, "Hiker is valued MEASURED (well below its tier-5 floor of ~10.5)")
+    t.ok(hiker3 > rbus3, "Hiker (unconditional every-hand chip buff) beats Ride the Bus (near-useless resetting)")
+    t.ok(hiker5 < hiker3, "Hiker projects DOWN as blinds run out (fewer hands left to accrue)")
+  end
+
   local function shop_state(o)
     return GS.new{
       jokers = o.jokers or {},

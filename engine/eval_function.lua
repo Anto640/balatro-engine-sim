@@ -223,6 +223,28 @@ local function accumulating_scaler_marginal(gs, key, opts)
   return (head + future) * scaler_spu(gs, key, opts)
 end
 
+-- Measured value of a DECK-BUFF scaler (Hiker): it adds `deck_buff` chips to each scored card, permanently.
+-- Unlike the joker-counter accumulators there is no counter to inject -- the growth lives on the CARDS -- so
+-- value it as (chips it projects to add to a hand's score, averaged over the run) x (score per unit per-card
+-- chip, MEASURED deck-aware via JV.deck_buff_delta). Hiker adds deck_buff to the ~s scored cards each hand;
+-- those chips only pay when a buffed card is RE-scored, so the effective per-hand chips grow ~linearly to
+-- deck_buff*buff_rate*n and average half that. buff_rate folds in the re-score concentration (a committed
+-- build re-scores its core cards, so its +5s compound; a scattered deck spreads them thin). The deck_buff_delta
+-- spu already carries the s scored cards and the board mult, so s cancels out of the product. nil if not a
+-- modelled deck-buff joker or no deck to sample. Same forward-average model as the buy case for an owned one
+-- (its already-accrued perma_chips are baked into the current board, so this is the go-forward marginal).
+local DECK_BUFF_REF = 25
+local function deck_buff_scaler_marginal(gs, key, opts)
+  local e = JokerData.resolve(key)
+  if not (e and e.deck_buff) then return nil end
+  local spu = JokerValue.deck_buff_delta(gs, DECK_BUFF_REF,
+    { samples = (opts and opts.samples) or 6, rng = opts and opts.rng, cache = opts and opts.cache })
+  if not spu then return nil end
+  local rate = e.buff_rate or 0.4
+  local n = Eval.blinds_remaining(gs) * ACC_HANDS_PER_BLIND
+  return e.deck_buff * rate * n / 2 * spu
+end
+
 -- Mean best-play score of the CURRENT board (the base a conditional xmult multiplies),
 -- memoised like hand_freq. jp_from_measure always receives the full current gs (owned AND
 -- shop paths), so this is the same board across a whole evaluation -> sample it once.
@@ -291,6 +313,14 @@ end
 -- their trigger hand appears (only those sample frequencies). Returns (jp, measured?).
 local function jp_from_measure(gs, key, edition, m, opts, owned)
   local e = JokerData.resolve(key)
+  -- DECK-BUFF scaler (Hiker): no joker counter, no scoring model, so m is always nil -- value it MEASURED
+  -- via its deck-buff spu (before the tier fallback) and skip the tier floor, like the other scalers.
+  if e.deck_buff then
+    local sm = deck_buff_scaler_marginal(gs, key, opts)
+    if sm then
+      return (sm / Mechanics.boss_per_hand_need(gs)) * JP_PER_FRAC + edition_jp(edition, false), true
+    end
+  end
   local freq = JokerData.scale_trigger_hands(key) and hand_freq(gs, opts) or nil
   local proj = Eval.scaling_projection(gs, key, freq)
   if not m then
