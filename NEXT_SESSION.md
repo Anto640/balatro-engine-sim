@@ -1,8 +1,38 @@
-# NEXT_SESSION.md — fresh-session handoff (2026-09-01)
+# NEXT_SESSION.md — fresh-session handoff (2026-09-02)
 
-## ⭐⭐ WHEN THE OWNER SAYS "PROCEED": build Hiker's deck-buff valuation, then SIM-validate the scalers
-This is the current live thread. **Task 1 = "finish the measured-scaler system"** (owner directive:
-*tiers are a LEGACY FALLBACK — measure the scalers, drop the tier floor*). Progress + the exact next steps:
+## ✅ TASK 1 COMPLETE: the measured-scaler system is finished + SIM-validated (2026-09-02)
+**Task 1 = "finish the measured-scaler system"** (owner directive: *tiers are a LEGACY FALLBACK — measure
+the scalers, drop the tier floor*) is DONE. Hiker (the last unmodelled scaler) is now measured, and the whole
+system was SIM-A/B'd against the pre-scaler tier-floor baseline. **Result: SAFE (neutral-to-slightly-positive,
+no regression) — KEEP.** Details below; the open work is now **Task 2** (deck-modifier effects) + a follow-up.
+
+**Hiker — DONE (`13f6917`).** A DECK-BUFFER (+5 chips/scored card, permanent) with NO joker counter to inject.
+Valued MEASURED via a new **deck-buff spu** (`JV.deck_buff_delta` — paired per-hand score delta from a uniform
+per-card chip buff, deck-aware): `value = deck_buff·buff_rate·N/2·spu` (`eval_function.deck_buff_scaler_marginal`,
+config `D.j_hiker.deck_buff=5 / buff_rate=0.4` in joker_data). `buff_rate` = re-score CONCENTRATION (derivation
+exact: it's the Σrᵢ²/s concentration, /2 the linear-ramp average — no double-count). On a standard deck ante 3
+Hiker measures **0.848** (was tier-floored ~10.5) — just below a basic Joker, just above Runner.
+
+**SIM A/B — DONE (paired n=40, HEAD 13f6917 vs baseline 7911554 = pre-scaler tier floor).** Measured scalers
+lead: progress **4.250 vs 4.171** (Δ +0.079, p 0.43 n.s.), wins **3 vs 2**, reach-8 **3 vs 2**, sign **6/5, 29
+tied**, NO crashes. The 29/40 ties + near-identical scaler BUY counts (RtB 4/4, runner 2/2, hiker 3/3) confirm
+the FREQUENCY CEILING: scaler valuation rarely flips a decision → it can't (and needn't) move an n=40 winrate
+verdict. Its value is **advice CORRECTNESS for the human overlay**, and the change meets the keep criterion for
+a correctness fix (ship unless significantly negative — it leans positive). The sim can't adjudicate the FINE
+calibration (Runner 2.49 vs Supernova 1.02 etc. are invisible at this n); that stays owner domain knowledge.
+Arms on disk: `sim_out/scaler_head.jsonl` (measured) · `sim_out/scaler_base.jsonl` (tier floor).
+
+**⭐ FOLLOW-UP found during the A/B (separate lever, NOT the scaler valuation).** The engine still *buys* the
+near-useless Ride the Bus (measured 0.04) ~4×/40-run in the SHOP — but its ADVICE de-prioritizes it (only **2
+buy-advices for RtB in the whole 40-run arm**; the ticks recommend Ramen/Blueprint/reroll/save). The buys come
+from a DRIVER slot-fill / low-positive-value execution path (identical in BOTH arms, so not caused by the
+scaler change). Worth a pass: the driver executes cheap positive-value buys to fill a slot even when the
+headline advice says otherwise — the "over-buy weak jokers early" pattern the owner has flagged. See
+`sim/driver.lua` buy loop vs the single top-line advice.
+
+---
+
+## (historical) The "proceed" plan that produced the above — Task 1 progress log
 
 **DONE + committed this session:**
 - **Resetting scaler** (Ride the Bus) — `97227b6`. Valued at its geometric EQUILIBRIUM (measured per-unit ×
@@ -16,15 +46,9 @@ This is the current live thread. **Task 1 = "finish the measured-scaler system"*
   start (`e.head_start`). Key fns in `eval_function.lua`: `scaler_marginal` (resetting), `accumulating_
   scaler_marginal`, `scaler_spu` (counter injection; mult-proxy for run-state jokers), `face_free_prob`.
 
-**⛔ NOT DONE — this is what "proceed" means:**
-1. **HIKER — the last unmodelled scaler.** It is a DECK-BUFFER (+5 chips per scored card, permanent) — it
-   has NO joker counter to inject, so `m` is nil → it still falls to the tier prior (10.50, inconsistently
-   HIGH vs the measured four). Needs its own valuation: project the deck chips it adds over the run and
-   measure a DECK-BUFF spu (buff the deck cards, measure the delta), not a counter injection. It's the one
-   `SCORING`-category joker with no `joker_effects` handler (in the deck-modifier exclusion list, ~line 364).
-2. **SIM A/B THE WHOLE THING.** The corpus is NEUTRAL but can't validate scaler valuation (scalers are too
-   rare in the 7 wins). The real ruler is the SIM (whole runs): `bash tools/sim_par.sh 40 <name>` on this
-   tree vs a baseline worktree, then `lua tools/analyze_runs.lua`. **The calibration may be revised by it.**
+**✅ DONE (both items — see the completion block at the top):**
+1. **HIKER** — measured deck-buff valuation shipped (`13f6917`). 10.5 → 0.848.
+2. **SIM A/B** — paired n=40 vs the pre-scaler tier-floor baseline: SAFE (neutral-to-positive, no regression).
 
 **⚠ TWO LESSONS baked into the above:** (a) *don't anchor to Runner* — it's just a joker the engine happened
 to pick; measure all scalers correctly and let values fall out. (b) *PULL REAL GAME VALUES, don't guess* —
