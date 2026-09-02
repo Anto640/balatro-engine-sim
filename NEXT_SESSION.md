@@ -1,5 +1,34 @@
 # NEXT_SESSION.md — fresh-session handoff (2026-09-02)
 
+## ✅ TASK 2 COMPLETE: deck-modifier jokers modeled off tier + SIM-validated (2026-09-02)
+The four `deck_modifier` jokers (Midas/Certificate/Marble/DNA) had no scoring model → a flat, deck-blind
+tier floor. Now each is valued off its real channel (`ad9eb45`):
+- **Midas Mask & Certificate** pay in MONEY → routed through `Eval.econ_value` (jp_to_fv's econ term) with
+  scoring jp ~0 (`DECK_MOD_ECON`), NOT the tier floor (which double-counts). **Midas is FACE-DECK-AWARE**
+  (`CONDITIONAL_ECON`, 12/52 baseline like Business Card): no-face deck ~0, face-heavy up to 3×. Certificate's
+  seal is random → flat modest prior. (Midas econ 2.0, Certificate 1.5.)
+- **Marble (adds Stones) & DNA (duplicates your best card)** reduce to "value of adding a card to the deck",
+  MEASURED by `ConsumableValue.card_add_value` (score delta + dilution + deck-size joker feed). Floored at a
+  REDUCED prior fraction (`DECK_MOD_FLOOR=0.12`, not 0.5) because a single-card marginal at the CURRENT board
+  under-states the late compounding + strategic/consistency value a snapshot can't see; the measured value
+  dominates upward when a premium copy target / deck-size synergy is present.
+- Balanced-deck fv: **Midas 1.60** (highest, owner prior; → ~4.8 face-heavy) > **DNA 1.44** > **Certificate
+  1.20** > **Marble 0.54**. Config: `eval_function.deck_modifier_jp` / `DECK_MOD_ECON`; `joker_data` econ
+  priors. 6 regression tests.
+
+**SIM A/B (paired n=40, HEAD `ad9eb45` vs baseline `3c13617` = deck-mods at tier floor):** modeled LEADS —
+progress **4.470 vs 4.250** (Δ +0.220, p 0.085), wins **4 vs 3**, reach-8 **5 vs 3**, **sign 4/0 (every
+seed that moved improved, none regressed), 36/40 tied**, no crashes. ⚠ The behavioral change is TINY (Midas
+buys 0→1, others ~flat) so the +0.220 is **cascade-carried, not a proven winrate lever** — same epistemic
+status as the scalers (frequency ceiling: these fire ~10% of runs). It meets the correctness keep-criterion
+(leans positive, no regression). Value = **advice correctness**. Arms: `sim_out/dm_head.jsonl` · `dm_base.jsonl`.
+⚠ Deck-mod valuation adds `card_add_value` cost (Marble/DNA measure avg_score ×2/offer) — the HEAD arm ran ~15%
+slower; acceptable but note it if the shop-eval hot path ever matters.
+
+**➡ NEXT: the driver slot-fill follow-up** (task #22) — the engine still BUYS weak scalers (Ride the Bus 0.04)
+in the shop despite advice de-prioritizing them; a `sim/driver.lua` execution path fills slots with cheap
+positive-value jokers. Then Task 3 (owner-parallel tier review). See the completion blocks below.
+
 ## ✅ TASK 1 COMPLETE: the measured-scaler system is finished + SIM-validated (2026-09-02)
 **Task 1 = "finish the measured-scaler system"** (owner directive: *tiers are a LEGACY FALLBACK — measure
 the scalers, drop the tier floor*) is DONE. Hiker (the last unmodelled scaler) is now measured, and the whole
