@@ -16,8 +16,11 @@ plus a large correctness/coverage/strategy pass.
 > Balatro inputs and plays whole runs unattended — a real-game bug-finder for the overlay. The owner watches
 > its runs and reports misplays; I fix them and, for economy/valuation changes, **MEASURE on the frozen 7-win
 > agreement corpus** (`tools/agreement_run.sh`) before keeping — the durable, non-ceilinged ruler. **Read
-> `NEXT_SESSION.md` top block FIRST** (2026-08-31: in-blind play fixes + Hologram feed + joker-model audit +
-> the ante-aware econ floor). ⭐ TWO lessons from this loop: (1) the winners DIG hard (discard 57% vs the
+> `NEXT_SESSION.md` top block FIRST** (2026-09-01 ACTIVE THREAD: the MEASURED-SCALER VALUATION — owner
+> directive that TIERS are a legacy fallback, so measure scalers + drop the tier floor; resetting (Ride the
+> Bus) + accumulating joker-counter scalers done + owner-calibrated, HIKER's deck-buff valuation + a SIM A/B
+> are the open "proceed" work. Earlier 2026-08-31: in-blind play fixes + Hologram feed + the econ floor).
+> ⭐ TWO lessons from this loop: (1) the winners DIG hard (discard 57% vs the
 > engine's 41%) — but a uniform dig bias was REFUTED by the corpus (it digs where the human PLAYED; the gap
 > is SITUATIONAL commit-to-a-line, the build-commitment wall). (2) the ante-aware econ floor (hold the
 > interest buffer, stop the single-digit spiral) was CONFIRMED (agree_save +20). **A live-run misplay is a

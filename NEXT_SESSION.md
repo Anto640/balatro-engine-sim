@@ -1,4 +1,58 @@
-# NEXT_SESSION.md — fresh-session handoff (2026-08-30)
+# NEXT_SESSION.md — fresh-session handoff (2026-09-01)
+
+## ⭐⭐ WHEN THE OWNER SAYS "PROCEED": build Hiker's deck-buff valuation, then SIM-validate the scalers
+This is the current live thread. **Task 1 = "finish the measured-scaler system"** (owner directive:
+*tiers are a LEGACY FALLBACK — measure the scalers, drop the tier floor*). Progress + the exact next steps:
+
+**DONE + committed this session:**
+- **Resetting scaler** (Ride the Bus) — `97227b6`. Valued at its geometric EQUILIBRIUM (measured per-unit ×
+  `inc*p/(1-p)`, p = P a scored hand is face-free). 7.875 → 0.04. Anti-synergy (Sock&Buskin/Pareidolia)
+  falls out of p. Also `46eb53f` (a projection damp, now largely superseded by the equilibrium path).
+- **Accumulating joker-counter scalers** (Runner/Square/Supernova/Green) — the checkpoint just committed.
+  Value = measured-per-unit (counter injection) × projected avg counter, NO tier floor. Per-joker `inc` +
+  `scale_rate` in `joker_data.lua` (after the catalogue). **Owner-calibrated ranking: Runner(2.49) >
+  Supernova(1.02) > Square(0.74) > Green(0.64).** Runner inc fixed 8→**15** (owner data catch). Supernova
+  reads `gs.run.hand_type_plays` (not a counter) → measured via a generic mult proxy + existing-plays head
+  start (`e.head_start`). Key fns in `eval_function.lua`: `scaler_marginal` (resetting), `accumulating_
+  scaler_marginal`, `scaler_spu` (counter injection; mult-proxy for run-state jokers), `face_free_prob`.
+
+**⛔ NOT DONE — this is what "proceed" means:**
+1. **HIKER — the last unmodelled scaler.** It is a DECK-BUFFER (+5 chips per scored card, permanent) — it
+   has NO joker counter to inject, so `m` is nil → it still falls to the tier prior (10.50, inconsistently
+   HIGH vs the measured four). Needs its own valuation: project the deck chips it adds over the run and
+   measure a DECK-BUFF spu (buff the deck cards, measure the delta), not a counter injection. It's the one
+   `SCORING`-category joker with no `joker_effects` handler (in the deck-modifier exclusion list, ~line 364).
+2. **SIM A/B THE WHOLE THING.** The corpus is NEUTRAL but can't validate scaler valuation (scalers are too
+   rare in the 7 wins). The real ruler is the SIM (whole runs): `bash tools/sim_par.sh 40 <name>` on this
+   tree vs a baseline worktree, then `lua tools/analyze_runs.lua`. **The calibration may be revised by it.**
+
+**⚠ TWO LESSONS baked into the above:** (a) *don't anchor to Runner* — it's just a joker the engine happened
+to pick; measure all scalers correctly and let values fall out. (b) *PULL REAL GAME VALUES, don't guess* —
+two data errors this session (Runner inc 8→15; earlier Hologram ×0.1→×0.25) were both in NEW code.
+
+## Task 2 (after Task 1): MODEL the deck-modifier effects
+Midas Mask (gold econ), DNA (deck→four-of-a-kind), Certificate (seals), Marble (stone) are `deck_modifier`
+jokers valued off TIER (effects not scored). Midas likely highest value. Medium-hard.
+
+## Task 3 (OWNER doing in parallel): tier review of the ~18 genuine-utility jokers
+Where tier legitimately IS the value: Chaos, Space, Burglar, Mr. Bones, Matador, Chicot, Invisible, Burnt,
+Troubadour, Oops!, Showman, Merry Andy, Turtle Bean, Luchador, Juggler, Drunkard, Diet Cola, Credit Card.
+Owner annotates 0–10; apply as the fallback beneath the measured system.
+
+## Earlier this session (2026-09-01) — SHIPPED live-run fixes (all deployed, corpus-checked)
+- **The Mouth** (`316f29b` populate `played_hand_types` live + `7911554` first play must be a REPEATABLE
+  hand type — the cheap overlay pass is survive_after-blind and the self-player acts on it).
+- **MILK** deferring a trivial clear on illusory held-gold (`71dedb3`) + Midas gold-exclusion in HoldFuel.
+- **Reroll escalation damp** (`96b56b1`) — MEASURED WIN: eng_reroll_human_save 120→109 (was the money-bleed
+  behind the "sold Fibonacci" death; the churn was the symptom, the reroll spree the cause).
+- **Anti-churn generalised** (`0597c14` SA.stb_funder_allowed — plain scorers were churned) + card-generation
+  (Vagabond) churn protection (`d268ff6`).
+- **Mystic Summit play-timing** (`84dd375` defer_uplift — dig to 0 discards). **Ride the Bus face
+  anti-synergy** (`46eb53f`). **level_need planet freq-gate** (`15e35af`).
+- Full owner-observation log: `ADVICE_REVIEW.md` R4. Method: reconstruct the misplay from telemetry
+  (`bes_fixtures.jsonl` **state** records carry the full `gs`), fix, regression-test, corpus/sim A/B.
+
+---
 
 ## ⭐ IN-BLIND PLAY + HOLOGRAM + JOKER AUDIT (2026-08-31) — from more live self-player runs
 **Joker-model audit (owner flagged a 0.1-vs-0.25 error).** It was a typo in NEW credit code, NOT the
