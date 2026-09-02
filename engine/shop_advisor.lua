@@ -610,6 +610,17 @@ end
 -- for the upcoming boss. MEASURED from your deck; falls back to the data tier as
 -- a prior only when the joker has no scoring model or there's no deck to sample.
 local function scoring_gain(gs, sj, rng, pace)
+  -- MEASURED-SCALER / DECK-MODIFIER bridge (Tasks 1-2): if the joker is one the measured system models
+  -- (Ride the Bus at equilibrium, the accumulating scalers, Hiker, Marble/DNA, or an econ deck-mod), use
+  -- that value instead of the tier-prior x projection below -- which otherwise valued Ride the Bus at 3.78
+  -- of a boss hand (vs the measured 0.04) and never saw any of the measured work. The modeled scalers
+  -- already project internally, so we do NOT re-apply `proj`; pace still damps it (don't over-invest in a
+  -- scaler's future when near-term survival is at risk). Econ deck-mods return 0 here (money, not score).
+  local modeled = Eval.modeled_scoring_fraction(gs, sj.key, { rng = rng, samples = 8 })
+  if modeled then
+    local ed = (sj.edition == "negative") and Eval.negative_slot_fv(gs) or Eval.edition_score_bonus(sj.edition, false)
+    return modeled * SA.proj_damp(pace) + ed
+  end
   local prior = (JokerData.resolve(sj.key).tier or 3) * 0.3
   -- A scaling joker is bought for what it BECOMES: measured/prior is its value
   -- TODAY, so project it forward over the blinds remaining (1.0 for flat jokers).
@@ -775,7 +786,7 @@ function SA.recommend(gs, opts)
     if JokerData.is_unmodelled(sj.key) then return end
     local cost = sj.cost or 0
     local sgain = scoring_gain(gs, sj, rng, pace)       -- measured (or prior); pace damps scaler projection
-    local econ = JokerData.resolve(sj.key).econ or 0    -- $/round it generates
+    local econ = Eval.econ_value(gs, sj.key)            -- $/round, DECK-AWARE (Rough Gem by diamonds, Midas by faces)
     -- first-scorer priority: a board with no scorer NEEDS one that scores NOW (flat); a
     -- board with only ONE still wants a second (survivors carry ~2 flat scorers, deaths ~1),
     -- so graduate the bonus -- strong at 0, smaller at 1, gone at 2+.

@@ -180,6 +180,35 @@ return function(t)
     t.ok(dna > marble, "DNA (Rare) is valued above Marble (weak Uncommon)")
   end
 
+  -- WIRING (Tasks 1-2 -> the SHOP): shop_advisor.scoring_gain had its OWN tier-prior x projection
+  -- valuation that IGNORED the measured-scaler system, so the live shop valued Ride the Bus at ~3.78 of a
+  -- boss hand (tier 7 x proj) and bought it. Eval.modeled_scoring_fraction now bridges the measured value
+  -- into the shop, so a near-useless resetting scaler ranks BELOW a basic Joker and far below a real xmult.
+  do
+    local deck = {}
+    for i = 1, 52 do deck[#deck + 1] = card{ id = i, rank_id = ((i - 1) % 13) + 2,
+      suit = ({ "Spades", "Hearts", "Clubs", "Diamonds" })[((i - 1) % 4) + 1] } end
+    local gs = GS.new{
+      deck = deck, meta = { ante = 3 }, jokers = { joker{ key = "j_joker", name = "Joker" } },
+      economy = { dollars = 30, interest_cap = 5 },
+      run = { hand_levels = {}, joker_slots = 5, hand_type_plays = {}, hand_size = 8 },
+      blind = { target_chips = 800 },
+      shop = { joker_slots = 5, reroll_cost = 5, jokers = {
+        joker{ key = "j_ride_the_bus", cost = 5 }, joker{ key = "j_joker", name = "Joker2", cost = 5 },
+        joker{ key = "j_cavendish", cost = 5 } } },
+    }
+    local r = SA.recommend(gs, {})
+    local val = {}
+    val[r.best.target and (r.best.target.key or r.best.target.name) or "?"] = r.best.value
+    for _, e in ipairs(r.alternatives or {}) do
+      if e.type == "BUY_JOKER" and e.target then val[e.target.key or e.target.name] = e.value end
+    end
+    t.ok(r.best.target and r.best.target.key == "j_cavendish", "shop buys the real xmult (Cavendish) over the weak scaler")
+    t.ok((val.j_ride_the_bus or 99) < (val.j_joker or 0),
+      "measured Ride the Bus now ranks BELOW a basic Joker in the SHOP (was ~3.78-of-a-boss-hand tier x proj)")
+    t.ok((val.j_ride_the_bus or 99) < 3, "Ride the Bus shop value is measured-low, not the old tier x projection ~10")
+  end
+
   local function shop_state(o)
     return GS.new{
       jokers = o.jokers or {},

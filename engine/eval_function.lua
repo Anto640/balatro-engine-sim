@@ -369,6 +369,30 @@ local function conditional_xmult_marginal(gs, key, opts, owned)
   return p * factor * base
 end
 
+-- The measured SCORING value (fraction of a boss hand) of a joker the measured-scaler / deck-modifier
+-- system models, or nil if it isn't one (so the caller keeps its own valuation). This is the BRIDGE that
+-- carries Tasks 1-2 (Ride the Bus at equilibrium, the accumulating scalers, Hiker, Marble/DNA) into the
+-- SHOP buy decision -- `shop_advisor.scoring_gain` has its OWN tier-prior x projection valuation that
+-- otherwise ignores all of the above (it valued Ride the Bus at 3.78 vs the measured 0.04). The scalers
+-- already project internally (accrued counter / equilibrium), so the caller must NOT re-apply a projection.
+-- Econ-channel deck-mods (Midas/Certificate) return 0 here -- their value is MONEY, added via Eval.econ_value.
+function Eval.modeled_scoring_fraction(gs, key, opts)
+  local e = JokerData.resolve(key)
+  local need = Mechanics.boss_per_hand_need(gs)
+  if not need or need <= 0 then return nil end
+  if e.reset_on then
+    local sm = scaler_marginal(gs, key, opts); return sm and (sm / need) or nil
+  elseif e.inc then
+    local sm = accumulating_scaler_marginal(gs, key, opts); return sm and (sm / need) or nil
+  elseif e.deck_buff then
+    local sm = deck_buff_scaler_marginal(gs, key, opts); return sm and (sm / need) or nil
+  elseif DECK_MOD_ECON[key] then
+    return 0
+  end
+  local dmj = deck_modifier_jp(gs, key, opts)
+  return dmj and (dmj / JP_PER_FRAC) or nil
+end
+
 -- joker_power units from a measured marginal `m` (raw score the joker adds), or
 -- the tier prior when `m` is nil (no deck / no scoring model). Measured value is
 -- normalised to a boss-hand fraction and scaled onto the joker_power scale, then
