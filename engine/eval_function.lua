@@ -257,6 +257,71 @@ local function board_base(gs, opts)
   return s
 end
 
+-- DECK-MODIFIER jokers whose value is ECON, not scoring (Midas golds played faces; Certificate adds a
+-- sealed card/round). Their money flows through Eval.econ_value (jp_to_fv's econ term), so jp_from_measure
+-- returns ~0 SCORING jp for them -- dropping the tier floor, which otherwise DOUBLE-COUNTS with the econ.
+local DECK_MOD_ECON = { j_midas_mask = true, j_certificate = true }
+
+-- DECK-GROWTH deck-modifiers (Marble adds Stone cards; DNA duplicates your best card). Both reduce to
+-- "value of adding a card to the deck", which ConsumableValue.card_add_value MEASURES deck-aware (score
+-- delta + dilution + any deck-size joker feed). Returns a measured jp, or nil (no deck / cheap path /
+-- not a modelled deck-grower) to fall through to the tier floor.
+local STONE_CARD = { enhancement = "m_stone", id = -911 }
+local DNA_COPIES = 2   -- useful permanent copies DNA makes over a run (conservative; each further copy bloats)
+-- The deck card most worth duplicating with DNA: prefer editions/enhancements/seals, else the highest rank.
+-- Returns a COPY (distinct id) so the measurement adds a duplicate rather than re-counting one identity.
+local function dna_best_card(gs)
+  local deck = gs.deck
+  if not deck or #deck == 0 then return nil end
+  local best, bestq
+  for _, c in ipairs(deck) do
+    local q = 0
+    if c.edition == "polychrome" then q = q + 5
+    elseif c.edition == "holo" or c.edition == "foil" then q = q + 3 end
+    if c.enhancement == "m_glass" then q = q + 4
+    elseif c.enhancement == "m_steel" then q = q + 3
+    elseif c.enhancement == "m_mult" then q = q + 2
+    elseif c.enhancement then q = q + 1 end
+    if c.seal then q = q + 1 end
+    q = q + (Cards.chips(c) or 0) / 100   -- tie-break toward high chips
+    if not bestq or q > bestq then bestq = q; best = c end
+  end
+  if not best then return nil end
+  local copy = {}
+  for k, v in pairs(best) do copy[k] = v end
+  copy.id = -912
+  return copy
+end
+-- A REDUCED tier floor for the deck-growth modifiers: their card_add_value is measured at the CURRENT
+-- board's mult, so it under-states the value the added cards accrue as the board grows LATER (Marble's
+-- stones are chip fuel; DNA's copies compound) and the option value of future synergies/copy-targets a
+-- single snapshot can't see. Floor at a small fraction of the prior (not the full 0.5) so a vanilla deck
+-- reads "modest, situational" rather than exactly 0, while the measured value dominates when it's higher
+-- (Hologram-fed Marble, an enhanced-card DNA copy).
+local DECK_MOD_FLOOR = 0.12
+local function deck_modifier_jp(gs, key, opts)
+  if not (opts and opts.rng) then return nil end
+  local deck = gs.deck
+  if not deck or #deck < JokerValue.MIN_DECK then return nil end
+  local need = Mechanics.boss_per_hand_need(gs)
+  local cav_opts = { samples = (opts.samples or 6), rng = opts.rng, need = need }
+  local floor = (JokerData.resolve(key).tier or 3) * DECK_MOD_FLOOR
+  if key == "j_marble" then
+    -- Marble adds ~1 Stone per blind selected, so the deck's stone count ramps to blinds_remaining and the
+    -- average per-hand benefit over the run is ~ (blinds_remaining/2) x the value of one added stone.
+    local cav = ConsumableValue.card_add_value(gs, STONE_CARD, cav_opts)
+    if not cav then return nil end
+    return math.max(floor, math.max(0, cav) * (Eval.blinds_remaining(gs) / 2) * JP_PER_FRAC)
+  elseif key == "j_dna" then
+    local best = dna_best_card(gs)
+    if not best then return nil end
+    local cav = ConsumableValue.card_add_value(gs, best, cav_opts)
+    if not cav then return nil end
+    return math.max(floor, math.max(0, cav) * DNA_COPIES * JP_PER_FRAC)
+  end
+  return nil
+end
+
 -- Hand-conditional xmults (The Duo/Trio/Family/Order/Tribe): { trigger, xmult }. The trigger
 -- keys mirror joker_effects.lua's ctx.contains checks; the xmult magnitudes are the same
 -- constants those on_hand closures return. Blueprint/Brainstorm copies are handled separately.
@@ -320,6 +385,16 @@ local function jp_from_measure(gs, key, edition, m, opts, owned)
     if sm then
       return (sm / Mechanics.boss_per_hand_need(gs)) * JP_PER_FRAC + edition_jp(edition, false), true
     end
+  end
+  -- DECK-MODIFIER jokers (Task 2): value them off their real channel, not the tier floor.
+  -- Econ-channel (Midas/Certificate): scoring jp ~0 -- their money is added via Eval.econ_value.
+  if DECK_MOD_ECON[key] then
+    return edition_jp(edition, false), true
+  end
+  -- Deck-growth (Marble/DNA): MEASURED via card_add_value; nil on the cheap/no-deck path -> tier floor.
+  local dmj = deck_modifier_jp(gs, key, opts)
+  if dmj then
+    return dmj + edition_jp(edition, false), true
   end
   local freq = JokerData.scale_trigger_hands(key) and hand_freq(gs, opts) or nil
   local proj = Eval.scaling_projection(gs, key, freq)
@@ -542,6 +617,14 @@ local CONDITIONAL_ECON = {
   -- at a flat $3 regardless of how many faces the deck actually has -- the same gap
   -- Business Card already had fixed above it. Same baseline (12/52 faces).
   j_reserved_parking = function(gs, base)
+    local n, _, face = deck_counts(gs)
+    if n == 0 then return base end
+    return base * clampf((face / n) / (12 / 52), 0, 3)
+  end,
+  -- Midas Mask (Task 2): golds PLAYED faces; a Gold card pays $3 when later HELD at round end. So the
+  -- money scales with how many faces the deck has to convert. Same face baseline (12/52); a no-face deck
+  -- correctly earns ~0 (the tier floor valued it flat regardless), a face-heavy deck earns more.
+  j_midas_mask = function(gs, base)
     local n, _, face = deck_counts(gs)
     if n == 0 then return base end
     return base * clampf((face / n) / (12 / 52), 0, 3)

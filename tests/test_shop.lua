@@ -142,6 +142,44 @@ return function(t)
     t.ok(hiker5 < hiker3, "Hiker projects DOWN as blinds run out (fewer hands left to accrue)")
   end
 
+  -- Task 2: DECK-MODIFIER jokers are valued off their real channel, not the flat tier floor.
+  -- Midas Mask & Certificate pay in MONEY (Eval.econ_value), scoring jp ~0; Midas is FACE-DECK-AWARE
+  -- (the tier floor never varied by deck). Marble/DNA are deck-growth, measured via card_add_value with
+  -- a reduced prior floor. Owner prior: Midas is the highest-value of the four.
+  do
+    local Eval = require("engine.eval_function")
+    local GSm = require("model.game_state")
+    local function lcg(s) s = s % 2147483647; if s <= 0 then s = s + 2147483646 end
+      return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end end
+    local function mkdeck(faceheavy)
+      local d = {}
+      for i = 1, 52 do
+        local rid = faceheavy and ({ 11, 12, 13, 14, 11, 12, 13 })[((i - 1) % 7) + 1] or ((i - 1) % 13) + 2
+        d[#d + 1] = card{ id = i, rank_id = rid, suit = ({ "Spades", "Hearts", "Clubs", "Diamonds" })[((i - 1) % 4) + 1] }
+      end
+      return d
+    end
+    local balanced, faces = mkdeck(false), mkdeck(true)
+    local function fv(deck, buy)
+      local gs = GSm.new{ deck = deck, meta = { ante = 3 }, jokers = {},
+        run = { hand_levels = {}, joker_slots = 5, hand_type_plays = {} }, blind = { target_chips = 800 } }
+      return Eval.add_joker_marginal_fv(gs, GSm.joker{ key = buy }, { rng = lcg(7), samples = 24 })
+    end
+    local function econ(deck, key)
+      local gs = GSm.new{ deck = deck, meta = { ante = 3 }, jokers = {}, run = { hand_levels = {} } }
+      return Eval.econ_value(gs, key)
+    end
+    local midas, cert = fv(balanced, "j_midas_mask"), fv(balanced, "j_certificate")
+    local marble, dna = fv(balanced, "j_marble"), fv(balanced, "j_dna")
+    t.ok(econ(balanced, "j_midas_mask") > 0, "Midas pays in econ (played faces -> Gold), not a flat tier score")
+    t.ok(econ(faces, "j_midas_mask") > econ(balanced, "j_midas_mask") + 1e-6,
+      "Midas econ is FACE-DECK-AWARE (a face-heavy deck golds more) -- the tier floor never was")
+    t.ok(fv(faces, "j_midas_mask") > midas, "Midas is worth more on a face-heavy deck")
+    t.ok(econ(balanced, "j_certificate") > 0, "Certificate pays in econ (a random-sealed card/round)")
+    t.ok(midas > marble, "owner prior: Midas is the highest-value deck-modifier; Marble the weakest")
+    t.ok(dna > marble, "DNA (Rare) is valued above Marble (weak Uncommon)")
+  end
+
   local function shop_state(o)
     return GS.new{
       jokers = o.jokers or {},

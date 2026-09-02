@@ -217,6 +217,13 @@ D.j_green_joker.inc = 1;   D.j_green_joker.scale_rate = 0.10 -- +1/hand -1/disca
 -- the ruler). See engine/eval_function deck_buff_scaler_marginal.
 D.j_hiker.deck_buff = 5;   D.j_hiker.buff_rate  = 0.4       -- +5 chips/scored card; moderate re-score concentration
 
+-- DECK-MODIFIER econ priors (Task 2, engine/eval_function): Midas & Certificate pay in MONEY, not score,
+-- so their value flows through Eval.econ_value (jp_to_fv's econ term) with scoring jp ~0 (DECK_MOD_ECON) --
+-- NOT the tier floor, which double-counts. Midas is face-density scaled (CONDITIONAL_ECON); Certificate's
+-- seal is RANDOM so it stays a flat prior. Conservative $/round -- the SIM guards against over-valuation.
+D.j_midas_mask.econ  = 2.0   -- played faces -> Gold ($3 held-at-round-end); lagged+hold-gated, so modest, face-scaled
+D.j_certificate.econ = 1.5   -- +1 random-sealed card/round: ~1/4 gold seal ($3 on play) + a bonus card + util seals
+
 -- ===================== lookups =====================
 
 local DEFAULT = { name = "Joker", rarity = "Common", cost = 4, cat = "flat_mult",
