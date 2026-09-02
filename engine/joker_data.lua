@@ -191,6 +191,23 @@ D.j_yorick           = J("Yorick", "Legendary", 20, "xmult_scaling", 9, 0, { "xm
 D.j_chicot           = J("Chicot", "Legendary", 20, "utility", 8, 0, {})
 D.j_perkeo           = J("Perkeo", "Legendary", 20, "card_generation", 9, 0, { "consumable" })
 
+-- ACCUMULATING-scaler config (engine/eval_function accumulating_scaler_marginal): a JOKER-COUNTER scaler
+-- whose counter grows monotonically. Value = (measured score per unit of counter) x (projected average
+-- counter over the run) -- NO tier floor. inc = raw per-trigger gain; a hand-type-gated scaler uses
+-- scale_trigger_hands for its trigger rate, an every_hand one triggers every scoring hand. Placed after
+-- the whole catalogue so every D.j_* it patches already exists. (Hiker is EXCLUDED: it buffs the cards,
+-- not a joker counter, so it has no injectable counter -- handled by its own deck-buff valuation.)
+-- scale_rate = realized trigger rate for a COMMITTED build (owner's domain read: DIGGABILITY of the
+-- trigger hand + any penalty, which greedy frequency can't see). inc = raw per-trigger gain. Ranking the
+-- owner gave (best->worst to scale): Runner (straights easy to dig, +8 good gain) > Square (4-card hand
+-- easier to trigger but only +4, slower) > Green Joker (LOSES mult per discard, so on red deck / whenever
+-- you dig it barely scales -- the worst).
+D.j_runner.inc      = 15;  D.j_runner.scale_rate    = 0.45   -- +15 chips/Straight (diggable) [was wrongly 8]
+D.j_square.inc      = 4;   D.j_square.scale_rate    = 0.50   -- +4 chips/4-card hand: easy but small gain
+D.j_supernova.inc   = 1;   D.j_supernova.scale_rate = 0.16   -- +1 mult per play of your COMMITTED hand type; you don't play the same type every turn (dig/mix), so the effective rate is low -> value ~Square (owner)
+D.j_supernova.head_start = "hand_type_plays"                 -- reads run's cumulative plays -> starts high if bought late
+D.j_green_joker.inc = 1;   D.j_green_joker.scale_rate = 0.10 -- +1/hand -1/discard: discards gut it, esp. red deck (worst)
+
 -- ===================== lookups =====================
 
 local DEFAULT = { name = "Joker", rarity = "Common", cost = 4, cat = "flat_mult",

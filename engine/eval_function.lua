@@ -114,11 +114,17 @@ local function face_free_prob(gs)
 end
 
 -- Score value of ONE unit of a scaler's counter (measured deck-aware by injecting a reference counter).
+-- A joker that reads RUN STATE instead of its own ability (Supernova reads gs.run.hand_type_plays, so
+-- injecting ability.mult does nothing) is measured through a generic +mult scaler proxy -- a unit of mult
+-- is worth the same whichever joker adds it.
+local MULT_PROXY = "j_ride_the_bus"   -- reads ability.mult straight (measures the per-mult value cleanly)
 local function scaler_spu(gs, key, opts)
-  local cat = (JokerData.resolve(key) or {}).cat
+  local e = JokerData.resolve(key) or {}
+  local mkey = e.head_start and MULT_PROXY or key
+  local cat = (JokerData.resolve(mkey) or {}).cat
   local ref = 10
   local ability = (cat == "scaling_chips") and { extra = { chips = ref } } or { mult = ref }
-  local m = JokerValue.score_delta(gs, { key = key, ability = ability },
+  local m = JokerValue.score_delta(gs, { key = mkey, ability = ability },
     { samples = (opts and opts.samples) or 6, rng = opts and opts.rng, cache = opts and opts.cache })
   return (m or 0) / ref
 end
@@ -180,6 +186,41 @@ local function hand_freq(gs, opts)
   local f = ConsumableValue.hand_frequencies(gs, { samples = opts.samples or 8, rng = opts.rng })
   if cache then cache._hand_freq = f or false end
   return f
+end
+
+-- Scoring hands the run has left for a scaler to accrue over. ~2.5 scoring hands per blind (blinds
+-- mostly clear in 1-2, plus some farm/setup hands), across blinds_remaining. Principled, not tuned to
+-- any one joker.
+local ACC_HANDS_PER_BLIND = 2.5
+-- Measured value of an ACCUMULATING joker-counter scaler: (score per unit of counter, MEASURED deck-aware)
+-- x (average counter over the run). The counter ramps ~linearly to inc*rate*N, so its average is half of
+-- that. A hand-type scaler's trigger rate is the shaped scale_trigger_factor (floored, since play shapes
+-- toward it); an every_hand scaler triggers every scoring hand. NO tier floor. nil if not a modelled
+-- joker-counter accumulator (reset_on scalers and Hiker are handled elsewhere).
+local function accumulating_scaler_marginal(gs, key, opts)
+  local e = JokerData.resolve(key)
+  if not (e and e.inc) or e.reset_on then return nil end
+  local rate = e.scale_rate or 1                             -- committed-build trigger rate (domain data)
+  local hands = JokerData.scale_trigger_hands(key)
+  if hands then
+    -- deck-gate: you can't scale a hand the deck can't make. Full committed rate once the deck makes the
+    -- trigger hand >= ~5% greedily; damp toward half as it gets rarer (the spu is already deck-aware).
+    local freq = hand_freq(gs, opts)
+    if freq then
+      local gf = 0
+      for _, h in ipairs(hands) do gf = gf + (freq[h] or 0) end
+      rate = rate * math.max(0.5, math.min(1, gf / 0.05))
+    end
+  end
+  local n = Eval.blinds_remaining(gs) * ACC_HANDS_PER_BLIND
+  local future = e.inc * rate * n / 2
+  -- head start: Supernova's counter is the run's cumulative plays of your (most-played, most repeatable)
+  -- hand type -- so buying it late already reads high, and it never ramps from 0.
+  local head = 0
+  if e.head_start == "hand_type_plays" then
+    for _, c in pairs((gs.run and gs.run.hand_type_plays) or {}) do if c > head then head = c end end
+  end
+  return (head + future) * scaler_spu(gs, key, opts)
 end
 
 -- Mean best-play score of the CURRENT board (the base a conditional xmult multiplies),
@@ -261,6 +302,14 @@ local function jp_from_measure(gs, key, edition, m, opts, owned)
   -- (First piece of the measured-scaler system; accumulating scalers still use the proj+floor path below.)
   if e.reset_on then
     local sm = scaler_marginal(gs, key, opts)
+    if sm then
+      return (sm / Mechanics.boss_per_hand_need(gs)) * JP_PER_FRAC + edition_jp(edition, false), true
+    end
+  end
+  -- ACCUMULATING joker-counter scaler (Runner/Square/Supernova/Green): value it MEASURED at its projected
+  -- accrual, not the tier floor.
+  if e.inc then
+    local sm = accumulating_scaler_marginal(gs, key, opts)
     if sm then
       return (sm / Mechanics.boss_per_hand_need(gs)) * JP_PER_FRAC + edition_jp(edition, false), true
     end
