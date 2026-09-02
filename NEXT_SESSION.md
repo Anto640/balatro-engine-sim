@@ -1,5 +1,27 @@
 # NEXT_SESSION.md — fresh-session handoff (2026-09-02)
 
+## ✅✅ THE MEASURED VALUATION NOW REACHES THE SHOP (2026-09-02, `dfba522`) — the real completion
+Chasing the follow-up (the engine buying weak scalers) uncovered the load-bearing bug: **`shop_advisor.
+scoring_gain` has its OWN joker valuation (tier-prior × scaling-projection) that NEVER consulted the
+measured-scaler system.** So all of Tasks 1–2 reached `add_joker_marginal_fv` but **NOT the primary shop
+BUY decision** — the live overlay valued Ride the Bus at ~3.78 of a boss hand (≈10 in shop units) and
+recommended buying it, and that is exactly why the Task-1/2 A/Bs read neutral (the values weren't reaching
+the shop). **Fix:** `Eval.modeled_scoring_fraction` bridges the measured value into `scoring_gain` (no
+re-projection — the scalers project internally; pace still damps); the shop econ term now uses the
+deck-aware `Eval.econ_value`. Now Cavendish (xmult) 11.99 > basic Joker 4.00 > **Ride the Bus 1.68** (was
+~10), and a full board REROLLs rather than churning to buy a weak scaler.
+
+**SIM A/B — DECISIVE n=160 (HEAD `dfba522` vs baseline `591b462` = measured values NOT reaching the shop):
+NEUTRAL, confirmed KEEP.** Progress 4.144 vs 4.092 (the FIX slightly higher, Δ +0.052, p 0.53 n.s.); sign
+test leans to the fix (better on 30, worse on 21, 109 tied, n.s.); tail slightly favors baseline (wins 7 vs
+9, reach-8 12 vs 15 — within noise, MDE ≈ 0.23). ⚠ The n=40 first pass read scary-negative (wins 1 vs 4)
+but was cascade noise on 2 known coin-flip seeds (the baseline "won" by buying the WEAKEST jokers — Ride the
+Bus + green_joker — that luck into good downstream shops); n=160 dissolved it. The fix is correct for ADVICE
+QUALITY (the overlay no longer tells a human to buy a near-useless scaler at 3.78-of-a-boss-hand) and
+sim-neutral. Arms: `sim_out/wire_head160.jsonl` · `wire_base160.jsonl` (n=40: `wire_head.jsonl`/`wire_base.jsonl`).
+⚠ Perf: `scoring_gain` now measures modeled scalers/deck-mods per shop offer (Marble/DNA run `card_add_value`
+= avg_score ×2); the sim arm ran ~15% slower. Fine for now; note it if the shop-eval hot path ever matters.
+
 ## ✅ TASK 2 COMPLETE: deck-modifier jokers modeled off tier + SIM-validated (2026-09-02)
 The four `deck_modifier` jokers (Midas/Certificate/Marble/DNA) had no scoring model → a flat, deck-blind
 tier floor. Now each is valued off its real channel (`ad9eb45`):
