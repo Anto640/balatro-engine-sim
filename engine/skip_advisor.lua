@@ -7,6 +7,7 @@
 local Tags = require("engine.tags")
 local Mechanics = require("engine.mechanics")
 local Generators = require("engine.generators")
+local Eval = require("engine.eval_function")
 
 local SK = {}
 
@@ -53,6 +54,11 @@ function SK.recommend(gs, opts)
   -- you'd also bank ~$1 per hand you don't need to play; assume you clear with a
   -- couple to spare on a non-boss blind
   local hand_money = math.max(0, ((b.base_hands or 4) - 2))
+  -- PLAYING the blind fires the board's MONEY jokers for a round (Business Card / Bloodstone / Faceless /
+  -- Rough Gem / ...), deck-aware -- money you FORGO by skipping. The old flat hand_money missed a farming
+  -- board entirely (owner R5: skipped a Meteor pack while forgoing Business-Card-style farming). econ_power
+  -- is $/round the board generates, the same dollar scale as `reward`.
+  local joker_econ = Eval.econ_power(gs) or 0
   -- jokers that fire when you SELECT the blind (Cartomancer/Riff-Raff/Marble)
   -- are free value you forgo by skipping -> credit them to PLAYING.
   local gen_v, gen_note = Generators.blind_select_value(gs)
@@ -61,8 +67,9 @@ function SK.recommend(gs, opts)
   local slots = (gs.run and gs.run.joker_slots) or 5
   local fill = math.min(1, njokers / math.max(1, slots))
   local shop_value = SK.SHOP_VALUE * (1 + SK.BOARDLESS_SHOP_MULT * (1 - fill))
-  local play_value = reward + shop_value + hand_money + gen_v
+  local play_value = reward + shop_value + hand_money + gen_v + joker_econ
   local gen_str = (gen_note ~= "" and (" + " .. gen_note)) or ""
+  if joker_econ >= 1 then gen_str = gen_str .. string.format(" + ~$%d joker econ", math.floor(joker_econ + 0.5)) end
 
   local skip = tval > play_value * SK.SKIP_MARGIN
   local pv = math.floor(play_value + 0.5)   -- play_value is now fractional (board-scaled shop)
