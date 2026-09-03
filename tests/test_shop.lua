@@ -209,6 +209,94 @@ return function(t)
     t.ok((val.j_ride_the_bus or 99) < 3, "Ride the Bus shop value is measured-low, not the old tier x projection ~10")
   end
 
+  -- Invisible Joker is valued by the joker it will DUPLICATE (measured off the current board), not its flat
+  -- tier prior: ~0 with no board worth copying, and it scales with the board's best joker (owner: "very
+  -- strong when the build already has a strong joker worth copying"). Copying a scaled joker is priced at
+  -- its scaled worth automatically (via joker_jp). Needs a deck+board to measure.
+  do
+    local Eval = require("engine.eval_function")
+    local GSm = require("model.game_state")
+    local function lcg(s) s = s % 2147483647; if s <= 0 then s = s + 2147483646 end
+      return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end end
+    local deck = {}
+    for i = 1, 52 do deck[#deck + 1] = card{ id = i, rank_id = ((i - 1) % 13) + 2,
+      suit = ({ "Spades", "Hearts", "Clubs", "Diamonds" })[((i - 1) % 4) + 1] } end
+    local function inv_jp(board_keys)
+      local jk = {}
+      for _, k in ipairs(board_keys) do jk[#jk + 1] = joker{ key = k, name = k } end
+      jk[#jk + 1] = joker{ key = "j_invisible", name = "Invisible" }
+      local gs = GSm.new{ deck = deck, meta = { ante = 4 }, jokers = jk,
+        run = { hand_levels = {}, joker_slots = 6, hand_type_plays = {}, hand_size = 8 }, blind = { target_chips = 2000 } }
+      return (Eval.joker_jp(gs, #jk, { rng = lcg(7), samples = 16 }))
+    end
+    local empty = inv_jp({})
+    local weak  = inv_jp({ "j_joker" })
+    local strong = inv_jp({ "j_cavendish" })
+    t.ok(empty < 0.05, "Invisible with no board worth copying is worth ~0 (not its tier-7 prior)")
+    t.ok(strong > weak, "Invisible is worth more when there is a stronger joker to duplicate")
+    t.ok(strong < 2.1, "Invisible is worth LESS than the joker it copies (3-round delay damp)")
+  end
+
+  -- Burglar removes all discards, so DISCARD-FED jokers (Faceless/Mail-In Rebate/Yorick/...) and purple
+  -- seals go dead beside it -- a two-directional anti-synergy (owner). Green Joker is EXCLUDED (no discards
+  -- only helps it). Penalty is state-dependent: bigger with more discard-reliant pieces owned.
+  do
+    local Down = require("engine.joker_downside")
+    local GSm = require("model.game_state")
+    local function gs_with(board, purple_n)
+      local jk = {}
+      for _, k in ipairs(board) do jk[#jk + 1] = joker{ key = k, name = k } end
+      local deck = {}
+      for i = 1, 52 do deck[#deck + 1] = card{ id = i, rank_id = ((i - 1) % 13) + 2, suit = "Spades",
+        seal = (i <= (purple_n or 0)) and "Purple" or nil } end
+      return GSm.new{ deck = deck, meta = { ante = 3 }, jokers = jk, run = { hand_levels = {}, hand_size = 8 },
+        blind = { base_discards = 3, base_hands = 4 } }
+    end
+    local function pen(board, purple_n) local gs = gs_with(board, purple_n); return Down.penalty(gs, gs.jokers[1], 1) end
+    local alone = pen({ "j_burglar" })
+    t.ok(pen({ "j_burglar", "j_faceless" }) > alone + 0.5, "Burglar costs more beside a discard-fed joker (Faceless)")
+    t.ok(pen({ "j_burglar", "j_faceless", "j_yorick" }) > pen({ "j_burglar", "j_faceless" }),
+      "Burglar's anti-synergy stacks with more discard-reliant jokers")
+    t.ok(math.abs(pen({ "j_burglar", "j_green_joker" }) - alone) < 1e-6,
+      "Green Joker is NOT penalized beside Burglar (no discards only helps it)")
+    t.ok(pen({ "j_burglar" }, 5) > alone, "Burglar costs more with purple-seal cards (they need a discard)")
+    -- symmetric: a discard-fed joker is worth less beside Burglar
+    t.ok(pen({ "j_faceless", "j_burglar" }) > pen({ "j_faceless" }) + 0.5, "Faceless is penalized when Burglar owned")
+  end
+
+  -- Showman (game key j_ring_master, NOT j_showman) is build-dependent: base ~2 plus a fraction of the best
+  -- board joker (worth more when you have a strong joker to duplicate). Diet Cola's Double Tag decays late
+  -- (fewer skips left to spend it on).
+  do
+    local Eval = require("engine.eval_function")
+    local Down = require("engine.joker_downside")
+    local GSm = require("model.game_state")
+    local JD = require("engine.joker_data")
+    local function lcg(s) s = s % 2147483647; if s <= 0 then s = s + 2147483646 end
+      return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end end
+    local deck = {}
+    for i = 1, 52 do deck[#deck + 1] = card{ id = i, rank_id = ((i - 1) % 13) + 2,
+      suit = ({ "Spades", "Hearts", "Clubs", "Diamonds" })[((i - 1) % 4) + 1] } end
+    local function showman_jp(board)
+      local jk = {}
+      for _, k in ipairs(board) do jk[#jk + 1] = joker{ key = k, name = k } end
+      jk[#jk + 1] = joker{ key = "j_ring_master", name = "Showman" }
+      local gs = GSm.new{ deck = deck, meta = { ante = 4 }, jokers = jk,
+        run = { hand_levels = {}, joker_slots = 6, hand_type_plays = {}, hand_size = 8 }, blind = { target_chips = 2000 } }
+      return (Eval.joker_jp(gs, #jk, { rng = lcg(7), samples = 16 }))
+    end
+    t.ok(JD.get("j_ring_master") ~= nil and JD.get("j_showman") == nil,
+      "Showman lives under its real game key j_ring_master (no silent-zero j_showman duplicate)")
+    t.ok(showman_jp({ "j_cavendish" }) > showman_jp({}), "Showman is worth more with a strong joker to duplicate")
+    local function dc_pen(ante)
+      local gs = GSm.new{ deck = deck, meta = { ante = ante }, jokers = { joker{ key = "j_diet_cola", name = "DC" } },
+        run = { hand_levels = {}, hand_size = 8 }, blind = { base_discards = 3, base_hands = 4 } }
+      return Down.penalty(gs, gs.jokers[1], 1)
+    end
+    t.ok(dc_pen(1) < 0.01, "Diet Cola has ~no penalty early (many skips ahead to use the Double Tag)")
+    t.ok(dc_pen(8) > dc_pen(1) + 0.5, "Diet Cola decays late (fewer skips left to spend the Double Tag)")
+  end
+
   local function shop_state(o)
     return GS.new{
       jokers = o.jokers or {},

@@ -29,6 +29,21 @@ local ENH_DEPENDENT = {
   j_drivers_license = true, j_vampire = true,
 }
 
+-- Jokers FED by discarding -- they earn money / xmult / levels FROM discards, so Burglar (which removes ALL
+-- discards) guts them. The anti-synergy is two-directional: Burglar costs more beside them, and each of them
+-- is worth less beside Burglar (owner: "careful not to take Burglar with discard-reliant jokers like Mail-In
+-- Rebate or purple seals"). Green Joker is DELIBERATELY excluded -- it only LOSES mult on discards, so no
+-- discards actually helps it.
+local DISCARD_FED = {
+  j_faceless = true,      -- $5 for discarding 3+ faces at once
+  j_mail = true,          -- $ per discarded card of the day's rank
+  j_hit_the_road = true,  -- +xmult per Jack discarded this round
+  j_trading = true,       -- destroy the first single-card discard for $3
+  j_yorick = true,        -- xmult that grows every N discards
+  j_burnt = true,         -- levels the first DISCARDED hand each round
+  j_castle = true,        -- +chips per discarded card of a suit
+}
+
 -- ability.extra is a TABLE for some jokers but a NUMBER for others, so always
 -- type-check before indexing it (indexing a number throws).
 local function extra_of(ab) return (type(ab) == "table" and type(ab.extra) == "table") and ab.extra or nil end
@@ -78,10 +93,18 @@ function D.penalty(gs, j, idx)
     if spec.hands then
       pen = pen + spec.hands * 1.2 * clamp(4 / base_hands, 1, 2)
     end
-    -- discards removed: only a cost to the extent you had discards to rely on
+    -- discards removed (Burglar): the base cost of losing the discards themselves, PLUS the anti-synergy --
+    -- discard-FED jokers on the board go (nearly) dead without discards, and purple-seal cards can't make
+    -- their Tarot. Scales with how much your build actually leans on discarding.
     if spec.no_discards then
       local bd = (gs.blind and gs.blind.base_discards) or 3
       pen = pen + math.max(0, bd) * 0.4
+      for i, o in ipairs(gs.jokers or {}) do
+        if i ~= idx and DISCARD_FED[o.key] then pen = pen + own_value(o.key) * 0.5 end
+      end
+      local purple = 0
+      for _, c in ipairs(gs.deck or {}) do if c.seal == "Purple" then purple = purple + 1 end end
+      pen = pen + math.min(purple, 6) * 0.15
     end
     -- destroys a RANDOM other joker each blind: expected loss = mean value of the
     -- DESTROYABLE others (Eternal jokers are immune). Lone board -> no penalty.
@@ -117,6 +140,23 @@ function D.penalty(gs, j, idx)
     if spec.fragile then pen = pen + own_value(j.key) * spec.fragile * 1.5 end
     -- decaying/temporary: a small standing discount (still strong while it lasts)
     if spec.decay then pen = pen + 0.6 end
+  end
+
+  -- symmetric anti-synergy: a DISCARD-FED joker is worth much less when Burglar (no discards) is on the
+  -- board -- it can't earn from discards it no longer gets.
+  if DISCARD_FED[j.key] then
+    for i, o in ipairs(gs.jokers or {}) do
+      if i ~= idx and o.key == "j_burglar" then pen = pen + own_value(j.key) * 0.5; break end
+    end
+  end
+
+  -- Diet Cola sells for a free Double Tag, which only pays when you SKIP a blind with a good tag. Skips are
+  -- front-loaded (early you skip to build; late you play every blind for score), so the later it is, the
+  -- fewer skips remain to spend the tag on -- discount it by how far into the run you are. Owner: "only good
+  -- if it sees a skip it may take now or in a future ante." ~0 penalty early, ~its whole prior by ante 8.
+  if j.key == "j_diet_cola" then
+    local ante = math.floor((gs.meta and gs.meta.ante) or 1)
+    pen = pen + clamp((ante - 2) / 6, 0, 1) * own_value(j.key) * 0.5
   end
 
   -- ---- generic stickers (apply to ANY joker, spec or not) ----

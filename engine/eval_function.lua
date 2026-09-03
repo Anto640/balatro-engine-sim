@@ -388,6 +388,11 @@ function Eval.modeled_scoring_fraction(gs, key, opts)
     local sm = deck_buff_scaler_marginal(gs, key, opts); return sm and (sm / need) or nil
   elseif DECK_MOD_ECON[key] then
     return 0
+  elseif key == "j_invisible" then
+    -- Invisible's shop value is the copy it will make from the CURRENT board (not owned yet -> self_idx nil).
+    return Eval.invisible_copy_jp(gs, nil, opts) / JP_PER_FRAC
+  elseif key == "j_ring_master" then
+    return Eval.showman_jp(gs, opts) / JP_PER_FRAC
   end
   local dmj = deck_modifier_jp(gs, key, opts)
   return dmj and (dmj / JP_PER_FRAC) or nil
@@ -466,6 +471,48 @@ local function can_measure(gs, opts)
   return deck and #deck >= JokerValue.MIN_DECK
 end
 
+local INVISIBLE_DELAY_DAMP = 0.75   -- 3-round wait before you can sell-to-copy (dead weight meanwhile)
+-- Invisible Joker: after 3 rounds, SELL it to DUPLICATE a random OTHER owned joker (the copy inherits the
+-- joker's CURRENT state -- scaling counters included -- and lands in Invisible's own freed slot, so no extra
+-- slot is needed). Its value is therefore the value of the joker it will copy. The pick is RANDOM, but you
+-- shed weak jokers first to bias it toward your best, so blend the board mean with the best (lean best).
+-- Because each candidate is valued via joker_jp (measured, deck-aware), copying a SCALED joker is priced at
+-- its scaled worth automatically -- the owner's question. ~0 with no board worth copying; strong when the
+-- build already has strong jokers. `self_idx` excludes the owned Invisible itself (nil on the shop-BUY path,
+-- where the whole current board is the copy pool). Damped for the 3-round delay it sits idle.
+function Eval.invisible_copy_jp(gs, self_idx, opts)
+  local jokers = gs.jokers or {}
+  local vals = {}
+  for i, j in ipairs(jokers) do
+    if i ~= self_idx and j.key ~= "j_invisible" and not JokerData.is_unmodelled(j.key) then
+      local v = Eval.joker_jp(gs, i, opts)
+      if v and v > 0 then vals[#vals + 1] = v end
+    end
+  end
+  if #vals == 0 then return 0 end
+  table.sort(vals, function(a, b) return a > b end)
+  local best, sum = vals[1], 0
+  for _, v in ipairs(vals) do sum = sum + v end
+  return (0.4 * (sum / #vals) + 0.6 * best) * INVISIBLE_DELAY_DAMP
+end
+
+-- Showman (game key j_ring_master): lets DUPLICATE jokers/cards/planets/tarots appear in shops+packs. Value
+-- = the flat utility of "duplicates can show up" (base prior) PLUS how worth-duplicating the current board
+-- is -- but heavily damped vs Invisible, because Showman only lets a duplicate APPEAR; you still have to
+-- find AND buy it yourself. Owner: ~2 base, higher when the build already has strong jokers worth doubling.
+local SHOWMAN_BEST_FRAC = 0.25
+function Eval.showman_jp(gs, opts)
+  local base = (JokerData.resolve("j_ring_master").tier or 2) * 0.5
+  local best = 0
+  for i, j in ipairs(gs.jokers or {}) do
+    if j.key ~= "j_ring_master" and not JokerData.is_unmodelled(j.key) then
+      local v = Eval.joker_jp(gs, i, opts)
+      if v and v > best then best = v end
+    end
+  end
+  return base + SHOWMAN_BEST_FRAC * best
+end
+
 -- joker_power units for ONE owned joker, measured against the deck where possible:
 -- its marginal score added back to the rest of the board (paired sampling). Falls
 -- back to the tier prior with no deck. Returns (jp, measured?).
@@ -473,6 +520,10 @@ function Eval.joker_jp(gs, idx, opts)
   opts = opts or {}
   local j = (gs.jokers or {})[idx]
   if not j then return 0, false end
+  -- Invisible Joker has no scoring model -- its worth is the joker it will DUPLICATE (see invisible_copy_jp),
+  -- not its tier prior. Value it off the current board, not the flat floor.
+  if j.key == "j_invisible" then return Eval.invisible_copy_jp(gs, idx, opts), true end
+  if j.key == "j_ring_master" then return Eval.showman_jp(gs, opts), true end
   local m
   if can_measure(gs, opts) then
     local rest = {}

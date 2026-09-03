@@ -1,5 +1,30 @@
 # NEXT_SESSION.md — fresh-session handoff (2026-09-02)
 
+## ✅ FOUR UTILITY-JOKER MODELS shipped (2026-09-02) — beyond-tier follow-ups from the tier review
+Owner directed these off their flat tier priors, systematically:
+- **Invisible Joker** — was a flat prior (not modeled as a copier). Now valued by the joker it will
+  DUPLICATE: `Eval.invisible_copy_jp` blends the board mean with the best (0.4/0.6, you shed weak jokers to
+  bias the random pick), × 0.75 for the 3-round delay. **~0 with no board worth copying; scales with your
+  best joker.** Scaling-inheritance falls out for free — the copy is priced via `joker_jp` at the board
+  joker's CURRENT (scaled) value. Wired into `joker_jp` (owned) + `modeled_scoring_fraction` (shop). The
+  shop correctly won't buy it on an empty board and buys it beside a strong joker.
+- **Burglar** — discard anti-synergy in `joker_downside`. Burglar removes ALL discards, so DISCARD-FED
+  jokers (`DISCARD_FED`: Faceless/Mail/Hit-the-Road/Trading/Yorick/Burnt/Castle) and purple-seal cards go
+  dead beside it — penalized two-directionally (Burglar costs more with them owned; they cost more with
+  Burglar owned). **Green Joker deliberately EXCLUDED** (no discards only helps it).
+- **Diet Cola** — usage gate in `joker_downside`: its Double Tag only pays on a future SKIP, and skips are
+  front-loaded, so it decays with ante (~0 penalty antes 1–2 → ~its whole prior by ante 8). The
+  "don't sell a strong joker to fit it" concern is already handled by the anti-churn SELL_TO_BUY guard.
+- **Showman** — ⚠ was NOT missing: it's catalogued under its real game key **`j_ring_master`** (the silent-
+  key gotcha — `j_showman` would never match a live joker; a duplicate I added was caught by the coverage
+  guard and removed). Retuned to the owner's tier **2** and given a build-dependent model (`Eval.showman_jp`
+  = base + 0.25 × best board joker) — worth more when you have a strong joker worth duplicating.
+
+1141 tests pass; all deployed. ⭐ LESSON reinforced: a new catalogue key MUST match the live center key —
+the coverage guard (`no silent-zero jokers`) catches mismatches. **NEXT idea:** DNA-style copy models could
+extend to any "duplicate" joker; and Green Joker + Burglar is a positive SYNERGY not yet credited (only the
+anti-synergy is modeled).
+
 ## ✅✅ THE MEASURED VALUATION NOW REACHES THE SHOP (2026-09-02, `dfba522`) — the real completion
 Chasing the follow-up (the engine buying weak scalers) uncovered the load-bearing bug: **`shop_advisor.
 scoring_gain` has its OWN joker valuation (tier-prior × scaling-projection) that NEVER consulted the
