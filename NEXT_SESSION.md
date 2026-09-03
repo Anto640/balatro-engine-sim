@@ -109,10 +109,25 @@ two data errors this session (Runner inc 8→15; earlier Hologram ×0.1→×0.25
 Midas Mask (gold econ), DNA (deck→four-of-a-kind), Certificate (seals), Marble (stone) are `deck_modifier`
 jokers valued off TIER (effects not scored). Midas likely highest value. Medium-hard.
 
-## Task 3 (OWNER doing in parallel): tier review of the ~18 genuine-utility jokers
-Where tier legitimately IS the value: Chaos, Space, Burglar, Mr. Bones, Matador, Chicot, Invisible, Burnt,
-Troubadour, Oops!, Showman, Merry Andy, Turtle Bean, Luchador, Juggler, Drunkard, Diet Cola, Credit Card.
-Owner annotates 0–10; apply as the fallback beneath the measured system.
+## ✅ Task 3 COMPLETE (2026-09-02, `07b7ba4`): owner tier review of the genuine-utility jokers
+Applied the owner's 0–10 judgments to the utility jokers' tier prior (their whole valuation — they don't
+score): Chaos 3→6, Turtle Bean 3→5, Oops! 5→6, Invisible 6→7, Burnt 6→7, Juggler 3→4, Drunkard 3→4, Credit
+Card 1→2, Mr. Bones 6→5, Troubadour 5→4, Chicot 8→6. Held: Space 5, Burglar 5, Luchador 3, Diet Cola 3,
+Merry Andy 4, Matador 3. Shipped on correctness (fire rarely, no A/B).
+
+**⭐ BEYOND-TIER follow-ups the owner raised (tier can't capture these — future synergy/modeling work):**
+- **Invisible Joker** is NOT modeled as a copier at all (flat tier prior, unlike Blueprint/Brainstorm). Owner
+  asked: when it duplicates a SCALING joker, does the copy inherit the current scaled state? The engine
+  doesn't model its copy value yet — worth a DNA-style "value = copy your best joker" model (and verify the
+  scaling-inheritance game mechanic).
+- **Burglar** anti-synergy with DISCARD jokers (Mail-In Rebate, purple seals) — it removes all discards. A
+  downside-modeling opportunity (`joker_downside`).
+- **Oops! All 6s** — synergy with probability jokers is already modeled (`PROB_ECON` ×2); note the small
+  anti-synergy with Glass cards (doubles the shatter odds).
+- **Diet Cola** value is conditional (needs spare money + a free slot + a planned skip to buy-sell for the
+  Double Tag) — a usage-context gate, not a flat prior.
+- **Showman** is NOT in the catalogue at all — needs adding if the owner wants it valued.
+- **Matador** stays UNMODELLED/acquisition-gated (no boss-trigger model); un-gating needs a boss-econ model.
 
 ## Earlier this session (2026-09-01) — SHIPPED live-run fixes (all deployed, corpus-checked)
 - **The Mouth** (`316f29b` populate `played_hand_types` live + `7911554` first play must be a REPEATABLE
