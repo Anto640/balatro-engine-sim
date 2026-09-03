@@ -54,11 +54,16 @@ SA.DOLLAR_UTIL = VU.DOLLAR_UTIL -- utility of a dollar GAINED (money tarots) -- 
                          -- FRACTIONS) cannot drift away from it again -- they did,
                          -- by 1.5-3.2x, and only the pack side was wrong.
 SA.TYPICAL_JOKER_COST = 5 -- $ you expect to pay for a joker once a reroll surfaces one
-SA.FREE_SPEND_DISCOUNT = 0.4 -- purchasing-power cost charged for INTEREST-FREE dollars
+SA.FREE_SPEND_DISCOUNT = 0.4 -- purchasing-power cost charged for the FIRST INTEREST-FREE dollars
                           -- (overflow above the cap, or the partial bucket below a $5
                           -- boundary): they earn nothing, so they're the cheapest to
                           -- spend. <1 keeps a little opportunity cost (a freed dollar
                           -- could still buy something better next shop), not 0.
+SA.FREE_SPEND_DISCOUNT_MIN = 0.12 -- ...but a LARGE idle above-cap pile is increasingly dead money (earns
+                          -- nothing AND may not survive to be spent), so the option value decays toward
+                          -- this as the surplus grows -- holding $80 over a $25 cap wasted $55 (owner R5:
+                          -- "hoarding, nearly $80 in a shop ... died despite so much money").
+SA.FREE_SPEND_SCALE = 25  -- $ of above-cap surplus over which that option value decays (e^-1 per SCALE)
 SA.REROLL_DISCOUNT = 0.5  -- a reroll is speculative (one noisy roll) AND a fresh shop
                           -- comes FREE next round, so rerolling only buys the better
                           -- joker slightly earlier -- discount that marginal benefit
@@ -339,11 +344,24 @@ end
 -- full rate (plus the interest step from interest_penalty). Because `budget` is
 -- the shop-wide pool (not a per-buy partial bucket), a $6 then a $3 buy split the
 -- same free budget instead of each re-claiming a fresh discount.
+-- Option value of an idle above-cap dollar DECAYS as the pile grows: the first few dollars over the cap can
+-- be saved for a better future buy (full discount), but a large hoard earns nothing and may not survive to
+-- be spent, so treat it as increasingly dead money. Scales the free-dollar cost from FREE_SPEND_DISCOUNT
+-- toward FREE_SPEND_DISCOUNT_MIN by the size of the free budget. As the engine spends the hoard DOWN the
+-- budget shrinks and the discount rises back toward full -- so it converts the excess but protects the
+-- near-cap interest buffer.
+local function free_discount(budget)
+  budget = math.max(0, budget or 0)
+  return SA.FREE_SPEND_DISCOUNT_MIN
+    + (SA.FREE_SPEND_DISCOUNT - SA.FREE_SPEND_DISCOUNT_MIN) * math.exp(-budget / SA.FREE_SPEND_SCALE)
+end
+SA.free_discount = free_discount
+
 local function spend_power_cost(spend, budget)
   spend = math.max(0, spend)
   local free = math.min(spend, math.max(0, budget or 0))
   local working = spend - free
-  return (working + free * SA.FREE_SPEND_DISCOUNT) * SA.COST_WEIGHT
+  return (working + free * free_discount(budget)) * SA.COST_WEIGHT
 end
 
 -- SAVE is the "do nothing" baseline: value 0. Every other action is scored as a

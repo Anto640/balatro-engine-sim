@@ -30,7 +30,14 @@ local function keep_value(c, gs)
   if c.enhancement == "m_steel" or c.enhancement == "m_glass" then v = v + 40
   elseif c.enhancement == "m_gold" then v = v + 35      -- hold for $3 at round end
   elseif c.enhancement then v = v + 25 end
-  if c.seal == "Purple" then v = v + 3                   -- discarding it spawns a Tarot
+  if c.seal == "Purple" then
+    -- discarding a purple seal spawns a Tarot -- but ONLY if a consumable slot is free to hold it. With
+    -- FULL slots the Tarot overflows and is lost, so pitching the card for it gains nothing: treat it like
+    -- any other kept sealed card instead of throwing it for a Tarot that never lands (owner R5: "discarded
+    -- a purple seal despite full consumable slots").
+    local cons = (gs and #((gs.consumables) or {})) or 0
+    local cslots = (gs and gs.run and gs.run.consumable_slots) or 2
+    v = v + ((cons < cslots) and 3 or 15)
   elseif c.seal then v = v + 15 end                     -- keep Gold/Blue/Red sealed cards
   return v
 end
