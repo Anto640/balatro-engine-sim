@@ -1,4 +1,43 @@
-# NEXT_SESSION.md — fresh-session handoff (2026-09-02)
+# NEXT_SESSION.md — fresh-session handoff (2026-09-03)
+
+## ⭐ R5 LIVE-RUN REVIEW (2026-09-03) — 3 fixes shipped, the rest triaged
+Owner watched a run and reported ~10 issues. Outcomes:
+
+**✅ SHIPPED:**
+- **Purple seal discarded into full consumable slots** (`567c165`) — `discard_value.keep_value` now treats a
+  purple seal as pitchable (+3, for its Tarot) ONLY when a consumable slot is free; with full slots it's kept
+  like any sealed card (+15) so it isn't thrown for a Tarot that overflows. Corpus-neutral (no in-blind regression).
+- **Money hoarding** (`567c165`) — `FREE_SPEND_DISCOUNT` now DECAYS as the idle above-cap pile grows
+  (0.4→0.12 over $25 of surplus), so a large hoard converts to build while the near-cap interest buffer is
+  protected. **Corpus-neutral; baseline sim neutral/slight-neg (change barely fires — the poor sim engine
+  dies at ~$22); RICH10 POSITIVE on every metric (wins 13v11, reach-8 15v13, sign 15/9, progress +0.065, only
+  16 tied vs 34).** The operating-point signature (B3/level_gain) — neutral at baseline, converts at the rich
+  end the live overlay serves. ⚠ rich10-in-sample isn't a *proven* lever (B3-lesson), but mechanism-sound +
+  owner-reported + no baseline harm = defensible ship.
+- **Skip advisor missed the board's money jokers** (`6a7892b`) — added `Eval.econ_power` to the skip's
+  play-value, so a farming board (Business Card/Bloodstone/…) correctly prefers to PLAY not skip (owner:
+  skipped a Meteor pack forgoing Business-Card farming). Correctness (the play earns that money).
+
+**🔎 DIAGNOSED, not a bug / deferred:**
+- **Overlay "Jupiter/Earth" & "holo-8S/blue-seal" mismatches** — the live tick renders the CHEAP tier pass
+  (`main.lua:116`, `cheap = not with_sim`) then the background job refines to the MEASURED pick. The owner
+  read the transient cheap pick before it refined. Engine's actual pick is CORRECT — a display-latency
+  artifact. Fix is UX (mark provisional / prefer the cached measured pick); not done.
+- **Played 3 Kings incl. a DEBUFFED one, no dig with 3 discards** — the engine already scores a debuffed card
+  as 0 (`is_debuffed`), so it KNEW; playing to clear efficiently vs digging is the known build-commitment/dig
+  wall (a uniform dig bias was REFUTED by the corpus). Not a clean bug.
+
+**⛔ DEFERRED (harder — need modeling/measurement):**
+- **Skipped a Constellation (xmult_scaling) while rich** — an xmult scaler is under-valued at purchase
+  (fresh xmult ~1) and the engine doesn't connect "I'm rich → I'll use many planets → it scales fast."
+  Needs RESOURCE-AWARE scaler valuation.
+- **Kept an unscaled Castle while chip-flush** — Castle (discard-fed chip scaler) isn't in the measured-scaler
+  system, so it's tier×proj-valued (over-valued when unfed), and a chip-scaler's value should drop when MULT
+  (not chips) is the bottleneck. Add discard-fed scalers to the measured system + a chips-vs-mult-bottleneck
+  read.
+- **Build incoherence (held a Diamonds +mult without building Diamonds)** — the known CONVERSION wall (commit
+  to a suit + convert cards). The #1 unsolved winrate problem.
+- **Reluctant to use tarots (slows scaling)** — proactive consumable-use pacing; related to the conversion wall.
 
 ## ✅ FOUR UTILITY-JOKER MODELS shipped (2026-09-02) — beyond-tier follow-ups from the tier review
 Owner directed these off their flat tier priors, systematically:
