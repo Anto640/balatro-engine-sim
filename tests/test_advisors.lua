@@ -9,6 +9,7 @@ local CV = require("engine.consumable_value")
 local Packs = require("engine.packs")
 local PackOpen = require("engine.pack_open_advisor")
 local SA = require("engine.shop_advisor")
+local Mechanics = require("engine.mechanics")
 local GS = require("model.game_state")
 local Cards = require("util.cards")
 local card, joker = GS.card, GS.joker
@@ -999,5 +1000,58 @@ return function(t)
     -- ...and the ordering is untouched: still the hand the deck actually makes
     t.eq(rec.best.key, "c_mercury", "...and still prefers a hand the deck makes")
     t.eq(rec.ranked[3].key, "c_neptune", "...ranking Straight Flush (never made) last")
+  end
+
+  -- ---- ECTOPLASM: a contingent slot against a permanent cost (ADVICE_REVIEW R6) ----
+  -- Owner live-run report: the engine took Ectoplasm to put Negative on a joker it was
+  -- going to sell anyway. It fell through to a flat SPECTRAL_BASE prior of 0.7 with its
+  -- permanent -1 hand size charged at ZERO, so it read the SAME on every board.
+  do
+    local deck = {}
+    for _, s in ipairs({ "Spades", "Hearts", "Clubs", "Diamonds" }) do
+      for r = 2, 14 do deck[#deck + 1] = card{ id = #deck + 1, rank_id = r, suit = s } end
+    end
+    local function ecto_gs(jokers, ante)
+      return GS.new{ deck = deck, meta = { ante = ante or 3 }, jokers = jokers,
+        economy = { dollars = 10, interest_cap = 5 },
+        run = { hand_levels = {}, hand_size = 8, joker_slots = 5, consumable_slots = 2 } }
+    end
+    local JUNK = joker{ key = "j_joker" }            -- flat common: sellable, not a keeper
+    local CORE = joker{ key = "j_hanging_chad" }     -- retrigger: BP.CORE_KEEP
+    local function ecto(gs)
+      local need = Mechanics.boss_per_hand_need(gs)
+      return ({ CV.card_value(gs, "Spectral", "c_ectoplasm", nil, need, lcg(7), 8) })[1]
+    end
+
+    -- the measured -1 hand size price exists and is real money in boss-hand fractions
+    local hc = CV.hand_size_cost(ecto_gs({ JUNK }), Mechanics.boss_per_hand_need(ecto_gs({ JUNK })),
+      { rng = lcg(7), samples = 8 })
+    t.ok(hc and hc > 0, "a permanent -1 hand size is MEASURED off the deck, not free")
+    t.ok(CV.hand_size_cost(ecto_gs({ JUNK }), 100, {}) == nil,
+      "...and never samples without a seeded rng (that is what makes the live panel flicker)")
+
+    local none  = ecto(ecto_gs({}))
+    local junk  = ecto(ecto_gs({ JUNK, JUNK, JUNK }))
+    local mixed = ecto(ecto_gs({ JUNK, JUNK, CORE }))
+    local cores = ecto(ecto_gs({ CORE, CORE, CORE }))
+
+    -- THE REPORTED MISPLAY: a board of disposable commons must now DECLINE. The +1 slot
+    -- rides on a random joker and leaves when you sell it; the hand size never comes back.
+    t.ok(junk < 0, "R6: Ectoplasm onto a board of sellable commons is NEGATIVE (was a flat +0.7)")
+    -- with no joker at all the edition lands nowhere -- but you still pay the hand size
+    t.ok(none < 0, "R6: Ectoplasm with no joker does nothing and still costs hand size")
+    -- ...and it is genuinely board-sensitive now, not one constant for every state
+    t.ok(cores > mixed and mixed > junk,
+      "R6: Ectoplasm scales with how much of the board the plan intends to KEEP")
+    t.ok(cores > 0, "R6: ...and is still strongly positive on a board of keepers")
+
+    -- runway: the same core board is worth far less at ante 8, where a new slot has no
+    -- time to be filled while the hand-size loss is still charged in full.
+    t.ok(ecto(ecto_gs({ CORE, CORE, CORE }, 8)) < cores,
+      "R6: the slot is runway-aware (ante 8 << ante 3), which the flat prior could not see")
+
+    -- determinism: the branch samples the deck, so it must be stable under a seeded rng
+    t.eq(ecto(ecto_gs({ JUNK, CORE })), ecto(ecto_gs({ JUNK, CORE })),
+      "R6: Ectoplasm's value is deterministic under a seeded rng")
   end
 end

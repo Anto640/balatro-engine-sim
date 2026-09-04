@@ -128,6 +128,68 @@ function CV.hand_frequencies(gs, opts)
   return freq, ctx
 end
 
+-- MEASURED price of a PERMANENT -1 hand size (Ouija, Ectoplasm), in boss-hand fractions.
+--
+-- This used to be a bare 0.3 inside the Ouija branch, which was reverse-engineered to net
+-- Ouija to ~0 rather than derived -- and Ectoplasm, which inflicts the SAME downside, was
+-- charged nothing at all (ADVICE_REVIEW R6). Both are now priced the same way, and the way is
+-- the project's own convention: MEASURE it off the real deck instead of asserting a constant.
+--
+-- Method: paired sampling. Draw a hand, score `HandEval.best_play` at the current hand size and
+-- again at one card fewer FROM THE SAME SHUFFLE, and take the mean drop. Pairing is what makes
+-- this measurable at a handful of samples -- the two arms share the deal, so the deck's variance
+-- cancels and only the marginal card's contribution survives.
+--
+-- It is board- and deck-aware, which a constant cannot be: the same lost card costs more on a
+-- board with xmult to multiply it, for the same reason CV.level_gain needed board context.
+--
+-- ⚠ MEASURED DIRECTION, and it is the OPPOSITE of the intuition -- recorded because the first
+-- draft of this comment asserted the intuition and the probe refuted it (the CLAUDE.md rule:
+-- verify a value by measuring it, not by reading the diff). At ante 3 on a stock deck the cost
+-- measures 0.33 at hand size 8 but only 0.09 at hand size 5. Losing a card from an already-small
+-- hand costs LESS in absolute score, because a small hand makes weak hands to begin with and the
+-- marginal card has less to contribute. That is correct in this module's units (everything here
+-- is a fraction of a boss hand, an absolute quantity) even though the marginal card matters more
+-- to you strategically when you have few.
+-- ⚠ CONSEQUENCE / KNOWN LIMITATION: this does NOT make Ectoplasm's stacking penalty self-pricing.
+-- The real card costs -1 hand size on the first use, -2 on the second, and so on; this charges a
+-- marginal -1 every time, so repeated Ectoplasms are UNDER-charged. Inferring the use count from
+-- the current hand size was considered and rejected as too fragile -- Ouija also reduces it, and
+-- deck/voucher effects move the baseline, so the inference would misfire on exactly the decks
+-- that differ from the default.
+--
+-- Scaled by CV.level_scale: the loss is PERMANENT, so it recurs every hand of every remaining
+-- blind. That is the identical persistence argument the leveling channel already makes, so it
+-- uses the identical factor rather than a second, differently-fitted ramp.
+--
+-- Returns nil when it cannot measure (no deck, or no seeded rng). Callers MUST fall back to
+-- CV.HAND_SIZE_COST rather than sample with the global math.random: an advisor that samples off
+-- an unseeded stream makes the live panel flicker between ticks (CLAUDE.md, Determinism).
+CV.HAND_SIZE_COST = 0.3   -- un-measurable fallback; the historical Ouija constant
+function CV.hand_size_cost(gs, need, opts)
+  opts = opts or {}
+  local rng = opts.rng
+  if not rng then return nil end                     -- no seeded stream -> do NOT sample
+  local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
+  if not deck or #deck < CV.MIN_DECK then return nil end
+  local hs = math.min((gs.run and gs.run.hand_size) or 8, #deck)
+  if hs <= 1 then return nil end
+  local samples = mc(opts.samples or 6)
+  local drop = 0
+  for _ = 1, samples do
+    local s = shuffled(deck, rng)
+    local full, short = {}, {}
+    for i = 1, hs do full[i] = s[i] end
+    for i = 1, hs - 1 do short[i] = s[i] end         -- SAME deal, one card fewer
+    local a = HandEval.best_play(gs, full)
+    local b = HandEval.best_play(gs, short)
+    local sa = a and (a.chips or 0) * (a.mult or 0) or 0
+    local sb = b and (b.chips or 0) * (b.mult or 0) or 0
+    drop = drop + math.max(0, sa - sb)
+  end
+  return (drop / samples) / math.max(1, need or 1) * CV.level_scale(gs)
+end
+
 -- Score gained from leveling a hand by `levels`.
 --
 -- ⚠ THE UNIT ERROR THIS FIXES (2026-08-14). Without `ctx` this computes the delta in the
@@ -497,8 +559,59 @@ function CV.card_value(gs, set, key, freq, need, rng, samples, hand_ctx)
       -- converts ALL cards to one random rank (helps pairs/Flush House, KILLS straights)
       -- and PERMANENTLY costs -1 hand size -- a real ongoing downside. Charge it, so an
       -- Ouija isn't reflexively picked over a harmless spectral (the player's Ouija-vs-
-      -- Incantation case). Net ~0 -> situational, not auto-taken.
-      return (CV.SPECTRAL_BASE.c_ouija or 0.3) - 0.3, 0, "one rank, but -1 hand size (permanent)"
+      -- Incantation case). The charge is now MEASURED off the deck (CV.hand_size_cost)
+      -- instead of the flat 0.3 that was fitted to net this one card to ~0.
+      local hcost = CV.hand_size_cost(gs, need, { rng = rng, samples = samples }) or CV.HAND_SIZE_COST
+      return (CV.SPECTRAL_BASE.c_ouija or 0.3) - hcost, 0, "one rank, but -1 hand size (permanent)"
+    end
+    if key == "c_ectoplasm" then
+      -- Ectoplasm puts NEGATIVE on a RANDOM joker (+1 permanent joker slot) and PERMANENTLY
+      -- costs -1 hand size, stacking with every previous use.
+      --
+      -- It used to fall through to a flat SPECTRAL_BASE prior of 0.7 -- the third-highest
+      -- spectral, behind only The Soul and Black Hole -- with the downside charged at ZERO,
+      -- while the structurally identical Ouija branch directly above charged its identical
+      -- -1 hand size. The FACTS layer has always paid the cost (sim/world.lua reduces
+      -- hand_size), so the sim was being charged for a decision the engine priced blind.
+      -- Owner report, ADVICE_REVIEW R6. Three corrections, none of them a new constant:
+      --
+      -- 1. NO ELIGIBLE JOKER -> the edition lands nowhere and the card does nothing, but you
+      --    still eat the hand size. (Same shape as the Hex/Ankh n == 0 guard above, which came
+      --    from the same class of live misplay. A joker that is ALREADY negative cannot take
+      --    it either -- see the edition check in sim/world.lua.)
+      -- 2. The slot is priced by the engine's OWN calibrated slot model, Eval.negative_slot_fv
+      --    (board- and runway-aware), not by a flat prior. That model knows a slot is worth
+      --    little at ante 8 and most when the board is full -- neither of which 0.7 could see.
+      -- 3. ⭐ THE SLOT IS CONTINGENT, WHICH IS THE OWNER'S ACTUAL POINT. negative_slot_fv prices
+      --    a PERMANENT slot -- what Antimatter or a Negative joker you chose to buy gives you.
+      --    Ectoplasm's slot rides on a RANDOM joker and leaves the moment you sell it. So the
+      --    benefit is sellable while the cost never is, and the credit is scaled by how much of
+      --    the board the plan actually intends to KEEP -- BP.keep_bias >= BP.CORE_KEEP, the
+      --    codebase's own keeper predicate, which is already commitment-aware (an on-plan joker
+      --    counts as a keeper even if it is a plain common). A board of disposable commons
+      --    therefore reads ZERO benefit against a permanent cost -- "took Ectoplasm on a joker
+      --    which is pointless" -- while a board of cores reads full.
+      --    ⚠ The graded alternative (crediting each joker kb/CORE_KEEP) was written first and
+      --    REJECTED on measurement: it pays a flat common SCORER_KEEP/CORE_KEEP = 48%, which left
+      --    a board of three junk commons at +0.97 -- ABOVE the flat 0.7 this fix replaces, i.e.
+      --    it would have made the reported misplay MORE likely, not less.
+      local Eval = require("engine.eval_function")   -- lazy: eval_function requires US at load time
+      local hcost = CV.hand_size_cost(gs, need, { rng = rng, samples = samples }) or CV.HAND_SIZE_COST
+      local eligible, stick = 0, 0
+      for _, j in ipairs(gs.jokers or {}) do
+        if j.edition ~= "negative" then
+          eligible = eligible + 1
+          if (BuildPlan.keep_bias(j.key, gs) or 0) >= BuildPlan.CORE_KEEP then stick = stick + 1 end
+        end
+      end
+      if eligible == 0 then
+        return -hcost, 0, "no joker can take Negative — pure -1 hand size (permanent)"
+      end
+      local slot = Eval.negative_slot_fv(gs) * (stick / eligible)
+      local note = (stick > 0)
+        and "Negative on a random joker (+1 slot) at a permanent -1 hand size"
+        or "-1 hand size (permanent) for a slot on a joker you'd sell — the slot goes with it"
+      return slot - hcost, 0, note
     end
     return CV.SPECTRAL_BASE[key] or 0.3, 0, "spectral"
   end
