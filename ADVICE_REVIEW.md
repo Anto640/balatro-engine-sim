@@ -279,6 +279,82 @@ project has. They want scoping and a paired A/B, not a quick edit. Riff-Raff's s
 
 ---
 
+## ⭐ R8 — THE DEATH, RECONSTRUCTED FROM TELEMETRY (seed 6EDJFT2Y, ante 4): selling the only Mult
+
+> Owner: *"it also sold Greedy despite having no other plus mult other than levels, which lost it the game,
+> just for a To Do List — despite having a Riff-Raff which wasn't doing anything and already having econ from
+> interest and Business Card."*
+>
+> **This one is fully evidenced.** The run is in `bes_runs.jsonl` and the exact shop state is in
+> `bes_fixtures.jsonl`, so the decision was **replayed through the current engine** rather than guessed at.
+> Every number below is measured, not inferred. It is the first live death this project has traced end to end
+> from board state → valuation → the specific line of code that produced it.
+
+**The run, from telemetry:**
+
+| t | event | board after |
+|---|---|---|
+| 90.8 | buy **Greedy Joker** | Hit the Road, Greedy |
+| 156–210 | buy Hanging Chad, Ice Cream | + Chad, Ice Cream |
+| 365.1 | **Business Card** from a pack | **5/5 — board now FULL** |
+| 501.5 | sell Ice Cream *(decaying — defensible)* | 4/5 |
+| 507.4 | **buy Riff-Raff ($6) into the last slot** | **5/5 — Riff-Raff can now never spawn** |
+| 730.6 | **sell GREEDY** → buy To Do List ($4, holding $42) | Hit the Road, Chad, Business, Riff-Raff, To Do |
+| 903.0 | **DEATH**, ante-4 Boss | — |
+
+**The death record:** target **10,000**, scored **2,149** — **21.5%** of the requirement — holding **$52**
+with `hand_level_sum` **5**. ⚠ Note the exact echo of the project's canonical loss (CLAUDE.md: *"X3L32ZEA
+died at ante 5 holding $52 — more than most of the wins had"*). **Same $52. Conversion, not resources.**
+Of the five jokers on the death board, **three score nothing at all** (Business Card, Riff-Raff, To Do List),
+and there are **zero `joker_gain` records after t=507** — Riff-Raff, bought for $6, produced **nothing for
+the rest of the run**, exactly as R7 predicted.
+
+**⭐ THE REPLAY — the engine re-run on the real state (`$44`, board and shop as recorded):**
+
+| # | joker | cat | **marginal** | `keep_bias` | `funder_is_live` |
+|---|---|---|---|---|---|
+| 1 | Hit the Road | xmult_scaling | 9.450 | 2.5 | false |
+| 2 | **Greedy Joker** | flat_mult | **1.800 — lowest** | 1.2 | **false → SELLABLE** |
+| 3 | Hanging Chad | retrigger | 4.050 | 2.5 | false |
+| 4 | Business Card | economy | 3.881 | **0.0** | **true → PROTECTED** |
+| 5 | **Riff-Raff** | card_generation | **3.000** | **0.0** | **true → PROTECTED** |
+
+The engine's top sell candidate is **`SELL_JOKER Greedy Joker`** — the reported misplay, reproduced exactly
+from the recorded state. Three separate defects compose to produce it:
+
+1. 🔧 **Riff-Raff's marginal reads 3.000 on a FULL board** — 67% more than the only Mult source — although
+   its output is structurally impossible. This is R7's slot-blindness appearing in the *marginal*, not just
+   the buy price, so it is not merely a shop-time mistake: the dead joker keeps a standing credit forever.
+2. 🔧 **⭐ `keep_bias` and `funder_is_live` give OPPOSITE verdicts, and the protective one wins.**
+   `keep_bias` scores Riff-Raff **0.0** — it knows perfectly well the joker is not worth keeping. But
+   `funder_is_live` (`shop_advisor.lua:481`, added 2026-09-01 for **Vagabond**) protects *any*
+   `cat == "card_generation"` joker from being a funder, on the rationale that *"it holds its value in its
+   OUTPUT"*. **Riff-Raff is not Vagabond**: Vagabond makes CONSUMABLES (consumable slot), Riff-Raff makes
+   JOKERS (joker slot). On a full joker board there IS no output, so the rationale is void — yet the
+   protection fires, and the two subsystems never consult each other.
+   ⇒ **The surgical fix: the `card_generation` clause must require that the generator can actually produce**
+   — a free joker slot for a joker-maker — exactly the gate `generators.lua:41` already applies on the
+   play path. That single condition removes Riff-Raff from the protected set and restores the correct funder.
+3. 🔧 **Nothing notices the sale leaves the board with no unconditional Mult.** Greedy is `flat_mult` →
+   `keep_bias` **1.2** (`SCORER_KEEP`), not `CORE_KEEP`, and `funder_is_live` **deliberately** excludes plain
+   scorers (its comment: re-protecting them *"broadened the gate to every joker and dented the sim"*). The
+   remaining board reads strong by marginals — Hit the Road 9.450 — but Hit the Road is **conditional and
+   resets every round** (xMult per Jack *discarded this round*) and Hanging Chad is a **retrigger**, which
+   multiplies nothing by itself; it needs something worth retriggering. Sum-of-marginals cannot see that.
+   ⇒ this is the project's #1 open research problem in miniature (CLAUDE.md §31f: **score the board as a
+   SET — copiers × xmult × triggers as a PRODUCT**). Mult is a FACTOR: dropping the last one does not cost
+   its marginal, it collapses the product. **A live death now demonstrates it concretely.**
+4. ❓ **Money was never the constraint — the SLOT was.** To Do List cost **$4** against **$42** held, and it
+   died on **$52**. Both ante-4 purchases (Riff-Raff $6, To Do List $4) were non-scoring, bought onto a board
+   that already had Business Card plus interest at cap. The owner's *"already having econ"* is exactly right,
+   and it is the same conversion failure as the canonical loss run.
+
+**⇒ RANKED next actions.** (2) is surgical, mechanically justified, and directly caused this death — ship it
+first. (1) follows from R7 and is the same root cause seen from the sell side. (3) is the research problem
+and must not be attempted as a magnitude tweak.
+
+---
+
 ## 1. In-blind play & digging (the play engine)
 
 - 🔧 **[R1] Didn't discard a dead low card in a marginal draw.** Opening hand held a 4-diamond flush draw
