@@ -11,12 +11,37 @@ Despite the historical filename, this guide applies equally to Codex and other c
 action, and overlays a ranked "best move" with a reason. Roadmap M1–M4 is complete
 plus a large correctness/coverage/strategy pass.
 
+> ### ⭐⭐ THE SHARPEST DIAGNOSTIC THIS PROJECT HAS (2026-09-04, `ADVICE_REVIEW.md` R8) — USE IT FIRST.
+> **A live misplay can now be traced from board state → valuation → the exact line of code, because the mod
+> records both the run and the DECISION STATE.** The loop, in four steps:
+> 1. owner reports a misplay → find the run in **`bes_runs.jsonl`** (in the LÖVE save folder, `%APPDATA%/Balatro/`)
+>    — `joker_gain`/`joker_loss`/`death` records give the board over time and the death stats;
+> 2. pull the matching decision from **`bes_fixtures.jsonl`**, which stores the FULL `gs` at every shop/pack
+>    decision (`core/replay_fixture.lua` writes it);
+> 3. **replay that `gs` through the current engine** (`SA.recommend(gs, {})`, `Eval.joker_marginal_fv`, …) and
+>    watch it reproduce the misplay on the real state;
+> 4. fix, and re-replay the same fixture to prove the advice changed.
+>
+> R8 used exactly this to convert *"it sold Greedy for a To Do List"* into two located defects and a verified
+> fix in one session. **It beats reasoning from a synthetic board, which is how the same session's first
+> attempt at that diagnosis went wrong** — a hand-built reconstruction picked a different funder and its
+> "only Mult" measurement was invalid because the sampled hand contained no Diamonds at all. **Replay the
+> recorded state; do not rebuild it from the description.**
+>
 > ### ⭐ CURRENT FOCUS (2026-08-31): ADVICE QUALITY, driven by the IN-GAME SELF-PLAYER + owner review + the AGREEMENT A/B.
 > **The in-game self-player** (`ui/autoplay.lua`, **F11**) translates the engine's live advice into REAL
 > Balatro inputs and plays whole runs unattended — a real-game bug-finder for the overlay. The owner watches
 > its runs and reports misplays; I fix them and, for economy/valuation changes, **MEASURE on the frozen 7-win
 > agreement corpus** (`tools/agreement_run.sh`) before keeping — the durable, non-ceilinged ruler. **Read
-> `NEXT_SESSION.md` top block FIRST** (2026-09-01 ACTIVE THREAD: the MEASURED-SCALER VALUATION — owner
+> `NEXT_SESSION.md` top block FIRST** (**2026-09-04 ACTIVE THREAD: R6–R8 owner review.** SHIPPED: Ectoplasm
+> priced properly + `CV.hand_size_cost` measured and shared with Ouija (`175b5c4`); a generator with nowhere
+> to put its output is no longer "live" — the two defects behind the R8 death (`b21aa57`). OPEN, ranked, in
+> `ADVICE_REVIEW.md` R7/R8: **the PLAY CHOOSER is order-blind** (`ordering.lua` is correct and wired, but it
+> runs AFTER `best_play` has picked, and `best_play` compares subsets in DEALT order — cost a clearing 748 to
+> take a 350); **Business Card is invisible to the in-blind money model** (`VALUE_ONLY`, so the tier-2
+> "both clear → maximise money" tie-break reads $0 either way); autoplay never reorders CARDS; **no guard on
+> selling the board's last unconditional Mult** (= §31f board-as-a-SET, now with a live death behind it);
+> and **12 of 18 spectrals are still flat priors**. Earlier 2026-09-01: the MEASURED-SCALER VALUATION — owner
 > directive that TIERS are a legacy fallback, so measure scalers + drop the tier floor; resetting (Ride the
 > Bus) + accumulating joker-counter scalers done + owner-calibrated, HIKER's deck-buff valuation + a SIM A/B
 > are the open "proceed" work. Earlier 2026-08-31: in-blind play fixes + Hologram feed + the econ floor).
@@ -59,8 +84,13 @@ thing **headless-testable**. See the Layout section in `README.md` for the per-f
 - **Tool index:** `tools/README.md` — 31 analysis tools grouped by the QUESTION each answers.
   Read it before writing a new one; most read existing telemetry and cost nothing to run.
 - **Tests (do this after every change):** `lua tests/runner.lua` (run via the Bash
-  tool). Lua 5.1+/LuaJIT, no `love`/`G`/Steamodded needed. Currently **1017 pass** (+ 524 sim).
+  tool). Lua 5.1+/LuaJIT, no `love`/`G`/Steamodded needed. Currently **1156 pass** (+ 604 sim).
   Failures print `FAIL  <case>  (got X, want Y)`; exit code is non-zero on failure.
+  ⚠ **Two known, pre-existing conditions — don't mistake either for a regression you caused:**
+  (1) the sim suite has **one** standing failure, `test_world` *"no overflow on a full disposable board"*
+  (verified on clean HEAD in a scratch worktree, 2026-09-04); (2) `tests/test_shop.lua` calls
+  `table.unpack` (~line 1048), which is **nil under LuaJIT**, so that suite aborts there if you run it
+  standalone with `luajit`. It is fine under `lua tests/runner.lua`, which is how it is meant to run.
 - **Phase-1 simulator suites are SEPARATE** (they drive the real engine per hand and
   take minutes): `luajit tests/runner_sim.lua` (`test_world`, `test_driver`, `test_consumables`, `test_content_rates`, …). `luajit`
   is installed and ~2.5x faster — prefer it for anything that runs the `sim/` forward
@@ -627,6 +657,16 @@ expect sd ~1.9 (MDE ~0.42 at n=160) for anything touching the shop loop.
   free slot. Value it by how much output actually lands (`pack_open_advisor` `gen_fit`),
   and advise making room — *use* a held consumable or *sell* a joker — rather than blindly
   recommending it. Same idea funds a buy you're short on (`SA` `SELL_TO_BUY`).
+  ⭐ **This applies to generator JOKERS too, and forgetting it cost a run** (`ADVICE_REVIEW.md` R8).
+  `Generators.output_fit` / `has_output_room` are the shared helpers — use them, don't re-derive the
+  slot check. Three call sites now share them (blind-select, `SA.funder_is_live`, and BOTH tier-prior
+  paths: `Eval.jp_from_measure` **and** the independent `shop_advisor.scoring_gain` prior — patching
+  only one leaves the other flat, which is exactly what happened first).
+  ⚠ The joker/consumable split is **not** cosmetic: a **consumable** slot frees up as you use it, so a
+  full tray is a TRANSIENT blockage and must NOT unprotect a consumable-maker (that would re-open the
+  Vagabond churn the 2026-09-01 `funder_is_live` clause closed). A **joker** slot is scarce and sticky,
+  so a full board is STRUCTURAL. `joker_data` already encodes the split: every `card_generation` joker
+  carries the `"consumable"` tag **except `j_riff_raff`**, the one that makes jokers.
 - **Tarot targets = your DRAWN hand, not the deck.** A card-tarot applies to cards you
   select from `gs.hand` (drawn). Naming a `gs.deck` card you haven't drawn is a bug
   (`Tarot.target_note`): name from an explicit pool or `gs.hand`, else give a strategy

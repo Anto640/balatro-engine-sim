@@ -1,4 +1,93 @@
-# NEXT_SESSION.md — fresh-session handoff (2026-09-03)
+# NEXT_SESSION.md — fresh-session handoff (2026-09-04)
+
+## ⭐⭐ R6–R8 LIVE-RUN REVIEW (2026-09-04) — 3 fixes shipped, and the FIRST death traced end to end
+
+> **Read `ADVICE_REVIEW.md` R6/R7/R8 for the full detail.** The headline is methodological: R8 is the first
+> time this project has traced a live death from **board state → valuation → the specific line of code**,
+> by finding the run in `bes_runs.jsonl` and **replaying the exact shop state from `bes_fixtures.jsonl`**.
+> That loop — owner reports a misplay, find the seed, replay the fixture, watch the engine reproduce it —
+> is now the sharpest diagnostic this project has, and it is repeatable. **Use it before theorising.**
+
+**✅ SHIPPED THIS SESSION:**
+- **Ectoplasm priced properly** (`175b5c4`) — it fell through to a flat `SPECTRAL_BASE` prior of **0.7** (3rd
+  highest spectral) with its permanent −1 hand size charged at **zero**, while the structurally identical
+  Ouija branch directly above it did charge one. Now: no-eligible-joker guard; the +1 slot priced by the
+  existing board/runway-aware `Eval.negative_slot_fv`; and the credit scaled by how much of the board
+  `BP.keep_bias` calls a keeper — because the slot rides on a RANDOM joker and leaves when you sell it, while
+  the hand size never comes back. Ante 3, stock deck: **0 jokers −0.130 · 3 junk commons −0.466 · 2 commons +
+  1 core +0.634 · 3 cores +2.808 · 3 cores at ante 8 +0.498 · 5 cores full board ante 2 +5.366** (all were a
+  flat 0.700). New `CV.hand_size_cost` MEASURES the −1 hand size off the real deck by paired sampling, and
+  **Ouija now uses it too**, so both cards inflicting that downside are charged the same way.
+- **A generator with nowhere to put its output is not "live"** (`b21aa57`) — the two defects behind the R8
+  death, below.
+
+**⭐ R8, THE DEATH (seed 6EDJFT2Y, ante 4).** Board full → bought **Riff-Raff into the last joker slot** (it
+spawned **zero** jokers for the rest of the run) → later needed a slot for a To Do List and **sold Greedy
+Joker, the board's only unconditional Mult** → died at the ante-4 boss on **21.5% of the requirement holding
+$52** (the same $52 as the canonical X3L32ZEA loss). Three of the five jokers on the death board score
+nothing. Replaying the recorded state reproduced the misplay exactly, and **two composing defects are now
+fixed**:
+- 🔧 **`funder_is_live` protected a generator that could not generate.** The `card_generation` clause (added
+  2026-09-01 for **Vagabond**) shields a joker whose "value is in its OUTPUT" — but with no room there IS no
+  output. The fix is deliberately **asymmetric**: consumable-makers keep their UNCONDITIONAL protection (a
+  consumable slot frees up as you use it, so a full tray is transient and gating it would re-open the very
+  churn the 09-01 fix closed — that path is byte-identical), while the joker-maker is gated on a free joker
+  slot. Riff-Raff is the only `card_generation` joker without the `"consumable"` tag, so **exactly one key**
+  changes behaviour, in exactly the state where it provably produces nothing.
+- 🔧 **The tier prior assumed the output lands.** Fix 2 alone does NOT change the outcome — Riff-Raff's
+  marginal was **3.000** (a pure tier prior, 6 × 0.5) against Greedy's **1.800**, so unprotecting it still
+  left the Mult as the cheapest sale. Both prior paths — sell-side `Eval.jp_from_measure` and the
+  **independent** buy-side prior in `shop_advisor.scoring_gain` — are now scaled by `Generators.output_fit`.
+  **No new constant:** it reuses `pack_open_advisor`'s existing `gen_fit` convention and its `room_credit`
+  reading (Judgement is 0.1 there because "a RANDOM joker rarely beats what you sacrifice"; Riff-Raff makes
+  2 random **Commons**, strictly weaker, so it takes the same 0.1).
+  Result: marginal **3.000 → 0.300**, advice **SELL Greedy → SELL Riff-Raff**; buy value was **7.5233 on
+  every board size**, now 7.02 / 7.02 / 2.43 / **−2.16** as the slots after purchase go 3 / 2 / 1 / 0.
+
+**⏳ OPEN, ranked — the two biggest are in R7 and both touch `hand_eval`'s hot path:**
+1. **⭐ THE PLAY CHOOSER IS ORDER-BLIND.** `engine/ordering.lua` is complete and correct — it permutes card
+   AND joker order, is wired into `decision_engine:479`, and the overlay renders a gold "Reorder:" line. But
+   `Ordering.optimize` runs on the play `best_play` has **already chosen**, and `best_play` compares subsets
+   **in dealt order**. Owner's Greedy + Hanging Chad hand: Two Pair scores **340 dealt / 748 with the Diamond
+   led**, High Card scores 350 → it took the **High Card**, and the blind needed **400**. The reordered Two
+   Pair clears; the chosen play does not, and being a 1-card play there is nothing left to permute. The fix
+   belongs in the CHOOSER, not in `ordering.lua`.
+2. **Business Card is invisible to the in-blind money model** — `j_business` is in `joker_effects.VALUE_ONLY`,
+   so a 4-face-card Two Pair and a 1-card non-face High Card both read **$0.00**. That defeats
+   `best_play_target`'s tier-2 "both clear, so maximise MONEY" tie-break, which is precisely when it matters.
+   Note the gap: R5 taught the SKIP advisor about Business Card and `DE.DIG_FOR_MONEY` handles Faceless (the
+   DISCARD channel) — the **PLAY** channel, Business Card's actual trigger, was never taught.
+3. **The self-player never reorders CARDS** — `ui/autoplay.lua` has a joker-reorder phase; `card_order`
+   appears **zero times**. Also a human-path UX gap: card order is HAND order, so the tip means "drag these
+   left before playing", which the overlay line does not say.
+4. **⚠ Nothing notices a sale leaves the board with no unconditional Mult** (R8 defect 3, NOT fixed). Greedy
+   is `flat_mult` → `SCORER_KEEP`, and plain scorers are *deliberately* unprotected. The rest of that board
+   read strong by marginals (Hit the Road 9.450) but Hit the Road is conditional and **resets every round**
+   and Hanging Chad is a retrigger that multiplies nothing by itself. **This is §31f's board-as-a-SET problem
+   in miniature — Mult is a FACTOR, so dropping the last one collapses the product rather than costing its
+   marginal — and there is now a concrete live death behind it. Do NOT attempt it as a magnitude tweak.**
+5. **The spectral valuation layer is mostly priors: 12 of 18 unmodelled.** Tier 1 (machinery already exists,
+   this is wiring): **Black Hole** is fully measured by `Packs.black_hole_value` but only on the pack-pool
+   path — `card_value` returns a flat 0.9 and `decision_engine`'s use-table a flat 0.5, three prices for one
+   card; **the four SEAL spectrals** (Talisman/Deja Vu/Trance/Medium) all read a flat **0.2** so the engine
+   cannot tell them apart, while `CV.card_econ_value` already prices all four seals deck-aware; **Sigil** is
+   flat 0.3 with no flush-plan awareness though `CV.suit_tarot_value` does exactly that job. Tier 2 (real
+   modelling): Soul, and the destroy-and-add group Aura/Cryptid/Familiar/Grim/Incantation.
+
+**🛑 A PROCESS LESSON THAT PAID FOR ITSELF TWICE THIS SESSION** — CLAUDE.md's *"verify by MEASURING, not by
+reading the diff"*. On Ectoplasm, the first draft's comment asserted the hand-size cost was **convex** in hand
+size; the probe refuted it (0.33 at hand size 8, **0.09** at 5 — a smaller hand makes weaker hands, so the
+marginal card contributes less), which also means stacking Ectoplasms are under-charged (recorded in-code).
+And the first `stick` formula credited each joker `keep_bias / CORE_KEEP`, paying a flat common **48%** and
+leaving three junk commons at **+0.97 — ABOVE the 0.7 being replaced**: as first written, the fix would have
+made the reported misplay MORE likely. **Both were caught only by running the numbers.**
+
+⚠ **Test-suite note:** `tests/test_shop.lua` uses `table.unpack` (~line 1048), which is nil under **LuaJIT**
+— the suite aborts there if run with `luajit`. It is fine under `lua tests/runner.lua`, which is how the
+headless suite is meant to run. Pre-existing, unrelated to this session's changes, but it will bite anyone
+running that one suite standalone under luajit.
+
+---
 
 ## ⭐ R5 LIVE-RUN REVIEW (2026-09-03) — 3 fixes shipped, the rest triaged
 Owner watched a run and reported ~10 issues. Outcomes:

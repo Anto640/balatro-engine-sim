@@ -353,6 +353,41 @@ from the recorded state. Three separate defects compose to produce it:
 first. (1) follows from R7 and is the same root cause seen from the sell side. (3) is the research problem
 and must not be attempted as a magnitude tweak.
 
+### ✅ (1) AND (2) SHIPPED + DEPLOYED (`b21aa57`) — verified against the recorded state
+
+**(2) `funder_is_live` no longer protects a generator that cannot generate.** The gate is deliberately
+**asymmetric**, and that asymmetry is the whole fix: a **consumable** slot frees up as you use it, so a full
+tray is a TRANSIENT blockage and gating it would re-open the very Vagabond churn the 2026-09-01 clause was
+written to close — so consumable-makers keep their **unconditional** protection and that path is
+byte-identical to before. A **joker** slot is scarce and sticky, so a full board is STRUCTURAL. Riff-Raff is
+the only `card_generation` joker without the `"consumable"` tag, so **exactly one key** changes behaviour.
+
+**(1) The tier prior no longer assumes the output lands.** ⚠ Note (2) alone would NOT have fixed the misplay
+— unprotecting Riff-Raff still left it at **3.000** against Greedy's **1.800**, so the Mult was still the
+cheapest thing to sell. Both prior paths are now scaled by `Generators.output_fit`: the sell-side one in
+`Eval.jp_from_measure` **and the independent buy-side prior in `shop_advisor.scoring_gain`** (a separate
+`tier × 0.3`, which is why patching only the first left the buy value flat — caught by measuring, not by
+reading the diff). **No new constant**: `output_fit` reuses `pack_open_advisor`'s existing `gen_fit` and its
+`room_credit` reading — Judgement is 0.1 there because *"a RANDOM joker rarely [beats what you sacrifice]"*,
+and Riff-Raff makes 2 random **Commons**, strictly weaker, so it takes the same 0.1.
+
+**Replayed on the real R8 state** (`bes_fixtures.jsonl`, board 5/5, $44):
+
+| | before | after |
+|---|---|---|
+| Riff-Raff marginal | 3.000 (protected) | **0.300 (sellable)** |
+| Greedy marginal | 1.800 (sellable) | 1.800 — unchanged |
+| **engine advice** | **`SELL Greedy Joker`** | **`SELL Riff-raff` — "frees a slot for To Do List"** |
+
+Buy side, previously **7.5233 on every board size**: 3 slots free after buying **7.0233** · 2 free 7.0233 ·
+1 free **2.4333** · 0 free **−2.1567** (declined outright). The three places that ask *"can this generator
+produce"* — the blind-select gates, the funder gate and the valuation prior — now route through one shared
+helper so they cannot drift apart again.
+
+**Still open from R8: defect (3), the missing board-composition guard.** Unchanged and deliberately so — it
+is the board-as-a-SET research problem, not a magnitude tweak. Tests 1149 → **1156**; sim **604/1**, the one
+failure being the pre-existing `test_world` overflow case verified unchanged on clean HEAD.
+
 ---
 
 ## 1. In-blind play & digging (the play engine)
