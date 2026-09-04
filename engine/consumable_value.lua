@@ -492,6 +492,96 @@ function CV.sigil_value(gs, need, opts)
   return math.max(0, with - base) / need * 0.8   -- x0.8: the suit is RANDOM, not chosen
 end
 
+-- ===== TIER 2 spectrals (real modelling, not just wiring): Soul, Cryptid, Aura, and the destroy-and-add
+-- group Familiar/Grim/Incantation. All were flat SPECTRAL_BASE priors. =====================================
+
+-- SOUL: a random LEGENDARY joker. Valued deck-aware by the same pool measurement the skip-tags use
+-- (Packs.expected_joker_of_rarity, which floors a conditional legendary like Triboulet by its tier so it
+-- doesn't read 0 on a weak board). A legendary needs a slot -- you would sell a weak joker to land one, so a
+-- full board is a modest haircut, not zero. Was a flat 1.2.
+function CV.soul_value(gs, need, opts)
+  opts = opts or {}
+  local ok, Packs = pcall(require, "engine.packs")
+  if not ok or not Packs.expected_joker_of_rarity then return CV.SPECTRAL_BASE.c_soul or 1.2 end
+  local v = Packs.expected_joker_of_rarity(gs, "Legendary", opts)
+  if not v then return CV.SPECTRAL_BASE.c_soul or 1.2 end
+  local slots = (gs.run and gs.run.joker_slots) or 5
+  local free = slots - #(gs.jokers or {})
+  return v * (free >= 1 and 1 or 0.7)
+end
+
+-- The deck card most worth DUPLICATING (Cryptid makes 2 copies of a selected card): prefer editions /
+-- enhancements / seals, else the highest rank. Returns a distinct-id COPY so a measurement adds a duplicate.
+local function best_copy_card(deck)
+  local best, bestq
+  for _, c in ipairs(deck) do
+    if not Cards.is_stone(c) then
+      local q = 0
+      if c.edition == "polychrome" then q = q + 5 elseif c.edition then q = q + 3 end
+      if c.enhancement == "m_glass" then q = q + 4 elseif c.enhancement == "m_steel" then q = q + 3
+      elseif c.enhancement then q = q + 1 end
+      if c.seal then q = q + 1 end
+      q = q + (Cards.chips(c) or 0) / 100
+      if not bestq or q > bestq then bestq = q; best = c end
+    end
+  end
+  if not best then return nil end
+  local copy = {}; for k, v in pairs(best) do copy[k] = v end; copy.id = -913
+  return copy
+end
+
+-- CRYPTID: 2 copies of a selected card -> duplicate your best card twice (like DNA). Measured via
+-- card_add_value, but FLOORED at a reduced fraction of the prior exactly as DNA/Marble are (deck-copy value
+-- is dilution-dominated in a single-snapshot measurement -- card_add_value sees only the immediate bloat and
+-- misses that the copies COMPOUND as the build thins/focuses later; the floor is that option value). One-shot
+-- 2-copy, so floored below DNA's ongoing copies. Was a flat 0.4.
+CV.CRYPTID_FLOOR = 0.2
+function CV.cryptid_value(gs, need, opts)
+  opts = opts or {}
+  local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
+  if not deck or #deck < CV.MIN_DECK then return CV.SPECTRAL_BASE.c_cryptid or 0.4 end
+  local best = best_copy_card(deck)
+  if not best then return CV.SPECTRAL_BASE.c_cryptid or 0.4 end
+  local cav = CV.card_add_value(gs, best, { need = need, samples = opts.samples, rng = opts.rng }) or 0
+  return math.max(math.max(0, cav) * 2, CV.CRYPTID_FLOOR)
+end
+
+-- AURA: a random edition (foil/holo/poly) on one card in hand. Like the Red seal, the value is the edition on
+-- the card you'd deliberately pick and build around -- which a greedy single-card measurement can't see (it
+-- editions a card the sampler rarely scores and reads ~0, verified). So estimate it deck-aware as a fraction
+-- of the per-hand score (mostly foil/holo, polychrome rare), bounded. Was a flat 0.35. Owner-tunable AURA_FRAC.
+CV.AURA_FRAC = 0.10
+function CV.aura_value(gs, need, opts)
+  opts = opts or {}
+  need = (need and need > 0) and need or 1
+  local base = JokerValue.avg_score(gs, { samples = mc(opts.samples or 6), rng = opts.rng })
+  if not base then return CV.AURA_FRAC * 0.3 end
+  return math.min(0.30, CV.AURA_FRAC * base / need)
+end
+
+-- DESTROY-AND-ADD group: destroy 1 random card, add N random ENHANCED cards of a rank class. Net value = N x
+-- (value of adding one representative enhanced card of that class, MEASURED deck-aware -- card_add_value
+-- already prices the deck-bloat dilution) minus the destroyed card, which is RANDOM so it is ~a wash / mild
+-- thinning and left uncharged. m_bonus (+30 chips) is a neutral stand-in for the random enhancement. Was a
+-- flat 0.25 each.
+local ADD_SPECTRAL_SPEC = {
+  c_familiar    = { n = 3, ranks = { 11, 12, 13 } },                 -- 3 enhanced FACE cards
+  c_grim        = { n = 2, ranks = { 14 } },                        -- 2 enhanced ACES
+  c_incantation = { n = 4, ranks = { 2, 3, 4, 5, 6, 7, 8, 9, 10 } }, -- 4 enhanced NUMBERED cards
+}
+function CV.add_spectral_value(gs, key, need, opts)
+  opts = opts or {}
+  local spec = ADD_SPECTRAL_SPEC[key]; if not spec then return nil end
+  need = (need and need > 0) and need or 1
+  local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
+  if not deck or #deck < CV.MIN_DECK then return CV.SPECTRAL_BASE[key] or 0.25 end
+  local base = CV.deck_baseline(gs, { samples = mc(opts.samples or 8), rng = opts.rng })
+  local rank = spec.ranks[math.floor(#spec.ranks / 2) + 1]
+  local addc = { id = -20, rank_id = rank, suit = "Hearts", enhancement = "m_bonus" }
+  local per = CV.card_add_value(gs, addc, { need = need, base = base, samples = opts.samples, rng = opts.rng }) or 0
+  return math.max(0, per) * spec.n
+end
+
 -- Value a single consumable card. Returns (vfrac, gain_dollars, note):
 --   vfrac        scoring value as a fraction of a boss hand
 --   gain_dollars immediate money it produces (money tarots) -- valued by the
@@ -690,6 +780,19 @@ function CV.card_value(gs, set, key, freq, need, rng, samples, hand_ctx)
     end
     if key == "c_sigil" then
       return CV.sigil_value(gs, need, { rng = rng, samples = samples }), 0, "converts ~a hand to one suit (flush enabler)"
+    end
+    if key == "c_soul" then
+      return CV.soul_value(gs, need, { rng = rng, samples = samples }), 0, "creates a random Legendary joker"
+    end
+    if key == "c_cryptid" then
+      return CV.cryptid_value(gs, need, { rng = rng, samples = samples }), 0, "2 copies of your best card"
+    end
+    if key == "c_aura" then
+      return CV.aura_value(gs, need, { rng = rng, samples = samples }), 0, "a random edition on your best card"
+    end
+    if ADD_SPECTRAL_SPEC[key] then
+      local v = CV.add_spectral_value(gs, key, need, { rng = rng, samples = samples })
+      return v, 0, "destroy 1 card, add enhanced cards"
     end
     return CV.SPECTRAL_BASE[key] or 0.3, 0, "spectral"
   end

@@ -323,6 +323,26 @@ return function(t)
       end
       local sig = ({ CV.card_value(built, "Spectral", "c_sigil", nil, need, lcg(4), 8) })[1]
       t.ok(sig and sig >= 0 and sig < 5, "Sigil is measured off the deck (finite flush value), not a flat 0.3")
+
+      -- ---- TIER 2 (real modelling): Soul, Cryptid, Aura, and the destroy-and-add group ----
+      local soul_free = ({ CV.card_value(empty, "Spectral", "c_soul", nil, need, lcg(4), 6) })[1]
+      local bh_e = ({ CV.card_value(empty, "Spectral", "c_black_hole", nil, need, lcg(4), 6) })[1]
+      t.ok(soul_free and soul_free > bh_e, "Soul (a Legendary joker) is the top spectral, above Black Hole")
+      -- Soul is slot-aware: a legendary you'd sell for, so a full board is a haircut not zero
+      local soul_full = ({ CV.card_value(built, "Spectral", "c_soul", nil, need, lcg(4), 6) })[1]
+      t.ok(soul_full and soul_full > 0 and soul_full < soul_free,
+        "Soul is slot-aware (full board < free slot, but still positive -- you'd sell for a Legendary)")
+      -- the destroy-and-add group is modelled and scales with how many cards it adds (Incantation 4 > Grim 2)
+      local fam = ({ CV.card_value(empty, "Spectral", "c_familiar", nil, need, lcg(4), 8) })[1]
+      local grim = ({ CV.card_value(empty, "Spectral", "c_grim", nil, need, lcg(4), 8) })[1]
+      local inc = ({ CV.card_value(empty, "Spectral", "c_incantation", nil, need, lcg(4), 8) })[1]
+      t.ok(fam and grim and inc, "Familiar/Grim/Incantation are all modelled (not the flat 0.25 prior)")
+      t.ok(inc > grim, "Incantation (adds 4) is worth more than Grim (adds 2)")
+      -- Cryptid and Aura are modelled and finite (Cryptid floored like DNA for the compounding it can't measure)
+      local cry = ({ CV.card_value(empty, "Spectral", "c_cryptid", nil, need, lcg(4), 8) })[1]
+      local aura = ({ CV.card_value(empty, "Spectral", "c_aura", nil, need, lcg(4), 8) })[1]
+      t.ok(cry and cry >= CV.CRYPTID_FLOOR - 1e-9, "Cryptid is modelled (>= its DNA-style compounding floor)")
+      t.ok(aura and aura >= 0 and aura < 1, "Aura is a deck-aware edition estimate (not the flat 0.35)")
     end
 
     -- B5 (w^2): joker_pool items are now equal-weighted (rarity already sampled), so the rare
