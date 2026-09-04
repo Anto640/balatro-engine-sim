@@ -287,6 +287,17 @@ local function generator_use(gs)
         or (spec.needs == "consumable" and cfree >= 1)
       if ok then
         local val = spec.v * need
+        -- Black Hole's "+1 level to every hand" is MEASURED (deck-aware) in the BUY valuation; use the same
+        -- value for the USE decision instead of the flat 0.5 prior, so a held Black Hole is priced once, not
+        -- three ways. Deterministic per-state seed (the determinism rule: no math.random in a live advisor).
+        if c.key == "c_black_hole" then
+          local seed = (#(gs.deck or {}) * 40503 + 17) % 2147483647
+          if seed <= 0 then seed = 1 end
+          local s = seed
+          local rng = function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end
+          local vfrac = ConsumableValue.card_value(gs, "Spectral", "c_black_hole", nil, need, rng, 6)
+          if vfrac and vfrac > 0 then val = vfrac * need end
+        end
         if not best or val > best.value then
           local name = c.name or c.key
           best = { type = "USE_CONSUMABLE", target = { name = name, key = c.key }, use_names = { c.key }, use_keys = { c.key },

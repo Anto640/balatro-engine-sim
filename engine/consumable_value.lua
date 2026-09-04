@@ -264,6 +264,9 @@ CV.SPECTRAL_BASE = {
   c_ouija = 0.3, c_familiar = 0.25, c_grim = 0.25, c_incantation = 0.25,
   c_talisman = 0.2, c_deja_vu = 0.2, c_trance = 0.2, c_medium = 0.2,
 }
+-- Seal each of these spectrals adds to one selected card (mirrors sim/world.lua's table). Deja Vu's Red
+-- seal is a RETRIGGER (scoring); the others are econ seals -- CV.seal_spectral_value measures both.
+local SEAL_SPECTRAL = { c_talisman = "Gold", c_deja_vu = "Red", c_trance = "Blue", c_medium = "Purple" }
 -- Wraith spawns a random RARE joker but SETS YOUR MONEY TO $0. Each dollar it would
 -- wipe costs this much boss-hand-fraction of purchasing power -- so Wraith is great
 -- broke and a trap when rich (the player's "value it more the less money it loses").
@@ -431,6 +434,62 @@ function CV.suit_tarot_value(gs, key, need, opts)
     return v, string.format("weak flush starter toward %s", suit)
   end
   return 0.0, string.format("no flush benefit toward %s", suit)
+end
+
+-- Value of a SEAL SPECTRAL (Talisman=Gold, Deja Vu=Red, Trance=Blue, Medium=Purple): it adds one seal to a
+-- card you select. The four used to read a flat 0.2 -- indistinguishable -- while a Red seal (retrigger) and
+-- a Gold seal ($3) are nothing alike. Value each deck-aware:
+--   * Gold/Blue/Purple are ECON seals -- CV.card_econ_value already prices them ($3 / a held-card Planet /
+--     a discard Tarot), deck-aware and on the right scale.
+--   * Red RETRIGGERS the card it sits on. Its value is a retrigger of the card you would deliberately seal
+--     (your best scorer) and build around -- which a greedy single-card measurement CANNOT see: it seals a
+--     plain high card the sampler rarely scores and reads ~0 (verified). So estimate it as a retrigger of
+--     ~one good scored card: a fraction of the per-hand score, bounded. This scales UP on a strong board,
+--     unlike the flat 0.2, and is owner-calibratable via RED_SEAL_FRAC.
+CV.RED_SEAL_FRAC = 0.15   -- a red seal ~ retriggers one good card (~15% of a hand's score); deck-aware, bounded
+function CV.seal_spectral_value(gs, seal, need, opts)
+  opts = opts or {}
+  need = (need and need > 0) and need or 1
+  if seal ~= "Red" then
+    return CV.card_econ_value(gs, { seal = seal }, opts.rng)
+  end
+  local base = JokerValue.avg_score(gs, { samples = mc(opts.samples or 8), rng = opts.rng })
+  if not base then return CV.RED_SEAL_FRAC * 0.3 end       -- no deck to measure: a small option value
+  return math.min(0.30, CV.RED_SEAL_FRAC * base / need)
+end
+
+-- MEASURED value of SIGIL: converts ~a hand's worth of cards to a single RANDOM suit, permanently (the
+-- FACTS layer modifies the deck cards in place). It is a bigger, un-chosen version of the suit tarots, so
+-- value it the same way -- convert the highest-chip off-suit cards toward the deck's DOMINANT suit (the
+-- flush direction the conversion naturally builds) and pair-measure the flush gain -- then damp for the
+-- random suit you don't get to pick. Flat 0.3 before, blind to whether you can flush at all.
+function CV.sigil_value(gs, need, opts)
+  opts = opts or {}
+  need = (need and need > 0) and need or 1
+  local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
+  if not deck or #deck < CV.MIN_DECK then return CV.SPECTRAL_BASE.c_sigil or 0.3 end
+  local SUITS = { "Spades", "Hearts", "Clubs", "Diamonds" }
+  local counts = {}
+  for _, c in ipairs(deck) do
+    if not Cards.is_stone(c) then for _, s in ipairs(SUITS) do if Cards.is_suit(c, s) then counts[s] = (counts[s] or 0) + 1 end end end
+  end
+  local suit, bestn = "Spades", -1
+  for _, s in ipairs(SUITS) do if (counts[s] or 0) > bestn then bestn = counts[s] or 0; suit = s end end
+  local idxs = {}
+  for i, c in ipairs(deck) do if not Cards.is_stone(c) and not Cards.is_suit(c, suit) then idxs[#idxs + 1] = i end end
+  if #idxs == 0 then return 0.0 end
+  table.sort(idxs, function(a, b) return (Cards.chips(deck[a]) or 0) > (Cards.chips(deck[b]) or 0) end)
+  local hs = (gs.run and gs.run.hand_size) or 8
+  local newdeck = {}; for i, c in ipairs(deck) do newdeck[i] = c end
+  for k = 1, math.min(hs, #idxs) do
+    local i = idxs[k]; local nc = {}; for kk, vv in pairs(deck[i]) do nc[kk] = vv end; nc.suit = suit; newdeck[i] = nc
+  end
+  local samples = mc(opts.samples or 8)
+  local seed = #deck * 40503 + 91
+  local base = JokerValue.avg_score(gs, { samples = samples, rng = lcg(seed) }) or 0
+  local g2 = {}; for k, v in pairs(gs) do g2[k] = v end; g2.deck = newdeck
+  local with = JokerValue.avg_score(g2, { samples = samples, rng = lcg(seed) }) or 0
+  return math.max(0, with - base) / need * 0.8   -- x0.8: the suit is RANDOM, not chosen
 end
 
 -- Value a single consumable card. Returns (vfrac, gain_dollars, note):
@@ -612,6 +671,25 @@ function CV.card_value(gs, set, key, freq, need, rng, samples, hand_ctx)
         and "Negative on a random joker (+1 slot) at a permanent -1 hand size"
         or "-1 hand size (permanent) for a slot on a joker you'd sell — the slot goes with it"
       return slot - hcost, 0, note
+    end
+    if key == "c_black_hole" then
+      -- +1 level to EVERY hand -- fully MEASURED by Packs.black_hole_value (freq x level_gain, deck-aware,
+      -- leveling-persistence scaled). It used to read a flat 0.9 here and 0.5 in the use-table -- three
+      -- prices for one card. Lazy require: packs requires US at load time (same cycle-break as Eval above).
+      local ok, Packs = pcall(require, "engine.packs")
+      if ok and Packs.black_hole_value then
+        local bh = Packs.black_hole_value(gs, { rng = rng, samples = samples })
+        if bh and bh > 0 then return bh, 0, "+1 level to EVERY hand (measured)" end
+      end
+      return CV.SPECTRAL_BASE.c_black_hole or 0.9, 0, "+1 level to every hand"
+    end
+    if SEAL_SPECTRAL[key] then
+      local seal = SEAL_SPECTRAL[key]
+      local v = CV.seal_spectral_value(gs, seal, need, { rng = rng, samples = samples })
+      return v, 0, string.format("adds a %s seal to your best card", seal)
+    end
+    if key == "c_sigil" then
+      return CV.sigil_value(gs, need, { rng = rng, samples = samples }), 0, "converts ~a hand to one suit (flush enabler)"
     end
     return CV.SPECTRAL_BASE[key] or 0.3, 0, "spectral"
   end

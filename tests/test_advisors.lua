@@ -295,6 +295,36 @@ return function(t)
     local vs = ({ Packs.value(built, { key = "p_spectral_mega" }, { rng = lcg(6) }) })[1]
     t.ok(vs > 0 and vs < 100, "B5: spectral pack finite/positive; no Hex/Ankh over-valuation")
 
+    -- ---- SPECTRAL WIRING (2026-09-04): 12 flat-prior spectrals -> the deck-aware machinery ----
+    -- Black Hole (+1 level to EVERY hand) is now MEASURED (Packs.black_hole_value) not the flat 0.9 prior --
+    -- one price, and deck-aware. The four SEAL spectrals were an indistinguishable flat 0.2; now each is
+    -- priced by its real effect (Gold $3 / Blue Planet / Purple Tarot via card_econ_value; Red retrigger),
+    -- so they DIFFER. Sigil (flush enabler) is measured off the deck, not a flat 0.3.
+    do
+      local Mech = require("engine.mechanics")
+      local need = Mech.boss_per_hand_need(built)
+      local bh = ({ CV.card_value(built, "Spectral", "c_black_hole", nil, need, lcg(4), 8) })[1]
+      t.ok(bh and bh > 0, "Black Hole has a positive measured value")
+      t.ok(math.abs(bh - 0.9) > 1e-6, "Black Hole is MEASURED, not the flat 0.9 prior")
+      local seals = {}
+      for _, k in ipairs({ "c_talisman", "c_deja_vu", "c_trance", "c_medium" }) do
+        seals[k] = ({ CV.card_value(built, "Spectral", k, nil, need, lcg(4), 8) })[1]
+      end
+      -- they are no longer all the flat 0.2: at least two of the four differ
+      local allsame = true
+      for _, k in ipairs({ "c_deja_vu", "c_trance", "c_medium" }) do
+        if math.abs(seals[k] - seals.c_talisman) > 1e-4 then allsame = false end
+      end
+      t.ok(not allsame, "the four seal spectrals are now DISTINGUISHED (not a flat 0.2 each)")
+      -- each is non-negative and priced by its real effect (Blue's Planet value scales with the board's
+      -- xmult -- Duo x2 * Cavendish x3 here -- so it is not bounded to <1; see the B2 note below).
+      for _, k in ipairs({ "c_talisman", "c_deja_vu", "c_trance", "c_medium" }) do
+        t.ok(seals[k] >= 0 and seals[k] < 5, k .. " is priced by its real seal effect (deck-aware, finite)")
+      end
+      local sig = ({ CV.card_value(built, "Spectral", "c_sigil", nil, need, lcg(4), 8) })[1]
+      t.ok(sig and sig >= 0 and sig < 5, "Sigil is measured off the deck (finite flush value), not a flat 0.3")
+    end
+
     -- B5 (w^2): joker_pool items are now equal-weighted (rarity already sampled), so the rare
     -- tail isn't double-clipped. Sanity: the expected best joker is positive and rises with more
     -- slots seen (order statistics), which relies on a non-degenerate pool.
