@@ -1,5 +1,48 @@
 # NEXT_SESSION.md — fresh-session handoff (2026-09-04)
 
+## ⭐ TASK 3 SWEEP — bring EVERY scaler onto the measured system (owner directive, 2026-09-04)
+
+> **Owner reframed the goal: ALL jokers should follow the measured system, not revert to tier constants.**
+> The scaler-coverage audit answers "how many still do": of **151 catalogued jokers, 120 non-scalers are
+> already MEASURED** (deck-aware `score_delta`, or `econ_value` for money jokers — tier is only a low floor);
+> **12 scalers were on the measured system; 19 still fell through** to `tier-prior × generic-projection`. A
+> fresh scaler contributes ~0 (a fresh xmult is ×1), so `score_delta` reads 0 and the value collapses to the
+> tier constant — the same class of error that had Ride the Bus at 3.78 vs measured 0.04.
+
+**✅ BATCH 1 SHIPPED (`88ed981` + fix `1b2e6a1`) — the consumable-fed class + a class-A freebie (19 → 16):**
+- **Constellation (+0.1x/Planet) & Fortune Teller (+1 mult/Tarot)** — the R5 "skipped a Constellation while
+  rich" item. Now `Eval.consumable_fed_forward`: `value = feed_inc × projected_uses / 2 × measured-spu`,
+  deck-aware, **no tier floor**. The new primitive is **`projected_consumable_uses` — RESOURCE-AWARE**:
+  uses/scoring-hand scales with generation capacity (Astronomer 0.30, tarot-makers 0.14), leveling / Satellite
+  (0.15), money (0.06), else base 0.03 (rates OWNER-CALIBRATABLE like `scale_rate`). Constellation went from a
+  context-blind flat **4.32-of-a-boss-hand EVERYWHERE** → ~nil in a non-planet build (the over-buy TRAP fixed)
+  rising to **1.86** in a leveled Astronomer build (tracks how leveled you are). Catalogue: `D.j_*.feed_set /
+  feed_inc / feed_xmult`.
+- **Spare Trousers (class A)** — just needed `inc=2, scale_rate=0.50`; trigger hands were already gated.
+
+**⭐ THE CORPUS CAUGHT A REGRESSION — the reusable lesson.** The agreement corpus (161 Constellation states)
+was NEUTRAL overall (±0.2pp), but its **picks-diff** showed dropping the tier floor made an owned scaling core
+measure LOW on a still-weak board → the engine wanted to **SELL its own committed Constellation** (seed
+Z9PBGTL2, jp 0.113, below Egg). **Fix: gate the measured value to the BUY side only (`owned=false`).** The
+owned/sell path keeps the measured+tier-floor route — sell-side core protection (`BP.CORE_KEEP` / the tier
+floor as a FLOOR) is a SEPARATE, endorsed concern from not-over-BUYING. owned jp 0.113 → 7.200; buy-side
+unchanged. **"Drop the tier floor" is a BUY-side directive; check the SELL ranking + corpus picks-diff, not
+just the headline metrics, when you change a scaler.** The remaining −2 buy_agree was diagnosed to 3 winning
+planet-build states where the decline is DEFENSIBLE (full-board swap / short runway / early speculation), not
+undervaluation — the old flat 4.32 "agreed" by over-valuing everything.
+
+**➡ NEXT: the sweep continues — 16 scalers still on constants, by FUEL class:**
+- **C. Discard-fed:** `j_castle` (also an R5 deferred item — "kept unscaled Castle"), `j_hit_the_road`, `j_yorick`
+- **D. Enhanced/destroyed-card-fed:** `j_vampire`, `j_glass`, `j_lucky_cat`
+- **E. Deck-size-fed:** `j_hologram`
+- **F. Action-fed (sell/skip/reroll):** `j_campfire`, `j_throwback`, `j_flash`, `j_red_card`
+- **G. Reset/joker-destroying (hardest — fuel has a cost or resets):** `j_obelisk`, `j_madness`, `j_ceremonial`, `j_caino`
+- **(class-A leftover)** `j_wee` (+8 chips/scored 2 — a rank trigger, needs a rank-frequency gate not a hand-type one).
+
+Each needs a small feed model + an owner-calibratable rate (like Runner/Square). Do them class-by-class; G is
+the hard one (the fuel is a sale/skip/joker-destruction with its own cost). Note the BUY-vs-OWNED split lesson
+above applies to every one.
+
 ## ⭐⭐ R6–R8 LIVE-RUN REVIEW (2026-09-04) — 3 fixes shipped, and the FIRST death traced end to end
 
 > **Read `ADVICE_REVIEW.md` R6/R7/R8 for the full detail.** The headline is methodological: R8 is the first
