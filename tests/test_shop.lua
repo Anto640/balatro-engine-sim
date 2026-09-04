@@ -77,6 +77,41 @@ return function(t)
       "Vagabond (card_generation) is a LIVE value joker, protected from churn")
     t.ok(not SA.funder_is_live(GSm.new{ jokers = { GSm.joker{ key = "j_joker" } } }, GSm.joker{ key = "j_joker" }),
       "a plain scorer is NOT 'live' (its marginal is already charged)")
+
+    -- ...but the protection rests on the OUTPUT, so a generator that CANNOT produce is not live.
+    -- ADVICE_REVIEW R8 (seed 6EDJFT2Y): Riff-Raff bought into the last joker slot spawned nothing
+    -- all run, yet this gate shielded it while the board's only Mult was sold to make room.
+    local Gen = require("engine.generators")
+    local function jbank(n)
+      local js = {}
+      for i = 1, n do js[i] = GSm.joker{ key = "j_joker", name = "J" .. i } end
+      return js
+    end
+    local full = GSm.new{ jokers = jbank(4), run = { hand_levels = {}, joker_slots = 5 } }
+    table.insert(full.jokers, GSm.joker{ key = "j_riff_raff" })      -- 5/5, no room for its output
+    local roomy = GSm.new{ jokers = { GSm.joker{ key = "j_riff_raff" } },
+      run = { hand_levels = {}, joker_slots = 5 } }
+    t.ok(SA.funder_is_live(roomy, GSm.joker{ key = "j_riff_raff" }, 0),
+      "R8: Riff-Raff WITH a free joker slot is still churn-protected")
+    t.ok(not SA.funder_is_live(full, GSm.joker{ key = "j_riff_raff" }, 0),
+      "R8: Riff-Raff on a FULL board can never spawn -> NOT protected (it was the dead joker)")
+
+    -- the asymmetry is deliberate: a consumable slot frees up as you use it, so a full tray is a
+    -- TRANSIENT blockage and must not re-open the Vagabond churn the gate was written to close.
+    local vag_full = GSm.new{ jokers = { GSm.joker{ key = "j_vagabond" } },
+      consumables = { { key = "c_pluto" }, { key = "c_mars" } },
+      run = { hand_levels = {}, joker_slots = 5, consumable_slots = 2 } }
+    t.ok(SA.funder_is_live(vag_full, GSm.joker{ key = "j_vagabond" }, 0),
+      "R8: a CONSUMABLE-maker stays protected even with a full tray (transient, unlike a joker slot)")
+
+    -- output_fit: the landed-output multiplier, reusing pack_open_advisor's gen_fit convention
+    t.near(Gen.output_fit(roomy, "j_riff_raff", true), 1.0, "output_fit: 4 free slots -> both Commons land", 1e-9)
+    t.near(Gen.output_fit(full, "j_riff_raff", true), 0.1, "output_fit: full board -> only room-MADE credit (0.1)", 1e-9)
+    t.near(Gen.output_fit(full, "j_joker", true), 1.0, "output_fit is identity for a non-generator", 1e-9)
+    -- buying is different from owning: the joker takes one of the free slots itself
+    local one_left = GSm.new{ jokers = jbank(4), run = { hand_levels = {}, joker_slots = 5 } }
+    t.near(Gen.output_fit(one_left, "j_riff_raff", false), 0.1,
+      "R7: BUYING Riff-Raff into the last slot leaves nowhere for its output", 1e-9)
   end
 
   -- Ride the Bus grows only on face-FREE hands and RESETS on a scored face, so it anti-synergizes with

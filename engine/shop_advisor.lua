@@ -24,6 +24,7 @@ local ShopState = require("model.shop_state")
 local Tarot = require("engine.tarot")
 local Cards = require("util.cards")
 local BuildPlan = require("engine.build_plan")
+local Generators = require("engine.generators")
 local VU = require("engine.value_units")
 
 local SA = {}
@@ -478,7 +479,29 @@ local function funder_is_live(gs, j, contribution)
   -- (4) a CARD-GENERATION joker (Vagabond/Cartomancer: makes Tarots/Planets each qualifying hand) holds
   -- its value in its OUTPUT, so its scoring marginal reads ~0 and it looks "dead" -- but dumping it after
   -- one round is churn (owner 2026-09-01: sold Vagabond after a single round without milking it).
-  if (JokerData.resolve(j.key) or {}).cat == "card_generation" then return true end
+  --
+  -- ...BUT ONLY IF IT CAN ACTUALLY PRODUCE (ADVICE_REVIEW R8). The protection rests entirely on the
+  -- output; with nowhere for the output to land there IS no output, and the clause then protects a
+  -- joker doing literally nothing. That is not hypothetical: seed 6EDJFT2Y bought Riff-Raff into its
+  -- LAST joker slot, it spawned zero jokers for the rest of the run, and this clause still shielded it
+  -- while the board's only unconditional Mult (Greedy) was sold to make room for a To Do List. The run
+  -- died at the ante-4 boss on 21% of the requirement holding $52.
+  --
+  -- Riff-Raff is NOT Vagabond, which is the distinction the original clause missed: Vagabond makes
+  -- CONSUMABLES, Riff-Raff makes JOKERS. That difference is the whole gate, and it is why the check
+  -- below is deliberately asymmetric rather than "does the output fit" for everyone:
+  --   * a CONSUMABLE slot frees up constantly (you use the tarot and the slot is back), so a full
+  --     consumable tray is a TRANSIENT blockage. Unprotecting Vagabond for it would re-open exactly
+  --     the churn the 2026-09-01 fix closed, on the turn the tray happens to be full. So the
+  --     consumable-makers keep their UNCONDITIONAL protection -- that path is byte-identical to before.
+  --   * a JOKER slot is scarce and sticky: nothing frees it but a deliberate sale, so a full board is
+  --     a STRUCTURAL blockage. Riff-Raff is the only card_generation joker that makes jokers (every
+  --     other one carries the "consumable" tag), so this unprotects exactly one key, in exactly the
+  --     state where it is provably producing nothing.
+  if (JokerData.resolve(j.key) or {}).cat == "card_generation" then
+    if JokerData.has_tag(j.key, "consumable") then return true end
+    return Generators.has_output_room(gs, j.key, true)
+  end
   local ed = j.edition
   if ed and ed ~= "" and ed ~= "base" and ed ~= "none" then return true end
   return false
@@ -639,7 +662,13 @@ local function scoring_gain(gs, sj, rng, pace)
     local ed = (sj.edition == "negative") and Eval.negative_slot_fv(gs) or Eval.edition_score_bonus(sj.edition, false)
     return modeled * SA.proj_damp(pace) + ed
   end
-  local prior = (JokerData.resolve(sj.key).tier or 3) * 0.3
+  -- A GENERATOR's tier prior assumes its output lands. Scale it by how much actually can, on the
+  -- SAME basis the sell-side prior in Eval.jp_from_measure now uses. Note `owned = false`: we are
+  -- pricing a PURCHASE, so the joker will consume one of the free slots itself -- which is the whole
+  -- point, because buying Riff-Raff into the LAST slot leaves nowhere for its 2 Commons to go and it
+  -- can never spawn. Before this, its buy value measured 7.5233 on EVERY board size including that
+  -- one (ADVICE_REVIEW R7/R8). Identity (x1) for every non-generator.
+  local prior = (JokerData.resolve(sj.key).tier or 3) * 0.3 * Generators.output_fit(gs, sj.key, false)
   -- A scaling joker is bought for what it BECOMES: measured/prior is its value
   -- TODAY, so project it forward over the blinds remaining (1.0 for flat jokers).
   -- Condition-locked scalers (Runner/Square) are gated by how often their trigger

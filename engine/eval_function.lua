@@ -9,6 +9,7 @@
 local Cards = require("util.cards")
 local JokerData = require("engine.joker_data")
 local Downside = require("engine.joker_downside")
+local Generators = require("engine.generators")
 local JokerValue = require("engine.joker_value")
 local Mechanics = require("engine.mechanics")
 local VU = require("engine.value_units")
@@ -428,7 +429,15 @@ local function jp_from_measure(gs, key, edition, m, opts, owned)
   local freq = JokerData.scale_trigger_hands(key) and hand_freq(gs, opts) or nil
   local proj = Eval.scaling_projection(gs, key, freq)
   if not m then
-    return (e.tier or 3) * 0.5 * proj + edition_jp(edition, true), false
+    -- A GENERATOR reaches this branch because it has no scoring model of its own, and the tier
+    -- prior it falls back to silently ASSUMES its output lands. Scale it by how much actually can
+    -- (Generators.output_fit, the same convention pack_open_advisor's gen_fit already uses).
+    -- Without this, a Riff-Raff on a full board -- structurally incapable of ever spawning -- kept
+    -- the full prior of tier 6 x 0.5 = 3.000, which outranked the board's ONLY unconditional Mult
+    -- at 1.800 and made that Mult the cheapest thing to sell. ADVICE_REVIEW R8, where exactly that
+    -- happened and cost the run at the ante-4 boss. Identity (x1) for every non-generator.
+    local fit = Generators.output_fit(gs, key, owned)
+    return (e.tier or 3) * 0.5 * proj * fit + edition_jp(edition, true), false
   end
   -- RESETTING scaler (Ride the Bus): a fresh one measures 0, so the tier FLOOR used to decide its value
   -- (tier 7 -> priced above Runner). Instead value it MEASURED at its low geometric equilibrium and skip

@@ -19,6 +19,66 @@ local function owns(gs, key)
   return false
 end
 
+-- ---------------------------------------------------------------------------
+-- OUTPUT ROOM. A generator's entire value IS its output, and the output needs a SLOT --
+-- the documented "Created things need a SLOT" rule (CLAUDE.md). Which slot depends on what
+-- it makes, and joker_data already encodes that: every `card_generation` joker carries the
+-- "consumable" tag EXCEPT j_riff_raff, which is the one that makes JOKERS.
+--
+-- This is shared so the several places that need it cannot drift apart. It was written after
+-- ADVICE_REVIEW R8, where they had: `blind_select_value` below gated Riff-Raff on a free joker
+-- slot correctly, while the shop's funder gate and the valuation prior did not -- so a Riff-Raff
+-- bought into the last slot produced nothing for a whole run yet stayed both PROTECTED from
+-- sale and credited a full tier prior, and the board's only Mult was sold to make room instead.
+-- ---------------------------------------------------------------------------
+
+-- Does this generator's output have somewhere to land right now? `owned` = the joker is already
+-- on the board (so it is counted in the board size); false = we are pricing BUYING it, in which
+-- case it will occupy one of the free slots itself.
+function G.output_room_free(gs, key, owned)
+  gs = gs or {}
+  if JokerData.has_tag(key, "consumable") then
+    local slots = (gs.run and gs.run.consumable_slots) or 2
+    return slots - #(gs.consumables or {})
+  end
+  local slots = (gs.run and gs.run.joker_slots) or (gs.shop and gs.shop.joker_slots) or 5
+  local free = slots - #(gs.jokers or {})
+  if not owned then free = free - 1 end   -- the generator itself takes a slot when bought
+  return free
+end
+
+function G.has_output_room(gs, key, owned)
+  return G.output_room_free(gs, key, owned) > 0
+end
+
+-- How much of a generator's output actually LANDS, as a multiplier in [0,1]. This is the SAME
+-- convention pack_open_advisor's gen_fit already applies to tarot/spectral generators, reused
+-- rather than reinvented: each output dropping into a FREE slot counts full, each that needs room
+-- MADE is credited at `room_credit`, and anything beyond that overflows to nothing.
+--
+-- `room_credit` is output-QUALITY-aware there, and the number below follows the same reading:
+-- pack_open_advisor prices The Judgement's room_credit at 0.1 because "a RANDOM joker rarely
+-- [beats what you sacrifice]" -- and Riff-Raff's output is 2 random COMMONS, strictly the weakest
+-- joker output in the game. Selling a joker you chose to keep in order to make room for a random
+-- common is a bad trade, so it takes the same 0.1.
+--
+-- Only the JOKER-output generator is listed. A consumable-maker's overflow is transient (see the
+-- asymmetry argument in shop_advisor's funder_is_live) and its value is already handled by the
+-- econ/consumable channels, so it keeps a flat 1 and this function is a no-op for it.
+G.OUTPUT = {
+  j_riff_raff = { out = "joker", n = 2, room_credit = 0.1 },  -- 2 random Commons on blind select
+}
+function G.output_fit(gs, key, owned)
+  local meta = G.OUTPUT[key]
+  if not meta or meta.n <= 0 then return 1 end
+  local free = math.max(0, G.output_room_free(gs, key, owned))
+  -- room can be MADE by selling a joker; count only jokers other than the generator itself
+  local roomable = math.max(0, #((gs and gs.jokers) or {}) - (owned and 1 or 0))
+  local landed = math.min(free, meta.n)
+  local made = math.min(math.max(0, meta.n - free), roomable)
+  return (landed + (meta.room_credit or 0.5) * made) / meta.n
+end
+
 -- Per-PLAY econ farmers: they pay only when you actually PLAY a blind (discard/play triggers), so
 -- SKIPPING forgoes their earnings this blind. (Per-ROUND econ like Rocket/Cloud 9 is excluded -- a skip
 -- may still pay it, and double-counting it here would wrongly suppress every skip.)
@@ -32,13 +92,12 @@ local PLAY_FARM_ECON = { j_faceless = 4, j_mail = 3, j_trading = 3 }
 function G.blind_select_value(gs)
   local v, notes = 0, {}
   local function add(d, n) v = v + d; notes[#notes + 1] = n end
-  local njok = #(gs.jokers or {})
-  local joker_slots = (gs.run and gs.run.joker_slots) or (gs.shop and gs.shop.joker_slots) or 5
-  local cons = #(gs.consumables or {})
-  local cons_slots = (gs.run and gs.run.consumable_slots) or 2
 
-  if owns(gs, "j_cartomancer") and cons < cons_slots then add(4, "Cartomancer makes a Tarot") end
-  if owns(gs, "j_riff_raff") and (joker_slots - njok) > 0 then add(8, "Riff-Raff makes 2 Jokers") end
+  -- both slot gates now go through G.has_output_room (exactly equivalent to the inline
+  -- `cons < cons_slots` / `joker_slots - njok > 0` they replace), so the shop-side gate added
+  -- for R8 and this one can never disagree about whether a generator can produce.
+  if owns(gs, "j_cartomancer") and G.has_output_room(gs, "j_cartomancer", true) then add(4, "Cartomancer makes a Tarot") end
+  if owns(gs, "j_riff_raff") and G.has_output_room(gs, "j_riff_raff", true) then add(8, "Riff-Raff makes 2 Jokers") end
   if owns(gs, "j_marble") then add(2, "Marble adds a Stone card") end
 
   -- (2) in-blind value forgone by skipping
