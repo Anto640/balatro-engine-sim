@@ -109,6 +109,62 @@ jokers where the churn fix pays, so it can't see the live benefit. Ships on corr
 
 ---
 
+## R6 — owner-followed run (2026-09-04): ECTOPLASM on a sellable joker + the poverty spiral
+
+> Owner's report: *"took Ectoplasm on a joker which is pointless — the joker is so sellable when Ecto causes
+> a permanent −1 hand size. It stuck very poor throughout the game which meant it struggled to build, and it
+> also meant Bull was doing very little."* Two observations; the code review below found a concrete cause
+> for each. **Both are HYPOTHESES until measured** (the R5 standard), but the Ectoplasm one is a plain
+> correctness hole rather than a magnitude call.
+
+- 🔧 **Ectoplasm is priced as a flat 0.7 prior with its permanent downside charged at ZERO.**
+  `CV.card_value` (`engine/consumable_value.lua:503`) falls through to `CV.SPECTRAL_BASE.c_ectoplasm = 0.7`
+  — the **third-highest spectral prior**, behind only The Soul (1.2) and Black Hole (0.9). Three distinct
+  errors, and the fix template already sits in the same function:
+  * **The cost is not charged at all.** `c_ouija` has an explicit branch two lines up
+    (`consumable_value.lua:496-501`) subtracting 0.3 for exactly this — *"PERMANENTLY costs -1 hand size —
+    a real ongoing downside. Charge it, so an Ouija isn't reflexively picked over a harmless spectral."*
+    Ectoplasm inflicts the **same −1 hand size** and gets **no such branch**. ⚠ `-- VERIFY`: in the real
+    game Ectoplasm's penalty *stacks per use in a run* (−1, then −2, …), making it strictly worse than
+    Ouija's, while the sim world (`sim/world.lua:461`) models a flat −1 per use.
+  * **The benefit is a flat prior when a MEASURED one already exists.** Ectoplasm grants Negative on a
+    random joker = **+1 joker slot**, which the engine prices properly via `Eval.negative_slot_fv`
+    (`eval_function.lua:842` — board- and runway-aware: `NEG_SLOT_FV` 6.0 tapering to a 0.5 floor,
+    discounted when slots aren't binding). Ectoplasm never calls it. Two things the flat prior cannot see:
+    with **0 jokers it does literally nothing** yet still costs the hand size (`sim/world.lua:454-461`), and
+    at ante 8 the slot is worth the 0.5 floor while the hand-size cost is still full price.
+  * **⭐ The owner's actual point — the ASYMMETRY, which even `negative_slot_fv` doesn't capture.** That
+    function prices a *permanent* slot. Ectoplasm's slot is yours only while you hold **that specific
+    random joker** — sell it and the slot goes with it. **The benefit is contingent and sellable; the cost
+    is permanent and unsellable.** So the Negative wants to land on a joker the plan will KEEP
+    (`BP.is_core`/`CORE_KEEP`), and the value should discount by the chance the target is later sold.
+  * ⚠ The FACTS layer already pays this cost (`sim/world.lua:461` reduces `hand_size`) while the OPINION
+    layer prices it at zero — an engine/world mismatch: the sim is *already* charged for a decision the
+    engine made blind.
+- 🔧 **"Stuck very poor + Bull doing very little" — Bull is credited as INCOME when it produces none.**
+  Bull is a *converter* ($ → chips, `joker_effects.lua:178` = `2 × dollars`), not a producer, but
+  `commitment_signals` (`build_plan.lua:228`) scores it **econ + 3** — the top weight, tied with Bootstraps
+  and **3× any real income joker** (`econ + 1`). `BP.ECON_COMMIT_THRESHOLD` is **4.0**
+  (`build_plan.lua:345`), so **Bull plus any one economy joker commits the whole run to the ECONOMY
+  archetype** with no actual income on the board. `BP.is_core` then returns `CORE_KEEP` for it
+  (`build_plan.lua:446`) and `fit` rewards further economy buys as *"converts the committed bankroll into
+  score"* (`build_plan.lua:577-579`) — a bankroll that in this run never arrived. That is a self-reinforcing
+  poverty trap matching the reported symptom exactly: commit to economy → never get rich → Bull scores
+  nothing → the build never happens. **Proposed direction: a converter must not be able to *establish* an
+  economy commitment by itself** — credit Bull/Bootstraps toward the plan in proportion to realised income,
+  or require a genuine producer to cross the threshold.
+- ❓ **Are the two observations one story?** Plausibly: −1 hand size → weaker hands → fewer/cheaper clears →
+  less money → Bull (money-scaled) contributes less → the build stalls. Worth checking the run log for
+  whether the Ectoplasm *preceded* the poverty rather than merely accompanying it.
+
+**Status: RECORDED, NOT FIXED.** Per the frequency ceiling (CLAUDE.md), one spectral card fires far too
+rarely to move an n≥160 batch, so the Ectoplasm item ships (if it ships) as a **live-advice correctness fix
+justified on mechanism**, with the agreement corpus guarding against regression — not as a winrate lever.
+The Bull / econ-commitment item is the opposite class: it moves `build_plan` thresholds that gate every run,
+so it needs a paired A/B before anything changes.
+
+---
+
 ## 1. In-blind play & digging (the play engine)
 
 - 🔧 **[R1] Didn't discard a dead low card in a marginal draw.** Opening hand held a 4-diamond flush draw
