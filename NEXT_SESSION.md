@@ -129,13 +129,22 @@ fixed**:
    and Hanging Chad is a retrigger that multiplies nothing by itself. **This is §31f's board-as-a-SET problem
    in miniature — Mult is a FACTOR, so dropping the last one collapses the product rather than costing its
    marginal — and there is now a concrete live death behind it. Do NOT attempt it as a magnitude tweak.**
-5. **The spectral valuation layer is mostly priors: 12 of 18 unmodelled.** Tier 1 (machinery already exists,
-   this is wiring): **Black Hole** is fully measured by `Packs.black_hole_value` but only on the pack-pool
-   path — `card_value` returns a flat 0.9 and `decision_engine`'s use-table a flat 0.5, three prices for one
-   card; **the four SEAL spectrals** (Talisman/Deja Vu/Trance/Medium) all read a flat **0.2** so the engine
-   cannot tell them apart, while `CV.card_econ_value` already prices all four seals deck-aware; **Sigil** is
-   flat 0.3 with no flush-plan awareness though `CV.suit_tarot_value` does exactly that job. Tier 2 (real
-   modelling): Soul, and the destroy-and-add group Aura/Cryptid/Familiar/Grim/Incantation.
+5. **✅ TIER 1 DONE (`0c6ae12`, 2026-09-04) — the spectral wiring.** **Black Hole** now uses the measured
+   `Packs.black_hole_value` in BOTH the buy valuation (`card_value`) and the use decision (`DE.GEN_USE`) —
+   one deck-aware price, not three (0.9 → 0.388 stock ante 3). **The four SEAL spectrals** are now
+   distinguished via `CV.seal_spectral_value` (Gold/Blue/Purple by `card_econ_value`; Red as a bounded
+   retrigger estimate `CV.RED_SEAL_FRAC`, because a greedy measurement seals a plain card and reads ~0) —
+   flat 0.2 → Gold .063 / Red .016 / Blue .026 / Purple .100. **Sigil** via `CV.sigil_value` (measure the
+   flush conversion toward the dominant suit, damp for the random suit) — flat 0.3 → 0.020 rising to 0.055 as
+   the deck leans flush. **Corpus (pre-spectral → wired): NET POSITIVE — PACK agree_same +0.5pp (84→86),
+   PACK diff −0.5pp, everything else neutral, guards unchanged.** The changed picks are the engine choosing
+   spectrals by measured value instead of flat priors (Sigil→Grim/Talisman where Sigil measures low with no
+   flush lean; Incantation→Deja Vu on a board where the red retrigger is worth more) + spectral pack EVs
+   recomputed. No regressions. ⏳ **TIER 2 REMAINS (real modelling, NOT wiring): Soul, Aura, Cryptid, and the
+   destroy-and-add group Familiar/Grim/Incantation** — these still read `SPECTRAL_BASE` flat priors (Soul 1.2,
+   Cryptid 0.4, Aura 0.35, the add-group 0.25). Soul (a Legendary joker) and Cryptid (2 copies of a card) are
+   the highest-value of the remainder — and the corpus showed the engine flipping some Sigil picks TO the
+   still-flat Grim/Incantation, so measuring those is the natural finish.
 
 **🛑 A PROCESS LESSON THAT PAID FOR ITSELF TWICE THIS SESSION** — CLAUDE.md's *"verify by MEASURING, not by
 reading the diff"*. On Ectoplasm, the first draft's comment asserted the hand-size cost was **convex** in hand
