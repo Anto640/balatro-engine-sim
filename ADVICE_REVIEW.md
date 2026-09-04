@@ -157,11 +157,43 @@ jokers where the churn fix pays, so it can't see the live benefit. Ships on corr
   less money → Bull (money-scaled) contributes less → the build stalls. Worth checking the run log for
   whether the Ectoplasm *preceded* the poverty rather than merely accompanying it.
 
-**Status: RECORDED, NOT FIXED.** Per the frequency ceiling (CLAUDE.md), one spectral card fires far too
-rarely to move an n≥160 batch, so the Ectoplasm item ships (if it ships) as a **live-advice correctness fix
-justified on mechanism**, with the agreement corpus guarding against regression — not as a winrate lever.
-The Bull / econ-commitment item is the opposite class: it moves `build_plan` thresholds that gate every run,
-so it needs a paired A/B before anything changes.
+**✅ ECTOPLASM SHIPPED + DEPLOYED (`175b5c4`).** All three corrections, plus `CV.hand_size_cost` — the
+permanent −1 hand size is now MEASURED off the real deck (paired sampling at hand size N vs N−1 from the
+same shuffle, scaled by `CV.level_scale` for permanence) and **Ouija uses it too**, so the two cards that
+inflict this downside are finally charged the same way. Measured at ante 3 on a stock deck, against the flat
+**0.700** it read in every one of these rows before:
+
+| board | value | board | value |
+|---|---|---|---|
+| 0 jokers (lands nowhere) | **−0.130** | 3 cores | **+2.808** |
+| 3 disposable commons | **−0.466** | 3 cores, ante 8 (no runway) | **+0.498** |
+| 2 commons + 1 core | +0.634 | 5 cores, full board, ante 2 | **+5.366** |
+
+The reported misplay — Ectoplasm onto a board of sellable commons — now reads **negative** and is declined.
+Justified on mechanism, not on the metric: per the frequency ceiling one spectral cannot move an n≥160 batch.
+
+⚠ **TWO ERRORS CAUGHT BY MEASURING RATHER THAN BY READING THE DIFF** (the CLAUDE.md rule, earning its keep):
+* the first draft's comment asserted the hand-size cost was **convex** in hand size. The probe refuted it —
+  0.33 at hand size 8 but 0.09 at 5, because a smaller hand makes weaker hands so the marginal card has less
+  to contribute. Correct in this module's absolute units, but it means Ectoplasm's **stacking** penalty is
+  *not* self-pricing; repeated uses are under-charged. Recorded in-code as a known limitation.
+* the first draft credited each joker `keep_bias / CORE_KEEP`, which pays a flat common **48%** and left a
+  board of three junk commons at **+0.97 — above the 0.7 being replaced.** The fix as first written would
+  have made the reported misplay MORE likely. Replaced with the codebase's own binary keeper predicate.
+
+**⏳ THE BULL / ECON-COMMITMENT ITEM IS STILL OPEN** — the opposite class: it moves `build_plan` thresholds
+that gate every run, so it needs a paired A/B before anything changes.
+
+**➡ ADJACENT FINDING — the spectral valuation layer is mostly priors.** After this fix **6 of 18** spectrals
+have a real branch in `CV.card_value` (Immolate, Hex, Ankh, Wraith, Ouija, Ectoplasm); the other 12 return a
+flat `SPECTRAL_BASE` number. The cheapest wins are the ones whose machinery **already exists**:
+* **Black Hole** is fully measured by `Packs.black_hole_value` — but only on the pack-pool path. `card_value`
+  still returns the flat 0.9 and `decision_engine`'s use-table a flat 0.5. Wiring, not new modelling.
+* **The four SEAL spectrals** (Talisman→Gold, Deja Vu→Red, Trance→Blue, Medium→Purple) all read a flat 0.2,
+  so the engine cannot tell them apart — while `CV.card_econ_value` already prices all four seals deck-aware
+  (there is even a test asserting Blue > Gold on a built board).
+* **Sigil** (all cards → one suit) is flat 0.3 with no flush-plan awareness, though `CV.suit_tarot_value`
+  does exactly this for suit tarots.
 
 ---
 
