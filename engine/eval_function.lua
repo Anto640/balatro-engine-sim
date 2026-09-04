@@ -540,10 +540,15 @@ local function jp_from_measure(gs, key, edition, m, opts, owned)
       return (sm / Mechanics.boss_per_hand_need(gs)) * JP_PER_FRAC + edition_jp(edition, false), true
     end
   end
-  -- CONSUMABLE-FED scaler (Constellation/Fortune Teller): value = current measured contribution (m, the
-  -- already-accrued counter for an owned one; ~0 fresh) PLUS its resource-aware forward accrual. No tier
-  -- floor, no separate projection (the forward term IS the projection).
-  if e.feed_set then
+  -- CONSUMABLE-FED scaler (Constellation/Fortune Teller), BUY side only: value = resource-aware forward
+  -- accrual + the fresh joker's measured ~0. No tier floor -- this is what stops over-buying it in a
+  -- non-planet build (the R5 trap). The OWNED/sell side (owned=true) deliberately does NOT take this path:
+  -- an owned scaling core measures LOW on a still-weak board (nothing to multiply YET), and dropping its
+  -- tier floor here made it the most-disposable joker -- the engine dumped its own committed Constellation
+  -- (corpus seed Z9PBGTL2: human BOUGHT Constellation, engine wanted to SELL its owned one). Sell-side core
+  -- protection is a SEPARATE, endorsed concern (BP.CORE_KEEP / the tier floor as a FLOOR), so an owned one
+  -- falls through to the measured+floor path below and keeps its protection.
+  if e.feed_set and not owned then
     local fwd = consumable_fed_forward(gs, key, opts)
     if fwd then
       local frac = (m + fwd) / Mechanics.boss_per_hand_need(gs)
