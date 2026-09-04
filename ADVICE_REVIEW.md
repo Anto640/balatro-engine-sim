@@ -184,16 +184,98 @@ Justified on mechanism, not on the metric: per the frequency ceiling one spectra
 **⏳ THE BULL / ECON-COMMITMENT ITEM IS STILL OPEN** — the opposite class: it moves `build_plan` thresholds
 that gate every run, so it needs a paired A/B before anything changes.
 
-**➡ ADJACENT FINDING — the spectral valuation layer is mostly priors.** After this fix **6 of 18** spectrals
-have a real branch in `CV.card_value` (Immolate, Hex, Ankh, Wraith, Ouija, Ectoplasm); the other 12 return a
-flat `SPECTRAL_BASE` number. The cheapest wins are the ones whose machinery **already exists**:
-* **Black Hole** is fully measured by `Packs.black_hole_value` — but only on the pack-pool path. `card_value`
-  still returns the flat 0.9 and `decision_engine`'s use-table a flat 0.5. Wiring, not new modelling.
-* **The four SEAL spectrals** (Talisman→Gold, Deja Vu→Red, Trance→Blue, Medium→Purple) all read a flat 0.2,
-  so the engine cannot tell them apart — while `CV.card_econ_value` already prices all four seals deck-aware
-  (there is even a test asserting Blue > Gold on a built board).
-* **Sigil** (all cards → one suit) is flat 0.3 with no flush-plan awareness, though `CV.suit_tarot_value`
-  does exactly this for suit tarots.
+**➡ ADJACENT FINDING — the spectral valuation layer is mostly priors. 12 of 18 are unmodelled.** After this
+fix **6** spectrals have a real branch in `CV.card_value` — Immolate, Hex, Ankh, Wraith, Ouija, Ectoplasm.
+The other **12 return a flat `SPECTRAL_BASE` number** regardless of deck, board or ante: Soul, Black Hole,
+Aura, Cryptid, Sigil, Familiar, Grim, Incantation, Talisman, Deja Vu, Trance, Medium.
+
+**Tier 1 — the machinery ALREADY EXISTS, this is wiring not modelling:**
+* **Black Hole** is fully measured by `Packs.black_hole_value` (deck-aware, all-hands level gain) — but only
+  on the pack-pool path. `card_value` still returns the flat 0.9 and `decision_engine`'s held-use table a
+  flat 0.5. The same card is priced three different ways depending on where you meet it.
+* **The four SEAL spectrals** — Talisman→Gold, Deja Vu→Red, Trance→Blue, Medium→Purple — all read a flat
+  **0.2**, so the engine literally cannot tell them apart. Meanwhile `CV.card_econ_value` prices all four
+  seals deck-aware, and a passing test asserts Blue > Gold on a built board.
+* **Sigil** (all cards → one suit) is a flat 0.3 with no flush-plan awareness, though `CV.suit_tarot_value`
+  does exactly this job for suit tarots.
+
+**Tier 2 — needs real modelling:** Soul (a measured Legendary, not a 1.2 prior — `pack_open_advisor` already
+knows it needs a slot), and the destroy-and-add group Aura / Cryptid / Familiar / Grim / Incantation, which
+want deck-mutation valuation off `DeckPlan.delete_value` + `CV.card_add_value`.
+
+---
+
+## R7 — same run, three more (2026-09-04): card ORDER, Business Card, Riff-Raff
+
+> Follow-ups from the same owner-followed run. All three were reproduced on a probe before being written
+> down, and all three are **confirmed**, not suspected.
+
+- ❓→🔧 **"Can it reorder cards for more score/money?" — YES, the capability is real and complete, but the
+  PLAY CHOOSER never sees it.** `engine/ordering.lua` permutes both joker order and card order with a SCORE
+  objective and a MONEY objective; its own header names *"first-card retriggers (Hanging Chad) want the
+  highest-value card first"*, and the money objective exists for exactly *"a Hanging Chad first-card
+  retrigger landing on a Gold-seal card"*. It is wired into `decision_engine:479` and surfaced by
+  `ui/overlay.lua:98-108` as a dedicated, untruncated gold **"Reorder:"** line. On the owner's exact setup
+  (Greedy Joker + Hanging Chad, Two Pair with the Diamond dealt second) it finds the right answer and the
+  swing is enormous:
+
+  | played order | score |
+  |---|---|
+  | as dealt (`10S 10D 4C 4H`) | 340 |
+  | **engine's reorder (`10D 10S 4C 4H`)** | **748 (+408, 2.2×)** |
+
+  by which card leads: `10D` → **748**, `10S` → 340, `4C`/`4H` → 280. The Diamond-first read is exact.
+  **⭐ THE BUG IS SEQUENCING, NOT CAPABILITY.** `Ordering.optimize` runs on the play that `best_play` has
+  ALREADY chosen, and `best_play` compares candidate subsets **in dealt order**. So on that hand it scored
+  Two Pair at 340, High Card `10D` at 350, **picked the High Card — and the blind needed 400.** The Two Pair
+  correctly ordered scores 748 and clears; the chosen play does not. Worse, the chosen play is a SINGLE
+  card, so there is nothing left to permute and the post-hoc reorder recovers **none** of the 398 lost.
+  ⇒ the fix is to make the CHOOSER order-aware for order-sensitive boards, not to touch `ordering.lua`.
+- 🔧 **The self-player never reorders CARDS.** `ui/autoplay.lua` has a "PHASE 0 — JOKER REORDER" that applies
+  `best.reorder.joker_order` by rewriting `G.jokers.cards` (there is no reorder button in Balatro, it is
+  drag-only). `card_order` appears **zero times** in the file. So even when the engine emits the right card
+  order, an F11 run plays them as dealt. ⚠ Related UX question for the human path: card scoring order is
+  the order in your **hand**, so acting on the tip means DRAGGING cards left before playing — the overlay
+  line says `cards 10D 10S 4C 4H` without saying that.
+- 🔧 **Business Card is invisible to the in-blind money model.** Owner: *"it had Business Card but only
+  played a High Card rather than a Two Pair of face cards despite both being able to win."* `j_business` is
+  listed in `joker_effects.VALUE_ONLY` — no scoring/effect hook — so its money never reaches `ev.money`.
+  Measured on a 4-face-card Two Pair vs a single non-face High Card, both with Business Card on board:
+
+  | play | model money | real EV |
+  |---|---|---|
+  | Two Pair, 4 face cards | **$0.00** | ~$4 (4 × ½ × $2) |
+  | High Card, 1 non-face | **$0.00** | $0 |
+
+  This matters precisely BECAUSE both plays clear: `HandEval.best_play_target` tier 2 says *"the extra score
+  is WASTED overkill, so maximise MONEY"* — and the money it maximises reads $0 either way. The only
+  per-card in-blind money the model knows is Rough Gem, Gold seals and Lucky. ⚠ Note the asymmetry with the
+  already-shipped work: R5 taught the SKIP advisor about Business Card farming and `DE.DIG_FOR_MONEY`
+  handles Faceless (the DISCARD channel), but the PLAY channel — which is Business Card's actual trigger —
+  was never taught.
+- 🔧 **Riff-Raff is bought with no room for what it makes.** Owner: *"it bought Riff-Raff despite not really
+  having any space for extra jokers."* Riff-Raff spawns 2 Common Jokers at blind select **only if a slot is
+  free**. `Generators.play_bonus` gates this correctly (`generators.lua:41` requires `joker_slots - njok > 0`)
+  and `SA.SLOT_FARM_JOKER` even credits selling a common to reopen a slot for it — but both of those are
+  about a Riff-Raff you ALREADY OWN. The BUY path only checks that *a* slot exists (`shop_advisor:839`,
+  `slots_free > 0`), never that one will REMAIN afterwards. Measured — the buy value is **byte-identical**
+  across every board size:
+
+  | board before buying | slots free after | buy value |
+  |---|---|---|
+  | 1/5 | 3 | 7.5233 |
+  | 2/5 | 2 | 7.5233 |
+  | 3/5 | 1 | 7.5233 |
+  | **4/5** | **0 — spawns nothing, ever** | **7.5233** |
+
+  This is the documented "**Created things need a SLOT**" convention (CLAUDE.md) applied on the pack path
+  (`pack_open_advisor` `gen_fit`) and the tarot path (`SA.CREATES_JOKER`, which lists only `c_judgement`) but
+  **never to a generator JOKER bought in the shop**.
+
+**Status: RECORDED, NOT FIXED** — deliberately. All three are live-advice correctness items below the
+frequency ceiling, but two of them (the order-aware chooser, and any in-blind money term) touch `hand_eval`'s
+hot path, which cascades the seeded RNG in every blind of every run — the highest-variance change class this
+project has. They want scoping and a paired A/B, not a quick edit. Riff-Raff's slot gate is the surgical one.
 
 ---
 
