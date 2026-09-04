@@ -11,13 +11,11 @@
 
 **✅ BATCH 1 SHIPPED (`88ed981` + fix `1b2e6a1`) — the consumable-fed class + a class-A freebie (19 → 16):**
 - **Constellation (+0.1x/Planet) & Fortune Teller (+1 mult/Tarot)** — the R5 "skipped a Constellation while
-  rich" item. Now `Eval.consumable_fed_forward`: `value = feed_inc × projected_uses / 2 × measured-spu`,
-  deck-aware, **no tier floor**. The new primitive is **`projected_consumable_uses` — RESOURCE-AWARE**:
-  uses/scoring-hand scales with generation capacity (Astronomer 0.30, tarot-makers 0.14), leveling / Satellite
-  (0.15), money (0.06), else base 0.03 (rates OWNER-CALIBRATABLE like `scale_rate`). Constellation went from a
-  context-blind flat **4.32-of-a-boss-hand EVERYWHERE** → ~nil in a non-planet build (the over-buy TRAP fixed)
-  rising to **1.86** in a leveled Astronomer build (tracks how leveled you are). Catalogue: `D.j_*.feed_set /
-  feed_inc / feed_xmult`.
+  rich" item. Valued by the event-fed model (below), **RESOURCE-AWARE**: planet/tarot uses per scoring-hand
+  scale with generation capacity (Astronomer 0.30, tarot-makers 0.14), leveling / Satellite (0.15), money
+  (0.06), else base 0.03. Constellation went from a context-blind flat **4.32-of-a-boss-hand EVERYWHERE** →
+  ~nil in a non-planet build (the over-buy TRAP fixed) rising to **1.86** in a leveled Astronomer build (tracks
+  how leveled you are).
 - **Spare Trousers (class A)** — just needed `inc=2, scale_rate=0.50`; trigger hands were already gated.
 
 **⭐ THE CORPUS CAUGHT A REGRESSION — the reusable lesson.** The agreement corpus (161 Constellation states)
@@ -31,17 +29,39 @@ just the headline metrics, when you change a scaler.** The remaining −2 buy_ag
 planet-build states where the decline is DEFENSIBLE (full-board swap / short runway / early speculation), not
 undervaluation — the old flat 4.32 "agreed" by over-valuing everything.
 
-**➡ NEXT: the sweep continues — 16 scalers still on constants, by FUEL class:**
-- **C. Discard-fed:** `j_castle` (also an R5 deferred item — "kept unscaled Castle"), `j_hit_the_road`, `j_yorick`
-- **D. Enhanced/destroyed-card-fed:** `j_vampire`, `j_glass`, `j_lucky_cat`
-- **E. Deck-size-fed:** `j_hologram`
-- **F. Action-fed (sell/skip/reroll):** `j_campfire`, `j_throwback`, `j_flash`, `j_red_card`
-- **G. Reset/joker-destroying (hardest — fuel has a cost or resets):** `j_obelisk`, `j_madness`, `j_ceremonial`, `j_caino`
-- **(class-A leftover)** `j_wee` (+8 chips/scored 2 — a rank trigger, needs a rank-frequency gate not a hand-type one).
+**✅ BATCH 2 SHIPPED (`1993ca7`) — the remaining 14 scalers; 31/31 now measured, 0 fall-throughs.** The
+consumable-fed model was generalized into a unified **EVENT-FED** model (`Eval.event_fed_forward`): `value =
+feed_inc × projected_events / 2 × deck-aware-spu`, no tier floor, BUY-side only. Catalogue `feed_fuel/feed_inc`
+drives it; the counter unit (chips/mult/x_mult) is derived from `cat`. Fuels by class:
+- **C. Discard-fed:** Castle (+3ch/suit-discard), Hit-the-Road (+0.5x/Jack, resets/round), Yorick (+1x/23 discards)
+- **scored-rank:** Wee (+8ch/scored 2)
+- **D. Deck-content (bounded by deck count, deck-aware):** Vampire (+0.1x/enh eaten), Glass (+0.75x/shatter —
+  **0 with no Glass cards, 0.50 with eight**), Lucky Cat (+0.25x/trigger)
+- **E. Deck-size:** Hologram (+0.25x/card added)
+- **F. Action-fed:** Campfire (+0.25x/sell, resets/ante), Throwback (+0.25x/skip), Flash (+2mult/reroll —
+  **money-gated: 0.19 poor → 0.47 rich**), Red Card (+3mult/pack-skip)
+- **G. Reset/rare/destroying:** Obelisk (+0.2x off-type, resets), Madness (+0.5x/select, DESTROYS a joker →
+  `feed_damp 0.3`), Canio (+1x/face destroyed), Ceremonial (one-shot +2×right-sell, `feed_once` + damp)
 
-Each needs a small feed model + an owner-calibratable rate (like Runner/Square). Do them class-by-class; G is
-the hard one (the fuel is a sale/skip/joker-destruction with its own cost). Note the BUY-vs-OWNED split lesson
-above applies to every one.
+`event_rate` holds the per-fuel rates (OWNER-CALIBRATABLE like `scale_rate`); resetting fuels use the PERIOD as
+the horizon; deck-content fuels are bounded by deck count. **`SCALER FALL-THROUGHS: 0`** (audit:
+`tools/scratchpad audit_scalers`). 1182 tests.
+**Corpus (batch-1 → all-scalers): NET POSITIVE — `agree_save` +0.8pp (316→324)**, everything else neutral
+(±0.1pp), guards unchanged. Dropping the inflated tier values made the engine **over-buy and over-churn
+scalers LESS**: the changed decisions are the engine no longer selling working jokers to fund inflated scalers
+(Smiley Face, 8 Ball, Gros Michel, Raised Fist — all "SELL → SAVE" now) and no longer speculatively buying
+inflated Castle/Campfire/Hologram. **No early-core dumps** (the buy-side-only gate held); the only oddities are
+ante-8 already-won states where measurement noise reshuffles equivalent win-lines.
+
+**➡ THE SCALER SWEEP IS COMPLETE. Where the frontier goes next** (all optional, none is a fall-through fix):
+- **Owner-calibrate the `event_rate` rates + `feed_damp`s** if any live-run value looks off — these are the
+  Runner/Square-style domain constants, set to reasonable defaults, not yet owner-tuned.
+- **The remaining tier-prior dependence is NOT scalers:** the 3 joker-making generators (Riff-Raff/Vagabond/
+  Cartomancer, valued tier × `output_fit`) and a few utility jokers. Different modeling axis (output/utility),
+  not the scaler system.
+- **Deck-content BUY-timing:** Glass/Vampire/Lucky read 0 until the cards are in the deck — correct per-state,
+  but a human buys them as a COMMITMENT to add those cards (the same foresight gap as early Constellation). A
+  future "planned deck-content" signal could credit that; deferred (it's the build-commitment wall again).
 
 ## ⭐⭐ R6–R8 LIVE-RUN REVIEW (2026-09-04) — 3 fixes shipped, and the FIRST death traced end to end
 
