@@ -246,6 +246,85 @@ local function deck_buff_scaler_marginal(gs, key, opts)
   return e.deck_buff * rate * n / 2 * spu
 end
 
+-- ===== CONSUMABLE-FED scaler valuation (Constellation +0.1x per Planet used; Fortune Teller +1 mult per
+-- Tarot used). The counter grows on a SHOP/ECONOMY action (using a consumable), not on a played hand, so
+-- unlike the hand-type accumulators its projected accrual is RESOURCE-AWARE: how many planets/tarots you
+-- will actually USE over the rest of the run, which depends on your generation capacity (Astronomer,
+-- tarot-makers), leveling commitment and money. A flat tier x generic-projection valued a fresh
+-- Constellation at 4.32-of-a-boss-hand in EVERY context -- bare ante-1 deck and committed Astronomer build
+-- alike -- so it could neither justify a swap in a planet build nor avoid the trap in a non-planet one
+-- (owner R5: skipped a Constellation while rich). Same medicine as Ride the Bus: measure it, drop the tier
+-- floor. =========================================================================================
+
+local function owns_joker(gs, key)
+  for _, j in ipairs(gs.jokers or {}) do if j.key == key then return true end end
+  return false
+end
+
+-- Is the run committed to LEVELING (so it will keep buying/using planets)? Any hand pushed above its base
+-- level is the cleanest deck-only signal (no build_plan dependency -- eval is below it in the stack).
+local function is_leveling(gs)
+  local hl = gs.run and gs.run.hand_levels
+  if not hl then return false end
+  for _, lv in pairs(hl) do if type(lv) == "table" and (lv.level or 1) > 1 then return true end end
+  return false
+end
+
+-- Rich enough that buying consumables is unconstrained (comfortably above the interest-maxing hold).
+local function is_rich(gs)
+  local e = gs.economy or {}
+  local hold = ((e.interest_cap or 5) * 5)   -- $ held to max interest (5 per $5, capped)
+  return (e.dollars or 0) >= hold + 10
+end
+
+-- Projected consumable USES per SCORING HAND over the rest of the run, resource-aware. Tiers are
+-- OWNER-CALIBRATABLE (like the accumulating scalers' scale_rate) and anchored to telemetry: a COMMITTED
+-- planet human used ~0.99 planets/ante ~= 0.13/scoring-hand; the engine's realized ~0.43/ante ~= 0.06.
+-- A GENERATOR of that consumable (Astronomer's free Celestials; the tarot-makers) drives the rate above
+-- the committed human; a merely-committed build sits near it; an uncommitted build uses few.
+local TAROT_MAKERS = { j_cartomancer = true, j_vagabond = true, j_hallucination = true }
+local function consumable_use_rate(gs, set)
+  if set == "Planet" then
+    if owns_joker(gs, "j_astronomer") then return 0.30 end   -- free Celestial packs -> heavy planet throughput
+    if is_leveling(gs) or owns_joker(gs, "j_satellite") then return 0.15 end
+    if is_rich(gs) then return 0.06 end
+    return 0.03
+  else -- Tarot
+    for k in pairs(TAROT_MAKERS) do if owns_joker(gs, k) then return 0.14 end end
+    if is_rich(gs) then return 0.05 end
+    return 0.03
+  end
+end
+
+local function projected_consumable_uses(gs, set)
+  local br = Eval.blinds_remaining(gs)
+  if br <= 0 then return 0 end
+  return br * ACC_HANDS_PER_BLIND * consumable_use_rate(gs, set)
+end
+
+-- Score per 1.0 unit of a consumable-fed scaler's counter, measured deck-aware. Constellation's counter
+-- is x_mult (measure the joker at +1.0x, i.e. x_mult=2, and divide); Fortune Teller's is flat mult.
+local function consumable_scaler_spu(gs, key, xmult, opts)
+  local ref = 1.0
+  local ability = xmult and { x_mult = 1 + ref } or { mult = 10 }
+  local denom = xmult and ref or 10
+  local m = JokerValue.score_delta(gs, { key = key, ability = ability },
+    { samples = (opts and opts.samples) or 6, rng = opts and opts.rng, cache = opts and opts.cache })
+  return (m or 0) / denom
+end
+
+-- Forward (go-forward) accrual value of a consumable-fed scaler in RAW score units: the counter ramps
+-- ~linearly to inc*uses over the remaining run, so its average ADDED contribution per hand is half that
+-- times the per-unit score. nil if not a modelled consumable-fed scaler. For an OWNED already-scaled one
+-- the current accrued counter is captured separately by the normal measured score_delta and ADDED to this.
+local function consumable_fed_forward(gs, key, opts)
+  local e = JokerData.resolve(key)
+  if not (e and e.feed_set) then return nil end
+  local uses = projected_consumable_uses(gs, e.feed_set)
+  local spu = consumable_scaler_spu(gs, key, e.feed_xmult, opts)
+  return e.feed_inc * uses / 2 * spu
+end
+
 -- Mean best-play score of the CURRENT board (the base a conditional xmult multiplies),
 -- memoised like hand_freq. jp_from_measure always receives the full current gs (owned AND
 -- shop paths), so this is the same board across a whole evaluation -> sample it once.
@@ -387,6 +466,10 @@ function Eval.modeled_scoring_fraction(gs, key, opts)
     local sm = accumulating_scaler_marginal(gs, key, opts); return sm and (sm / need) or nil
   elseif e.deck_buff then
     local sm = deck_buff_scaler_marginal(gs, key, opts); return sm and (sm / need) or nil
+  elseif e.feed_set then
+    -- Consumable-fed (Constellation/Fortune Teller): a fresh one measures 0, so value it by its
+    -- resource-aware projected accrual (no tier floor). It projects internally -> caller must not re-project.
+    local fwd = consumable_fed_forward(gs, key, opts); return fwd and (fwd / need) or nil
   elseif DECK_MOD_ECON[key] then
     return 0
   elseif key == "j_invisible" then
@@ -455,6 +538,16 @@ local function jp_from_measure(gs, key, edition, m, opts, owned)
     local sm = accumulating_scaler_marginal(gs, key, opts)
     if sm then
       return (sm / Mechanics.boss_per_hand_need(gs)) * JP_PER_FRAC + edition_jp(edition, false), true
+    end
+  end
+  -- CONSUMABLE-FED scaler (Constellation/Fortune Teller): value = current measured contribution (m, the
+  -- already-accrued counter for an owned one; ~0 fresh) PLUS its resource-aware forward accrual. No tier
+  -- floor, no separate projection (the forward term IS the projection).
+  if e.feed_set then
+    local fwd = consumable_fed_forward(gs, key, opts)
+    if fwd then
+      local frac = (m + fwd) / Mechanics.boss_per_hand_need(gs)
+      return frac * JP_PER_FRAC + edition_jp(edition, false), true
     end
   end
   -- Analytic floor for hand-conditional xmults: the noisy 6-sample delta reads ~0 when the

@@ -207,6 +207,16 @@ D.j_square.inc      = 4;   D.j_square.scale_rate    = 0.50   -- +4 chips/4-card 
 D.j_supernova.inc   = 1;   D.j_supernova.scale_rate = 0.16   -- +1 mult per play of your COMMITTED hand type; you don't play the same type every turn (dig/mix), so the effective rate is low -> value ~Square (owner)
 D.j_supernova.head_start = "hand_type_plays"                 -- reads run's cumulative plays -> starts high if bought late
 D.j_green_joker.inc = 1;   D.j_green_joker.scale_rate = 0.10 -- +1/hand -1/discard: discards gut it, esp. red deck (worst)
+D.j_trousers.inc    = 2;   D.j_trousers.scale_rate  = 0.50 -- +2 mult per hand CONTAINING Two Pair (trigger hands already gated); diggable, moderate gain
+
+-- CONSUMABLE-FED scaler config (engine/eval_function consumable_fed_forward): the counter grows each time
+-- you USE a Planet (Constellation) or Tarot (Fortune Teller) card -- a shop/economy action, not a played
+-- hand -- so the accrual is projected RESOURCE-awarely (generation capacity + leveling commitment + money),
+-- NOT the flat tier x projection that valued a fresh Constellation identically in every context. feed_inc =
+-- counter gain per use; feed_xmult = the counter is x_mult (measure per-1.0x), else flat mult. Rates in
+-- consumable_use_rate are owner-calibratable (like scale_rate); the SIM/corpus are the ruler.
+D.j_constellation.feed_set  = "Planet"; D.j_constellation.feed_inc = 0.1; D.j_constellation.feed_xmult = true  -- +0.1x per Planet used
+D.j_fortune_teller.feed_set = "Tarot";  D.j_fortune_teller.feed_inc = 1                                        -- +1 mult per Tarot used
 
 -- DECK-BUFF scaler (Hiker): it has NO joker counter to inject -- it permanently adds chips to the CARDS
 -- when scored, so it's valued by a DECK-BUFF spu (buff the deck, measure the score delta) x the chips it

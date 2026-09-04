@@ -177,6 +177,45 @@ return function(t)
     t.ok(hiker5 < hiker3, "Hiker projects DOWN as blinds run out (fewer hands left to accrue)")
   end
 
+  -- Task 3: CONSUMABLE-FED scalers (Constellation +0.1x/Planet, Fortune Teller +1 mult/Tarot) are the last
+  -- scalers off the measured system. A flat tier x projection valued a fresh Constellation IDENTICALLY in
+  -- every context (bare deck and committed Astronomer build alike). Now it is modelled RESOURCE-awarely: its
+  -- value rises with planet-generation (Astronomer), leveling commitment and money, and collapses in a
+  -- non-planet build (owner R5: over-bought while it can never scale; skipped while rich in a real build).
+  do
+    local Eval = require("engine.eval_function")
+    local GSm = require("model.game_state")
+    local function lcg(s) s = s % 2147483647; if s <= 0 then s = s + 2147483646 end
+      return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end end
+    local deck = {}
+    for i = 1, 52 do deck[#deck + 1] = card{ id = i, rank_id = ((i - 1) % 13) + 2,
+      suit = ({ "Spades", "Hearts", "Clubs", "Diamonds" })[((i - 1) % 4) + 1] } end
+    local function msf(key, jokers, dollars)
+      local gs = GSm.new{ deck = deck, meta = { ante = 4 }, jokers = jokers or {},
+        economy = { dollars = dollars or 30, interest_cap = 5 },
+        run = { hand_levels = {}, joker_slots = 5, consumable_slots = 2, hand_type_plays = {} } }
+      return Eval.modeled_scoring_fraction(gs, key, { rng = lcg(9), samples = 12 })
+    end
+    -- it is now MODELLED (non-nil), not falling through to the tier prior
+    t.ok(msf("j_constellation", {}) ~= nil, "Constellation is modelled by the measured system (not the tier fallthrough)")
+    t.ok(msf("j_fortune_teller", {}) ~= nil, "Fortune Teller is modelled (consumable-fed)")
+    t.ok(msf("j_trousers", {}) ~= nil, "Spare Trousers is modelled (accumulating hand-type, class A)")
+    -- RESOURCE-AWARE: Astronomer (free Celestials -> heavy planet throughput) lifts Constellation's value
+    -- over the SAME board without it -- the whole point the flat tier prior could never express.
+    local con_astro = msf("j_constellation", { joker{ key = "j_astronomer", name = "Astro" },
+      joker{ key = "j_photograph", name = "Photo" }, joker{ key = "j_hanging_chad", name = "Chad" } }, 55)
+    local con_none  = msf("j_constellation", { joker{ key = "j_photograph", name = "Photo" },
+      joker{ key = "j_hanging_chad", name = "Chad" } }, 25)
+    t.ok(con_astro > con_none, "Constellation is worth MORE in a rich Astronomer build than a poor non-planet one")
+    -- the non-planet TRAP: a fresh Constellation with no planet income barely scales -> ~0, not the old 4.32
+    t.ok(msf("j_constellation", { joker{ key = "j_joker" } }, 20) < 0.1,
+      "Constellation is ~nil in a non-planet build (the R5 over-buy trap, was a flat 4.32)")
+    -- Fortune Teller: a tarot-MAKER (Cartomancer) feeds it, so it is worth more than with no tarot source
+    t.ok(msf("j_fortune_teller", { joker{ key = "j_cartomancer", name = "Carto" } }, 30)
+       > msf("j_fortune_teller", { joker{ key = "j_joker" } }, 20),
+      "Fortune Teller is worth more with a tarot generator (Cartomancer) feeding it")
+  end
+
   -- Task 2: DECK-MODIFIER jokers are valued off their real channel, not the flat tier floor.
   -- Midas Mask & Certificate pay in MONEY (Eval.econ_value), scoring jp ~0; Midas is FACE-DECK-AWARE
   -- (the tier floor never varied by deck). Marble/DNA are deck-growth, measured via card_add_value with
