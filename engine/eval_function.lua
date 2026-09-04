@@ -246,15 +246,19 @@ local function deck_buff_scaler_marginal(gs, key, opts)
   return e.deck_buff * rate * n / 2 * spu
 end
 
--- ===== CONSUMABLE-FED scaler valuation (Constellation +0.1x per Planet used; Fortune Teller +1 mult per
--- Tarot used). The counter grows on a SHOP/ECONOMY action (using a consumable), not on a played hand, so
--- unlike the hand-type accumulators its projected accrual is RESOURCE-AWARE: how many planets/tarots you
--- will actually USE over the rest of the run, which depends on your generation capacity (Astronomer,
--- tarot-makers), leveling commitment and money. A flat tier x generic-projection valued a fresh
--- Constellation at 4.32-of-a-boss-hand in EVERY context -- bare ante-1 deck and committed Astronomer build
--- alike -- so it could neither justify a swap in a planet build nor avoid the trap in a non-planet one
--- (owner R5: skipped a Constellation while rich). Same medicine as Ride the Bus: measure it, drop the tier
--- floor. =========================================================================================
+-- ===== EVENT-FED scaler valuation (the measured-scaler system, generalized). A large family of scalers
+-- grows its counter on a specific EVENT -- using a consumable (Constellation/Planet, Fortune Teller/Tarot),
+-- DISCARDING (Castle/Hit-the-Road/Yorick), scoring a rank (Wee), scoring/destroying an enhanced card
+-- (Vampire/Glass/Lucky Cat), adding a card (Hologram), a shop/blind ACTION (Campfire/sell, Throwback/skip,
+-- Flash/reroll, Red Card/pack-skip, Madness/blind-select) -- rather than on the played HAND TYPE the
+-- accumulating scalers key on. A flat tier x generic-projection valued a FRESH one identically in every
+-- context (it valued a fresh Constellation at 4.32-of-a-boss-hand on a bare deck AND a committed build).
+-- The measured model instead projects the counter's accrual by (a) how often the fuel EVENT fires -- deck-
+-- aware or resource-aware per fuel -- and (b) the deck-aware per-unit score (spu), and drops the tier floor.
+-- value = feed_inc * projected_events / 2 * spu   (the /2 is the linear-ramp average, as for the
+-- accumulating scalers). RESETTING fuels (Hit-the-Road/round, Campfire/ante, Obelisk/on-type) don't accrue
+-- over the whole run -- they sit at a per-period equilibrium, so the horizon is the PERIOD not the run.
+-- Rates are OWNER-CALIBRATABLE (like scale_rate). Owner directive: measure scalers, drop the tier floor. ==
 
 local function owns_joker(gs, key)
   for _, j in ipairs(gs.jokers or {}) do if j.key == key then return true end end
@@ -270,59 +274,132 @@ local function is_leveling(gs)
   return false
 end
 
--- Rich enough that buying consumables is unconstrained (comfortably above the interest-maxing hold).
+-- Rich enough that buying consumables/rerolls is unconstrained (comfortably above the interest-maxing hold).
 local function is_rich(gs)
   local e = gs.economy or {}
   local hold = ((e.interest_cap or 5) * 5)   -- $ held to max interest (5 per $5, capped)
   return (e.dollars or 0) >= hold + 10
 end
 
--- Projected consumable USES per SCORING HAND over the rest of the run, resource-aware. Tiers are
--- OWNER-CALIBRATABLE (like the accumulating scalers' scale_rate) and anchored to telemetry: a COMMITTED
--- planet human used ~0.99 planets/ante ~= 0.13/scoring-hand; the engine's realized ~0.43/ante ~= 0.06.
--- A GENERATOR of that consumable (Astronomer's free Celestials; the tarot-makers) drives the rate above
--- the committed human; a merely-committed build sits near it; an uncommitted build uses few.
+-- The scaler's counter UNIT, from its catalogue cat: chips (scaling_chips), flat mult (scaling_mult), or
+-- x_mult (xmult_scaling). Drives where the reference counter is injected for the spu measurement.
+local function scaler_kind(e)
+  if e.cat == "scaling_chips" then return "chips"
+  elseif e.cat == "xmult_scaling" then return "xmult" end
+  return "mult"
+end
+
+-- Fraction of the (non-stone) deck that is a given rank_id, and count of a given enhancement. Deck-aware
+-- inputs for the rank/suit/enhancement-gated fuels (Wee's 2s, Hit-the-Road's Jacks, Vampire/Glass' enh).
+local function deck_rank_frac(gs, rank_id)
+  local n, hit = 0, 0
+  for _, c in ipairs(gs.deck or {}) do
+    if not Cards.is_stone(c) then n = n + 1; if Cards.rank_id(c) == rank_id then hit = hit + 1 end end
+  end
+  return (n > 0) and (hit / n) or 0
+end
+local function deck_enh_count(gs, enh)
+  local k = 0
+  for _, c in ipairs(gs.deck or {}) do
+    if c.enhancement and (not enh or c.enhancement == enh) then k = k + 1 end
+  end
+  return k
+end
+local function deck_enh_frac(gs, enh)
+  local n = #(gs.deck or {})
+  return (n > 0) and (deck_enh_count(gs, enh) / n) or 0
+end
+
+-- Cards scored per hand (~a 5-card hand, minus the odd non-scorer) and discards spent per scoring hand
+-- (a ~3-discard budget over ~2.5 scoring hands, not all used) -- the base multipliers the rank/suit gates
+-- scale. Owner-calibratable.
+local SCORED_PER_HAND   = 4.5
+local DISCARDS_PER_HAND = 1.0
 local TAROT_MAKERS = { j_cartomancer = true, j_vagabond = true, j_hallucination = true }
-local function consumable_use_rate(gs, set)
-  if set == "Planet" then
-    if owns_joker(gs, "j_astronomer") then return 0.30 end   -- free Celestial packs -> heavy planet throughput
+
+-- Events of a scaler's fuel per SCORING HAND (deck/resource-aware), OWNER-CALIBRATABLE per fuel.
+local function event_rate(gs, e)
+  local fuel = e.feed_fuel
+  if fuel == "planet" then
+    if owns_joker(gs, "j_astronomer") then return 0.30 end          -- free Celestials -> heavy throughput
     if is_leveling(gs) or owns_joker(gs, "j_satellite") then return 0.15 end
     if is_rich(gs) then return 0.06 end
     return 0.03
-  else -- Tarot
+  elseif fuel == "tarot" then
     for k in pairs(TAROT_MAKERS) do if owns_joker(gs, k) then return 0.14 end end
     if is_rich(gs) then return 0.05 end
     return 0.03
+  elseif fuel == "discard_any" then
+    return DISCARDS_PER_HAND
+  elseif fuel == "discard_suit" then
+    return DISCARDS_PER_HAND * 0.25                                 -- a random suit each round ~ 1/4 of discards
+  elseif fuel == "discard_rank" then
+    return DISCARDS_PER_HAND * deck_rank_frac(gs, e.feed_rank)
+  elseif fuel == "scored_rank" then
+    return SCORED_PER_HAND * deck_rank_frac(gs, e.feed_rank)
+  elseif fuel == "lucky_trigger" then
+    return SCORED_PER_HAND * deck_enh_frac(gs, "m_lucky") * 0.20    -- lucky card scored, ~1/5 mult trigger
+  elseif fuel == "card_add" then
+    return 0.06                                                     -- Standard/tarot deck additions, rare
+  elseif fuel == "reroll" then
+    return is_rich(gs) and 0.30 or 0.12                             -- money-gated
+  elseif fuel == "skip" then
+    return 0.03
+  elseif fuel == "pack_skip" then
+    return 0.04
+  elseif fuel == "sell" then
+    return 0.05
+  elseif fuel == "blind_select" then
+    return 2 / (ACC_HANDS_PER_BLIND * 3)                            -- 2 selectable blinds per ante
+  elseif fuel == "off_type" then
+    return 0.55                                                     -- fraction of hands that aren't your most-played
+  elseif fuel == "face_destroy" then
+    return 0.02                                                     -- face-destruction events are rare
   end
+  return 0
 end
 
-local function projected_consumable_uses(gs, set)
-  local br = Eval.blinds_remaining(gs)
-  if br <= 0 then return 0 end
-  return br * ACC_HANDS_PER_BLIND * consumable_use_rate(gs, set)
-end
-
--- Score per 1.0 unit of a consumable-fed scaler's counter, measured deck-aware. Constellation's counter
--- is x_mult (measure the joker at +1.0x, i.e. x_mult=2, and divide); Fortune Teller's is flat mult.
-local function consumable_scaler_spu(gs, key, xmult, opts)
-  local ref = 1.0
-  local ability = xmult and { x_mult = 1 + ref } or { mult = 10 }
-  local denom = xmult and ref or 10
+-- Score per 1.0 unit of a scaler's counter (per-chip, per-mult, or per-1.0-x_mult), measured deck-aware by
+-- injecting a reference counter. A per-1.0-x_mult unit is measured at x_mult=2 (i.e. +1.0x) and divided.
+local function unit_spu(gs, key, kind, opts)
+  local ability, denom
+  if kind == "xmult" then ability, denom = { x_mult = 2 }, 1.0
+  elseif kind == "chips" then ability, denom = { extra = { chips = 100 } }, 100
+  else ability, denom = { mult = 10 }, 10 end
   local m = JokerValue.score_delta(gs, { key = key, ability = ability },
     { samples = (opts and opts.samples) or 6, rng = opts and opts.rng, cache = opts and opts.cache })
   return (m or 0) / denom
 end
 
--- Forward (go-forward) accrual value of a consumable-fed scaler in RAW score units: the counter ramps
--- ~linearly to inc*uses over the remaining run, so its average ADDED contribution per hand is half that
--- times the per-unit score. nil if not a modelled consumable-fed scaler. For an OWNED already-scaled one
--- the current accrued counter is captured separately by the normal measured score_delta and ADDED to this.
-local function consumable_fed_forward(gs, key, opts)
+-- Total counter the scaler accrues over its effective horizon (RUN, or a resetting PERIOD). Deck-CONSUME
+-- fuels (Vampire eats enhancements, Glass shatters Glass cards) are bounded by the deck count, once each,
+-- rather than a per-hand rate.
+local function total_counter_gain(gs, e)
+  local fuel = e.feed_fuel
+  if fuel == "enh_scored" then return e.feed_inc * deck_enh_count(gs) end        -- Vampire: each enh eaten once
+  if fuel == "glass_break" then return e.feed_inc * deck_enh_count(gs, "m_glass") end  -- Glass: each shatters once
+  if fuel == "ceremonial" then return e.feed_inc * 2.5 end   -- one-shot: 2 x a typical right-neighbour sell value
+  -- rate-based fuels: events over the horizon (run, or one resetting period)
+  local horizon = Eval.blinds_remaining(gs) * ACC_HANDS_PER_BLIND
+  if e.feed_reset == "round" then horizon = ACC_HANDS_PER_BLIND
+  elseif e.feed_reset == "ante" then horizon = ACC_HANDS_PER_BLIND * 3
+  elseif e.feed_reset == "on_type" then horizon = ACC_HANDS_PER_BLIND end   -- Obelisk resets ~each time you play best
+  if horizon <= 0 then return 0 end
+  return e.feed_inc * event_rate(gs, e) * horizon
+end
+
+-- Forward (go-forward) accrual value of an event-fed scaler in RAW score units: the counter ramps
+-- ~linearly to total_counter_gain over its horizon, so its average ADDED per-hand contribution is half
+-- that times the per-unit score. `feed_damp` (Madness: it destroys a joker each blind-select) discounts
+-- the net. nil if not a modelled event-fed scaler.
+local function event_fed_forward(gs, key, opts)
   local e = JokerData.resolve(key)
-  if not (e and e.feed_set) then return nil end
-  local uses = projected_consumable_uses(gs, e.feed_set)
-  local spu = consumable_scaler_spu(gs, key, e.feed_xmult, opts)
-  return e.feed_inc * uses / 2 * spu
+  if not (e and e.feed_fuel) then return nil end
+  local total = total_counter_gain(gs, e)
+  if total <= 0 then return 0 end
+  local spu = unit_spu(gs, key, scaler_kind(e), opts)
+  local ramp = e.feed_once and 1 or 0.5   -- a one-shot gain is at full from hand 1 (no linear ramp)
+  return total * ramp * spu * (e.feed_damp or 1)
 end
 
 -- Mean best-play score of the CURRENT board (the base a conditional xmult multiplies),
@@ -466,10 +543,10 @@ function Eval.modeled_scoring_fraction(gs, key, opts)
     local sm = accumulating_scaler_marginal(gs, key, opts); return sm and (sm / need) or nil
   elseif e.deck_buff then
     local sm = deck_buff_scaler_marginal(gs, key, opts); return sm and (sm / need) or nil
-  elseif e.feed_set then
-    -- Consumable-fed (Constellation/Fortune Teller): a fresh one measures 0, so value it by its
-    -- resource-aware projected accrual (no tier floor). It projects internally -> caller must not re-project.
-    local fwd = consumable_fed_forward(gs, key, opts); return fwd and (fwd / need) or nil
+  elseif e.feed_fuel then
+    -- EVENT-fed (Constellation, Castle, Vampire, Campfire, ...): a fresh one measures 0, so value it by its
+    -- deck/resource-aware projected accrual (no tier floor). It projects internally -> caller must not re-project.
+    local fwd = event_fed_forward(gs, key, opts); return fwd and (fwd / need) or nil
   elseif DECK_MOD_ECON[key] then
     return 0
   elseif key == "j_invisible" then
@@ -540,16 +617,16 @@ local function jp_from_measure(gs, key, edition, m, opts, owned)
       return (sm / Mechanics.boss_per_hand_need(gs)) * JP_PER_FRAC + edition_jp(edition, false), true
     end
   end
-  -- CONSUMABLE-FED scaler (Constellation/Fortune Teller), BUY side only: value = resource-aware forward
-  -- accrual + the fresh joker's measured ~0. No tier floor -- this is what stops over-buying it in a
-  -- non-planet build (the R5 trap). The OWNED/sell side (owned=true) deliberately does NOT take this path:
-  -- an owned scaling core measures LOW on a still-weak board (nothing to multiply YET), and dropping its
-  -- tier floor here made it the most-disposable joker -- the engine dumped its own committed Constellation
-  -- (corpus seed Z9PBGTL2: human BOUGHT Constellation, engine wanted to SELL its owned one). Sell-side core
-  -- protection is a SEPARATE, endorsed concern (BP.CORE_KEEP / the tier floor as a FLOOR), so an owned one
-  -- falls through to the measured+floor path below and keeps its protection.
-  if e.feed_set and not owned then
-    local fwd = consumable_fed_forward(gs, key, opts)
+  -- EVENT-FED scaler (Constellation, Castle, Vampire, Campfire, ...), BUY side only: value = deck/resource-
+  -- aware forward accrual + the fresh joker's measured ~0. No tier floor -- this is what stops over-buying a
+  -- scaler that can never be fed (the R5 non-planet Constellation trap). The OWNED/sell side (owned=true)
+  -- deliberately does NOT take this path: an owned scaling core measures LOW on a still-weak board (nothing
+  -- to multiply YET), and dropping its tier floor here made it the most-disposable joker -- the engine
+  -- dumped its own committed Constellation (corpus seed Z9PBGTL2). Sell-side core protection is a SEPARATE,
+  -- endorsed concern (BP.CORE_KEEP / the tier floor as a FLOOR), so an owned one falls through to the
+  -- measured+floor path below and keeps its protection.
+  if e.feed_fuel and not owned then
+    local fwd = event_fed_forward(gs, key, opts)
     if fwd then
       local frac = (m + fwd) / Mechanics.boss_per_hand_need(gs)
       return frac * JP_PER_FRAC + edition_jp(edition, false), true

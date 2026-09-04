@@ -216,6 +216,46 @@ return function(t)
       "Fortune Teller is worth more with a tarot generator (Cartomancer) feeding it")
   end
 
+  -- Task 3 (rest): EVERY scaler is now on the measured system -- the discard/deck-content/action-fed classes
+  -- too. Directional: deck-content scalers respond to the DECK (Glass to Glass cards), money-gated fuels to
+  -- MONEY (Flash to rerolls), and none falls through to the flat tier prior.
+  do
+    local Eval = require("engine.eval_function")
+    local GSm = require("model.game_state")
+    local function lcg(s) s = s % 2147483647; if s <= 0 then s = s + 2147483646 end
+      return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end end
+    local function mkdeck(enh, nenh)
+      local d = {}
+      for i = 1, 52 do
+        local c = card{ id = i, rank_id = ((i - 1) % 13) + 2,
+          suit = ({ "Spades", "Hearts", "Clubs", "Diamonds" })[((i - 1) % 4) + 1] }
+        if enh and i <= nenh then c.enhancement = enh end
+        d[#d + 1] = c
+      end
+      return d
+    end
+    local function msf(key, deck, dollars)
+      local gs = GSm.new{ deck = deck, meta = { ante = 3 }, jokers = {},
+        economy = { dollars = dollars or 30, interest_cap = 5 },
+        run = { hand_levels = {}, joker_slots = 5, consumable_slots = 2, hand_type_plays = {} } }
+      return Eval.modeled_scoring_fraction(gs, key, { rng = lcg(4), samples = 12 })
+    end
+    -- every remaining scaler class is MODELLED (non-nil), not falling through to the tier prior
+    for _, k in ipairs({ "j_castle","j_hit_the_road","j_yorick","j_wee","j_vampire","j_glass","j_lucky_cat",
+                         "j_hologram","j_campfire","j_throwback","j_flash","j_red_card","j_obelisk",
+                         "j_madness","j_caino","j_ceremonial" }) do
+      t.ok(msf(k, mkdeck(nil, 0)) ~= nil, k .. " is modelled by the measured system (no tier fallthrough)")
+    end
+    -- deck-content: Glass Joker is worthless with no Glass cards, valuable with them (deck-aware, not flat)
+    t.eq(msf("j_glass", mkdeck(nil, 0)), 0, "Glass Joker is ~0 with no Glass cards in the deck")
+    t.ok(msf("j_glass", mkdeck("m_glass", 8)) > 0.1, "Glass Joker is valuable with Glass cards to shatter")
+    t.ok(msf("j_vampire", mkdeck("m_bonus", 8)) > msf("j_vampire", mkdeck(nil, 0)),
+      "Vampire is worth more with enhanced cards to eat")
+    -- money-gated fuel: Flash Card (per reroll) is worth more when rich (you reroll more)
+    t.ok(msf("j_flash", mkdeck(nil, 0), 60) > msf("j_flash", mkdeck(nil, 0), 20),
+      "Flash Card (reroll-fed) is worth more when rich (more rerolls)")
+  end
+
   -- Task 2: DECK-MODIFIER jokers are valued off their real channel, not the flat tier floor.
   -- Midas Mask & Certificate pay in MONEY (Eval.econ_value), scoring jp ~0; Midas is FACE-DECK-AWARE
   -- (the tier floor never varied by deck). Marble/DNA are deck-growth, measured via card_add_value with

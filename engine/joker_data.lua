@@ -209,14 +209,40 @@ D.j_supernova.head_start = "hand_type_plays"                 -- reads run's cumu
 D.j_green_joker.inc = 1;   D.j_green_joker.scale_rate = 0.10 -- +1/hand -1/discard: discards gut it, esp. red deck (worst)
 D.j_trousers.inc    = 2;   D.j_trousers.scale_rate  = 0.50 -- +2 mult per hand CONTAINING Two Pair (trigger hands already gated); diggable, moderate gain
 
--- CONSUMABLE-FED scaler config (engine/eval_function consumable_fed_forward): the counter grows each time
--- you USE a Planet (Constellation) or Tarot (Fortune Teller) card -- a shop/economy action, not a played
--- hand -- so the accrual is projected RESOURCE-awarely (generation capacity + leveling commitment + money),
--- NOT the flat tier x projection that valued a fresh Constellation identically in every context. feed_inc =
--- counter gain per use; feed_xmult = the counter is x_mult (measure per-1.0x), else flat mult. Rates in
--- consumable_use_rate are owner-calibratable (like scale_rate); the SIM/corpus are the ruler.
-D.j_constellation.feed_set  = "Planet"; D.j_constellation.feed_inc = 0.1; D.j_constellation.feed_xmult = true  -- +0.1x per Planet used
-D.j_fortune_teller.feed_set = "Tarot";  D.j_fortune_teller.feed_inc = 1                                        -- +1 mult per Tarot used
+-- EVENT-FED scaler config (engine/eval_function event_fed_forward): a large family whose counter grows on a
+-- specific EVENT (using a consumable, discarding, scoring/destroying a card, a shop/blind action) rather than
+-- a played hand type. Value = feed_inc x projected_events / 2 x deck-aware spu, NO tier floor -- the flat tier
+-- x projection valued a FRESH one identically in every context (a fresh Constellation read 4.32-of-a-boss-hand
+-- on a bare deck). feed_fuel names the growth event (rates in event_rate, OWNER-CALIBRATABLE); feed_inc = gain
+-- per event; the counter UNIT (chips/mult/x_mult) is derived from cat. feed_reset = a per-period resetting
+-- counter (round/ante/on_type -> horizon is the period, not the run); feed_rank gates a rank-specific fuel;
+-- feed_damp discounts a fuel with a COST (Madness destroys a joker); feed_once = a one-shot board-dependent
+-- gain (Ceremonial). The SIM/corpus are the ruler.
+--   consumable-fed:
+D.j_constellation.feed_fuel  = "planet"; D.j_constellation.feed_inc = 0.1   -- +0.1x per Planet used
+D.j_fortune_teller.feed_fuel = "tarot";  D.j_fortune_teller.feed_inc = 1    -- +1 mult per Tarot used
+--   discard-fed:
+D.j_castle.feed_fuel       = "discard_suit"; D.j_castle.feed_inc = 3                                    -- +3 chips/discard of the round's suit
+D.j_hit_the_road.feed_fuel = "discard_rank"; D.j_hit_the_road.feed_inc = 0.5; D.j_hit_the_road.feed_rank = 11; D.j_hit_the_road.feed_reset = "round"  -- +0.5x/Jack discarded, resets each round
+D.j_yorick.feed_fuel       = "discard_any";  D.j_yorick.feed_inc = 1 / 23                               -- +1x per 23 cards discarded
+--   scored-rank:
+D.j_wee.feed_fuel          = "scored_rank";  D.j_wee.feed_inc = 8; D.j_wee.feed_rank = 2                -- +8 chips per scored 2
+--   enhanced / destroyed card (deck-content, bounded by deck count):
+D.j_vampire.feed_fuel      = "enh_scored";   D.j_vampire.feed_inc = 0.1                                 -- +0.1x/scored enhanced card (eats it)
+D.j_glass.feed_fuel        = "glass_break";  D.j_glass.feed_inc = 0.75                                  -- +0.75x per Glass card shattered
+D.j_lucky_cat.feed_fuel    = "lucky_trigger";D.j_lucky_cat.feed_inc = 0.25                              -- +0.25x per Lucky trigger
+--   deck-size:
+D.j_hologram.feed_fuel     = "card_add";     D.j_hologram.feed_inc = 0.25                               -- +0.25x per card added to deck
+--   action-fed (sell / skip / reroll / pack-skip):
+D.j_campfire.feed_fuel     = "sell";         D.j_campfire.feed_inc = 0.25; D.j_campfire.feed_reset = "ante"  -- +0.25x/joker sold, resets on boss
+D.j_throwback.feed_fuel    = "skip";         D.j_throwback.feed_inc = 0.25                              -- +0.25x per blind skipped
+D.j_flash.feed_fuel        = "reroll";       D.j_flash.feed_inc = 2                                     -- +2 mult per reroll
+D.j_red_card.feed_fuel     = "pack_skip";    D.j_red_card.feed_inc = 3                                  -- +3 mult per booster skipped
+--   reset-on-repeat / joker-destroying / rare (class G -- conservative):
+D.j_obelisk.feed_fuel      = "off_type";     D.j_obelisk.feed_inc = 0.2; D.j_obelisk.feed_reset = "on_type"  -- +0.2x/off-most-played hand, resets on it
+D.j_madness.feed_fuel      = "blind_select"; D.j_madness.feed_inc = 0.5; D.j_madness.feed_damp = 0.3    -- +0.5x/blind select, but DESTROYS a joker -> damped
+D.j_caino.feed_fuel        = "face_destroy"; D.j_caino.feed_inc = 1                                     -- +1x per face card destroyed (rare)
+D.j_ceremonial.feed_fuel   = "ceremonial";   D.j_ceremonial.feed_inc = 2; D.j_ceremonial.feed_once = true; D.j_ceremonial.feed_damp = 0.5  -- one-shot +2x(right sell) mult, destroys that joker
 
 -- DECK-BUFF scaler (Hiker): it has NO joker counter to inject -- it permanently adds chips to the CARDS
 -- when scored, so it's valued by a DECK-BUFF spu (buff the deck, measure the score delta) x the chips it
