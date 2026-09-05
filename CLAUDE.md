@@ -33,18 +33,21 @@ plus a large correctness/coverage/strategy pass.
 > Balatro inputs and plays whole runs unattended — a real-game bug-finder for the overlay. The owner watches
 > its runs and reports misplays; I fix them and, for economy/valuation changes, **MEASURE on the frozen 7-win
 > agreement corpus** (`tools/agreement_run.sh`) before keeping — the durable, non-ceilinged ruler. **Read
-> `NEXT_SESSION.md` top block FIRST** (**2026-09-04 ACTIVE THREAD: R6–R8 owner review.** SHIPPED: Ectoplasm
-> priced properly + `CV.hand_size_cost` measured and shared with Ouija (`175b5c4`); a generator with nowhere
-> to put its output is no longer "live" — the two defects behind the R8 death (`b21aa57`). OPEN, ranked, in
-> `ADVICE_REVIEW.md` R7/R8: **the PLAY CHOOSER is order-blind** (`ordering.lua` is correct and wired, but it
-> runs AFTER `best_play` has picked, and `best_play` compares subsets in DEALT order — cost a clearing 748 to
-> take a 350); **Business Card is invisible to the in-blind money model** (`VALUE_ONLY`, so the tier-2
-> "both clear → maximise money" tie-break reads $0 either way); autoplay never reorders CARDS; **no guard on
-> selling the board's last unconditional Mult** (= §31f board-as-a-SET, now with a live death behind it);
-> and **12 of 18 spectrals are still flat priors**. Earlier 2026-09-01: the MEASURED-SCALER VALUATION — owner
-> directive that TIERS are a legacy fallback, so measure scalers + drop the tier floor; resetting (Ride the
-> Bus) + accumulating joker-counter scalers done + owner-calibrated, HIKER's deck-buff valuation + a SIM A/B
-> are the open "proceed" work. Earlier 2026-08-31: in-blind play fixes + Hologram feed + the econ floor).
+> `NEXT_SESSION.md` top block FIRST** (**2026-09-05: THE "MEASURE, DON'T USE CONSTANTS" ARC IS COMPLETE + the
+> two clearest in-blind live bugs are fixed.** SHIPPED this arc: **ALL 31 scalers measured** (0 tier
+> fall-throughs) via a unified EVENT-FED model (`Eval.event_fed_forward`); **ALL 18 spectrals measured** (Tier
+> 1 Black Hole/seals/Sigil + Tier 2 Soul/Cryptid/Aura/add-group); **the PLAY CHOOSER is now CARD-ORDER-AWARE**
+> (`best_play_target` re-judges the top subsets at their best card order when Hanging Chad/Photograph/xmult
+> present — corpus BLIND agree +1.0pp; was order-blind, a real death); **Business Card feeds the in-blind money
+> model** (was `VALUE_ONLY` → $0 to the tier-2 money tie-break); **Vagabond value is econ-aware**
+> (`Generators.fire_rate` — fires only ≤$4). Earlier R6–R8: Ectoplasm priced properly + `CV.hand_size_cost`
+> (`175b5c4`); a generator with nowhere to put its output is no longer "live" (`b21aa57`).
+> ⛔ OPEN, deliberately deferred with reasons: **the last-unconditional-Mult sale guard** (R8 #4) is the HARD
+> §31f board-as-a-SET problem — the leave-one-out marginal is ACCURATE; the gap is worst-case-hand board
+> collapse, which needs SET-scoring, NOT a magnitude/guard hack (the research fork); and **the self-player
+> never reorders CARDS** (`ui/autoplay.lua`, live-only — must execute the chooser's reorder; the sim already
+> does). Earlier 2026-09-01: the MEASURED-SCALER VALUATION owner directive (tiers are a legacy fallback);
+> earlier 2026-08-31: in-blind play fixes + Hologram feed + the econ floor).
 > ⭐ TWO lessons from this loop: (1) the winners DIG hard (discard 57% vs the
 > engine's 41%) — but a uniform dig bias was REFUTED by the corpus (it digs where the human PLAYED; the gap
 > is SITUATIONAL commit-to-a-line, the build-commitment wall). (2) the ante-aware econ floor (hold the
@@ -84,7 +87,7 @@ thing **headless-testable**. See the Layout section in `README.md` for the per-f
 - **Tool index:** `tools/README.md` — 31 analysis tools grouped by the QUESTION each answers.
   Read it before writing a new one; most read existing telemetry and cost nothing to run.
 - **Tests (do this after every change):** `lua tests/runner.lua` (run via the Bash
-  tool). Lua 5.1+/LuaJIT, no `love`/`G`/Steamodded needed. Currently **1156 pass** (+ 604 sim).
+  tool). Lua 5.1+/LuaJIT, no `love`/`G`/Steamodded needed. Currently **1209 pass** (+ 604 sim).
   Failures print `FAIL  <case>  (got X, want Y)`; exit code is non-zero on failure.
   ⚠ **Two known, pre-existing conditions — don't mistake either for a regression you caused:**
   (1) the sim suite has **one** standing failure, `test_world` *"no overflow on a full disposable board"*
