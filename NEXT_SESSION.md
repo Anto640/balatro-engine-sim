@@ -107,28 +107,42 @@ fixed**:
   Result: marginal **3.000 → 0.300**, advice **SELL Greedy → SELL Riff-Raff**; buy value was **7.5233 on
   every board size**, now 7.02 / 7.02 / 2.43 / **−2.16** as the slots after purchase go 3 / 2 / 1 / 0.
 
-**⏳ OPEN, ranked — the two biggest are in R7 and both touch `hand_eval`'s hot path:**
-1. **⭐ THE PLAY CHOOSER IS ORDER-BLIND.** `engine/ordering.lua` is complete and correct — it permutes card
-   AND joker order, is wired into `decision_engine:479`, and the overlay renders a gold "Reorder:" line. But
-   `Ordering.optimize` runs on the play `best_play` has **already chosen**, and `best_play` compares subsets
-   **in dealt order**. Owner's Greedy + Hanging Chad hand: Two Pair scores **340 dealt / 748 with the Diamond
-   led**, High Card scores 350 → it took the **High Card**, and the blind needed **400**. The reordered Two
-   Pair clears; the chosen play does not, and being a 1-card play there is nothing left to permute. The fix
-   belongs in the CHOOSER, not in `ordering.lua`.
-2. **Business Card is invisible to the in-blind money model** — `j_business` is in `joker_effects.VALUE_ONLY`,
-   so a 4-face-card Two Pair and a 1-card non-face High Card both read **$0.00**. That defeats
-   `best_play_target`'s tier-2 "both clear, so maximise MONEY" tie-break, which is precisely when it matters.
-   Note the gap: R5 taught the SKIP advisor about Business Card and `DE.DIG_FOR_MONEY` handles Faceless (the
-   DISCARD channel) — the **PLAY** channel, Business Card's actual trigger, was never taught.
+**⏳ OPEN, ranked:**
+1. **✅ DONE (`f46b5cc`, 2026-09-05) — THE PLAY CHOOSER IS NOW CARD-ORDER-AWARE.** `best_play` compared
+   subsets in dealt order and could take a play that fails to clear while a REORDERED subset clears (owner's
+   Greedy + Hanging Chad hand — Two Pair 340 dealt / 924 lead-Diamond-Ace, verified). `HandEval.best_play_target`
+   now, when `HandEval.card_order_sensitive` (Hanging Chad / Photograph / Glass or poly cards), collects the
+   top-K subsets by dealt score and re-judges each at its best CARD order (bounded cards-only permute), then
+   returns the sel already in best order (so the sim, which scores sel in order, plays optimally). The human
+   REORDER tip is preserved: `decision_engine` feeds `Ordering.optimize` the HAND-order sequence so it still
+   recovers hand→best. Order-INSENSITIVE boards are byte-identical (0.98 ms/call; sensitive ~6.4 ms, gated).
+   `best_play` (the 80× discard-sampling path) is left dealt-order for perf. **Corpus (cf_spec2→cf_play):
+   BLIND class-agree +1.0pp (431→439)** — the engine's in-blind play choices now match the winning human MORE
+   often; everything else neutral, guards intact. The changed plays are higher-value ordered picks.
+2. **✅ DONE (`0538fa1`) — Business Card feeds the in-blind money model.** `j_business` (VALUE_ONLY) never
+   reached `ev.money`, so the tier-2 "both clear → maximise MONEY" play tie-break read $0 for a farming board.
+   `score_with` now adds $1 expected per played FACE card per Business Card (per trigger — a Hanging Chad
+   retrigger re-rolls it; Oops! → $2; Pareidolia counts all cards). Feeds `ev.money` → `play_econ` → the
+   tie-break and `econ_power`. **Corpus (cf_play→cf_all, with Vagabond): NEUTRAL** — BLIND −0.3pp (2 tier-2
+   plays where the money tie-break now prefers the higher-$ clearing play), all SHOP/PACK metrics 0.0.
 3. **The self-player never reorders CARDS** — `ui/autoplay.lua` has a joker-reorder phase; `card_order`
-   appears **zero times**. Also a human-path UX gap: card order is HAND order, so the tip means "drag these
-   left before playing", which the overlay line does not say.
-4. **⚠ Nothing notices a sale leaves the board with no unconditional Mult** (R8 defect 3, NOT fixed). Greedy
-   is `flat_mult` → `SCORER_KEEP`, and plain scorers are *deliberately* unprotected. The rest of that board
-   read strong by marginals (Hit the Road 9.450) but Hit the Road is conditional and **resets every round**
-   and Hanging Chad is a retrigger that multiplies nothing by itself. **This is §31f's board-as-a-SET problem
-   in miniature — Mult is a FACTOR, so dropping the last one collapses the product rather than costing its
-   marginal — and there is now a concrete live death behind it. Do NOT attempt it as a magnitude tweak.**
+   appears **zero times**. Now that the chooser (item 1) returns the best card order and the overlay tip
+   recovers hand→best, the live autoplayer must EXECUTE that card reorder to realize the fix (the sim already
+   does, since it scores the sel in order). ⚠ Live-only (`ui/autoplay.lua` needs `G`/love) — cannot be
+   validated headlessly; needs an in-game run.
+4. **⚠ Nothing notices a sale leaves the board with no unconditional Mult** (R8 defect 3, STILL open — the
+   hard one). Greedy is `flat_mult` → `SCORER_KEEP`; plain scorers are deliberately unprotected. **Assessed
+   2026-09-05 and deliberately NOT quick-fixed:** the leave-one-out marginal `joker_marginal_fv` is ACCURATE
+   (Greedy really was weak on a few-Diamonds deck); the gap is WORST-CASE-hand board collapse — the boss hand
+   didn't trigger the board's conditional/retrigger mult, so scoring collapsed. This is genuinely §31f's
+   board-as-a-SET problem (Mult is a FACTOR; its marginal ≠ the product's collapse) and needs set-scoring
+   (score the board as copiers×xmult×triggers, detect the last mult FACTOR), not a magnitude tweak or a
+   guard bolted onto the averaged marginal. Left for the research fork.
+
+**✅ GENERATORS (`c491742`, 2026-09-05) — Vagabond value is now econ-aware.** It makes a Tarot only at <= $4,
+but the flat tier prior valued it 3.75 at every dollar level; `Generators.fire_rate` damps it by expected
+firing rate (3.75 at $2 → 0.38 at $25). Cartomancer (unconditional) and Riff-Raff (output-fit gated, R8) are
+unchanged. The generators are no longer context-blind constants.
 5. **✅ TIER 1 DONE (`0c6ae12`, 2026-09-04) — the spectral wiring.** **Black Hole** now uses the measured
    `Packs.black_hole_value` in BOTH the buy valuation (`card_value`) and the use decision (`DE.GEN_USE`) —
    one deck-aware price, not three (0.9 → 0.388 stock ante 3). **The four SEAL spectrals** are now
