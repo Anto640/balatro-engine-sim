@@ -140,11 +140,21 @@ fixed**:
    PACK diff −0.5pp, everything else neutral, guards unchanged.** The changed picks are the engine choosing
    spectrals by measured value instead of flat priors (Sigil→Grim/Talisman where Sigil measures low with no
    flush lean; Incantation→Deja Vu on a board where the red retrigger is worth more) + spectral pack EVs
-   recomputed. No regressions. ⏳ **TIER 2 REMAINS (real modelling, NOT wiring): Soul, Aura, Cryptid, and the
-   destroy-and-add group Familiar/Grim/Incantation** — these still read `SPECTRAL_BASE` flat priors (Soul 1.2,
-   Cryptid 0.4, Aura 0.35, the add-group 0.25). Soul (a Legendary joker) and Cryptid (2 copies of a card) are
-   the highest-value of the remainder — and the corpus showed the engine flipping some Sigil picks TO the
-   still-flat Grim/Incantation, so measuring those is the natural finish.
+   recomputed. No regressions. **✅ TIER 2 DONE (`009c368`, 2026-09-05) — ALL 18 spectrals now measured, 0 flat priors.**
+   **Soul** (a random Legendary) via `Packs.expected_joker_of_rarity("Legendary")`, slot-aware (full board
+   ×0.7) — 1.2 → 1.98 free / 1.39 full, now the top spectral above Black Hole; its `DE.GEN_USE` uses the same
+   measured value. **Cryptid** (2 copies of a card) via `card_add_value ×2` FLOORED like DNA/Marble
+   (`CV.CRYPTID_FLOOR` — deck-copy value is dilution-dominated in a snapshot; the floor is the compounding it
+   can't measure) — 0.4 → 0.2. **Aura** (a random edition) via an analytic `AURA_FRAC × base/need` estimate
+   (a greedy measurement editions a card the sampler rarely scores and reads ~0, same intent-blindness as the
+   Red seal) — 0.35 → deck-aware 0.01–0.10. **Familiar/Grim/Incantation** (destroy 1, add N enhanced) via
+   `N × card_add_value` — 0.25 flat → scales with N (Incantation 0.37 > Familiar 0.29 > Grim 0.19). The pack
+   pool inherits all of it (spectral_pool calls card_value). **Corpus (Tier1→Tier2): NEUTRAL** — PACK agree
+   ±0.3pp (1 state), all SHOP metrics 0.0, guards unchanged. Changed picks = choosing spectrals by measured
+   value (Incantation, the strongest add-group, now often wins) + spectral pack EVs rising because Soul is
+   valued; no aggregate buy/save shift. ⚠ Watch: Soul at ~1.98 lifts spectral-pack EVs noticeably — if a live
+   run shows over-buying Spectral packs, damp `CV.soul_value` or the pool's best-of-N.
+   **➡ THE SPECTRAL LAYER IS FULLY MEASURED (18/18). No spectral reverts to a constant.**
 
 **🛑 A PROCESS LESSON THAT PAID FOR ITSELF TWICE THIS SESSION** — CLAUDE.md's *"verify by MEASURING, not by
 reading the diff"*. On Ectoplasm, the first draft's comment asserted the hand-size cost was **convex** in hand
