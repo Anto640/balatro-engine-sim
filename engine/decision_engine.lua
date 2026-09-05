@@ -476,6 +476,17 @@ function DE.decide(gs, opts)
     end
   end
 
+  -- best_play_target now returns play_cards ALREADY in best card order (it chooses the subset by its best-
+  -- ordered score, R7 fix). The human-facing REORDER tip must therefore be computed against the HAND order
+  -- the cards are physically in, not against the already-optimised play_cards (or it would find nothing to
+  -- suggest). Rebuild the hand-order sequence of the played cards and let Ordering.optimize recover the
+  -- reorder from there. (Order-insensitive boards leave play_cards in hand order, so this is a no-op there.)
+  local hand_pos = {}
+  for i, c in ipairs(hand or {}) do hand_pos[c] = i end
+  local hand_ordered_play = {}
+  for _, c in ipairs(play_cards) do hand_ordered_play[#hand_ordered_play + 1] = c end
+  table.sort(hand_ordered_play, function(a, b) return (hand_pos[a] or 0) < (hand_pos[b] or 0) end)
+
   local play_action = {
     type = "PLAY",
     cards = play_cards,
@@ -487,8 +498,8 @@ function DE.decide(gs, opts)
     -- best joker/card ORDER for this exact play. Objective is MONEY once the
     -- clear is already guaranteed (extra score is overkill -> order for econ,
     -- e.g. retriggering a Gold-seal card), else SCORE/safety. Suggests a reorder
-    -- only if it beats the current order (see DE._annotate).
-    ordering = Ordering.optimize(gs, play_cards, {
+    -- only if it beats the current (HAND) order (see DE._annotate).
+    ordering = Ordering.optimize(gs, hand_ordered_play, {
       objective = (guaranteed and "money" or "score"), remaining = remaining }),
     fuel_note = play_fuel_note,   -- surfaced in DE._annotate
   }

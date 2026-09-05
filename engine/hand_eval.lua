@@ -677,9 +677,78 @@ end
 -- Tie-breaks: in tier 2 the extra score is WASTED overkill, so maximise MONEY
 -- (banked seals, held gold cards) then score; tier 0 maximises score. Within
 -- tier 1, equal expected scores prefer the higher guaranteed floor (F7).
+-- Card order changes a subset's score when a POSITIONAL joker is owned (Hanging Chad ×3 the first scored
+-- card; Photograph ×2 the first scored FACE) or a card xmult (Glass / polychrome) can interleave with the
+-- additive effects. When none is present, dealt order is already optimal and best_play_target below stays
+-- byte-identical (the ordering pass is skipped entirely -- no allocation, no re-score).
+local ORDER_JOKERS = { j_hanging_chad = true, j_photograph = true }
+function HandEval.card_order_sensitive(gs)
+  for _, j in ipairs(gs.jokers or {}) do if ORDER_JOKERS[j.key] then return true end end
+  for _, c in ipairs(gs.hand or {}) do
+    if c.enhancement == "m_glass" or c.edition == "polychrome" then return true end
+  end
+  return false
+end
+
+-- The survival-tier rank of one scored ev (mirrors the comparison in best_play_target): a play whose
+-- guaranteed floor clears (tier 2) beats one that clears only in expectation (tier 1) beats accumulation.
+local function target_tier(gs, ev, sel, remaining)
+  local tier = 0
+  if remaining > 0 then
+    if (ev.score_min or ev.score) >= remaining then tier = 2
+    elseif ev.score >= remaining then tier = 1 end
+  end
+  return tier, (tier == 2) and HandEval.play_econ(gs, ev, sel) or 0, ev.score, (ev.score_min or ev.score)
+end
+-- Is candidate (t,e,s,f) strictly better than the current best (bt,be,bs,bmin) under the survival objective?
+-- (sk is the retention tie-break, compared by the caller since it is order-independent.)
+local function target_better(t, e, s, f, bt, be, bs, bmin)
+  if t ~= bt then return t > bt end
+  if t == 2 and e ~= be then return e > be end
+  if s ~= bs then return s > bs end
+  if t == 1 and f ~= bmin then return f > bmin end
+  return false
+end
+
+-- Best CARD order of a fixed subset under the survival objective, searching permutations (cards only; a play
+-- is <=5 cards so this is bounded). Only called for the top candidates when the board is order-sensitive.
+local function best_card_order(gs, sel, remaining, effective, mods)
+  local n = #sel
+  if n < 2 then return HandEval.score_with(gs, sel, effective, mods), sel end
+  local a = {}; for i = 1, n do a[i] = sel[i] end
+  local best_ev, best_sel, bt, be, bs, bf
+  local function visit()
+    local ev = HandEval.score_with(gs, a, effective, mods)
+    local t, e, s, f = target_tier(gs, ev, a, remaining)
+    if not best_ev or target_better(t, e, s, f, bt, be, bs, bf) then
+      best_ev = ev; best_sel = {}; for i = 1, n do best_sel[i] = a[i] end
+      bt, be, bs, bf = t, e, s, f
+    end
+  end
+  local function rec(k)
+    if k > n then visit(); return end
+    for i = k, n do a[k], a[i] = a[i], a[k]; rec(k + 1); a[k], a[i] = a[i], a[k] end
+  end
+  rec(1)
+  return best_ev, best_sel
+end
+HandEval._best_card_order = best_card_order   -- exposed for tests
+
+-- how many candidates to card-order-optimize (top-K by dealt-order score); the winning ordered play is
+-- reliably near the top in dealt order too (the first-card retrigger swing is bounded), so a modest K suffices.
+HandEval.ORDER_TOPK = 10
+
 function HandEval.best_play_target(gs, cards, remaining, filter)
   remaining = remaining or 0
+  -- When card order can change scores (Hanging Chad / Photograph / xmult cards), best_play compares subsets
+  -- in DEALT order and can pick a play that fails to clear while a REORDERED subset clears (owner R7: took a
+  -- High Card into a blind a reordered Two Pair would have beaten). Collect the top candidates and re-judge
+  -- them at their best card order. Off when insensitive -> byte-identical to the old dealt-order chooser.
+  local sensitive = HandEval.card_order_sensitive(gs)
+  local effective, mods
+  if sensitive then effective = HandEval.effective_jokers(gs); mods = joker_mods(effective) end
   local best, best_sel, bt, be, bs, bmin, bsk
+  local cands = sensitive and {} or nil
   each_subset(gs, cards, function(ev, sel, copy)
     local tier = 0
     if remaining > 0 then
@@ -705,7 +774,26 @@ function HandEval.best_play_target(gs, cards, remaining, filter)
     if better then
       best, best_sel, bt, be, bs, bmin, bsk = ev, copy(sel), tier, econ, ev.score, floor, sk
     end
+    if cands then cands[#cands + 1] = { sel = copy(sel), score = ev.score } end
   end, filter)
+
+  if cands and #cands > 0 then
+    table.sort(cands, function(x, y) return x.score > y.score end)
+    for i = 1, math.min(HandEval.ORDER_TOPK, #cands) do
+      local oev, osel = best_card_order(gs, cands[i].sel, remaining, effective, mods)
+      local tier, econ, score, floor = target_tier(gs, oev, osel, remaining)
+      local sk = spent_keep(osel)
+      local better
+      if not best then better = true
+      elseif tier ~= bt then better = tier > bt
+      elseif tier == 2 and econ ~= be then better = econ > be
+      elseif score ~= bs then better = score > bs
+      elseif tier == 1 and floor ~= bmin then better = floor > bmin
+      elseif tier < 2 and sk ~= bsk then better = sk < bsk
+      else better = false end
+      if better then best, best_sel, bt, be, bs, bmin, bsk = oev, osel, tier, econ, score, floor, sk end
+    end
+  end
   return best, best_sel
 end
 

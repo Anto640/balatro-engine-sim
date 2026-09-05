@@ -206,4 +206,35 @@ return function(t)
         "a flush-family hand is still found in an over-budget hand (got " .. tostring(ev.hand_type) .. ")")
     end
   end
+
+  -- ---- R7: the play chooser is ORDER-AWARE (best_play_target picks a subset by its best CARD order) ----
+  -- Owner R7: with Hanging Chad (x3 the first scored card) the engine took a High Card into a blind a
+  -- REORDERED Two Pair would clear, because best_play compared subsets in DEALT order. best_play_target now
+  -- re-judges the top candidates at their best card order.
+  do
+    local function c(r, rid, su, id) return GS.card{ id = id, rank = r, rank_id = rid, suit = su } end
+    -- Greedy (+3 mult on Diamonds) + Hanging Chad. A Two Pair leading the Ace of Diamonds scores far more
+    -- than in dealt order; a lone High Card is the dealt-order winner but doesn't clear.
+    local hand = {
+      c("King", 13, "Spades", 1), c("King", 13, "Hearts", 2),
+      c("Ace", 14, "Diamonds", 3), c("Ace", 14, "Clubs", 4), c("2", 2, "Clubs", 5),
+    }
+    local gs = GS.new{ deck = hand, hand = hand, meta = { ante = 1 },
+      jokers = { GS.joker{ key = "j_greedy_joker" }, GS.joker{ key = "j_hanging_chad" } },
+      run = { hand_levels = {}, joker_slots = 5 }, blind = { discards_left = 0, hands_left = 1 } }
+    -- the SAME Two Pair scores much more with the Diamond Ace led -> order matters here
+    local dealt = HandEval.score(gs, { hand[1], hand[2], hand[3], hand[4] }).score
+    local led   = HandEval.score(gs, { hand[3], hand[4], hand[1], hand[2] }).score
+    t.ok(led > dealt * 1.5, "reordering the Two Pair (lead the Diamond Ace) scores far more")
+    t.ok(HandEval.card_order_sensitive(gs), "Hanging Chad makes the board card-order-sensitive")
+    -- with a target only the REORDERED Two Pair can clear, the chooser must pick it (not the dealt-order best)
+    local target = math.floor((dealt + led) / 2)   -- above dealt Two Pair, below the reordered one
+    local ev = HandEval.best_play_target(gs, hand, target)
+    t.ok(ev and ev.score >= target,
+      "best_play_target picks a play that CLEARS via reordering (got " .. tostring(ev and ev.score) .. " vs " .. target .. ")")
+    -- an order-INSENSITIVE board is unchanged (no Hanging Chad/Photograph/xmult cards)
+    local plain = GS.new{ deck = hand, hand = hand, meta = { ante = 1 }, jokers = {},
+      run = { hand_levels = {}, joker_slots = 5 }, blind = { discards_left = 0, hands_left = 1 } }
+    t.ok(not HandEval.card_order_sensitive(plain), "a plain board is not card-order-sensitive (chooser unchanged)")
+  end
 end
