@@ -112,6 +112,16 @@ return function(t)
     local one_left = GSm.new{ jokers = jbank(4), run = { hand_levels = {}, joker_slots = 5 } }
     t.near(Gen.output_fit(one_left, "j_riff_raff", false), 0.1,
       "R7: BUYING Riff-Raff into the last slot leaves nowhere for its output", 1e-9)
+
+    -- fire_rate: Vagabond makes a Tarot only at <= $4, so it is econ-CONDITIONAL -- worth full when poor,
+    -- near-nothing when rich (was a flat tier prior at every dollar level). Unconditional generators are 1.
+    local function econ_gs(d) return GSm.new{ economy = { dollars = d } } end
+    t.eq(Gen.fire_rate(econ_gs(2), "j_vagabond"), 1.0, "Vagabond fires fully at <= $4")
+    t.ok(Gen.fire_rate(econ_gs(25), "j_vagabond") < 0.2, "Vagabond is near-worthless when rich (rarely at <= $4)")
+    t.ok(Gen.fire_rate(econ_gs(2), "j_vagabond") > Gen.fire_rate(econ_gs(12), "j_vagabond"),
+      "Vagabond fires less as you get richer")
+    t.eq(Gen.fire_rate(econ_gs(25), "j_cartomancer"), 1.0, "Cartomancer is unconditional (per blind select) -> fire_rate 1")
+    t.eq(Gen.fire_rate(econ_gs(25), "j_joker"), 1.0, "fire_rate is identity for a non-generator")
   end
 
   -- Ride the Bus grows only on face-FREE hands and RESETS on a scored face, so it anti-synergizes with

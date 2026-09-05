@@ -79,6 +79,22 @@ function G.output_fit(gs, key, owned)
   return (landed + (meta.room_credit or 0.5) * made) / meta.n
 end
 
+-- Expected FIRING rate of a CONDITIONAL generator, as a multiplier in [0,1] applied alongside output_fit.
+-- Vagabond makes a Tarot only on a hand played at <= $4 -- so it is near-worthless to a RICH engine and
+-- valuable when poor, yet the flat tier prior (tier x 0.5) valued it identically at every dollar level (the
+-- same context-blindness the scaler/spectral sweeps removed). Current dollars is the proxy for how often you
+-- will actually be at <= $4 when you play. Owner-calibratable; 1 (no change) for unconditional generators.
+function G.fire_rate(gs, key)
+  if key == "j_vagabond" then
+    local d = (gs and gs.economy and gs.economy.dollars) or 0
+    if d <= 4 then return 1.0        -- at/under the threshold now -> fires this round
+    elseif d <= 10 then return 0.5   -- you dip to <= $4 some rounds
+    elseif d <= 20 then return 0.25
+    else return 0.10 end             -- rich: almost never at <= $4 when playing
+  end
+  return 1
+end
+
 -- Per-PLAY econ farmers: they pay only when you actually PLAY a blind (discard/play triggers), so
 -- SKIPPING forgoes their earnings this blind. (Per-ROUND econ like Rocket/Cloud 9 is excluded -- a skip
 -- may still pay it, and double-counting it here would wrongly suppress every skip.)

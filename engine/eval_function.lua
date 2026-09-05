@@ -596,7 +596,7 @@ local function jp_from_measure(gs, key, edition, m, opts, owned)
     -- the full prior of tier 6 x 0.5 = 3.000, which outranked the board's ONLY unconditional Mult
     -- at 1.800 and made that Mult the cheapest thing to sell. ADVICE_REVIEW R8, where exactly that
     -- happened and cost the run at the ante-4 boss. Identity (x1) for every non-generator.
-    local fit = Generators.output_fit(gs, key, owned)
+    local fit = Generators.output_fit(gs, key, owned) * Generators.fire_rate(gs, key)
     return (e.tier or 3) * 0.5 * proj * fit + edition_jp(edition, true), false
   end
   -- RESETTING scaler (Ride the Bus): a fresh one measures 0, so the tier FLOOR used to decide its value

@@ -668,7 +668,7 @@ local function scoring_gain(gs, sj, rng, pace)
   -- point, because buying Riff-Raff into the LAST slot leaves nowhere for its 2 Commons to go and it
   -- can never spawn. Before this, its buy value measured 7.5233 on EVERY board size including that
   -- one (ADVICE_REVIEW R7/R8). Identity (x1) for every non-generator.
-  local prior = (JokerData.resolve(sj.key).tier or 3) * 0.3 * Generators.output_fit(gs, sj.key, false)
+  local prior = (JokerData.resolve(sj.key).tier or 3) * 0.3 * Generators.output_fit(gs, sj.key, false) * Generators.fire_rate(gs, sj.key)
   -- A scaling joker is bought for what it BECOMES: measured/prior is its value
   -- TODAY, so project it forward over the blinds remaining (1.0 for flat jokers).
   -- Condition-locked scalers (Runner/Square) are gated by how often their trigger
