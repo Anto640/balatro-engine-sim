@@ -237,4 +237,20 @@ return function(t)
       run = { hand_levels = {}, joker_slots = 5 }, blind = { discards_left = 0, hands_left = 1 } }
     t.ok(not HandEval.card_order_sensitive(plain), "a plain board is not card-order-sensitive (chooser unchanged)")
   end
+
+  -- ---- R7: Business Card feeds the in-blind MONEY model (was VALUE_ONLY -> $0 to the play tie-break) ----
+  do
+    local function c(r, rid, su, id) return GS.card{ id = id, rank = r, rank_id = rid, suit = su } end
+    local biz = GS.new{ jokers = { GS.joker{ key = "j_business" } }, run = { hand_levels = {} }, blind = {} }
+    local kings = { c("King", 13, "Spades", 1), c("King", 13, "Hearts", 2) }   -- 2 scoring face cards
+    local fives = { c("5", 5, "Spades", 3), c("5", 5, "Hearts", 4) }           -- 2 non-face
+    t.near(HandEval.score(biz, kings).money, 2, "Business Card: $1 expected per played face card ($2 for a King pair)")
+    t.eq(HandEval.score(biz, fives).money, 0, "Business Card pays nothing on non-face cards")
+    -- Oops! doubles the odds -> $2 per face
+    local bizo = GS.new{ jokers = { GS.joker{ key = "j_business" }, GS.joker{ key = "j_oops" } }, run = { hand_levels = {} }, blind = {} }
+    t.near(HandEval.score(bizo, kings).money, 4, "Oops! doubles Business Card's odds ($2/face)")
+    -- without Business Card, faces pay no in-blind money
+    local none = GS.new{ jokers = {}, run = { hand_levels = {} }, blind = {} }
+    t.eq(HandEval.score(none, kings).money, 0, "no Business Card -> face cards pay no in-blind $")
+  end
 end

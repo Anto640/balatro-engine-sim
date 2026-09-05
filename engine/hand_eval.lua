@@ -398,6 +398,13 @@ function HandEval.score_with(gs, played, effective, mods)
   for i, c in ipairs(played) do if scoring[i] and not is_debuffed(gs, c) then scoring_cards[#scoring_cards + 1] = c end end
   local held = held_cards(gs, played)
 
+  -- Business Card: each played FACE card has a 1/2 chance of $2 (expected $1; Oops! doubles the odds -> $2).
+  -- It is VALUE_ONLY (no scoring impl) so it never reached the in-blind money model, which zeroed the tier-2
+  -- "both clear -> maximise MONEY" play tie-break for a farming board (owner R7). Counted per-JOKER (Showman
+  -- can duplicate it) and per-TRIGGER below (a retrigger re-rolls it, like a Gold seal).
+  local business = 0
+  for _, j in ipairs(gs.jokers or {}) do if j.key == "j_business" then business = business + 1 end end
+
   local njokers = #(gs.jokers or {})
   local joker_slots = (gs.shop and gs.shop.joker_slots) or (gs.run and gs.run.joker_slots) or 5
   local ctx = {
@@ -446,6 +453,9 @@ function HandEval.score_with(gs, played, effective, mods)
         -- retrigger (Hanging Chad) on a money card is worth ordering for.
         if card.seal == "Gold" then money = money + 3 end
         if card.enhancement == "m_lucky" then money = money + (mods.oops and 40 or 20) / 15 end  -- Oops doubles Lucky's 1/15 $ odds
+        if business > 0 and (mods.all_faces or Cards.is_face(card)) then
+          money = money + business * (mods.oops and 2 or 1)   -- $2 at 1/2 (Oops -> 1/1) per Business Card, per trigger
+        end
       end
     end
   end
