@@ -10,6 +10,44 @@
 
 ---
 
+## 🔬 LOSS DIAGNOSIS (2026-09-18) — competence vs optimization: it is OPTIMIZATION (supply×survival)
+
+Ran a position-level failure taxonomy over the engine's OWN 147 losing runs (`tools/loss_diagnosis.py`),
+plus the supply-vs-competence test (were multipliers OFFERED+AFFORDABLE but passed, or never seen?). This
+is the test the "I win with sloppy play, why can't it" question demands — and it is NOT the per-decision
+agreement corpus (which is human WINNING states); it judges the engine's own LOSS states.
+
+**Failure taxonomy (147 losses):** NO_CORE 39% (never assembled 2+ multipliers) · VARIANCE 37% (died within
+15% of target — mostly one-multiplier-short) · BASELESS 12% (multipliers, no base) · ECON_CLOG 7.5% · rest <5%.
+
+**The decisive supply-vs-competence numbers:**
+| | multiplier SUPPLY (shop+pack offers, whole run) | ACQUIRED | positively-rated buyable mults PASSED |
+|---|---|---|---|
+| WINS (13) | **12.0** | 3.7 | — |
+| ALL losses (147) | **4.4** | 1.3 | 0.5 / run |
+| NO_CORE losses | **3.1** | 0.5 | **0.2 / run** |
+
+**Verdict: it is NOT a per-decision competence gap.** The engine takes the multipliers it is offered at a
+normal rate (~30%) and passes almost none it rates positively (0.2–0.5/run — confirming C'). The losses get
+**~4× less multiplier EXPOSURE** (3 vs 12 offers) for one reason: **they die early (mean ante 3.7)**, before
+accumulating the shop visits that build a core. Per-shop offer rate is similar (~0.8–1.3); the gap is NUMBER
+of shops = SURVIVAL. And early death traces to early poverty (NO_CORE dies at ante 3.7 with only ~$24, unable
+to afford the first multiplier without bankrupting — the economy-timing lever, already worked/reverted).
+
+**⇒ The chain is `early economy → early survival → shop EXPOSURE → a multiplier core → survival`, and it is
+self-reinforcing.** This is the SAME supply×survival×economy wall, now measured from the loss side and shown
+to be structural, NOT a handful of fixable gestalt mistakes. **There is no cheap competence fix hiding here.**
+
+**This is the precise answer to "why not a chess engine":** the engine already *picks* correctly (the search/
+eval half a chess engine adds isn't the gap). What it lacks is the human's intuitive **early-game position
+sense** — surviving thin early boards and banking to afford the first multiplier, which then compounds into
+exposure. That IS a value-function job (a chess eval / human intuition), and it is exactly the piece the
+compute path (learned `V(state)`) would supply — and the piece 2 years of hand-crafting could not. The honest
+fork stands: **(B) learn that early-position value (needs the data the data-scaling probe would size), or
+(A) accept the ceiling and pivot to advice quality.** The diagnosis rules out "cheap policy fix" as a third option.
+
+---
+
 ## 🧭 S1 AUDIT (2026-09-18) — the economy/supply frontier is EXHAUSTED, verified against the graveyard
 
 Before building S1 (economy timing) I audited exactly what has been tried (owner directive: do not repeat).
