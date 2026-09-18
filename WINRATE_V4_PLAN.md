@@ -10,6 +10,44 @@
 
 ---
 
+## ❌ PHASE 1 RESULT (2026-09-18) — WS-3 conversion-pressure lever BUILT, MEASURED, REVERTED
+
+**What was built.** `BP.conversion_cost`: charge the permanent-slot opportunity cost of buying a
+non-multiplier into a maturing, multiplier-poor board (gated on base-exists + slot-pressure, pace-damped),
+to push the engine to bank/reroll for a multiplier instead of filling slots with additive/econ commons —
+targeting the confirmed defect (death boards 26.8% multiplier vs human 86.5%). Value decomposition first
+confirmed filler is bought on `sgain` (current-board score), not the money term, so the lever aimed there.
+
+**Measured (paired n=160, `sim_out/v4_ws3.jsonl` vs `v4_base.jsonl`):**
+- winrate **8.1% → 6.2%**; sign test **3 better / 11 worse (p 0.06)**; tail **reach-8 −4**; **4 winning runs killed**.
+- **Board composition UNCHANGED** — still 26.8% multiplier / 27.4% econ / 23.4% flat (it did not replace filler).
+- **Agreement byte-identical** to HEAD (eng_buy_human_save still 266) — zero decisions flipped on the win corpus.
+
+**Mechanism (now triangulated with the refuted ecap3 §28 and buy-bar §31g — three independent probes, same
+wall):** *refusing filler does not create multipliers.* When the shop offers no multiplier, banking/rerolling
+lands on **other filler** or a **weaker board that dies**. The engine already buys multipliers #1 when
+present (decomposition value 21.83). **The constraint is multiplier SUPPLY (packs / tags / rerolls / later
+shops) and the economy that funds it — NOT the engine's willingness to buy them.** The restraint/preference
+lever family is closed. Reverted; kept the diagnosis, the `_G.BES_VALUE_DEBUG` instrumentation, and this record.
+
+**⭐ Two things this fast, decisive negative bought us (vs the old grind):**
+1. It ruled out an entire family in ONE clean measurement (agreement + composition + paired sim), with a
+   named mechanism — not a "bounced slightly, unclear why" revert.
+2. It surfaced a ruler limitation: **the agreement corpus is winning-human STATES, so a change that only
+   affects the engine's own FAILURE trajectories is invisible there.** For supply-side work, the sim's
+   board-composition + winrate is the ruler; agreement gates only decisions on good boards.
+
+**⇒ REDIRECT: the frontier is multiplier SUPPLY**, in priority order by leverage × attainability:
+- **(S1) Economy timing to afford more multiplier DRAWS.** rich10 (+$10/rd) → 28.7% proves money→supply→wins.
+  The engine is ½ the human's bankroll early ($3/$12 vs $8/$26 at ante 2/3) because it over-buys early
+  packs/commons (eng_buy_human_save 266, mostly packs at ante 1–2). Bank early like the human → afford shop
+  multipliers + packs when they matter. ⚠ must NOT reduce board size (ecap3) — spend EFFICIENCY, not restraint.
+- **(S2) Directed multiplier acquisition from packs** (open Buffoon packs / reroll-for-a-multiplier when
+  mult-poor AND funded) — the pack-throughput channel the human back-loads and the engine front-loads.
+- **(S3) Slot expansion valuation** (Negative jokers) — GRAND_AUDIT's top un-probed lever, but rare (freq ceiling).
+
+---
+
 ## ✅ PHASE 0 RESULTS (2026-09-18, fresh current-HEAD data)
 
 All numbers re-derived on today's engine (the Aug-24 baseline files were stale — 40+ engine commits since).

@@ -587,6 +587,20 @@ function BP.fit(gs, sj, plan, invest)
   return fit, note
 end
 
+-- ============================================================================================
+-- WS-3 conversion-pressure lever (2026-09-18): BUILT, MEASURED, REVERTED. Recorded so it is not
+-- re-tried. The idea was to charge the permanent-slot opportunity cost of buying a non-multiplier
+-- into a maturing, multiplier-poor board (BP.conversion_cost, gated on base-exists + slot-pressure +
+-- pace), to shift the board from the measured 26.8% multiplier (engine deaths) toward the human's
+-- 86.5%. Paired n=160: winrate 8.1% -> 6.2%, sign 3/11 (p 0.06), tail reach-8 -4, FOUR winning runs
+-- killed; board composition UNCHANGED (still 26.8% mult); agreement byte-identical. Mechanism (now
+-- triangulated with the refuted ecap3 §28 and buy-bar §31g): refusing filler does NOT create
+-- multipliers -- when the shop offers none, banking/rerolling lands on OTHER filler or a weaker board
+-- that dies. The constraint is multiplier SUPPLY (packs/tags/rerolls/later shops), not the engine's
+-- willingness to buy multipliers (it buys them #1 when present). The restraint family is closed;
+-- the frontier is multiplier ACQUISITION/supply + the economy that funds it. See WINRATE_V4_PLAN §P1.
+-- ============================================================================================
+
 -- The INVEST window from a pacing assessment: invest when we're behind the ante race (not
 -- on pace), so we need to out-scale it, but NOT when the run is already hopeless (a very low
 -- ante-8 projection margin -> the core won't have time to pay off; buy whatever scores now).

@@ -65,7 +65,8 @@ return function(t)
     local econgs = board({ "j_todo_list", "j_faceless" })  -- 2 econ already
     local fit_econ = (BP.fit(econgs, { key = "j_delayed_grat" }, BP.analyze(econgs), false))
     t.ok(fit_econ < 0, "a redundant econ joker is damped (money isn't the win condition)")
-  end
+  end
+
 
   -- ---- sell-side core protection: don't dump a low-measuring xmult/scaler ----
   do

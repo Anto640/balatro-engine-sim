@@ -863,6 +863,14 @@ function SA.recommend(gs, opts)
       reason = string.format("Buy %s ($%d) — adds ~%.0f%% of a boss hand%s.",
         sj.name or sj.key or "joker", cost, math.max(0, sgain) * 100, why),
     }
+    -- WS-3 instrumentation (gated): expose the value decomposition so a replay can see WHICH term
+    -- funds a buy (sgain=current-board score, econ=money, fit=planning, cost terms). Pure/read-only.
+    if _G.BES_VALUE_DEBUG then
+      entry.dbg = { key = sj.key, ante = (gs.meta and gs.meta.ante) or 1, cat = JokerData.resolve(sj.key).cat,
+        sgain = sgain, sgain_w = w_score * sgain * 5, syn = w_score * syn, fit = w_score * fit,
+        first = w_score * first_scorer, econ_w = w_econ * econ,
+        down = w_score * down, net_cost = net_cost_c(cost), floor = econ_floor_penalty(gs, cost), value = value }
+    end
     priced[#priced + 1] = entry
     local leaves = dollars(gs) - cost
     if ShopState.affordable(gs, cost, credit) and leaves >= reserve - credit and slots_free > 0 then
