@@ -10,6 +10,39 @@
 
 ---
 
+## 🎯 DATA-SCALING PROBE (2026-09-18) — path B go/no-go: NO-GO on attainable data
+
+`tools/data_scaling_probe.py` — the one measurement never done: does the learned piece-level value's
+**OOS** AUC keep RISING with more training wins (⇒ more data fixes it ⇒ build B), or PLATEAU below the free
+`capacity` baseline (⇒ data won't fix it ⇒ B dead)? Train = base-seed rich10 arms (85 wins); test = disjoint
++7-offset arm (52 wins); linear logistic over {capacity + joker multi-hot}.
+
+| training wins | ante-4 capacity-OOS | ante-4 piece-OOS | ante-5 capacity-OOS | ante-5 piece-OOS |
+|---|---|---|---|---|
+| 10 | 0.764 | 0.666 | 0.765 | 0.664 |
+| 20 | 0.764 | 0.686 | 0.765 | 0.727 |
+| 40 | 0.764 | 0.703 | 0.765 | 0.729 |
+| 85 | 0.764 | **0.712 (−0.052)** | 0.765 | **0.732 (−0.034)** |
+
+**Verdict: NO-GO.** The piece-level value rises fast to ~20–40 wins then **plateaus BELOW the free capacity
+baseline** (ante 5: +0.005 over the 20→85 quadrupling — flat; ante 4: closing but still −0.052 and would need
+*hundreds* more wins just to reach parity, with no margin above). So a learned early-position value does **not
+beat the heuristic the engine already uses** at any attainable data volume. This is the **5th independent
+confirmation** of the P5 bound (after NNUE-OOS, interactions-OOS, TD-OOS, offline-value), and the first as an
+explicit scaling curve. Caveat: this is a *linear* model; a nonlinear NNUE + GPU-scale self-play (orders more
+data, self-improving) is the only untested residual — but it fights a strong 0.76 baseline, is a multi-week/
+GPU build, and the linear+interaction evidence says capacity is near the achievable ceiling.
+
+**⇒ FINAL VERDICT OF THE V4 INVESTIGATION.** Both routes to materially-higher AUTONOMOUS winrate are now
+closed on fresh evidence: per-decision/policy levers are exhausted (S1 audit + loss diagnosis: the engine
+picks correctly, the gap is supply×survival×economy, all levers reverted), and the learned-value route does
+not beat the free baseline on attainable data (this probe). The measured ceiling — **~8% baseline / ~29%
+rich10** — is real and confirmed from every angle. Autonomous ~85%+ is **not reachable** with this engine +
+attainable data/compute. **The valuable, open, non-compute-bound objective is ADVICE QUALITY** (the mod
+advises a human who wins ~87.5%; measured on the agreement ruler). That is where further work should go.
+
+---
+
 ## 🔬 LOSS DIAGNOSIS (2026-09-18) — competence vs optimization: it is OPTIMIZATION (supply×survival)
 
 Ran a position-level failure taxonomy over the engine's OWN 147 losing runs (`tools/loss_diagnosis.py`),
