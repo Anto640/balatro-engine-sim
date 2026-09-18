@@ -10,6 +10,42 @@
 
 ---
 
+## 🧭 S1 AUDIT (2026-09-18) — the economy/supply frontier is EXHAUSTED, verified against the graveyard
+
+Before building S1 (economy timing) I audited exactly what has been tried (owner directive: do not repeat).
+**Result: every supply/economy/restraint lever is already tried — reverted or shipped-modest.** S1 as a
+build would repeat prior work. Evidence, current-code-verified:
+
+| lever | status | source |
+|---|---|---|
+| option-value banking (interest-cap fix + 4 variants) | **REVERTED** — regressed agreement (winners bank PAST the mechanical cap; old appetite was tuned around the bug) | conversion_baseline.txt B' |
+| pack-poverty discipline (damp poor-board packs) | **SHIPPED** (`SA.PACK_POVERTY_DAMP`, `^1.6`), modest (eng_buy_human_save 264→258) | 20c146c |
+| reroll-to-dig for a core when core-poor | **REVERTED** −0.015, sign 7/17 ("exposure spending is high-variance, −EV") | WINRATE_AUDIT 2026-07-11 |
+| buy more packs (levelbuy) | **REVERTED** −0.229 | archive |
+| ecap3 early board discipline | **REVERTED HARD** −0.945 @rich10 | §28 |
+| conversion-pressure / slot opportunity cost (P1 today) | **REVERTED** — killed winners, composition unchanged | this doc §P1 |
+| joker VALUATION forward-marginal (C') | **REFUTED as the gap** — engine ranks the human's multiplier #1 91% of the time | conversion_baseline C' |
+| pack-PICK card choice (D') | not a clean lever — within-category, tied to the hard commitment problem | conversion_baseline D' |
+| target model / completion credit (§32) | OOS-FAILED (winner's curse on n=7) | §32c |
+
+**The wall, re-confirmed from three sides this session:** the engine already BUYS multipliers first-choice
+when present (C', decomposition 21.83); it dies at 27% multiplier because multipliers are rarely PRESENT in
+its shops/packs; and **rich10 money does NOT raise `run_str` (0.62 in both)** — so it is not purely "can't
+afford". The binding constraint is **multiplier SUPPLY**, and supply is bounded by the greedy policy's
+inability to convert money→product plus the RNG. Per-decision levers to force conversion are all closed.
+
+**⇒ THE REMAINING PATHS ARE STRUCTURAL, NOT PER-DECISION** (a genuine strategic fork, not another tweak):
+- **(A) Pivot to ADVICE QUALITY** — the mod advises a human who already wins ~87.5%; that objective is
+  non-compute-bound and open (the agreement ruler measures it). "Autonomous ~100% to unlock the key" is
+  very likely NOT reachable with this architecture; ~8% baseline / ~29% rich10 is the measured ceiling.
+- **(B) The COMPUTE path** — a learned value function / GPU self-play (MCTS_PLAN). The only approach with a
+  real shot at materially higher AUTONOMOUS winrate; previously declined for compute cost.
+- **(C) A BIGGER winning-human corpus** — the n=7 winner's-curse blocker is what killed option-value
+  banking and forces every economy constant to fail OOS. More overlay-hidden owner wins would unblock the
+  one open economy thread; incremental (maybe 8%→~12–15%), not a path to human parity.
+
+---
+
 ## ❌ PHASE 1 RESULT (2026-09-18) — WS-3 conversion-pressure lever BUILT, MEASURED, REVERTED
 
 **What was built.** `BP.conversion_cost`: charge the permanent-slot opportunity cost of buying a
