@@ -1,0 +1,272 @@
+# WINRATE_V4_PLAN.md — the BUNDLE breakout (2026-09-18)
+
+> **One-line thesis.** The engine is at **2.5%**; an expert human under the *same rules* wins **~87.5%**.
+> The whole gap is policy, and it is **supermodular** — the fixes multiply, so no single lever shows a
+> measurable winrate signal, which is exactly why two years of single-lever tuning bounced and reverted.
+> This plan **builds the fix as ONE bundle and measures it on the DENSE agreement corpus**, not on chaotic
+> baseline winrate. It supersedes the single-lever method for this objective; it does not touch the
+> autonomous-ceiling verdicts in `GRAND_AUDIT.md` (which concern the *learned value function*, a different,
+> compute-bound path that stays declined).
+
+---
+
+## ✅ PHASE 0 RESULTS (2026-09-18, fresh current-HEAD data)
+
+All numbers re-derived on today's engine (the Aug-24 baseline files were stale — 40+ engine commits since).
+
+**The scoreboard moved — recent work already tripled baseline:**
+| config | winrate | progress | run_str@a8 | source |
+|---|---|---|---|---|
+| baseline | **8.1%** (13/160) | 4.287 | 0.60 | `sim_out/v4_base.jsonl` |
+| rich10 | **28.7%** (46/160) | 5.999 | 0.62 | `sim_out/v4_rich.jsonl` |
+
+**1. Deaths are BUILD/economy, not play.** Baseline **112 BUILD vs 35 VARIANCE**; boss deaths clear only
+**72–75%** of requirement — the board is ~¼ too weak at the fatal boss. (Confirms: fix shop/economy/valuation.)
+
+**2. The over-buy is real, dense, and chaos-free — the RULER.** On **1048** shop decisions (agreement corpus,
+`sim_out/agreement/head_v4.report.txt`): engine **buys where the human SAVES 266× (25%)** + **rerolls where
+human saves 120× (11%)** = spends on **~36%** of decisions the human banks, while **under-buying only 23×
+(2%)** — a **12:1 over-spend asymmetry**, concentrated at **ante 1–2 (49%/53% BUY)**, biggest category
+**packs (20.6% of all shop actions)**. This is the dense gradient the project never had: drive
+`eng_buy_human_save` down without raising `eng_save_human_buy`.
+
+**3. Economy gap confirmed and EARLY, and money gets spent not compounded.** Engine ≈ half the human's
+bankroll at every ante, and **plateaus at ~$27** while the human compounds to ~$45:
+| ante | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|---|---|---|
+| engine $ | 3 | 12 | 24 | 27 | 27 | 28 | 36 |
+| human $ | 8 | 26 | 26 | 45 | 38 | 39 | 52 |
+Given +$10/round (rich10) the engine's money **still plateaus at ~$30** — it *spends the surplus* (fills 5
+slots by **ante 2** at rich10 vs the human's 2).
+
+**4. ⭐ The TRUE WALL is board POWER (WS-3), and money cannot buy past it.** `run_str` caps at **~0.62 at
+ante 8 in BOTH baseline and rich10.** Extra money buys more LEVELS (hlv 13→16.5) but the **same board
+strength**. Proof in the death boards: at rich10 the engine dies holding **Golden, Mail, Golden Ticket,
+Cloud 9, Delayed Gratification** — five *economy* jokers. **It converts money into more money, not into a
+compounding score product.** This is the additive-sum-not-product defect, measured.
+
+**5. Leveling has CAUGHT UP — it is NOT the current gap.** Engine hlv **13 (baseline) / 16.5 (rich10)** at
+ante 8 vs human **15**. The old "engine 4.5 vs human 18" is stale (the scaler/spectral work closed it). ⇒
+**Do not spend effort on the leveling channel** (`planet_credit`/`LEVEL_PUSH`/`level_need`) — it's solved.
+
+**6. Slot COUNT gap is small** (a2: 3 vs 2). Confirms WS-2 is about slot *content/upgrade*, not holding open.
+
+**⇒ FINALIZED DIRECTION.** One deliverable dominates: **WS-3, a product- and opportunity-cost-aware buy
+valuation.** Value a joker by its marginal on the *projected assembled multiplicative board* (so
+multipliers/retriggers/copiers rate high and additive/econ commons rate low once a base exists), net of the
+true opportunity cost of the cash + slot it consumes. This one change fixes all three symptoms at once: less
+spend on additive/econ filler (WS-1 — cash compounds past $27), swaps toward multipliers (WS-2 — board stops
+freezing), and breaks the `run_str 0.62` wall (WS-3). WS-1/WS-2 become recalibration downstream, not builds.
+Primary ruler = `eng_buy_human_save` on the agreement corpus; confirmation = `run_str@a8` and winrate.
+
+---
+
+## 0. Why the old loop cannot work (the justification for changing method)
+
+Three facts, all from the project's own data, that together make single-lever winrate tuning structurally
+blind to the actual solution:
+
+1. **Frequency ceiling.** A fix touching one joker/situation reaches ~5% of runs and comes back
+   ~153/160 seeds TIED. It cannot move an n=160 verdict however correct it is. (CLAUDE.md, the frequency table.)
+2. **Chaos floor.** Per-seed sd ≈ 1.9; MDE at n=160 ≈ 0.42 progress. Most correct changes are *below the
+   noise floor at baseline*. (CLAUDE.md envelope analysis: 85% of seeds flip under tiny perturbations.)
+3. **Supermodularity — the killer.** From the ceiling probes on disk:
+
+   | config | winrate | source |
+   |---|---|---|
+   | baseline | 2.5% | `sim_out/base_31f.jsonl` |
+   | + money only (rich10) | 24% | `sim_out/baser_31f.jsonl` |
+   | + slots only | 14% | `sim_out/ceil_slots7.jsonl` |
+   | money **+** slots | **51%** | `sim_out/ceil_rich10_slots7.jsonl` |
+   | everything | **98%** | `sim_out/ceil_everything.jsonl` |
+
+   The levers **multiply**. The winning board is a *product* (xmult × retrigger × copier × leveled hand),
+   and so is its fix. **Any single piece of a supermodular fix looks like noise by construction** — so
+   "isolate a lever → measure its winrate delta → keep if significant" can *never* find it.
+
+**Consequence — the method changes:**
+- **Build the bundle together** (economy + slots + product-value), never lever-by-lever.
+- **Primary ruler = agreement with the winning human** (`tools/agreement_run.sh`, 928+ paired decisions,
+  deterministic, non-chaotic). "Does the engine now DECIDE like a winner?" is answerable; "did winrate
+  move 0.03?" is not.
+- **Secondary confirmation = rich10 winrate** (where a valuation change can express, per the §6 rule).
+- **Baseline winrate demoted to a regression guard only** ("don't go significantly negative"), never the
+  per-lever gate.
+
+---
+
+## 1. Target & definition of done
+
+- **Goal:** push far past 2.5% and measure where it caps. Expected realistic ceiling ≈ human parity
+  (~85%) — literal 100% is a cheat-config artifact (`ceil_everything`) and not an in-rules objective.
+- **Ship the bundle when ALL hold (paired, deterministic):**
+  1. **Agreement up** on the frozen corpus — BLIND + PACK + SHOP each ≥ HEAD, SHOP+PACK (the build
+     channels) up by a real margin.
+  2. **rich10 winrate up** — paired n≥160, t > 2, and OOS-confirmed at `BES_SEED_OFF=7` (mandatory; the
+     level_gain result replicated, the target model did not — breadth of the sign test is the tell).
+  3. **Baseline not significantly negative** — paired n≥160, progress Δ not below −0.15.
+- **Kill the bundle if:** agreement drops on any channel, or rich10 is null with the sign test even.
+
+---
+
+## 2. The three work-streams (one worktree, built together)
+
+> ### ⭐ PHASE 0 CORRECTION (2026-09-18) — the three WS are ONE root cause, and WS-2 was mis-stated.
+> Measured the **winning human** per-ante trajectory from `data/bes_runs_live_2026-08-12.jsonl` (7 wins,
+> `ante` records) and audited the current engine code. Two things changed:
+>
+> **(1) The winners do NOT hold slots open.** Median jokers held: **ante2 = 2, ante3 = 5, and 5 for the
+> rest of the run.** They fill to a full board by ante 3 and *keep it full* — the edge is slot *content*
+> and *continuous upgrading within 5 slots*, NOT holding slots empty. WS-2 as originally written ("hold a
+> slot open") is wrong; the real lever is the **swap/upgrade** policy (keep trading additive commons for
+> multipliers inside a full board), which the engine damps via `SA.UPGRADE_MARGIN=1.2` + strength-
+> proportional swap protection — it *freezes* the board at ante-4 additive commons instead.
+>
+> **(2) All the machinery already exists — this is a CALIBRATION/UNIT problem, not missing features.**
+> The engine already has: a ramping econ floor to the interest cap (`SA.econ_floor`, horizon decay,
+> `FREE_SPEND_DISCOUNT`), slot-dilution penalties (`BP.FLAT_GLUT/ECON_GLUT`), swap hysteresis
+> (`SA.UPGRADE_MARGIN`), and a planning layer with an invest gate (`BP.fit`). It wins 2.5% anyway. So the
+> defect is that the **buy value of a cheap additive common is measured too high** relative to (holding the
+> cash + holding the slot for a future multiplier), because it is a real positive marginal *on the current
+> board*. The hand-tuned penalties are patches fighting that mis-measurement.
+>
+> **⇒ The unified diagnosis:** the engine **over-buys cheap additive commons early**, which simultaneously
+> (a) drains early cash (WS-1 symptom — human $8/$26/$26/$45 at ante 2/3/4/5; engine far below), (b) fills
+> slots with non-compounding pieces then freezes (WS-2 symptom), and (c) makes the board an additive *sum*
+> not a *product* (WS-3). **One root cause, three symptoms — which is exactly why they are supermodular and
+> why isolated fixes failed.** The core deliverable is **WS-3: a product- and opportunity-cost-aware buy
+> valuation**; WS-1 and WS-2 become consequences + light recalibration, not separate greenfield builds.
+> (Winning-human target curve, medians: `$` 8/26/26/45/38/39/52 · `hlv` 0/0/3/5/8/13/15 over antes 2–8.)
+
+### Winning-human target trajectory (acceptance curve, medians over 7 wins)
+
+| ante | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+|---|---|---|---|---|---|---|---|---|
+| dollars | 8 | 26 | 26 | 45 | 38 | 39 | 52 | 57 |
+| jokers | 2 | 5 | 5 | 5 | 5 | 5 | 5 | 5 |
+| hand-lv sum | 0 | 0 | 3 | 5 | 8 | 13 | 15 | 15 |
+
+The one human LOSS (X3L32ZEA) was **poor early** ($0/$11/$6 at ante 2/3/4) then $54 at ante 5 with hlv 3 —
+economy-timing + conversion failure, confirming **early economy (antes 2–4) is the discriminator.**
+
+### WS-1 — Economy ACQUISITION (the #1 binding constraint)
+- **Defect (measured):** engine holds **$1 at ante 2** vs the human's **$7**, and its money **plateaus at
+  ~$28** while the human's **compounds to ~$45** (GRAND_AUDIT §A). Under identical rules — the human
+  *generates* it. Money alone is a 10× winrate swing.
+- **The spec already exists:** `human-economy-policy` memory — satisfice current-blind survival, bank to
+  the interest cap before spending on power, invest surplus only into the compounding core, econ gated by
+  remaining need, interest discipline, stake-aware skips.
+- **Where:** `shop_advisor.lua` (`SA.ECON_FLOOR*`, the buy gate), `engine/eval_function.lua`
+  (`Eval.econ_value`), `engine/skip_advisor.lua`, `engine/tags.lua` (skip-tag econ).
+- **Change:** replace the flat econ floor with a **bankroll target that ramps to the interest cap and
+  treats holding/compounding it as high-value early**, so a power buy that drops you below the interest
+  breakpoint must clear a higher bar than the interest it forgoes. Value money-generating jokers/skip-tags
+  higher in antes 1–3 (still capped by `BP.ECON_CAP=2` so it can't hoard econ).
+- **Not the graveyard:** this is *acquisition + interest discipline*, not "buy more econ jokers" (refuted).
+  It targets the compounding curve the human has and the engine lacks.
+
+### WS-2 — Slot CONTENT / continuous upgrade (REFRAMED by Phase 0 — was "slot discipline")
+- **Defect (measured, corrected):** the winners fill to 5 jokers by ante 3 and stay full; the edge is
+  that they keep **swapping additive commons for multipliers within the full board**, while the engine
+  **freezes** its board on ante-4 additive commons (board full + `SA.UPGRADE_MARGIN` hysteresis +
+  strength-proportional swap protection block the upgrade). NOT "hold a slot open" (winners don't).
+- **Where:** `shop_advisor.lua` (`SA.UPGRADE_MARGIN`, swap protection, `funder_is_live`/SELL_TO_BUY gates),
+  `build_plan.lua` (`BP.keep_bias`, `BP.fit`), `Eval.negative_slot_fv` (Negative slots already at 6.0).
+- **Change:** make the swap gate **product-aware** — trading an additive common for a multiplier/retrigger
+  should clear the margin easily even when the multiplier's *current-board* marginal is modest, because on
+  the assembled board it compounds (this is WS-3 applied to the sell/swap side). Do NOT lower the margin
+  uniformly (that thrashes working boards); raise it only for additive→multiplier trades.
+- **⚠ Not `ecap3`/readiness-gate (both REFUTED HARD):** those imposed a *hard cap on board size* and
+  starved the engine (board power produces money AND survival jointly, −0.945 at rich10). This is **not a
+  cap** — it's "fill slots with the RIGHT (compounding) jokers; hold a slot for a multiplier rather than
+  buy a diluting common." It only ever fires when survival is already satisficed, and it is part of the
+  bundle (the held slot exists *for* WS-3's core), never measured alone.
+
+### WS-3 — PRODUCT board-value on the buy side (the architectural core)
+- **Defect:** the buy value of a joker is its **marginal on the CURRENT board** (`Eval.jp_from_measure`
+  and the parallel `shop_advisor.scoring_gain`). That is additive-blind: an xmult on a thin early board
+  multiplies little, measures low, gets skipped — so the board never becomes a *product*. `BP.fit` patches
+  this with hand-tuned constants (`XMULT_FILL=2.2`, `SCALING_FILL=1.2`, `COMMIT_JOKER_FILL=1.2`), which is
+  exactly the guessed-magnitude class that never converts.
+- **Change — replace the constants with a MEASURED target-board marginal:**
+  1. Model the **projected assembled board** for the committed plan (`BP.commitment`): the target board is
+     the current board plus the plan's intended pieces, scored as
+     `base_chips × Σ(flat_mult) × Π(xmult) × Π(retrigger) × leveled_hand` (a PRODUCT, using the pieces
+     `BP.analyze` already counts).
+  2. New `Eval.board_product_marginal(gs, candidate, plan)` = the candidate's marginal on the **target**
+     board, not the current one — reusing the existing Monte-Carlo scorer at the projected state.
+  3. Blend: `buy_value = V_now + invest_weight(pace) × max(0, V_target − V_now)`, where `invest_weight`
+     is 0 when urgent and ramps with `pace.margin` (reuse `BP.invest_window`). Assembly feasibility gate:
+     `V_target` only counts pieces that fit in the **remaining** slots (ties WS-2 and WS-3 together).
+- **Not the graveyard:** the refuted xmult-floor "valued xmult high regardless" and bought too early
+  (bootstrap trap). This is **survival-gated and slot-feasible** — it only rewards the product when the
+  board can already clear the near-term blinds, which is the exact condition `BP.fit`'s `invest` gate was
+  built for. It is conclusion 6(c) of GRAND_AUDIT ("a product not sum board-value function on the buy
+  side"), which is named as genuinely un-built.
+
+---
+
+## 3. Phase 0 — diagnosis (fresh numbers before any code)
+
+Ground the build in current-HEAD data, not old docs. Produces the "before" baseline for every ruler.
+
+1. **Agreement baseline:** `tools/agreement_run.sh head_v4` → lock BLIND/PACK/SHOP % for HEAD.
+2. **Winrate baseline (locks the A/B "before"):** confirm `sim_out/base_31f.jsonl` (baseline) and
+   `sim_out/baser_31f.jsonl` (rich10) reproduce on current HEAD; if the engine drifted, re-run
+   `bash tools/sim_par.sh 160 v4_base` and `BES_PROBE=rich10 bash tools/sim_par.sh 160 v4_rich`.
+3. **Economy trajectory gap:** `lua tools/real_vs_sim.lua` — quantify $-per-ante and the $28-plateau vs
+   human $45-compound on CURRENT code (WS-1's target numbers).
+4. **Slot-fill timing:** measure jokers-held-per-ante for the engine vs the human corpus (extend
+   `analyze_runs.lua` action summary if needed) — WS-2's target curve.
+5. **Product-gap sanity:** on 5–10 real fixtures, dump `V_now` vs a hand-computed `V_target` for the
+   multipliers the engine skipped — confirm the product marginal would have re-ranked them (WS-3 exists).
+
+Phase 0 is cheap (all read existing telemetry) and its numbers are the acceptance targets for Phases 1–2.
+
+---
+
+## 4. Phase 1 — build (in a git worktree, never the live tree)
+
+- One worktree for the whole bundle (`git worktree add ../bes_v4 winrate-v4-bundle`). All three WS land here.
+- Keep tests green after each WS: `lua tests/runner.lua` (1209 pass) — correctness first.
+- Instrument, don't guess: WS-3's blend and WS-1's bankroll target must be verified by **printing the
+  values** on real fixtures (CLAUDE.md process rule #3: verify a threading change by measuring the value,
+  not reading the diff).
+- Deploy nothing to the install until Phase 2 passes.
+
+## 5. Phase 2 — validate as a BUNDLE (never per-lever)
+
+1. `tools/agreement_run.sh after_v4` → `tools/agreement_run.sh diff head_v4 after_v4`. **Gate 1** = all
+   three channels ≥, SHOP+PACK up.
+2. rich10 paired: `BES_PROBE=rich10 bash tools/sim_par.sh 160 v4_rich_after` →
+   `lua tools/analyze_runs.lua sim_out/v4_rich_after.jsonl compare sim_out/baser_31f.jsonl`. **Gate 2** =
+   Δ > 0, t > 2. Then OOS at `BES_SEED_OFF=7`. **Gate 2b** = replicates.
+3. baseline paired regression guard: `bash tools/sim_par.sh 160 v4_base_after` compare vs baseline.
+   **Gate 3** = Δ ≥ −0.15.
+4. If a gate fails, use the replay loop (CLAUDE.md ⭐⭐ diagnostic) to find WHICH ws/decision regressed —
+   do NOT revert the bundle blindly; the pieces are supposed to be individually weak.
+
+## 6. Phase 3 — ship / iterate / measure the cap
+
+- All gates pass → deploy the whole tree to `%APPDATA%/Balatro/Mods/balatroenginesim/` (diff the whole
+  tree, per CLAUDE.md), commit, and **run the ceiling ladder** (`base`, `rich10`, `rich`) to read where
+  the engine now caps — the answer to "85% or 100%".
+- Gates split (agreement up, winrate null) → the mechanism is right but under-expressed; tune magnitudes
+  *jointly* at rich10 and re-run, or find the next multiplicative partner. Do NOT revert on a baseline null.
+
+---
+
+## 7. Risks & honest caveats
+
+- **Realistic cap ≈ human parity (~85%), not 100%.** Variance alone caps an expert at ~87.5% (7/8). If
+  the run past 2.5% stalls at, say, 40–60%, that is already a 20× improvement and the correct place to
+  reassess — not a failure.
+- **Slot discipline is the highest-risk WS** (adjacent to two hard reverts). It is deliberately the
+  weakest lever, gated on survival slack, and only justified inside the bundle. If Phase 2 traces harm to
+  it, isolate and soften it first before touching WS-1/WS-3.
+- **The product-value could reintroduce the bootstrap trap.** The `invest_weight`/urgency gate is the
+  guard; Phase 0 step 5 and Phase 1 instrumentation must confirm it does NOT raise xmult priority on bare
+  early boards.
+- **This is not the learned-value function.** It stays hand-engineered and cheap. If it caps well below
+  human parity, the remaining gap is the compute-bound value function `GRAND_AUDIT` closed — a separate
+  decision, not this plan.
