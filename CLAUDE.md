@@ -545,7 +545,34 @@ NOTE: `xmult_scaling` jokers ARE xmult — use `JokerData.is_xmult()`.
 
 **THREE REAL HUMAN WINS analyzed** (`bes_runs.jsonl`; `winning-archetype-from-real-run` memory) — Flush
 House+leveling / Hologram+copier / economy→Bull+xmult; common thread = an XMULT stack the human KEPT.
-In-blind PLAY verified near-optimal; the losses are BUILD, not play.
+~~In-blind PLAY verified near-optimal; the losses are BUILD, not play.~~
+
+> ### ⭐ 2026-09-19 — WHAT THE PLAY INVESTIGATION ACTUALLY FOUND (read before trusting the play claims below).
+> Owner reported the F11 self-player's live play looked "nowhere near optimal." Investigated hard; the
+> nuanced, measured truth (full detail: `WINRATE_V4_PLAN.md` "IN-BLIND PLAY"):
+> **(1) PURE SCORING-PLAY IS near-optimal — but this is NARROW.** `HandEval` scores hands EXACTLY right
+> (7/7 canonical Balatro cases, `/tmp/hefid.lua`); the play-subset chooser picks the MAX-score play **94%**
+> of the time when it must maximize; the ante-1 dig is **at a clairvoyant ceiling** (78% one-hand vs 75% for a
+> future-knowing greedy reference, `tools/first_blind_optimal.lua`); and two dig-objective rewrites (clear-
+> probability vs mean-score, incl. 3× samples) measured **NEUTRAL** on both the isolated first blind and full
+> runs — REVERTED. So "which cards clear the blind" is solved; do not keep re-searching it.
+> **(2) ⭐ THE OPEN FRONTIER (owner, 2026-09-19): JOINT MONEY-FARMING + SCORING is NOT solved.** Optimal play
+> is not just "clear the blind" — it is milking ECONOMY *while* clearing: Gold cards/seals, Lucky, econ jokers
+> (Faceless/Mail/Reserved Parking), and card/joker EDITIONS, held/played to MAXIMIZE $ subject to still
+> clearing. The $1/unused-hand + farmed $ compounds into the next shop where every dollar decides survival.
+> The scoring-play tests above do NOT measure this joint optimization — it is the next thing to probe
+> (`engine/discard_fuel.lua`, `hold_fuel.lua`, `HandEval.play_econ`, the MILK/DIG paths in `decision_engine`).
+> **(3) NEAR-100% IS A LEGITIMATE TARGET.** Expert human play (DoctorSpectred-tier) reaches **>98% on GOLD
+> stake, hardest decks** — Balatro is ~fully winnable with expert play; the ceiling is POLICY, not variance.
+> The 7/8 (87.5%) local sample was a small non-peak sample, NOT the skill ceiling. Even 0.5% ante-1 failures
+> are a real defect (a competent human never dies ante 1).
+> **(4) LIVE vs SIM.** All (1) is measured in the SIM (which builds `gs` correctly and uses `HandEval` as both
+> chooser and referee, so it CANNOT reveal a live `state_extraction` fidelity gap). The live self-player runs
+> the FULL engine at `BES_SAMPLES=80` (main.lua) — NOT a degraded path. Owner (2026-09-19): assume autoplay
+> actuation is NOT the problem for now. So if live play still looks off after (2), the remaining suspect is
+> `state_extraction` feeding wrong inputs (the documented Mouth-bug class) — needs a live example to pin.
+> ⇒ The 2026-09-18 WINRATE_V4 "autonomous ceiling ~8–30% / compute-bound" conclusion STANDS for BUILD/scoring,
+> but the **joint economy-farming-during-play axis (2) is un-probed and deterministic** — the live frontier.
 
 **THE WORLD IS VALIDATED (2026-08-11) — `tools/real_vs_sim.lua`, live telemetry vs the n=344 baseline.**
 Median dollars at ante 2 are **$1 in BOTH** (real mean is a fat right tail, not a shifted centre);

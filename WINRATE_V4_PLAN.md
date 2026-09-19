@@ -10,6 +10,80 @@
 
 ---
 
+## 🃏 IN-BLIND PLAY (2026-09-18) — owner: live play is "nowhere near optimal"; sim chooser is not the gap
+
+Owner (reliable — found the true 8.1% winrate) reports the F11 self-player's live in-blind play is **nowhere
+near optimal**, contradicting the archived "regret 0.0076 / play is solved" claim. Also: expert human
+(DoctorSpectred-tier) hits **>98% GOLD-stake winrate on the hardest decks**, so near-100% is a real target
+(the winrate is NOT variance-capped ~87%). Both noted in CLAUDE.md.
+
+**Measured the in-SIM play regret (`tools/play_regret.lua`, 30 seeds, 461 plays):** overall regret **1.2%**;
+on must-maximize hands (max play can't clear in one) it picks the **MAX-score play 94%** of the time (mean
+regret 1.9%). So **the sim's play CHOOSER is near-optimal by its own scorer** — the old 0.0076 reproduces.
+
+**⇒ The live-play gap is NOT the chooser leaving score on the table in-sim. It is one of:**
+1. **`state_extraction` FIDELITY (prime suspect):** the sim builds `gs` correctly (chooser looks fine), but
+   live, `state_extraction` (the only file that reads `G`) may feed wrong/missing card or joker data →
+   `HandEval` plays on garbage → bad play, invisible to every headless test. This is a **documented recurring
+   class** (the Mouth bug: `played_hand_types` unpopulated live killed a run; see `churn-and-live-inert-boss`
+   memory). Any gs field the play path READS but `state_extraction` doesn't WRITE (or mis-reads) is dead live.
+2. **`HandEval` scorer fidelity vs real Balatro** on complex interactions (retrigger/card-order/held/seals) —
+   the winning-board pieces (Hanging Chad, Photograph, Sock & Buskin) are exactly the retrigger/order-sensitive
+   ones most prone to mis-modeling; a mis-rank makes the engine pick the wrong "best" play live.
+3. Satisficing philosophy (play to barely-clear + keep cards) looking passive — by design, minority of hands.
+
+**This REOPENS the winrate ceiling in a non-compute-bound direction:** if live play is materially sub-optimal
+from a fidelity bug, the "supply×survival / dies at ante 3.7" pattern is partly a *play* artifact (bad plays
+fail clearable blinds → die early → low exposure), fixable deterministically.
+
+### ✅ RESOLVED (2026-09-19) — scoring-play is near-optimal; the DIG objective is NOT the lever; new frontier = MONEY-FARMING
+
+The "located the dig objective" hypothesis below was BUILT, MEASURED, and REVERTED. Full arc:
+- **`HandEval` is a faithful scorer** — 7/7 canonical Balatro level-1 hands scored exactly (`/tmp/hefid.lua`).
+  So the sim's scoring is correct; there is no gross fidelity bug in the bare-hand scorer.
+- **The play-subset chooser is near-optimal** — 94% max-score on must-maximize hands (`tools/play_regret.lua`).
+- **The ante-1 dig is at a clairvoyant ceiling** — engine 78% one-hand vs a future-knowing greedy reference's
+  75% (`tools/first_blind_optimal.lua`). The ~22% two-hand clears are largely the base deck's limit (even
+  knowing all draws you often can't make 300-in-one), NOT engine error. First blind clears **99.5%** overall.
+- **The target-aware dig (clear-probability vs mean-score) measured NEUTRAL** on the isolated first blind
+  (79.8%→78.2%, even at 3× samples) AND on full runs (paired n=160: 8.1%→8.8%, sign 80/74 — dead even).
+  REVERTED both times. Mean-score prefers timid low-ceiling digs, but switching to clear-probability didn't
+  convert — the first blind is too easy to discriminate dig quality, and full runs showed no gain.
+- **The live self-player is NOT a degraded path** — it runs the full engine at `BES_SAMPLES=80` (main.lua),
+  more samples than the sim. Owner: assume autoplay actuation is fine for now.
+
+**⇒ Pure scoring-play ("which cards clear the blind") is solved — stop re-searching it.** ⭐ **THE OPEN
+FRONTIER (owner, 2026-09-19): JOINT MONEY-FARMING + SCORING.** Optimal play milks ECONOMY *while* clearing —
+Gold cards/seals, Lucky, editions, and econ jokers (Faceless/Mail/Reserved Parking) held/played to MAXIMIZE
+$ subject to still clearing; the $1/unused-hand + farmed $ compounds into the next shop where every dollar
+decides survival. None of the tests above measure this joint objective. Probe it in `engine/discard_fuel.lua`,
+`engine/hold_fuel.lua`, `HandEval.play_econ`, and the MILK/DIG paths in `engine/decision_engine.lua`. New
+diagnostics from this arc (kept): `tools/first_blind_fast.lua`, `first_blind_optimal.lua`, `play_regret.lua`,
+`loss_diagnosis.py`, `data_scaling_probe.py`.
+
+### (superseded) LOCATED (2026-09-18) — the DISCARD/DIG objective, not the play chooser
+
+Confirmed on ante-1 small blind (`tools/first_blind.lua`, ranks visible): the play-subset chooser is fine,
+but the DISCARD decisions are the suboptimal part (owner corroborated all three: fiddles instead of playing,
+pitches wrong cards, clears in 2 when 1 was possible). **Root cause, located in `engine/discard_value.lua`:
+`DiscardValue.expected_score` (line 109) values a candidate discard by the EXPECTED MEAN SCORE of the next
+best-play after redraw — NOT by the probability of CLEARING the target.** These differ decisively for
+clearing: to reach 300 you must maximize `P(best_play ≥ remaining)`, which favors the HIGH-CEILING chase
+(pitch a low card, draw toward a HIGH flush/full house), while maximizing mean score can prefer a safe hand
+that never reaches 300. This is exactly owner's flush example: the engine keeps the 2♥ because it raises the
+flush's mean/probability, ignoring that a 2-flush does not score 300. The dig is **target-blind.**
+
+**THE FIX (target-aware dig):** rank candidate discards by `P(post-redraw best_play ≥ remaining)` (clear
+probability / margin), tiebroken by expected score — so the dig chases a hand that actually CLEARS, pitching
+low cards even when they match the chased suit/type. Also re-check the discard-vs-play threshold so it does
+not "fiddle" when playing-now + a cheap second hand clears. **METHOD (owner's design):** optimize on the
+isolated ante-1 small blind (`tools/first_blind_stats.lua` — fixed 300 target, fixed red-deck 4-discard
+starting deck, only the draw varies; objective = maximize ONE-HAND clears / minimize hands-to-clear), because
+the play/discard logic is SHARED across all blinds, so a fix propagates everywhere. Then CONFIRM on full-run
+winrate (don't overfit to the base deck). This is deterministic and non-compute-bound — the real lever.
+
+---
+
 ## 🎯 DATA-SCALING PROBE (2026-09-18) — path B go/no-go: NO-GO on attainable data
 
 `tools/data_scaling_probe.py` — the one measurement never done: does the learned piece-level value's

@@ -1,4 +1,31 @@
-# NEXT_SESSION.md — fresh-session handoff (2026-09-04)
+# NEXT_SESSION.md — fresh-session handoff
+
+## ⭐⭐ 2026-09-19 — WINRATE_V4 investigation + the IN-BLIND PLAY / MONEY-FARMING finding (read `WINRATE_V4_PLAN.md`)
+
+**Fresh baselines (current HEAD, `branch winrate-v4-bundle`):** autonomous **8.1%** baseline / **28.7%** rich10
+(the old docs' 2.5% is STALE — recent scaler/spectral/R7 work tripled it). `run_str` caps ~0.62 at ante 8 in
+BOTH → money buys levels, not board power.
+
+**What this session established (all in `WINRATE_V4_PLAN.md`):**
+1. **Build/economy/supply levers are exhausted** — WS-3 product-value (reverted, killed winners), the whole
+   economy family already tried (reroll-to-dig, banking, ecap3, pack-poverty), loss diagnosis = SUPPLY×SURVIVAL
+   (engine takes offered multipliers fine; it just dies early → low exposure), and the learned-value path is a
+   NO-GO on attainable data (`tools/data_scaling_probe.py`: plateaus below the free `capacity` baseline).
+2. **In-blind SCORING-play is near-optimal** — `HandEval` faithful (7/7 canonical), chooser 94% max, ante-1 dig
+   at a clairvoyant ceiling (78% vs 75%), and target-aware dig rewrites measured NEUTRAL (reverted). First
+   blind clears 99.5%. The live self-player uses the full engine (`BES_SAMPLES=80`), not a degraded path.
+3. **⭐ THE OPEN FRONTIER (owner, 2026-09-19): JOINT MONEY-FARMING + SCORING in-blind.** Pure "clear the blind"
+   is solved, but milking ECONOMY *while* clearing (Gold cards/seals, Lucky, editions, econ jokers held/played
+   to MAX $ subject to still clearing; $1/unused-hand compounds into the next shop) is NOT measured or
+   optimized. Deterministic, non-compute-bound. Probe `engine/discard_fuel.lua`, `hold_fuel.lua`,
+   `HandEval.play_econ`, and the MILK/DIG paths in `decision_engine`. Owner: assume autoplay actuation is fine.
+4. **Target: near-100% is legitimate** (expert humans hit >98% gold-stake hardest decks); even 0.5% ante-1
+   failures are a real defect. New diagnostics kept: `tools/first_blind_fast.lua`, `first_blind_optimal.lua`,
+   `play_regret.lua`, `loss_diagnosis.py`, `data_scaling_probe.py`.
+
+---
+
+# NEXT_SESSION.md — earlier handoff (2026-09-04)
 
 ## ⭐ TASK 3 SWEEP — bring EVERY scaler onto the measured system (owner directive, 2026-09-04)
 
