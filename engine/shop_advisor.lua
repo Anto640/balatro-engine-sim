@@ -1000,7 +1000,19 @@ function SA.recommend(gs, opts)
     -- owned-synergy (sbonus) are never damped.
     local dollar_cap = (cap >= 25) and cap or (cap * 5)
     local pack_money = 1.0
-    if not (pace and pace.urgent) and dollars(gs) < dollar_cap and dollar_cap > 0 then
+    -- CELESTIAL EXEMPTION (conversion_baseline.txt): leveling a COMMITTED hand is a DIRECTED build
+    -- action, not a speculative gamble on a pool -- it is the ONE channel where engine and winner
+    -- agree EXACTLY (0 discordant pairs, WINRATE_V3_PLAN 5s), and the conversion investigation named
+    -- UNDER-LEVELING as the concrete gap (3 of 4 engine-followed losses died with an xmult core over
+    -- a level-1 base). So a planet pack is exempt from the poverty damp -- but ONLY in the FINISHING
+    -- WINDOW (BP.level_push_active: committed hand + banked >= $20 + ante >= 4). Gating it there is
+    -- deliberate: un-damping a planet pack while genuinely POOR (< $20, early) would re-open the §28
+    -- spending-when-poor harm the damp exists to prevent (ecap3 -0.945). In the finishing window the
+    -- bank is at/near the interest cap and the core+economy already stand, so converting it to levels
+    -- is exactly the winners' play -- and the damp there is only mild anyway (0.69-1.0), so this is a
+    -- safe, narrow correctness gate, not a licence to gamble when broke.
+    local directed_level = (kind == "planet") and BuildPlan.level_push_active(gs)
+    if not directed_level and not (pace and pace.urgent) and dollars(gs) < dollar_cap and dollar_cap > 0 then
       -- steeper than linear (^1.6): the human buys few packs until NEAR the cap, then ramps up
       -- (measured 6% poor -> ~20% rich), so the damp must bite hardest well below the cap and
       -- fade only as the bankroll approaches it.
