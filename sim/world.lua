@@ -953,10 +953,18 @@ function World.play_blind(run, blind)
     mr_bones_saved = mr_bones_save(run, b.scored, b.target)
     if mr_bones_saved then cleared = true end
   end
+  -- Gold ENHANCEMENT ($3 per card HELD in hand at end of round -- distinct from Gold SEAL, which pays
+  -- $3 when PLAYED and is already in ev.money). This whole channel was previously unmodelled: the sim
+  -- credited $0 for held gold cards, so the milk half of "farm money WHILE clearing" (hold your gold
+  -- cards, clear with the rest) paid nothing (tools/milk_regret.lua, 2026-09-19). The cards left in
+  -- `hand` at blind end are exactly the ones held. -- VERIFY $3 (wiki, Gold enhancement).
+  local held_gold = 0
+  for _, c in ipairs(hand) do if c.enhancement == "m_gold" then held_gold = held_gold + 1 end end
   return {
     cleared = cleared, scored = b.scored, target = b.target, mr_bones_saved = mr_bones_saved,
     hands_used = plays, hands_left = b.hands_left, discards_left = b.discards_left,
     discards_start = discards,                            -- for Delayed Gratification (no discards used)
+    held_gold = held_gold,                                -- Gold enhancement: $3 each at round end (award_income)
     played_types = b.played_types,                        -- for To Do List (was the target hand played?)
     blind_type = b.type, boss_key = b.boss_key,
     plays = b.plays, consumable_uses = b.consumable_uses,  -- telemetry (P1/P4)
@@ -1128,6 +1136,7 @@ function World.award_income(run, blind_result)
     run.economy.dollars, run.economy.interest_cap)
   income = income + joker_econ_income(run)   -- econ jokers finally pay their $/round
   income = income + conditional_econ(run, blind_result)  -- P1: Delayed Grat / Satellite (condition-gated)
+  income = income + 3 * (blind_result.held_gold or 0)    -- Gold enhancement: $3 per card held in hand at round end
   income = income + bonus_interest(run)      -- W-ECON: To the Moon (bankroll-proportional)
   income = income + rocket_income(run)       -- W-ECON: Rocket (grows per boss defeated)
   -- Phase A3 resource lesion: hand the engine unlimited money to test whether ACQUISITION
