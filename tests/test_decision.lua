@@ -1059,4 +1059,43 @@ return function(t)
     t.ok(DiscardValue.keep_value(flagged) < DiscardValue.keep_value(plain),
       "a per-card-debuffed King ranks below a live 2 -> pitched first (no gs needed)")
   end
+
+  -- LIVE boss_effect gap (2026-09-20 replay audit, PROVABLE): HandEval applies suit/face
+  -- debuffs and The Flint's halve-base only via gs.boss_effect, but state_extraction never
+  -- writes it -- so the LIVE overlay scored debuffed hands at FULL value and recommended a
+  -- play as a clear when it actually loses (real corpus case seed 2VGCT9W5: a Flint Flush
+  -- "beats the blind 12537>=10000" but really scores 6786). DE.decide must now DERIVE
+  -- gs.boss_effect from the boss key, so the live decision matches the boss-faithful one.
+  do
+    local Boss = require("engine.boss_effect")
+    local h = {
+      card{ id = 1, rank = "King", suit = "Spades" }, card{ id = 2, rank = "10", suit = "Spades" },
+      card{ id = 3, rank = "9", suit = "Spades" }, card{ id = 4, rank = "7", suit = "Spades" },
+      card{ id = 5, rank = "5", suit = "Spades" },
+    }
+    local deck = {}
+    for i = 1, 20 do deck[#deck + 1] = card{ id = 100 + i, rank = (i % 2 == 0 and "Ace" or "King"), suit = "Spades" } end
+    -- this Spade Flush scores 304 at full base, but only 117 under The Flint (halve base+mult).
+    -- target 200 -> full base "clears", Flint base does NOT -> with 3 discards the engine must dig.
+    local function flint_gs(preset)
+      local gs = GS.new{ hand = h, deck = deck, run = { hand_levels = {}, hand_size = 5 },
+        blind = { target_chips = 200, chips_scored = 0, hands_left = 4, discards_left = 3,
+          boss = true, boss_effect_key = "bl_flint", played_hand_types = {} } }
+      if preset then gs.boss_effect = Boss.of("bl_flint") end  -- as replay_fixture/sim do
+      return gs
+    end
+    -- control: no boss -> playing the 304-chip flush clears a 200 target
+    local nb = GS.new{ hand = h, deck = deck, run = { hand_levels = {}, hand_size = 5 },
+      blind = { target_chips = 200, chips_scored = 0, hands_left = 4, discards_left = 3 } }
+    t.eq(DE.decide(nb).best.type, "PLAY", "no boss: the flush clears the 200 target -> PLAY it")
+    -- LIVE (boss_effect NOT pre-set, exactly what state_extraction feeds): must honour The Flint
+    local live = DE.decide(flint_gs(false)).best
+    t.eq(live.type, "DISCARD",
+      "Flint, live gs (no pre-set boss_effect): the flush no longer clears -> DISCARD to dig, not a false-clear PLAY")
+    t.ok(not (live.reason or ""):match("beats the blind"),
+      "Flint live: does not claim the halved play 'beats the blind'")
+    -- and it matches the boss-faithful decision (the derivation closes the gap)
+    local faith = DE.decide(flint_gs(true)).best
+    t.eq(live.type, faith.type, "Flint: live decision == boss-faithful decision (gs.boss_effect derived)")
+  end
 end

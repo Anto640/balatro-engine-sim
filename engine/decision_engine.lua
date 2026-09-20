@@ -393,6 +393,16 @@ end
 function DE.decide(gs, opts)
   local hand = gs.hand or {}
   local b = gs.blind or {}
+  -- LIVE boss_effect gap (2026-09-20 replay audit, provable): HandEval scores suit/face
+  -- debuffs and Flint's halve-base ONLY via gs.boss_effect, but state_extraction never
+  -- writes that field -- so the LIVE overlay scored debuffed cards at full value and
+  -- recommended a play as a clear when it actually loses (seed 2VGCT9W5: a Flint Flush
+  -- "beats the blind 12537>=10000" but really scores 6786). replay_fixture/sim set
+  -- boss_effect before calling us; the live caller does not. Derive it here (the single
+  -- in-blind scoring chokepoint) so every caller is faithful. Pure: BossEffect.of is pure.
+  if not gs.boss_effect and b.boss and b.boss_effect_key then
+    gs.boss_effect = BossEffect.of(b.boss_effect_key)
+  end
   local hands_left = b.hands_left or 1
   local discards_left = b.discards_left or 0
   local remaining = remaining_target(gs)
