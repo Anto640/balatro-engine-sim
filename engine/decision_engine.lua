@@ -404,16 +404,27 @@ function DE.decide(gs, opts)
   -- single hand -- so prefer a play that reliably clears `remaining`.
   local pfilter = boss_filter(gs)
   local play_ev, play_cards = HandEval.best_play_target(gs, hand, remaining, pfilter)
+  -- OFF-TYPE-SCORES-ZERO (owner 2026-09-20: died to the Mouth playing Pair/High Card for 0 with 3
+  -- discards unused). Under the Mouth (single_hand_type) a play of a DIFFERENT type than the one already
+  -- locked scores ZERO -- and the pfilter forbids exactly those, so pfilter returning NO play here means
+  -- the hand cannot make the locked type THIS deal. The old fallback then played the best OFF-TYPE hand
+  -- as if it scored, and (valued at its apparent score) it out-ranked digging -- so the engine burned its
+  -- hands on 0-scorers instead of discarding to draw the locked type. Flag it: the play really scores 0,
+  -- so its value is zeroed below and the DIG (discard to draw the locked type) is preferred while discards
+  -- remain. Only the Mouth zeroes a played hand's score; Psychic/Eye "no legal play" is a genuine can't-
+  -- play (the fallback there is still the least-bad real play), so gate the zeroing on single_hand_type.
+  local play_scores_zero = false
   if not play_ev and pfilter then
-    -- no LEGAL play exists (e.g. can't make 5 cards under Psychic late in the hand) ->
-    -- recommend the least-bad legal-agnostic play rather than nothing.
+    local beff = b.boss_effect_key and BossEffect.of(b.boss_effect_key) or nil
+    play_scores_zero = beff and beff.single_hand_type or false
+    -- least-bad legal-agnostic play (the actual cards to play if forced)
     play_ev, play_cards = HandEval.best_play_target(gs, hand, remaining)
   end
   if not play_ev then
     return { best = nil, alternatives = {}, reason = "No cards to play." }
   end
-  local clears = play_ev.score >= remaining and remaining > 0
-  local guaranteed = (play_ev.score_min or play_ev.score) >= remaining and remaining > 0
+  local clears = (not play_scores_zero) and play_ev.score >= remaining and remaining > 0
+  local guaranteed = (not play_scores_zero) and (play_ev.score_min or play_ev.score) >= remaining and remaining > 0
   local forced_play = (hands_left <= 1) -- last hand: must play
 
   -- ---- MOUTH first-play repeatability (owner 2026-09-01: "died to the mouth ... playing repeat hand
@@ -505,6 +516,14 @@ function DE.decide(gs, opts)
   }
   -- credit the future growth this play triggers (0 unless it feeds a scaler)
   play_action.value = play_action.value + play_fuel_bonus
+  -- Mouth off-type play scores 0 (see OFF-TYPE-SCORES-ZERO above): value it at 0 so a DIG outranks it.
+  -- Keep a tiny epsilon so it stays a valid last-resort action when no discard/dig is available.
+  if play_scores_zero then
+    play_action.value = 0
+    play_action.score = 0
+    play_action.off_type_zero = true
+    play_action.reason = "No same-type hand available under The Mouth this deal — off-type plays score 0."
+  end
 
   -- play-time generators (Vagabond/Superposition/Seance/Midas): this play also
   -- makes a tarot/spectral/gold. Small credit (tie-breaks toward generating) +
@@ -526,7 +545,7 @@ function DE.decide(gs, opts)
   local use_action = planet_use(gs, play_ev, remaining, held, gs_eval)
   -- held Tarots: use for income (Hermit/Temperance) or score (enhancement/suit).
   -- Pick whichever consumable use is most valuable.
-  local tarot_action = Tarot.best_use(gs, play_ev, remaining, Heuristics.DOLLAR_VALUE)
+  local tarot_action = Tarot.best_use(gs, play_ev, remaining, Heuristics.DOLLAR_VALUE, pfilter)
   if tarot_action and (not use_action or tarot_action.value > use_action.value) then
     use_action = tarot_action
   end
@@ -779,7 +798,7 @@ function DE.decide(gs, opts)
     -- hand includes any held-planet level-up. Includes the heuristic's set as a
     -- candidate so the realistic, joker-aware measurement is the decider.
     local md = DiscardValue.best(gs_eval,
-      { samples = 10, rng = rng,
+      { samples = 10, rng = rng, filter = pfilter,   -- Mouth/Eye: dig toward the LEGAL (locked) type
         extra_discards = (d and d.cards and #d.cards > 0) and { d.cards } or nil })
     if md and #md.cards > 0 then
       -- CREDIT the money the pitched cards EARN (Faceless $5/3-faces, Mail/Trading), on the SAME frac
@@ -916,7 +935,11 @@ function DE.decide(gs, opts)
     -- mean-rule guarded against), under CRN, and only overrides toward the dig on a
     -- clear margin -- otherwise play the sure points.
     best = play_action
-    if discard_action and remaining > 0 and play_action.score < remaining
+    -- Mouth off-type play scores 0 even on the last hand -- but discards don't consume the hand, so
+    -- digging for the locked type (3 tries here) can only help: worst case you still play a 0-scorer.
+    if play_scores_zero and discard_action and discard_action.cards and #discard_action.cards > 0 then
+      best = discard_action; best.plan = true
+    elseif discard_action and remaining > 0 and play_action.score < remaining
        and discard_action.cards and #discard_action.cards > 0
        and play_action.cards and #play_action.cards > 0 then
       local seed = disc_seed(gs)

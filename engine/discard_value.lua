@@ -100,13 +100,19 @@ function DV.measured(gs, discard, opts)
     gs_after.blind = nb
   end
 
+  -- opts.filter: a boss play-legality filter (Mouth single-type / Eye no-repeat). When present, the
+  -- redraw is scored by its best LEGAL hand -- so under the Mouth the dig correctly values drawing the
+  -- LOCKED type, not a bigger off-type hand that would score 0 (owner 2026-09-20 Mouth death).
+  local filter = opts.filter
   local total = 0
   for _ = 1, samples do
     local s = shuffled(pile, rng)
     local nh = {}
     for i = 1, #keep do nh[i] = keep[i] end
     for i = 1, math.min(ndraw, #s) do nh[#nh + 1] = s[i] end
-    local ev = HandEval.best_play(gs_after, nh)
+    local ev
+    if filter then ev = HandEval.best_play_target(gs_after, nh, 0, filter)
+    else ev = HandEval.best_play(gs_after, nh) end
     total = total + (ev and ev.score or 0)
   end
   return total / samples

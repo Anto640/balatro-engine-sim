@@ -314,7 +314,10 @@ end
 
 -- Best held Tarot to USE in the blind. dollar_value converts $ to score-equiv so
 -- income and score tarots compare. Returns a USE_CONSUMABLE-style action or nil.
-function T.best_use(gs, base_ev, remaining, dollar_value)
+-- `filter` (optional): a boss play-legality filter (Mouth single-type / Eye no-repeat) so a "use
+-- tarot then play" proposal can't recommend an OFF-TYPE follow-up that scores 0 under the Mouth --
+-- which corrupts the locked-type set and defeats the play chooser's own filter (owner 2026-09-20).
+function T.best_use(gs, base_ev, remaining, dollar_value, filter)
   dollar_value = dollar_value or 12
   local hand = gs.hand or {}
   local base = base_ev and base_ev.score or 0
@@ -351,7 +354,7 @@ function T.best_use(gs, base_ev, remaining, dollar_value)
         local kept = {}
         for _, cc in ipairs(hand) do if not dead[cc] then kept[#kept + 1] = cc end end
         if #kept >= 5 then
-          local ev2, cards2 = HandEval.best_play_target(with_hand(gs, kept), kept, remaining)
+          local ev2, cards2 = HandEval.best_play_target(with_hand(gs, kept), kept, remaining, filter)
           local ndel = #hand - #kept
           if ev2 and ev2.score >= base * 0.98 and ndel > 0 then
             consider({ type = "USE_CONSUMABLE", target = { name = name, key = c.key }, kind = "score",
@@ -365,7 +368,7 @@ function T.best_use(gs, base_ev, remaining, dollar_value)
       else
         local nh = T.apply_to_hand(hand, c.key)
         if nh then
-          local ev2, cards2 = HandEval.best_play_target(with_hand(gs, nh), nh, remaining)
+          local ev2, cards2 = HandEval.best_play_target(with_hand(gs, nh), nh, remaining, filter)
           local gain = ev2 and ((ev2.score or 0) - base) or 0
           local card_tarot = T.ENH[c.key] or T.SUIT[c.key] or T.RANK[c.key]
           local need = Mechanics.boss_per_hand_need(gs)
