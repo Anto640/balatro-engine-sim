@@ -650,6 +650,35 @@ end
 -- Per-hand scoring this joker adds, as a fraction of the per-hand score we need
 -- for the upcoming boss. MEASURED from your deck; falls back to the data tier as
 -- a prior only when the joker has no scoring model or there's no deck to sample.
+-- Expected discards HELD when you actually PLAY, used to score discards_left-dependent jokers (Banner:
+-- +chips per REMAINING discard; Mystic Summit: +mult at 0 discards). The shop's gs.blind.discards_left
+-- is the FRESH-blind base (4) -- Banner's BEST case -- but a build that DIGS spends its discards and
+-- plays near 0 (owner 2026-09-20: "took Banner ... already using quite a few discards, negating most of
+-- its effect"; Banner measured 284 at 4 discards vs 71 at 1). One coherent value serves both, as mirrors:
+-- a dig build -> low (Banner discounted, Mystic boosted), a hold build -> base (Banner full, Mystic ~0);
+-- and it is a NO-OP for the ~all jokers whose score is discard-independent. Dig signal = the REST of the
+-- build owns a discard-synergy joker (Faceless/Mail/Trading/Burglar, "discard" tag) or is off-pace.
+SA.DIG_HOLD_FRAC = 0.4   -- discards still held at play in a digging build (~1.6 of 4: most spent, not all)
+function SA.expected_discards_left(gs, pace)
+  local b = gs.blind or {}
+  local base = b.base_discards or b.discards_left or 4
+  local digs = (pace and pace.urgent) or false
+  if not digs then
+    for _, j in ipairs(gs.jokers or {}) do
+      if JokerData.has_tag(j.key, "discard") then digs = true; break end
+    end
+  end
+  return digs and (base * SA.DIG_HOLD_FRAC) or base
+end
+-- gs with blind.discards_left overridden (shallow copy; for the joker-scoring measurement only).
+local function with_discards(gs, dl)
+  if not gs.blind or (gs.blind.discards_left or -1) == dl then return gs end
+  local g = {}; for k, v in pairs(gs) do g[k] = v end
+  local nb = {}; for k, v in pairs(gs.blind) do nb[k] = v end
+  nb.discards_left = dl; g.blind = nb
+  return g
+end
+
 local function scoring_gain(gs, sj, rng, pace)
   -- MEASURED-SCALER / DECK-MODIFIER bridge (Tasks 1-2): if the joker is one the measured system models
   -- (Ride the Bus at equilibrium, the accumulating scalers, Hiker, Marble/DNA, or an econ deck-mod), use
@@ -679,7 +708,10 @@ local function scoring_gain(gs, sj, rng, pace)
   -- project a scaler to its grown value, but DAMP that future toward its current worth
   -- when near-term survival is at risk (pace) -- don't buy a weak-now scaler into a boss.
   local proj = 1 + (Eval.scaling_projection(gs, sj.key, proj_freq) - 1) * SA.proj_damp(pace)
-  local measured = JokerValue.score_delta(gs, sj, { samples = 8, rng = rng })
+  -- score at the discards the build will actually HOLD when playing (Banner/Mystic Summit correctness),
+  -- not the fresh-blind maximum; a no-op for discard-independent jokers.
+  local gs_score = with_discards(gs, SA.expected_discards_left(gs, pace))
+  local measured = JokerValue.score_delta(gs_score, sj, { samples = 8, rng = rng })
   if measured then
     local per_hand_need = Mechanics.boss_per_hand_need(gs)
     local m = measured / per_hand_need
