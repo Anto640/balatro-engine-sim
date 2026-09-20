@@ -52,6 +52,30 @@ return function(t)
     t.eq(decide("Pair").hand_type, "Pair", "Mouth locked to Pair -> engine plays a Pair, not the 0-scoring Two Pair")
   end
 
+  -- The Mouth, locked to a type the CURRENT hand CANNOT make (owner 2026-09-20 death: locked to Straight,
+  -- then played Full House/Pair/High Card for 0 with 3 discards unused, died 2872/4000). When no legal
+  -- (locked-type) play exists this deal, an off-type play scores 0 -- so with discards in hand the engine
+  -- must DISCARD to dig for the locked type, not burn a hand on a guaranteed 0-scorer.
+  do
+    local deck = {}
+    for i = 1, 52 do deck[#deck + 1] = card{ id = 2000 + i, rank_id = ((i - 1) % 13) + 2,
+      suit = ({ "Spades", "Hearts", "Clubs", "Diamonds" })[((i - 1) % 4) + 1] } end
+    -- a hand that makes NO straight (two pairs + kickers), locked to Straight
+    local h = {
+      card{ id = 1, rank = "King", suit = "Hearts" }, card{ id = 2, rank = "King", suit = "Clubs" },
+      card{ id = 3, rank = "8", suit = "Spades" },   card{ id = 4, rank = "8", suit = "Diamonds" },
+      card{ id = 5, rank = "4", suit = "Hearts" },   card{ id = 6, rank = "2", suit = "Spades" },
+      card{ id = 7, rank = "Jack", suit = "Clubs" }, card{ id = 8, rank = "3", suit = "Diamonds" },
+    }
+    local function rng() local s = 11; return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end end
+    local gs = GS.new{ deck = deck, hand = h, remaining = deck,
+      run = { hand_levels = {}, hand_size = 8, joker_slots = 5 },
+      blind = { target_chips = 4000, chips_scored = 2872, hands_left = 2, discards_left = 3,
+        boss = true, boss_effect_key = "bl_mouth", played_hand_types = { Straight = 1 } } }
+    t.eq(DE.decide(gs, { rng = rng(), samples = 16 }).best.type, "DISCARD",
+      "Mouth locked to Straight + hand can't make one + discards left -> DIG, not play an off-type 0-scorer")
+  end
+
   -- HOLD-CONDITIONAL PLAY TIMING: Mystic Summit (+15 mult at 0 discards) makes a scoring play land far
   -- bigger once the discards are spent, so with discards still in hand the engine must DIG them out first
   -- (owner 2026-08-31: "use all its discards before playing" -- it was playing the flush at 2 discards
