@@ -53,6 +53,7 @@ local Simulation = try_require("engine.simulation")
 local ShopAdvisor = try_require("engine.shop_advisor")
 local SkipAdvisor = try_require("engine.skip_advisor")
 local PackOpenAdvisor = try_require("engine.pack_open_advisor")
+local BuildPlan = try_require("engine.build_plan")  -- live persistence of the archetype commitment
 local Overlay  = try_require("ui.overlay")
 local HUDInject = try_require("ui.hud_inject")
 local Autoplay = try_require("ui.autoplay")   -- F11: translate the engine's decision into real inputs
@@ -106,6 +107,25 @@ function BES.evaluate(with_sim, gs)
     return
   end
   pcall(BES.warn_uncovered, gs)
+
+  -- BUILD-COMMITMENT persistence (2026-09-20 field-diff audit, PROVABLE dead-field). BP.commitment
+  -- reads gs.run.build_plan, which the SIM advances every shop and carries across states
+  -- (sim/content.lua:923). The LIVE overlay never did -- state_extraction doesn't write it and
+  -- main.lua never called BP.advance -- so BP.commitment / anchored_commitment were nil and
+  -- BP.planet_credit was 0 in the ACTUAL mod. The whole build-commitment -> valuation channel
+  -- (the "located next lever", shipped +0.049 in sim) was silently DEAD live. Same class as the
+  -- Mouth (played_hand_types) and boss_effect gaps. Mirror the sim: keep a run-scoped plan, advance
+  -- it in the shop (where the sim does), and thread it into every gs the advisors read (in-blind
+  -- planet_credit included). Reset on a new run (the run seed changes).
+  if BuildPlan and gs.run then
+    local seed = (gs.meta and gs.meta.seed_hash) or ""
+    if seed ~= BES._build_seed then BES._build_seed, BES._build_plan = seed, nil end
+    if gs.shop then
+      local ok_bp, plan = pcall(BuildPlan.advance, gs, BES._build_plan)
+      if ok_bp then BES._build_plan = plan end
+    end
+    gs.run.build_plan = BES._build_plan   -- so BP.commitment/planet_credit see it (shop AND blind)
+  end
 
   -- An open booster pack: recommend which revealed items to take, and in what
   -- order (chained effects), or to skip the pack (deck bloat). The cheap pass
