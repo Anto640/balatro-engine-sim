@@ -13,20 +13,30 @@ local JokerData = require("engine.joker_data")   -- suit-scoring joker tags (bui
 
 local T = {}
 
--- The suits your BUILD actually rewards: owned suit-scoring jokers (Greedy->Diamonds, Lusty->Hearts,
--- Wrathful->Spades, Gluttonous->Clubs, Rough Gem/Arrowhead/Onyx/Bloodstone/Blackboard/Seeing Double)
--- plus a committed Flush's suit. A card in one of these SCORES far more often, so a targeted
--- enhancement/seal/edition belongs THERE -- not on whatever card has the most raw chips (owner
--- 2026-09-20: "Empress went on the 2 highest cards, not the Diamonds it was playing for Greedy").
--- Returns a set { [suit]=true } or nil when the build has no suit preference (-> unchanged behaviour).
+-- What your BUILD rewards in a scored card -- read from owned jokers' tags (the same vocab joker_data
+-- documents) plus a committed Flush's suit. A targeted enhancement/seal/edition/+rank pays off when the
+-- card SCORES, so it belongs on a card the build actually cares about -- NOT on whatever has the most raw
+-- chips (owner 2026-09-20: "Empress went on the 2 highest cards, not the Diamonds it was playing for
+-- Greedy ... it should be wider -- face cards for some builds, low/rank builds for Hack/Fibonacci etc.").
+-- Covers: suits (Greedy/Lusty/... + Flush), faces (Scary Face/Photograph/Sock and Buskin/Smiley/Business/
+-- Reserved Parking/Midas/Canio), even (Even Steven/Walkie Talkie), odd (Odd Todd), and specific ranks
+-- (rank:ace Fibonacci/Scholar, rank:king Baron/Triboulet, rank:queen Shoot the Moon/Triboulet).
+-- Returns a prefs table (or nil when the build has no card preference -> unchanged, chips-only behaviour).
 local SUIT_OF_TAG = { ["suit:Diamonds"] = "Diamonds", ["suit:Hearts"] = "Hearts",
                       ["suit:Spades"] = "Spades", ["suit:Clubs"] = "Clubs" }
-function T.build_suits(gs)
-  local suits, any = {}, false
+local RANK_OF_TAG = { ["rank:ace"] = 14, ["rank:king"] = 13, ["rank:queen"] = 12, ["rank:jack"] = 11 }
+function T.build_prefs(gs)
+  local p = { suits = {}, ranks = {}, face = false, even = false, odd = false, any = false }
   for _, j in ipairs((gs and gs.jokers) or {}) do
     for _, tag in ipairs(JokerData.resolve(j.key).tags or {}) do
-      local s = SUIT_OF_TAG[tag]
-      if s then suits[s] = true; any = true end
+      local suit = SUIT_OF_TAG[tag]
+      local rk = RANK_OF_TAG[tag]
+      if suit then p.suits[suit] = true; p.any = true
+      elseif rk then p.ranks[rk] = true; p.any = true
+      elseif tag == "rank:face" then p.face = true; p.any = true
+      elseif tag == "rank:even" then p.even = true; p.any = true
+      elseif tag == "rank:odd" then p.odd = true; p.any = true
+      end
     end
   end
   local c = gs and gs.run and gs.run.build_plan
@@ -37,10 +47,28 @@ function T.build_suits(gs)
     for _, s in ipairs({ "Clubs", "Diamonds", "Hearts", "Spades" }) do
       if (counts[s] or 0) > bestn then bestn = counts[s] or 0; best = s end
     end
-    if best then suits[best] = true; any = true end
+    if best then p.suits[best] = true; p.any = true end
   end
-  if not any then return nil end
-  return suits
+  if not p.any then return nil end
+  return p
+end
+
+-- How many build dimensions this card matches (0 = irrelevant). A card that is BOTH a build suit AND a
+-- face (Greedy + Photograph) scores 2 and is targeted first. Even/odd exclude face cards and treat Ace
+-- as ODD, matching Balatro's Even Steven (2/4/6/8/10) and Odd Todd (A/3/5/7/9).
+function T.build_match(card, p)
+  if not p or not card then return 0 end
+  local s = 0
+  if card.suit and p.suits[card.suit] then s = s + 1 end
+  local r = Cards.rank_id(card) or 0
+  if p.ranks[r] then s = s + 1 end
+  local face = Cards.is_face(card)
+  if p.face and face then s = s + 1 end
+  if not face and r > 0 then
+    if p.even and r ~= 14 and r % 2 == 0 then s = s + 1 end
+    if p.odd and (r == 14 or r % 2 == 1) then s = s + 1 end
+  end
+  return s
 end
 
 -- enhancement tarots: which enhancement they apply, and to how many cards
@@ -208,8 +236,7 @@ end
 function T.best_targets(gs, key, pool)
   pool = pool or ((gs.deck and #gs.deck > 0) and gs.deck or gs.hand)
   if not pool or #pool == 0 then return nil end
-  local bsuits = T.build_suits(gs)
-  local function in_build_suit(c) return bsuits and c.suit and bsuits[c.suit] or false end
+  local prefs = T.build_prefs(gs)
   local spec = T.ENH[key]
   if spec then
     local order = {}
@@ -219,12 +246,12 @@ function T.best_targets(gs, key, pool)
       -- never overwrite an existing enhancement when a plain card is available
       local ea, eb = a.enhancement ~= nil, b.enhancement ~= nil
       if ea ~= eb then return not ea end
-      -- BUILD-AWARE (owner 2026-09-20): an enhancement pays off when the card SCORES, so put it on a
-      -- card in a build-rewarded suit (the Diamonds a Greedy build plays), not the highest raw chips.
-      -- Skipped for Tower (wants the worst card to Stone) and when the build has no suit preference.
-      if not lowest and bsuits then
-        local sa, sb = in_build_suit(a), in_build_suit(b)
-        if sa ~= sb then return sa end
+      -- BUILD-AWARE (owner 2026-09-20): an enhancement pays off when the card SCORES, so put it on the
+      -- card the build rewards most (a Greedy Diamond, a Photograph face, an Odd Todd odd card), not the
+      -- highest raw chips. Skipped for Tower (wants the worst card) and when the build has no preference.
+      if not lowest and prefs then
+        local ma, mb = T.build_match(a, prefs), T.build_match(b, prefs)
+        if ma ~= mb then return ma > mb end
       end
       local ca, cb = Cards.chips(a), Cards.chips(b)
       if ca ~= cb then if lowest then return ca < cb else return ca > cb end end
@@ -259,9 +286,9 @@ function T.best_targets(gs, key, pool)
     local cand = {}
     for _, c in ipairs(pool) do if not Cards.is_stone(c) and ok(c) then cand[#cand + 1] = c end end
     table.sort(cand, function(a, b)
-      if bsuits then
-        local sa, sb = in_build_suit(a), in_build_suit(b)
-        if sa ~= sb then return sa end
+      if prefs then
+        local ma, mb = T.build_match(a, prefs), T.build_match(b, prefs)
+        if ma ~= mb then return ma > mb end
       end
       local ca, cb = Cards.chips(a), Cards.chips(b)
       if ca ~= cb then return ca > cb end
