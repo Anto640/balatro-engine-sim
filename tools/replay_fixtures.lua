@@ -21,6 +21,7 @@ local RF   = require("core.replay_fixture")
 local SA   = require("engine.shop_advisor")
 local PO   = require("engine.pack_open_advisor")
 local DE   = require("engine.decision_engine")
+local SK   = require("engine.skip_advisor")
 
 local function lcg(seed)
   local s = math.floor(seed) % 2147483647
@@ -41,9 +42,15 @@ local REPLAY = {
   shop  = function(gs, rng) return SA.recommend(gs, { rng = rng }) end,
   pack  = function(gs, rng) return PO.recommend(gs, { rng = rng }) end,
   blind = function(gs, rng) return DE.decide(gs, { rng = rng }) end,
+  skip  = function(gs, rng) return SK.recommend(gs, { rng = rng }) end,
 }
 local function pick_of(kind, ranked)
   if not ranked then return nil end
+  if kind == "skip" then
+    -- SkipAdvisor returns { recommend="SKIP"|"PLAY", tag, tag_value, play_value }
+    return { type = ranked.recommend, tag = ranked.tag,
+             tag_value = ranked.tag_value, play_value = ranked.play_value }
+  end
   if kind == "pack" then
     if ranked.skip then return { type = "SKIP_PACK" } end
     local it = ranked.best
@@ -89,7 +96,7 @@ end
 fh:close(); if out then out:close() end
 
 print(("replayed %d decisions from %s"):format(n, infile:gsub(".*/", "")))
-for _, k in ipairs({ "shop", "pack", "blind" }) do
+for _, k in ipairs({ "shop", "pack", "blind", "skip" }) do
   if bykind[k] then print(("  %-6s %5d"):format(k, bykind[k])) end
 end
 if plays > 0 then print(("  %-6s %5d  (human's actual in-blind plays, for the blind-agreement join)"):format("plays", plays)) end

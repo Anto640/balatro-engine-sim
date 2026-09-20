@@ -416,6 +416,9 @@ function BES.emit_fixture(gs)
   -- SELECTING_HAND only: DRAW_TO_HAND is the transient deal (partial hand) -- not a decision.
   elseif m.state == "SELECTING_HAND" and (gs.blind and (gs.blind.hands_left or 0) > 0)
       and #(gs.hand or {}) > 0 then kind = "blind"
+  -- BLIND-SELECT skip decision (SKIP-for-tag vs PLAY). Previously NOT captured, so skip misplays could
+  -- not be replayed/verified (owner 2026-09-20 Charm skip). Now recorded like any other decision.
+  elseif m.in_blind_select and gs.blind and gs.blind.skip_tag then kind = "skip"
   else return end
   local seed = m.seed_hash or ""
   if BES._fix.seed ~= seed then BES._fix = { seed = seed, idx = 0, sig = nil } end
@@ -429,6 +432,9 @@ function BES.emit_fixture(gs)
     for _, p in ipairs(gs.shop.boosters or {}) do parts[#parts + 1] = p.key or p.name or "?" end
   elseif kind == "pack" then
     for _, it in ipairs(gs.pack.items or {}) do parts[#parts + 1] = (it.key or it.set or "?") end
+  elseif kind == "skip" then   -- the offered tag + which blind it is: one decision per blind-select
+    parts[#parts + 1] = tostring(gs.blind.skip_tag)
+    parts[#parts + 1] = tostring(gs.blind.blind_type or "?")
   else -- blind: the hand you must act on + what you have left to spend on it
     local b = gs.blind
     parts[#parts + 1] = "H" .. tostring(b.hands_left) .. "D" .. tostring(b.discards_left or 0)
