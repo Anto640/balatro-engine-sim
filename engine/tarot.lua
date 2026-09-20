@@ -9,66 +9,82 @@
 local Cards = require("util.cards")
 local HandEval = require("engine.hand_eval")
 local Mechanics = require("engine.mechanics")
-local JokerData = require("engine.joker_data")   -- suit-scoring joker tags (build-aware targeting)
+local JokerData = require("engine.joker_data")
+local JokerEffects = require("engine.joker_effects")   -- probe scoring hooks for build-aware targeting
 
 local T = {}
 
--- What your BUILD rewards in a scored card -- read from owned jokers' tags (the same vocab joker_data
--- documents) plus a committed Flush's suit. A targeted enhancement/seal/edition/+rank pays off when the
--- card SCORES, so it belongs on a card the build actually cares about -- NOT on whatever has the most raw
--- chips (owner 2026-09-20: "Empress went on the 2 highest cards, not the Diamonds it was playing for
--- Greedy ... it should be wider -- face cards for some builds, low/rank builds for Hack/Fibonacci etc.").
--- Covers: suits (Greedy/Lusty/... + Flush), faces (Scary Face/Photograph/Sock and Buskin/Smiley/Business/
--- Reserved Parking/Midas/Canio), even (Even Steven/Walkie Talkie), odd (Odd Todd), and specific ranks
--- (rank:ace Fibonacci/Scholar, rank:king Baron/Triboulet, rank:queen Shoot the Moon/Triboulet).
--- Returns a prefs table (or nil when the build has no card preference -> unchanged, chips-only behaviour).
-local SUIT_OF_TAG = { ["suit:Diamonds"] = "Diamonds", ["suit:Hearts"] = "Hearts",
-                      ["suit:Spades"] = "Spades", ["suit:Clubs"] = "Clubs" }
-local RANK_OF_TAG = { ["rank:ace"] = 14, ["rank:king"] = 13, ["rank:queen"] = 12, ["rank:jack"] = 11 }
-function T.build_prefs(gs)
-  local p = { suits = {}, ranks = {}, face = false, even = false, odd = false, any = false }
-  for _, j in ipairs((gs and gs.jokers) or {}) do
-    for _, tag in ipairs(JokerData.resolve(j.key).tags or {}) do
-      local suit = SUIT_OF_TAG[tag]
-      local rk = RANK_OF_TAG[tag]
-      if suit then p.suits[suit] = true; p.any = true
-      elseif rk then p.ranks[rk] = true; p.any = true
-      elseif tag == "rank:face" then p.face = true; p.any = true
-      elseif tag == "rank:even" then p.even = true; p.any = true
-      elseif tag == "rank:odd" then p.odd = true; p.any = true
-      end
+-- Card relevance to your BUILD, read from the SOURCE OF TRUTH -- each owned joker's actual scoring hooks
+-- (on_card_scored / on_held / on_retrigger / on_held_retrigger) probed against the card -- plus scored-
+-- rank/suit SCALERS' feed target (Wee -> 2s, tracked in joker_data as feed_rank/feed_suit, NOT a tag)
+-- and a committed Flush's suit. This is COMPLETE by construction and self-maintaining: a targeted
+-- enhancement/seal/edition/+rank lands on the card the build most rewards -- a Greedy Diamond, a
+-- Photograph/Sock face, an Odd Todd odd card, a Wee 2, a Baron King, a Fibonacci A/2/3/5/8 -- not the
+-- highest raw chips, and new card-caring jokers need no tag upkeep (owner 2026-09-20: "wider than suits
+-- -- faces for some builds, low/rank builds for Hack/Fibonacci/Wee etc."). Returns rel(card)->number,
+-- or nil when nothing in the build cares which card (-> unchanged, chips-only ordering).
+local function effect_bonus(e)
+  if type(e) ~= "table" then return 0 end
+  local b = 0
+  if e.xmult and e.xmult > 1 then b = b + 3 end   -- xmult is the strongest signal
+  if e.mult and e.mult ~= 0 then b = b + 1 end
+  if e.chips and e.chips ~= 0 then b = b + 1 end
+  if e.dollars and e.dollars > 0 then b = b + 1 end
+  return b
+end
+function T.card_relevance_fn(gs)
+  local hooks = {}   -- { { fn, j, kind="eff"|"rt" }, ... }
+  local feed = {}    -- scored-rank/suit scaler targets: { rank= } / { suit= }
+  -- raw owned jokers (they keep their .key; effective_jokers strips it). Copy jokers (Blueprint/
+  -- Brainstorm) aren't expanded here -- a minor refinement, not needed to know what the build rewards.
+  local jokers = (gs and gs.jokers) or {}
+  for _, j in ipairs(jokers) do
+    local eff = JokerEffects.get(j.key)
+    if eff then
+      if eff.on_card_scored    then hooks[#hooks + 1] = { fn = eff.on_card_scored,    j = j, kind = "eff" } end
+      if eff.on_held           then hooks[#hooks + 1] = { fn = eff.on_held,           j = j, kind = "eff" } end
+      if eff.on_retrigger      then hooks[#hooks + 1] = { fn = eff.on_retrigger,      j = j, kind = "rt" } end
+      if eff.on_held_retrigger then hooks[#hooks + 1] = { fn = eff.on_held_retrigger, j = j, kind = "rt" } end
     end
+    local d = JokerData.resolve(j.key) or {}
+    if d.feed_fuel == "scored_rank" and d.feed_rank then feed[#feed + 1] = { rank = d.feed_rank } end
+    if d.feed_fuel == "scored_suit" and d.feed_suit then feed[#feed + 1] = { suit = d.feed_suit } end
   end
+  local flush_suit
   local c = gs and gs.run and gs.run.build_plan
   if c and c.kind == "hand" and c.hand == "Flush" then
     local pool = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand or {}
-    local counts, best, bestn = {}, nil, -1
+    local counts, bestn = {}, -1
     for _, cc in ipairs(pool) do if cc.suit then counts[cc.suit] = (counts[cc.suit] or 0) + 1 end end
     for _, s in ipairs({ "Clubs", "Diamonds", "Hearts", "Spades" }) do
-      if (counts[s] or 0) > bestn then bestn = counts[s] or 0; best = s end
+      if (counts[s] or 0) > bestn then bestn = counts[s] or 0; flush_suit = s end
     end
-    if best then p.suits[best] = true; p.any = true end
   end
-  if not p.any then return nil end
-  return p
-end
-
--- How many build dimensions this card matches (0 = irrelevant). A card that is BOTH a build suit AND a
--- face (Greedy + Photograph) scores 2 and is targeted first. Even/odd exclude face cards and treat Ace
--- as ODD, matching Balatro's Even Steven (2/4/6/8/10) and Odd Todd (A/3/5/7/9).
-function T.build_match(card, p)
-  if not p or not card then return 0 end
-  local s = 0
-  if card.suit and p.suits[card.suit] then s = s + 1 end
-  local r = Cards.rank_id(card) or 0
-  if p.ranks[r] then s = s + 1 end
-  local face = Cards.is_face(card)
-  if p.face and face then s = s + 1 end
-  if not face and r > 0 then
-    if p.even and r ~= 14 and r % 2 == 0 then s = s + 1 end
-    if p.odd and (r == 14 or r % 2 == 1) then s = s + 1 end
+  if #hooks == 0 and #feed == 0 and not flush_suit then return nil end
+  local memo = {}
+  return function(card)
+    local mk = (Cards.rank_id(card) or 0) .. "|" .. tostring(card.suit) .. "|"
+      .. tostring(card.enhancement) .. "|" .. tostring(card.edition) .. "|" .. tostring(card.seal)
+    local cached = memo[mk]; if cached ~= nil then return cached end
+    local s = 0
+    -- a fresh ctx per card so per-hand scratch (Photograph's first-face flag) can't leak between probes
+    local ctx = { all_faces = false, hands_left = 1, discards_left = 0, dollars = 0, njokers = #jokers,
+                  flags = {}, scoring = { card }, played = { card }, held = { card } }
+    for _, h in ipairs(hooks) do
+      local ok, r = pcall(h.fn, card, ctx, h.j)
+      if ok then
+        if h.kind == "eff" then s = s + effect_bonus(r)
+        elseif type(r) == "number" and r > 0 then s = s + 1 end
+      end
+    end
+    for _, f in ipairs(feed) do
+      if f.rank and Cards.rank_id(card) == f.rank then s = s + 1 end
+      if f.suit and Cards.is_suit(card, f.suit) then s = s + 1 end
+    end
+    if flush_suit and Cards.is_suit(card, flush_suit) then s = s + 1 end
+    memo[mk] = s
+    return s
   end
-  return s
 end
 
 -- enhancement tarots: which enhancement they apply, and to how many cards
@@ -236,7 +252,7 @@ end
 function T.best_targets(gs, key, pool)
   pool = pool or ((gs.deck and #gs.deck > 0) and gs.deck or gs.hand)
   if not pool or #pool == 0 then return nil end
-  local prefs = T.build_prefs(gs)
+  local rel = T.card_relevance_fn(gs)
   local spec = T.ENH[key]
   if spec then
     local order = {}
@@ -247,11 +263,12 @@ function T.best_targets(gs, key, pool)
       local ea, eb = a.enhancement ~= nil, b.enhancement ~= nil
       if ea ~= eb then return not ea end
       -- BUILD-AWARE (owner 2026-09-20): an enhancement pays off when the card SCORES, so put it on the
-      -- card the build rewards most (a Greedy Diamond, a Photograph face, an Odd Todd odd card), not the
-      -- highest raw chips. Skipped for Tower (wants the worst card) and when the build has no preference.
-      if not lowest and prefs then
-        local ma, mb = T.build_match(a, prefs), T.build_match(b, prefs)
-        if ma ~= mb then return ma > mb end
+      -- card the build rewards most (probed from the owned jokers' own scoring hooks -- Greedy Diamond,
+      -- Photograph face, Odd Todd odd, Wee 2, Baron King...), not the highest raw chips. Skipped for
+      -- Tower (wants the worst card to Stone) and when the build has no card preference.
+      if not lowest and rel then
+        local ra, rb = rel(a), rel(b)
+        if ra ~= rb then return ra > rb end
       end
       local ca, cb = Cards.chips(a), Cards.chips(b)
       if ca ~= cb then if lowest then return ca < cb else return ca > cb end end
@@ -286,9 +303,9 @@ function T.best_targets(gs, key, pool)
     local cand = {}
     for _, c in ipairs(pool) do if not Cards.is_stone(c) and ok(c) then cand[#cand + 1] = c end end
     table.sort(cand, function(a, b)
-      if prefs then
-        local ma, mb = T.build_match(a, prefs), T.build_match(b, prefs)
-        if ma ~= mb then return ma > mb end
+      if rel then
+        local ra, rb = rel(a), rel(b)
+        if ra ~= rb then return ra > rb end
       end
       local ca, cb = Cards.chips(a), Cards.chips(b)
       if ca ~= cb then return ca > cb end
