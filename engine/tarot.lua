@@ -9,8 +9,39 @@
 local Cards = require("util.cards")
 local HandEval = require("engine.hand_eval")
 local Mechanics = require("engine.mechanics")
+local JokerData = require("engine.joker_data")   -- suit-scoring joker tags (build-aware targeting)
 
 local T = {}
+
+-- The suits your BUILD actually rewards: owned suit-scoring jokers (Greedy->Diamonds, Lusty->Hearts,
+-- Wrathful->Spades, Gluttonous->Clubs, Rough Gem/Arrowhead/Onyx/Bloodstone/Blackboard/Seeing Double)
+-- plus a committed Flush's suit. A card in one of these SCORES far more often, so a targeted
+-- enhancement/seal/edition belongs THERE -- not on whatever card has the most raw chips (owner
+-- 2026-09-20: "Empress went on the 2 highest cards, not the Diamonds it was playing for Greedy").
+-- Returns a set { [suit]=true } or nil when the build has no suit preference (-> unchanged behaviour).
+local SUIT_OF_TAG = { ["suit:Diamonds"] = "Diamonds", ["suit:Hearts"] = "Hearts",
+                      ["suit:Spades"] = "Spades", ["suit:Clubs"] = "Clubs" }
+function T.build_suits(gs)
+  local suits, any = {}, false
+  for _, j in ipairs((gs and gs.jokers) or {}) do
+    for _, tag in ipairs(JokerData.resolve(j.key).tags or {}) do
+      local s = SUIT_OF_TAG[tag]
+      if s then suits[s] = true; any = true end
+    end
+  end
+  local c = gs and gs.run and gs.run.build_plan
+  if c and c.kind == "hand" and c.hand == "Flush" then
+    local pool = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand or {}
+    local counts, best, bestn = {}, nil, -1
+    for _, cc in ipairs(pool) do if cc.suit then counts[cc.suit] = (counts[cc.suit] or 0) + 1 end end
+    for _, s in ipairs({ "Clubs", "Diamonds", "Hearts", "Spades" }) do
+      if (counts[s] or 0) > bestn then bestn = counts[s] or 0; best = s end
+    end
+    if best then suits[best] = true; any = true end
+  end
+  if not any then return nil end
+  return suits
+end
 
 -- enhancement tarots: which enhancement they apply, and to how many cards
 T.ENH = {
@@ -177,6 +208,8 @@ end
 function T.best_targets(gs, key, pool)
   pool = pool or ((gs.deck and #gs.deck > 0) and gs.deck or gs.hand)
   if not pool or #pool == 0 then return nil end
+  local bsuits = T.build_suits(gs)
+  local function in_build_suit(c) return bsuits and c.suit and bsuits[c.suit] or false end
   local spec = T.ENH[key]
   if spec then
     local order = {}
@@ -186,6 +219,13 @@ function T.best_targets(gs, key, pool)
       -- never overwrite an existing enhancement when a plain card is available
       local ea, eb = a.enhancement ~= nil, b.enhancement ~= nil
       if ea ~= eb then return not ea end
+      -- BUILD-AWARE (owner 2026-09-20): an enhancement pays off when the card SCORES, so put it on a
+      -- card in a build-rewarded suit (the Diamonds a Greedy build plays), not the highest raw chips.
+      -- Skipped for Tower (wants the worst card to Stone) and when the build has no suit preference.
+      if not lowest and bsuits then
+        local sa, sb = in_build_suit(a), in_build_suit(b)
+        if sa ~= sb then return sa end
+      end
       local ca, cb = Cards.chips(a), Cards.chips(b)
       if ca ~= cb then if lowest then return ca < cb else return ca > cb end end
       return (a.id or 0) < (b.id or 0)   -- stable tiebreak -> deterministic naming
@@ -211,11 +251,18 @@ function T.best_targets(gs, key, pool)
     if #out == 0 then return nil end
     return out, suit
   end
-  -- helper: the N highest-value cards from `pool` matching `ok(c)` (chips desc, id tiebreak).
+  -- helper: the N most build-relevant cards from `pool` matching `ok(c)` -- build-suit first (a Gold
+  -- seal / +rank / edition pays off on a card you actually SCORE), then chips desc, id tiebreak. Shared
+  -- by the rank tarots (Strength/Death) AND the spectral seal/edition targets (T.SPECTRAL_TARGET), so
+  -- both now respect the build's suit instead of blindly taking the highest raw card (owner 2026-09-20).
   local function top_n(ok, n)
     local cand = {}
     for _, c in ipairs(pool) do if not Cards.is_stone(c) and ok(c) then cand[#cand + 1] = c end end
     table.sort(cand, function(a, b)
+      if bsuits then
+        local sa, sb = in_build_suit(a), in_build_suit(b)
+        if sa ~= sb then return sa end
+      end
       local ca, cb = Cards.chips(a), Cards.chips(b)
       if ca ~= cb then return ca > cb end
       return (a.id or 0) < (b.id or 0)
