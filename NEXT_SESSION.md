@@ -1,5 +1,43 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## ⭐⭐ 2026-09-20 — R9 LIVE-REVIEW FIXES + the REPLAY-AUDIT plan (read the `r9-live-review-2026-09-20` memory)
+
+Owner played a full live run (F11), it DIED to The Mouth, and owner flagged several decisions. All traced via
+the R8 replay loop (capture → `RF.rehydrate` → re-run the engine) and fixed as CORRECTNESS (not winrate
+tuning). Branch `winrate-v4-bundle`; all shipped to the install (`%APPDATA%/Balatro/Mods/balatroenginesim`,
+backup `bes_install_backup_20260920` OUTSIDE Mods/) and pushed.
+
+**Shipped this session (each tested + deployed):**
+1. **Mouth death (run-killer)** — off-type plays score 0 under `single_hand_type`, so the engine now DIGS for
+   the locked type instead of burning hands on 0-scorers; the tarot follow-up can't corrupt the lock. Locked
+   by a regression test (`tests/test_decision.lua`). ⚠ The sim referee auto-corrects illegal plays, so this
+   class is INVISIBLE to the sim suite — it needs live capture + replay.
+2. **Build-aware card targeting (`engine/tarot.lua` `T.card_relevance_fn`)** — Empress/Hierophant/Strength/
+   Death + spectral seals/editions target what the build REWARDS, read by PROBING each owned joker's scoring
+   hooks (complete + self-maintaining: catches Wee/Hack/Fibonacci/Baron/faces/odd, not just suits). Tag-based
+   was rejected as incomplete.
+3. **Banner/Mystic valuation** — scored at the discards you'll HOLD at play (`SA.expected_discards_left`), not
+   the fresh-blind max (Banner was 4× over-valued).
+4. **Sim held-gold $3 fidelity** (`sim/world.lua`) + **Celestial finishing-window poverty exemption**
+   (`shop_advisor`, agreement-neutral).
+5. **SKIP decisions are now CAPTURED** (`main.lua`/`replay_fixture`/`replay_fixtures`) — previously the one
+   decision class never logged. NOT a behaviour change (skip-RATE = the REFUTED `noskip` lever, −0.166).
+
+**⭐ THE RECOMMENDED NEXT STEP — a REPLAY-BASED PROVABLE-ERROR audit (not an agreement bake-off).** Owner's
+valid critique: "differs from my play" bottlenecks on the owner's judgment (the corpus IS their play). So the
+audit's PRIMARY signal is PROVABLE errors — wrong on their own terms, judgment-free: a played hand that scores
+0, an illegal play, a joker valued at an impossible state, an enhancement on a non-scoring card, a generator
+with no output room. Method: replay every captured fixture (`data/agreement_corpus/` OR the live save-folder
+`bes_fixtures.jsonl`) under the current engine and FLAG these. Agreement-divergence from the 7 winning human
+runs is a SECONDARY lead-generator only. Verified provable-correctness fixes ship + get a regression test;
+judgment/refuted items are LEFT (that's not the loop, it's discipline).
+
+**Verification is decoupled from the owner:** they PLAY (any runs, any seed), the mod captures every decision,
+the assistant REPLAYS. Owner does not need to know the optimum or replay a specific seed. The winrate CEILING
+(~8% autonomous) is compute-bound and per-decision fixes won't move it — this work is ADVICE CORRECTNESS,
+which is tractable and the live overlay's actual job. `run tests/runner.lua` (1210 pass) + `runner_sim.lua`
+(604 pass, 1 pre-existing `test_world` failure) before committing.
+
 ## ⭐⭐ 2026-09-19 — WINRATE_V4 investigation + the IN-BLIND PLAY / MONEY-FARMING finding (read `WINRATE_V4_PLAN.md`)
 
 **Fresh baselines (current HEAD, `branch winrate-v4-bundle`):** autonomous **8.1%** baseline / **28.7%** rich10
