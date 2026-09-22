@@ -71,9 +71,38 @@ local ReplayFixture = try_require("core.replay_fixture")
 -- more cost; the signature gate means this only runs when state changes.
 BES_SAMPLES = 80
 
+-- Heap GROWTH (KB, since the last full collect) above which we force a FULL GC instead
+-- of an incremental step. A Hanging-Chad / xmult board makes best_play_target enumerate
+-- card ORDERS (R7) and the survival sim (BES_SAMPLES) roll out repeatedly; both allocate,
+-- and the overlay re-evaluates on every drawn card. Under LuaJIT the incremental "step" GC
+-- may not COMPLETE a cycle while allocation is continuous, so freeable garbage piles up until
+-- the (32-bit) allocator ceiling throws "decide failed: not enough memory" and the game dies
+-- a few frames later (owner report 2026-09-22: The Goad + Hanging Chad + held Magician).
+-- GROWTH-based (not an absolute size) so it is independent of the game's own baseline heap:
+-- a cheap board never triggers it (pure step, no stutter); sustained accumulation forces a
+-- real collect that reclaims fully (a single decide's garbage is entirely collectable -- this
+-- is slow-GC pacing, not a leak) and re-floors. It therefore cannot run away.
+BES_GC_GROWTH_KB = 256 * 1024   -- force a full collect after +256 MB of growth
+
 local BES = {}
 BES.tracker = Sig and Sig.tracker() or nil
 BES.last = nil
+
+-- Bound the Lua heap after an evaluation. Step normally (cheap, non-stuttering), but once
+-- the heap has grown BES_GC_GROWTH_KB past the last full collect, force a full collect so
+-- repeated expensive decides / sims on a Hanging-Chad-class board cannot accumulate to the
+-- OOM ceiling. Growth-based so it is independent of the game's baseline heap (see there).
+BES._gc_floor = nil
+function BES.gc_guard()
+  local c = collectgarbage("count")
+  BES._gc_floor = BES._gc_floor or c
+  if c - BES._gc_floor > BES_GC_GROWTH_KB then
+    collectgarbage("collect")
+    BES._gc_floor = collectgarbage("count")
+  else
+    collectgarbage("step")
+  end
+end
 
 -- Run the decision engine on the current state and push it to the overlay.
 -- with_sim=true also runs the (expensive) Monte-Carlo probability engine; the
@@ -216,7 +245,7 @@ function BES.evaluate(with_sim, gs)
   -- allocating this hard between frames, and the garbage accumulated until LuaJIT's heap ran
   -- out ("decide failed: not enough memory"). An explicit incremental step after each pass
   -- keeps the heap flat. Pure mitigation: it changes no decision, only when memory is reclaimed.
-  collectgarbage("step")
+  BES.gc_guard()
   if not ok then
     Log.error("decide failed:", ranked)
     if Overlay then Overlay.set({ best = nil, reason = "Eval error: " .. tostring(ranked) }) end
@@ -355,6 +384,9 @@ function BES.pump_job(budget)
     end
     if coroutine.status(job.thread) == "dead" then
       BES.job = nil
+      -- the background sim (BES_SAMPLES rollouts) is the heaviest allocator; reclaim it
+      -- before it stacks with the next decide toward the OOM ceiling (see BES_GC_FULL_KB).
+      BES.gc_guard()
       if BES.tracker and BES.tracker.current() ~= job.sig then return end -- moved on
       pcall(job.finish, res)
       return
