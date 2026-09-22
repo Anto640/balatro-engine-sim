@@ -190,7 +190,7 @@ fixed**:
    retrigger re-rolls it; Oops! → $2; Pareidolia counts all cards). Feeds `ev.money` → `play_econ` → the
    tie-break and `econ_power`. **Corpus (cf_play→cf_all, with Vagabond): NEUTRAL** — BLIND −0.3pp (2 tier-2
    plays where the money tie-break now prefers the higher-$ clearing play), all SHOP/PACK metrics 0.0.
-3. **The self-player never reorders CARDS** — `ui/autoplay.lua` has a joker-reorder phase; `card_order`
+3. **✅ DONE (`ea897de`, 2026-09-22) — the self-player now EXECUTES the card reorder** (PHASE 0b in `ui/autoplay.lua`: permutes the played cards within their own hand slots to `best.reorder.card_order`, re-aligns; the game scores in T.x order, and align_cards sets T.x from the array index, so it sticks. Headless-tested vs a mock G with the real align/play-sort rules (`tests/test_autoplay.lua`); deployed. ⏳ still wants one in-game confirmation — look for `reorder cards (+N score)` in `bes_autoplay.log`.) Original note: ~~The self-player never reorders CARDS~~ — `ui/autoplay.lua` has a joker-reorder phase; `card_order`
    appears **zero times**. Now that the chooser (item 1) returns the best card order and the overlay tip
    recovers hand→best, the live autoplayer must EXECUTE that card reorder to realize the fix (the sim already
    does, since it scores the sel in order). ⚠ Live-only (`ui/autoplay.lua` needs `G`/love) — cannot be
