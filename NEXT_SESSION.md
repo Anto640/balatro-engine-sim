@@ -195,6 +195,7 @@ fixed**:
    recovers hand→best, the live autoplayer must EXECUTE that card reorder to realize the fix (the sim already
    does, since it scores the sel in order). ⚠ Live-only (`ui/autoplay.lua` needs `G`/love) — cannot be
    validated headlessly; needs an in-game run.
+4a. **✅ 2026-09-23 — the Smiley→Blackboard sale (DGTW4TTP) was a HELD-CARD CONTEXT BUG, fixed `7874b55` + deployed.** HandEval read held cards from gs.hand (EMPTY in the shop), so Blackboard's ×3 fired on every sampled hand and Raised Fist/Shoot the Moon/Baron/Chariot-Steel measured 0. Also fixed: Card Sharp never fired in the rollout (`58f0c06`). New tool `tools/rollout_calibration.{lua,sh}` ranks cheap measures vs the full engine (307 boards): the shop's per-hand mean ranks sells best (88–95%); the fast rollout is pessimistic; a dig-aware per-hand measure adds +2–5pp at ~15× cost. OPEN: Blackboard's BUY is still priced by the tier floor (1.08 vs measured 0.42) — revisit the floor as a measured change.
 4. **⚠ Nothing notices a sale leaves the board with no unconditional Mult** (R8 defect 3, STILL open — the
    hard one). Greedy is `flat_mult` → `SCORER_KEEP`; plain scorers are deliberately unprotected. **Assessed
    2026-09-05 and deliberately NOT quick-fixed:** the leave-one-out marginal `joker_marginal_fv` is ACCURATE
