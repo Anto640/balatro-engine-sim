@@ -280,6 +280,35 @@ local function reorder_jokers(G, joker_order)
   return true
 end
 
+-- Reorder the PLAYED cards within the live hand to the engine's recommended order (best.reorder.card_order).
+-- Balatro scores a play in SCREEN order: play_cards_from_highlighted sorts G.hand.highlighted by T.x, and
+-- the hand's align_cards assigns T.x from the array index BEFORE its own T.x sort -- so rewriting
+-- G.hand.cards then aligning sticks (same mechanism as reorder_jokers). Only the played cards move: they
+-- are permuted among the hand slots they already occupy, every other card keeps its position (what a
+-- human dragging them would do). Returns true only if the live order was actually changed.
+local function reorder_cards(G, card_order)
+  if not (G.hand and G.hand.cards) or not card_order or #card_order < 2 then return false end
+  local live = G.hand.cards
+  local want = {}
+  for _, pod in ipairs(card_order) do if pod.id ~= nil then want[#want + 1] = pod.id end end
+  if #want ~= #card_order then return false end
+  local in_play = {}
+  for _, id in ipairs(want) do in_play[id] = true end
+  local slots, byid = {}, {}
+  for i, c in ipairs(live) do
+    local id = cid(c)
+    if id ~= nil and in_play[id] then slots[#slots + 1] = i; byid[id] = c end
+  end
+  if #slots ~= #want then return false end               -- couldn't map every played card -> don't touch
+  local same = true
+  for k, i in ipairs(slots) do if cid(live[i]) ~= want[k] then same = false; break end end
+  if same then return false end
+  for k, i in ipairs(slots) do live[i] = byid[want[k]] end
+  pcall(function() if G.hand.set_ranks then G.hand:set_ranks() end end)
+  pcall(function() if G.hand.align_cards then G.hand:align_cards() end end)
+  return true
+end
+
 -- Is the target inner pack card currently selected/highlighted in G.pack_cards?
 local function pack_selected(G, target)
   if not (G.pack_cards and G.pack_cards.highlighted) then return false end
@@ -478,6 +507,23 @@ function Autoplay.tick(last, logger)
   if ch == "hand" and best.type == "PLAY" and best.reorder and best.reorder.joker_changed then
     if reorder_jokers(G, best.reorder.joker_order) then
       log(logger, "reorder jokers (+" .. tostring(math.floor((best.reorder.gain or 0))) .. " score)")
+      Autoplay.locked_until = now() + 0.4
+      return                                  -- re-enter next pass to select + play in the new order
+    end
+  end
+  -- PHASE 0b — CARD REORDER. Played cards score left->right in hand position (Hanging Chad retriggers the
+  -- FIRST card, Photograph the first face, Glass ×2 wants the additive cards before it), and the chooser
+  -- picked this play at its best card order (R7) -- playing it as dealt forfeits that score (the owner's
+  -- Greedy+Chad Two Pair: 340 dealt vs 748 reordered). Apply it before select+play. Capped per state so a
+  -- reorder that somehow doesn't stick can never spin the loop -- it then plays in the live order.
+  if ch == "hand" and best.type == "PLAY" and best.reorder and best.reorder.card_changed then
+    if Autoplay._card_reorder_sig ~= s then Autoplay._card_reorder_sig = s; Autoplay._card_reorder_n = 0 end
+    if Autoplay._card_reorder_n < 2 and reorder_cards(G, best.reorder.card_order) then
+      Autoplay._card_reorder_n = Autoplay._card_reorder_n + 1
+      local o = best.reorder
+      log(logger, "reorder cards"
+        .. (o.objective == "money" and (" (+$" .. tostring(o.money_gain or 0) .. ")")
+            or (" (+" .. tostring(math.floor(o.gain or 0)) .. " score)")))
       Autoplay.locked_until = now() + 0.4
       return                                  -- re-enter next pass to select + play in the new order
     end

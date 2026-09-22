@@ -56,6 +56,7 @@ local suites = {
   "tests.test_replay_fixture",
   "tests.test_telemetry",
   "tests.test_probe",
+  "tests.test_autoplay",
 }
 -- NOTE: the Phase-1 simulator integration suites (tests.test_world, tests.test_driver)
 -- drive the REAL engine per hand (Monte-Carlo) and take minutes, so they are NOT in the
