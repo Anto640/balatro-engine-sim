@@ -30,6 +30,7 @@ local Cards = require("util.cards")
 local Eval = require("engine.eval_function")
 local Mechanics = require("engine.mechanics")
 local BossEffect = require("engine.boss_effect")
+local DiscardValue = require("engine.discard_value")
 
 local Sim = {}
 
@@ -94,7 +95,12 @@ end
 -- expected survival instead of the mean-of-one-hand heuristic (F1/F2).
 local function money_credit(_, ev) return (ev and ev.money) or 0 end
 
-local function rollout(gs, start_hand, pile, target, chips0, hands, discards, hand_size, rng, eff, first, milk)
+-- `pol` (optional, OPT-IN): rollout-policy upgrades. pol.dig = when the hand can't clear and a discard
+-- remains, choose the discard by DiscardValue.best (MEASURED, joker-aware -- the same dig the full engine
+-- uses) with the poker-draw heuristic as one extra candidate, instead of the heuristic alone (which only
+-- sees flush/straight/set draws and otherwise PLAYS with discards left). pol.dig_samples = its MC samples.
+-- nil pol = the historical greedy policy, byte-identical (every in-blind caller passes none).
+local function rollout(gs, start_hand, pile, target, chips0, hands, discards, hand_size, rng, eff, first, milk, pol)
   local bgs = with_boss(gs, eff)
   local current = {}
   for i = 1, #start_hand do current[i] = start_hand[i] end
@@ -193,6 +199,20 @@ local function rollout(gs, start_hand, pile, target, chips0, hands, discards, ha
       end
     elseif ev.score < rem and discards_left > 0 then
       local d = Heuristics.best_discard(with_hand(bgs, current))
+      if pol and pol.dig then
+        local extra = (d and d.cards and #d.cards > 0 and #d.cards < #current) and { d.cards } or nil
+        local hgs = with_hand(bgs, current)
+        hgs.remaining = draw
+        local hb = {}; for k, v in pairs(bgs.blind or {}) do hb[k] = v end
+        hb.discards_left = discards_left
+        hgs.blind = hb
+        local dv = DiscardValue.best(hgs, { samples = pol.dig_samples or 4, rng = rng, extra_discards = extra, filter = filter })
+        if dv and dv.cards and #dv.cards > 0 and #dv.cards < #current and (dv.value or 0) > ev.score then
+          d = dv
+        else
+          d = nil
+        end
+      end
       if d and d.cards and #d.cards > 0 and #d.cards < #current then
         remove_played(d.cards); refill()
         discards_left = discards_left - 1
@@ -301,7 +321,7 @@ end
 
 -- Probability of clearing a FRESH blind (full deck, base hands, empty start).
 -- `eff` (optional) is the boss effect for that blind (only the Boss has one).
-function Sim.survive_fresh(gs, target, base_hands, base_discards, samples, rng, eff, yield)
+function Sim.survive_fresh(gs, target, base_hands, base_discards, samples, rng, eff, yield, pol)
   rng = rng or default_rng
   samples = samples or 200
   if target <= 0 then return 1 end
@@ -313,7 +333,7 @@ function Sim.survive_fresh(gs, target, base_hands, base_discards, samples, rng, 
     local deck = shuffled(gs.deck or {}, rng)
     local start = {}
     for _ = 1, math.min(hs, #deck) do start[#start + 1] = table.remove(deck) end
-    if rollout(gs, start, deck, target, 0, hands, discards, hs, rng, eff) >= target then wins = wins + 1 end
+    if rollout(gs, start, deck, target, 0, hands, discards, hs, rng, eff, nil, nil, pol) >= target then wins = wins + 1 end
     if yield then yield() end
   end
   return wins / samples
