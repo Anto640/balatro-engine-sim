@@ -239,15 +239,29 @@ function BES.evaluate(with_sim, gs)
     if ok then sim = res else Log.error("simulate failed:", res) end
   end
 
+  -- DIAGNOSTIC (2026-09-22 OOM hunt): the "not enough memory" crash is not reproducible in ANY
+  -- offline engine path (DE.decide / Simulation / tarot on every board incl. all-debuffed hands are
+  -- <=2 MB, <=2.5 s), so the failing allocation is likely the WHOLE PROCESS (game + JokerDisplay +
+  -- Multiplayer + ... + this mod) hitting a ceiling, with our small decide merely the first alloc to
+  -- fail. Record the Lua heap right before each decide so a crash log SHOWS whether the heap was
+  -- already huge (ambient exhaustion) or our decide spiked it (an engine bug on a live-only state).
+  local heap_before = collectgarbage("count")
   local ok, ranked = pcall(Decision.decide, gs, { sim = sim })
+  local heap_after = collectgarbage("count")
   -- A full evaluation churns tens of thousands of short-lived scoring tables (see
   -- HandEval.HAND_BUDGET). Balatro's own GC pacing is tuned for the base game, not for a mod
-  -- allocating this hard between frames, and the garbage accumulated until LuaJIT's heap ran
-  -- out ("decide failed: not enough memory"). An explicit incremental step after each pass
-  -- keeps the heap flat. Pure mitigation: it changes no decision, only when memory is reclaimed.
+  -- allocating this hard between frames; BES.gc_guard bounds the heap (see BES_GC_GROWTH_KB).
   BES.gc_guard()
+  -- Heap high-water WARN: surface WHO is growing memory. Logs only on a new +128 MB high, so it is
+  -- quiet normally but draws the climb toward any ceiling in the run log.
+  if heap_after > (BES._heap_hi or 0) + 128 * 1024 then
+    BES._heap_hi = heap_after
+    Log.warn(string.format("heap high-water: %.0f MB (this decide +%.1f MB)",
+      heap_after / 1024, (heap_after - heap_before) / 1024))
+  end
   if not ok then
-    Log.error("decide failed:", ranked)
+    Log.error(string.format("decide failed: %s  [heap before=%.0f MB after=%.0f MB]",
+      tostring(ranked), heap_before / 1024, heap_after / 1024))
     if Overlay then Overlay.set({ best = nil, reason = "Eval error: " .. tostring(ranked) }) end
     return
   end
