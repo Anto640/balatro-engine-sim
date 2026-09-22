@@ -102,6 +102,23 @@ local function money_credit(_, ev) return (ev and ev.money) or 0 end
 -- nil pol = the historical greedy policy, byte-identical (every in-blind caller passes none).
 local function rollout(gs, start_hand, pile, target, chips0, hands, discards, hand_size, rng, eff, first, milk, pol)
   local bgs = with_boss(gs, eff)
+  -- Card Sharp (x3 if this hand type was ALREADY played this round) reads gs.blind.played_hand_types.
+  -- The rollout plays several hands but never updated that set, so Card Sharp could NEVER fire in any
+  -- rollout (calibration 2026-09-23: full engine valued it at +0.42..+0.67 clear rate, the rollout 0).
+  -- Keep a rollout-local copy, seeded from the live blind, and add each simulated play's type. Gated on
+  -- owning Card Sharp (its only reader), so every other board takes the identical path as before.
+  local sharp_types
+  if has_joker(gs, "j_card_sharp") then
+    local nb = {}
+    for k, v in pairs(bgs.blind or {}) do nb[k] = v end
+    sharp_types = {}
+    for k, v in pairs(nb.played_hand_types or {}) do sharp_types[k] = v end
+    nb.played_hand_types = sharp_types
+    local p = {}
+    for k, v in pairs(bgs) do p[k] = v end
+    p.blind = nb
+    bgs = p
+  end
   local current = {}
   for i = 1, #start_hand do current[i] = start_hand[i] end
   local draw = shuffled(pile, rng)         -- draw from the end
@@ -140,6 +157,7 @@ local function rollout(gs, start_hand, pile, target, chips0, hands, discards, ha
   end
   local function after_play(ev, sel)
     pstate.types[ev.hand_type] = true
+    if sharp_types and ev.hand_type then sharp_types[ev.hand_type] = true end
     pstate.first = pstate.first or ev.hand_type
     if hold_lever then                       -- $ from cards HELD this hand (Reserved Parking / gold)
       local played = {}

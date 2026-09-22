@@ -521,4 +521,18 @@ return function(t)
     t.eq(sliced.win_probability, sync.win_probability, "sliced win_prob == sync win_prob")
     t.eq(sliced.ante_survival, sync.ante_survival, "sliced ante_survival == sync ante_survival")
   end
+
+  -- Card Sharp (x3 if the hand type was ALREADY played this round) must fire INSIDE the rollout. The
+  -- rollout never fed its own played hand types back to the scorer, so Card Sharp measured exactly the
+  -- same as an empty board (calibration 2026-09-23). No discards on a standard deck -> mostly Pair /
+  -- High Card, so repeats are common and Card Sharp must lift the clear rate.
+  do
+    local World = require("sim.world")
+    local function p_clear(js)
+      local gs = GS.new{ deck = World.standard_deck(), jokers = js, run = { hand_size = 8 }, meta = { ante = 1 } }
+      return Sim.survive_fresh(gs, 500, 4, 0, 200, lcg(42))
+    end
+    local none, sharp = p_clear({}), p_clear({ joker{ key = "j_card_sharp" } })
+    t.ok(sharp > none + 0.1, string.format("rollout credits Card Sharp's repeat-type x3 (%.2f vs %.2f)", sharp, none))
+  end
 end

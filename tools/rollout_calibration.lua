@@ -139,6 +139,8 @@ end
 -- rollout-policy VARIANTS to calibrate (nil = the shipped greedy policy)
 local VARIANTS = {
   greedy = nil,
+  dig1 = { dig = true, dig_samples = 1 },
+  dig2 = { dig = true, dig_samples = 2 },
   dig4 = { dig = true, dig_samples = 4 },
   dig8 = { dig = true, dig_samples = 8 },
 }
@@ -232,19 +234,20 @@ local load_rows
 local function cmd_rescore()
   local fixtures, out, variant = arg[2], arg[3], arg[4]
   local fast_rounds = tonumber(arg[5] or 200)
+  local shard, nshards = tonumber(arg[6] or 0), tonumber(arg[7] or 1)
   local pol = VARIANTS[variant]
-  assert(pol, "unknown variant " .. tostring(variant))
+  assert(pol or variant == "greedy", "unknown variant " .. tostring(variant))
   local states = load_states(fixtures, 1e9)
   local by_key = {}
   for _, st in ipairs(states) do by_key[st.key] = st.fix end
-  local path = out .. ".rescore_" .. variant
+  local path = out .. ".rescore_" .. variant .. ".p" .. shard
   local done = read_done(path)
   local fh = assert(io.open(path, "a"))
   local t0 = os.clock()
   local n = 0
-  for _, r in ipairs(load_rows(out)) do
+  for ri, r in ipairs(load_rows(out)) do
     local fix = by_key[r.state]
-    if fix and not done[r.item] then
+    if fix and not done[r.item] and (ri - 1) % nshards == shard then
       local board, tg
       for _, b in ipairs(boards_of(fix)) do if b.label == r.board then board = b end end
       for _, t in ipairs(targets_of(fix)) do if t.kind == r.target_kind then tg = t end end
@@ -299,10 +302,12 @@ local function cmd_report()
   local variant = arg[3]
   if variant then   -- substitute the fast column with a rescored policy variant
     local sub = {}
-    local fh = io.open(arg[2] .. ".rescore_" .. variant)
-    if fh then
-      for line in fh:lines() do local ok, r = pcall(Json.decode, line); if ok and r then sub[r.item] = r.fast end end
-      fh:close()
+    for i = 0, 63 do
+      local fh = io.open(arg[2] .. ".rescore_" .. variant .. ".p" .. i)
+      if fh then
+        for line in fh:lines() do local ok, r = pcall(Json.decode, line); if ok and r then sub[r.item] = r.fast end end
+        fh:close()
+      end
     end
     local kept = {}
     for _, r in ipairs(rows) do if sub[r.item] then r.fast = sub[r.item]; kept[#kept + 1] = r end end
