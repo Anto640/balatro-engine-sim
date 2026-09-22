@@ -748,13 +748,19 @@ HandEval._best_card_order = best_card_order   -- exposed for tests
 -- reliably near the top in dealt order too (the first-card retrigger swing is bounded), so a modest K suffices.
 HandEval.ORDER_TOPK = 10
 
-function HandEval.best_play_target(gs, cards, remaining, filter)
+-- `cheap` (5th arg): skip the card-order re-judging even on an order-sensitive board. The card-order
+-- enumeration (best_card_order per top-K subset) is the dominant cost on a Hanging-Chad / xmult board, and
+-- the survival ROLLOUT calls this once per simulated hand x per sample -- so R7 made the rollout ~4x slower
+-- there (owner 2026-09-22: "very very laggy" under a Hanging-Chad boss). A survival ESTIMATE does not need
+-- the exact retrigger-optimal order (the swing is bounded and it only reads E[clear]), so the rollout passes
+-- cheap=true to use the fast dealt-order chooser. The user-facing RECOMMENDATION still uses full card-order.
+function HandEval.best_play_target(gs, cards, remaining, filter, cheap)
   remaining = remaining or 0
   -- When card order can change scores (Hanging Chad / Photograph / xmult cards), best_play compares subsets
   -- in DEALT order and can pick a play that fails to clear while a REORDERED subset clears (owner R7: took a
   -- High Card into a blind a reordered Two Pair would have beaten). Collect the top candidates and re-judge
   -- them at their best card order. Off when insensitive -> byte-identical to the old dealt-order chooser.
-  local sensitive = HandEval.card_order_sensitive(gs)
+  local sensitive = (not cheap) and HandEval.card_order_sensitive(gs)
   local effective, mods
   if sensitive then effective = HandEval.effective_jokers(gs); mods = joker_mods(effective) end
   local best, best_sel, bt, be, bs, bmin, bsk

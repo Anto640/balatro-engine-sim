@@ -166,7 +166,10 @@ local function rollout(gs, start_hand, pile, target, chips0, hands, discards, ha
   while hands_left > 0 and #current > 0 do
     local rem = target - chips
     if rem <= 0 then return chips, money, hands_left end
-    local ev, sel = HandEval.best_play_target(bgs, current, rem, filter)
+    -- cheap=true: skip the card-order enumeration inside the rollout. It is a survival ESTIMATE
+    -- (E[clear]); the exact retrigger-optimal order is a bounded swing that does not change survival,
+    -- and doing it per simulated hand x per sample made a Hanging-Chad board ~4x slower (see best_play_target).
+    local ev, sel = HandEval.best_play_target(bgs, current, rem, filter, true)
     if not ev then break end -- no legal play (e.g. can't make 5 under Psychic)
 
     -- MILK finishing policy: the clear is available NOW and a spare hand remains, so play a
