@@ -88,6 +88,22 @@ local BES = {}
 BES.tracker = Sig and Sig.tracker() or nil
 BES.last = nil
 
+-- ROOT-CAUSE FIX for "decide failed: not enough memory" (owner 2026-09-22, The Goad).
+-- When the best play does not clear (constant under a suit-debuff boss where scored cards
+-- score 0), DE.decide DIGS -- DiscardValue.best measures candidate discards x samples x
+-- best_play, and each best_play enumerates every subset (HandEval.each_subset), allocating a
+-- short-lived scoring table per subset. That garbage is fully collectable, but LuaJIT's
+-- INCREMENTAL collector does not run inside the tight enumeration loop, so on some hands the
+-- transient heap ballooned to >1.7 GB in a SINGLE decide and hit the allocator ceiling (a
+-- profile showed the per-decide PEAK drop 39 MB -> 1.2 MB when a GC step runs per subset-enum).
+-- each_subset already calls a YIELD hook once per invocation (for the sim's time-slicing); set
+-- that hook, for the FOREGROUND decide, to an incremental GC step so the transient garbage is
+-- reclaimed as it is produced. Pure: it changes no decision, only when memory is freed. The
+-- background sim overrides YIELD with coroutine.yield during its own resumes (see pump_job),
+-- which restores this stepper afterwards.
+BES.gc_yield = function() collectgarbage("step") end
+if HandEval and HandEval.set_yield then HandEval.set_yield(BES.gc_yield) end
+
 -- Bound the Lua heap after an evaluation. Step normally (cheap, non-stuttering), but once
 -- the heap has grown BES_GC_GROWTH_KB past the last full collect, force a full collect so
 -- repeated expensive decides / sims on a Hanging-Chad-class board cannot accumulate to the
@@ -392,7 +408,10 @@ function BES.pump_job(budget)
   repeat
     if HandEval then HandEval.set_yield(coroutine.yield) end
     local ok, res = coroutine.resume(job.thread)
-    if HandEval then HandEval.set_yield(nil) end
+    -- restore the foreground GC-stepping hook (NOT nil) so the next foreground decide keeps its
+    -- per-subset-enum memory bound (see BES.gc_yield). nil here would leave the heavy foreground
+    -- dig unbounded again between background jobs.
+    if HandEval then HandEval.set_yield(BES.gc_yield) end
     if not ok then
       Log.error("background job failed:", res); BES.job = nil; return
     end
