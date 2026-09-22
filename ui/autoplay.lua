@@ -615,11 +615,17 @@ function Autoplay.tick(last, logger)
   elseif ch == "shop" then issued = do_shop(G, best, logger)
   elseif ch == "pack" then issued = do_pack(G, best, logger)
   elseif ch == "blind_select" then issued = do_blind_select(G, best, logger) end
-  -- Mark this decision done whether or not it issued: a repeated FAILED action (e.g. a not-yet-mapped
-  -- button) must not spam the log every 1.5s. It re-attempts only once the state genuinely changes
-  -- (new sig) — success advances the state, a wrong button name shows once and waits.
-  Autoplay.last_sig = s
-  Autoplay.pending_id = nil
+  -- Burn last_sig only when the action ISSUED, or after MAX_WAIT stuck on the SAME state. A button
+  -- sometimes appears a BEAT after the state settles -- e.g. a booster's `skip_booster` renders only
+  -- after the pack open-animation finishes -- so the first attempt legitimately fails. Marking the
+  -- decision done on that first failure set last_sig, and the state-gate at the top of tick() then
+  -- blocked EVERY retry, stalling the run until an F11 reset (owner 2026-09-22: stuck skipping a
+  -- standard pack). Now a transient miss is retried (every locked_until ~1.5s) until it renders, while
+  -- the MAX_WAIT deadlock-breaker still stops a genuinely-missing button from retrying forever.
+  if issued or (now() - (Autoplay.wait_since or now())) > Autoplay.MAX_WAIT then
+    Autoplay.last_sig = s
+    Autoplay.pending_id = nil
+  end
 end
 
 return Autoplay
