@@ -14,7 +14,7 @@
 #
 #   usage: python tools/agreement.py <fixtures.jsonl> <runs.jsonl> <picks.jsonl> [--exclude S1,S2]
 # where picks.jsonl is the output of:  luajit tools/replay_fixtures.lua <fixtures.jsonl> picks.jsonl
-import json, collections, bisect, re, sys
+import os, json, collections, bisect, re, sys
 
 def load(p):
     out = []
@@ -154,6 +154,9 @@ def main():
                 k = 'diff'
                 if len(ex['pack']) < 16: ex['pack'].append((label[s], r.get('ante'), ek, taken))
             PKc[k] += 1
+            if os.environ.get('AGREE_DUMP_PACK'):
+                with open(os.environ['AGREE_DUMP_PACK'], 'a', encoding='utf-8') as fh:
+                    fh.write(json.dumps({'seed': s, 'idx': r['idx'], 'engine': ek, 'human': taken, 'class': k}) + '\n')
 
     for r in fixs:
         if r.get('kind') != 'state' or r.get('decision') != 'shop': continue

@@ -193,7 +193,10 @@ local function rollout(gs, start_hand, pile, target, chips0, hands, discards, ha
     -- cheap=true: skip the card-order enumeration inside the rollout. It is a survival ESTIMATE
     -- (E[clear]); the exact retrigger-optimal order is a bounded swing that does not change survival,
     -- and doing it per simulated hand x per sample made a Hanging-Chad board ~4x slower (see best_play_target).
-    local ev, sel = HandEval.best_play_target(bgs, current, rem, filter, true)
+    -- the simulated hand IS the held context (hand_ctx would infer it, but a hand that shrank to a strict
+    -- subset of the start hand once the pile ran dry would otherwise keep the stale start hand)
+    local hgs = with_hand(bgs, current)
+    local ev, sel = HandEval.best_play_target(hgs, current, rem, filter, true)
     if not ev then break end -- no legal play (e.g. can't make 5 under Psychic)
 
     -- MILK finishing policy: the clear is available NOW and a spare hand remains, so play a
@@ -202,7 +205,7 @@ local function rollout(gs, start_hand, pile, target, chips0, hands, discards, ha
     -- cost the clear -- so this stays inside the rollout and shows up as a lower `frac`, which the
     -- caller's survival gate reads. Only fires when a strictly-more-$ non-clearing play exists.
     if milk and hands_left >= 2 and ev.score >= rem then
-      local mev, msel = HandEval.best_fuel_play(bgs, current, 0, money_credit)
+      local mev, msel = HandEval.best_fuel_play(hgs, current, 0, money_credit)
       if mev and msel and (mev.money or 0) > (ev.money or 0) and mev.score < rem then
         chips = chips + mev.score
         money = money + (mev.money or 0)

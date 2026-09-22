@@ -581,7 +581,37 @@ local function budget_cards(cards, budget)
 end
 HandEval._budget_cards = budget_cards   -- exposed for the work-budget tests
 
+-- HELD-CARD CONTEXT. score_with derives the HELD cards (Blackboard, Baron, Shoot the Moon, Raised Fist,
+-- Steel, Mime, held gold / Reserved Parking $) from gs.hand minus the played cards -- NOT from the `cards`
+-- being searched. That is right for the live chooser (cards IS gs.hand, or a sub-pool of it such as the
+-- milk pool, whose other cards really are still held), but every measurement that searches a DIFFERENT
+-- hand -- a sampled deal (joker/consumable value in the shop, where gs.hand is EMPTY), a post-discard
+-- redraw (DiscardValue), a simulated hand (the survival rollout) -- scored held effects against the wrong
+-- cards: in the shop nothing was ever held, so Blackboard's x3 fired on EVERY hand and Baron / Steel /
+-- Shoot the Moon never fired (found 2026-09-23 chasing the Smiley->Blackboard sale). Rule: if every
+-- searched card belongs to gs.hand, keep gs.hand as the held context; otherwise the search is over
+-- another hand, so that hand is the context. (search.lua / tarot.lua already did this by hand.)
+local function hand_ctx(gs, cards)
+  local h = gs.hand
+  if h == cards then return gs end
+  if h and #h > 0 then
+    local objs, ids = {}, {}
+    for _, c in ipairs(h) do objs[c] = true; if c.id ~= nil then ids[c.id] = true end end
+    local sub = true
+    for _, c in ipairs(cards) do
+      if not (objs[c] or (c.id ~= nil and ids[c.id])) then sub = false; break end
+    end
+    if sub then return gs end
+  end
+  local p = {}
+  for k, v in pairs(gs) do p[k] = v end
+  p.hand = cards
+  return p
+end
+HandEval.hand_ctx = hand_ctx
+
 local function each_subset(gs, cards, f, filter)
+  gs = hand_ctx(gs, cards)
   local budget = HandEval.HAND_BUDGET
   if budget and #cards > budget then cards = budget_cards(cards, budget) end
   local n = #cards
@@ -755,6 +785,7 @@ HandEval.ORDER_TOPK = 10
 -- the exact retrigger-optimal order (the swing is bounded and it only reads E[clear]), so the rollout passes
 -- cheap=true to use the fast dealt-order chooser. The user-facing RECOMMENDATION still uses full card-order.
 function HandEval.best_play_target(gs, cards, remaining, filter, cheap)
+  gs = hand_ctx(gs, cards)   -- held context for the card-order re-score + play_econ below too
   remaining = remaining or 0
   -- When card order can change scores (Hanging Chad / Photograph / xmult cards), best_play compares subsets
   -- in DEALT order and can pick a play that fails to clear while a REORDERED subset clears (owner R7: took a
@@ -819,6 +850,7 @@ end
 -- scaling FUEL among equally-safe options, then score. fuel(played, ev) -> credit.
 -- Returns the chosen evaluation, its cards, and that play's fuel credit.
 function HandEval.best_fuel_play(gs, cards, remaining, fuel)
+  gs = hand_ctx(gs, cards)
   remaining = remaining or 0
   local best, best_sel, bt, bf, bs
   each_subset(gs, cards, function(ev, sel, copy)

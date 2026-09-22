@@ -31,6 +31,7 @@ local HandEval  = require("engine.hand_eval")
 local BossEffect = require("engine.boss_effect")
 local Mechanics = require("engine.mechanics")
 local World     = require("sim.world")
+local DiscardValue = require("engine.discard_value")
 
 local function lcg(seed)
   local s = math.floor(seed) % 2147483647
@@ -171,6 +172,52 @@ local function mean_hand(fix, board, tg, samples, state_seed)
   return total / samples / (tg.target / 4)   -- in "fractions of a per-hand need"
 end
 
+-- DIG-AWARE hand measure: deal a hand, let the engine's joker-aware discard picker (DiscardValue.best)
+-- spend ONE discard if its measured redraw beats playing now, draw the ACTUAL replacements from the same
+-- shuffle, then score the best play. Paired across boards (same shuffles), so the discard choice -- the
+-- only board-dependent part of the deal -- is what separates a condition-digging board (Smiley/Photograph
+-- faces, Crazy straights) from one whose condition a random deal already meets or never will.
+local function dig_hand(fix, board, tg, samples, state_seed, dig_samples)
+  local gs = gs_for(fix, board, tg)
+  if tg.eff then gs.boss_effect = tg.eff end
+  local _, discards, hs = resources(fix)
+  local b0 = {}; for k, v in pairs(gs.blind or {}) do b0[k] = v end
+  b0.discards_left, b0.chips_scored = discards, 0
+  local b1 = {}; for k, v in pairs(b0) do b1[k] = v end
+  b1.discards_left = math.max(0, discards - 1)
+  local deck = gs.deck
+  local rng = lcg(state_seed * 11 + 5)            -- same deal stream as mean_hand
+  local drng = lcg(state_seed * 13 + 9)           -- the discard picker's own sampling
+  local total = 0
+  for _ = 1, samples do
+    local d = {}
+    for i, c in ipairs(deck) do d[i] = c end
+    for i = #d, 2, -1 do local j = math.floor(rng() * i) + 1; d[i], d[j] = d[j], d[i] end
+    local hand, pile = {}, {}
+    local n = math.min(hs, #d)
+    for i = 1, n do hand[i] = d[i] end
+    for i = n + 1, #d do pile[#pile + 1] = d[i] end
+    local g0 = {}; for k, v in pairs(gs) do g0[k] = v end
+    g0.hand, g0.remaining, g0.blind = hand, pile, b0
+    local play = HandEval.best_play(g0, hand)
+    local score = play and play.score or 0
+    if discards > 0 then
+      local dv = DiscardValue.best(g0, { samples = dig_samples, rng = drng })
+      if dv and dv.cards and #dv.cards > 0 and (dv.value or 0) > score then
+        local nh = {}
+        for _, c in ipairs(dv.keep) do nh[#nh + 1] = c end
+        for i = 1, math.min(#dv.cards, #pile) do nh[#nh + 1] = pile[i] end
+        local g1 = {}; for k, v in pairs(g0) do g1[k] = v end
+        g1.hand, g1.blind = nh, b1
+        local ev = HandEval.best_play(g1, nh)
+        score = ev and ev.score or 0
+      end
+    end
+    total = total + score
+  end
+  return total / samples / (tg.target / 4)
+end
+
 -- ---- run ------------------------------------------------------------------------
 local function read_done(path)
   local done = {}
@@ -262,6 +309,42 @@ local function cmd_rescore()
   io.stderr:write(string.format("[rescore %s] %d rows in %.0fs\n", variant, n, os.clock() - t0))
 end
 
+-- ---- remeasure: compute an alternative CHEAP per-board measure against existing full rows ----
+local MEASURES = {
+  dig1 = function(fix, board, tg, n, seed) return dig_hand(fix, board, tg, n, seed, 1) end,
+  dig2 = function(fix, board, tg, n, seed) return dig_hand(fix, board, tg, n, seed, 2) end,
+  mean = function(fix, board, tg, n, seed) return mean_hand(fix, board, tg, n, seed) end,
+}
+local function cmd_remeasure()
+  local fixtures, out, name = arg[2], arg[3], arg[4]
+  local samples = tonumber(arg[5] or 100)
+  local shard, nshards = tonumber(arg[6] or 0), tonumber(arg[7] or 1)
+  local fn = assert(MEASURES[name], "unknown measure " .. tostring(name))
+  local tag = name .. "_" .. samples
+  local states = load_states(fixtures, 1e9)
+  local by_key = {}
+  for _, st in ipairs(states) do by_key[st.key] = st.fix end
+  local path = out .. ".measure_" .. tag .. ".p" .. shard
+  local done = read_done(path)
+  local fh = assert(io.open(path, "a"))
+  local t0, n = os.clock(), 0
+  for ri, r in ipairs(load_rows(out)) do
+    local fix = by_key[r.state]
+    if fix and not done[r.item] and (ri - 1) % nshards == shard then
+      local board, tg
+      for _, b in ipairs(boards_of(fix)) do if b.label == r.board then board = b end end
+      for _, t in ipairs(targets_of(fix)) do if t.kind == r.target_kind then tg = t end end
+      if board and tg then
+        local v = fn(fix, board, tg, samples, str_hash(r.state))
+        fh:write(Json.encode({ item = r.item, value = v }) .. "\n"); fh:flush()
+        n = n + 1
+      end
+    end
+  end
+  fh:close()
+  io.stderr:write(string.format("[remeasure %s] %d rows in %.0fs\n", tag, n, os.clock() - t0))
+end
+
 -- ---- report -----------------------------------------------------------------------
 function load_rows(out)
   local rows = {}
@@ -312,6 +395,21 @@ local function cmd_report()
     local kept = {}
     for _, r in ipairs(rows) do if sub[r.item] then r.fast = sub[r.item]; kept[#kept + 1] = r end end
     rows = kept
+  end
+  local mvar = os.getenv("CALIB_MEAN")   -- substitute the per-hand column with a remeasured variant
+  if mvar then
+    local sub = {}
+    for i = 0, 63 do
+      local fh = io.open(arg[2] .. ".measure_" .. mvar .. ".p" .. i)
+      if fh then
+        for line in fh:lines() do local ok, r = pcall(Json.decode, line); if ok and r then sub[r.item] = r.value end end
+        fh:close()
+      end
+    end
+    local kept = {}
+    for _, r in ipairs(rows) do if sub[r.item] then r.mean_hand = sub[r.item]; kept[#kept + 1] = r end end
+    rows = kept
+    print("per-hand column = " .. mvar)
   end
   -- exclude boards whose resource jokers the fixture ALREADY folds into hand size / discards (the World
   -- re-applies them -> a double count on the full side, not a rollout error)
@@ -406,6 +504,7 @@ end
 local cmd = arg[1]
 if cmd == "run" then cmd_run()
 elseif cmd == "rescore" then cmd_rescore()
+elseif cmd == "remeasure" then cmd_remeasure()
 elseif cmd == "report" then cmd_report()
 else
   io.stderr:write("usage: rollout_calibration.lua run <fixtures> <out> [n_states] [full_rounds] [fast_rounds] [shard] [nshards]\n"

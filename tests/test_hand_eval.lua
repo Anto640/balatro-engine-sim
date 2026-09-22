@@ -253,4 +253,30 @@ return function(t)
     local none = GS.new{ jokers = {}, run = { hand_levels = {} }, blind = {} }
     t.eq(HandEval.score(none, kings).money, 0, "no Business Card -> face cards pay no in-blind $")
   end
+
+  -- HELD-CARD CONTEXT (2026-09-23): searching a hand OTHER than gs.hand must derive held cards from THAT
+  -- hand. In the shop gs.hand is empty, so every sampled deal counted as "nothing held" and Blackboard's x3
+  -- fired on every hand -- the engine sold Smiley Face for a Blackboard that rarely triggers. Only 2 black
+  -- cards in 8: any play of <= 5 leaves >= 3 held incl. a red one, so Blackboard can NEVER fire here.
+  do
+    local c = function(id, r, su) return GS.card{ id = id, rank_id = r, suit = su } end
+    local deal = { c(1, 14, "Spades"), c(2, 14, "Clubs"), c(3, 2, "Hearts"), c(4, 3, "Hearts"),
+                   c(5, 4, "Diamonds"), c(6, 5, "Diamonds"), c(7, 7, "Hearts"), c(8, 9, "Diamonds") }
+    local plain = GS.new{ hand = {}, jokers = {} }
+    local board = GS.new{ hand = {}, jokers = { GS.joker{ key = "j_blackboard" } } }
+    local a = HandEval.best_play(plain, deal)
+    local b = HandEval.best_play(board, deal)
+    t.eq(b.score, a.score, "shop-style sampled deal (empty gs.hand): Blackboard can't fire with reds held")
+    local bt = HandEval.best_play_target(board, deal, 0)
+    t.eq(bt.score, a.score, "best_play_target uses the searched hand as the held context too")
+    -- the live chooser is unchanged: cards IS gs.hand
+    local live = GS.new{ hand = deal, jokers = { GS.joker{ key = "j_blackboard" } } }
+    t.eq(HandEval.best_play(live, deal).score, a.score, "live hand: same held set as before")
+    -- a sub-POOL of the live hand keeps the live hand as the held context (the milk pool): holding only
+    -- black cards is impossible here, so a pool of the red cards must not fake a vacuous all-black hold
+    local reds = { deal[3], deal[4], deal[5], deal[6], deal[7] }
+    local pool = HandEval.best_play(live, reds)
+    local pool_plain = HandEval.best_play(GS.new{ hand = deal, jokers = {} }, reds)
+    t.eq(pool.score, pool_plain.score, "sub-pool of the live hand: other live cards still count as held")
+  end
 end
