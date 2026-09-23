@@ -143,6 +143,16 @@ function Extract.snapshot()
       skip_tag = (type(key) == "table") and key.key or key
     end
   end
+  -- The Orbital tag levels ONE specific hand, chosen in advance and shown on the tag -- not your best hand.
+  -- The game keeps it in G.GAME.orbital_choices[ante][blind] (functions/UI_definitions.lua). Without it the
+  -- engine priced every Orbital as +3 levels to its BEST planet hand (owner 2026-09-23: skipped ante 2's Big
+  -- blind for an Orbital valued ~$124 that then levelled a random hand).
+  local skip_tag_hand = nil
+  do
+    local oc = GAME.orbital_choices and GAME.orbital_choices[resets.ante or 0]
+    if type(oc) == "table" and GAME.blind_on_deck then skip_tag_hand = oc[GAME.blind_on_deck] end
+    if type(skip_tag_hand) ~= "string" then skip_tag_hand = nil end
+  end
 
   -- opened booster pack: read the revealed choices so we can value each one
   -- (jokers get measured). G.pack_cards holds the options while a pack is open.
@@ -233,6 +243,7 @@ function Extract.snapshot()
       boss = blind.boss or false,
       blind_type = GAME.blind_on_deck,       -- "Small"|"Big"|"Boss"  -- VERIFY
       skip_tag = skip_tag,                    -- offered skip tag key  -- VERIFY
+      skip_tag_hand = skip_tag_hand,          -- the hand an Orbital tag would level (nil if unknown)
       boss_effect_key = blind.config and blind.config.blind and blind.config.blind.key,
       played_hand_types = played_hand_types,  -- hand types played THIS blind (Mouth/Eye legality)
       hands_left = cur.hands_left or 0,

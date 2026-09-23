@@ -45,6 +45,17 @@ return function(t)
     t.ok(orb_flush > orb_mixed, "Orbital worth more leveling a concentrated flush hand (deck-aware)")
     t.eq(({ Tags.value(GS.new{}, "tag_orbital") })[1], 12, "no deck -> Orbital uses its flat prior")
 
+    -- The Orbital tag levels the hand NAMED on the tag (G.GAME.orbital_choices -> gs.blind.skip_tag_hand),
+    -- not your best hand (owner 2026-09-23: skipped ante 2's Big blind for a "~$124" Orbital that levelled a
+    -- random hand). A named hand this deck never makes is worth ~nothing; a hand it makes is worth more.
+    do
+      local function gsh(hand) local g = gsd(mixed); g.blind = { skip_tag_hand = hand }; return g end
+      local never = ({ Tags.value(gsh("Flush Five"), "tag_orbital", opt()) })[1]
+      local pair  = ({ Tags.value(gsh("Pair"), "tag_orbital", opt()) })[1]
+      t.ok(never < 0.1, "Orbital naming a hand the deck never makes (Flush Five) is worth ~$0")
+      t.ok(pair > 1, "Orbital naming a hand the deck makes (Pair) keeps real value")
+    end
+
     -- V2c finishing move: with the leveling-push gate OPEN (committed hand + banked +
     -- ante>=4), Orbital co-moves with the other leveling channels (it delivers +3 levels
     -- of the committed hand). Same deck + same seeded rng, only the gate differs.

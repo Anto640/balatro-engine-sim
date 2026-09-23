@@ -111,7 +111,7 @@ function RF.fixture_of(gs, choice, idx, kind)
                 chips_scored = b.chips_scored, hands_left = b.hands_left,
                 discards_left = b.discards_left, base_hands = b.base_hands,
                 base_discards = b.base_discards, played_hand_types = deep(b.played_hand_types),
-                skip_tag = b.skip_tag },   -- for the SKIP decision replay (blind-select)
+                skip_tag = b.skip_tag, skip_tag_hand = b.skip_tag_hand },   -- for the SKIP decision replay (blind-select)
       run = { hand_levels = deep(r.hand_levels), vouchers_owned = deep(r.vouchers_owned),
               tags = deep(r.tags), hand_size = r.hand_size, consumable_slots = r.consumable_slots,
               joker_slots = r.joker_slots, boss_key = r.boss_key,

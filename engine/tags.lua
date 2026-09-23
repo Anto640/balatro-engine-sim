@@ -27,7 +27,18 @@ end
 -- Measured: freq(you make it) x the real 3-level score gain, in dollar terms.
 local function orbital_dollars(gs, opts)
   if not has_deck(gs) then return nil end
-  local bp = ConsumableValue.best_planet(gs, opts)
+  -- The tag levels a SPECIFIC hand (gs.blind.skip_tag_hand, read live from G.GAME.orbital_choices). Value
+  -- THAT hand; fall back to the best planet hand only when it's unknown (the sim doesn't model the choice).
+  local bp
+  local th = gs.blind and gs.blind.skip_tag_hand
+  if th and Mechanics.HAND_PLANET[th] then
+    local freq = ConsumableValue.hand_frequencies(gs, opts)
+    local f = freq and freq[th] or 0
+    if f <= 0 then return 0.01 end            -- a hand this deck (almost) never makes: worth ~nothing
+    bp = { hand = th, freq = f }
+  else
+    bp = ConsumableValue.best_planet(gs, opts)
+  end
   if not bp then return nil end
   -- +3 levels PERSIST for the rest of the run (they raise every future play of that hand),
   -- so project over the remaining runway like the standalone-planet value does -- WITHOUT

@@ -131,9 +131,15 @@ local function find_card(areas, target)
     end
   end
   if target.key then
+    -- key fallback. If the target named an exact card (id) that wasn't found, only fall back when the key
+    -- is UNAMBIGUOUS: plain playing cards all share "c_base", so "first c_base" is a guess at a random card.
+    local first, n = nil, 0
     for _, area in ipairs(areas) do
-      if area and area.cards then for _, c in ipairs(area.cards) do if ckey(c) == target.key then return c end end end
+      if area and area.cards then
+        for _, c in ipairs(area.cards) do if ckey(c) == target.key then n = n + 1; first = first or c end end
+      end
     end
+    if target.id == nil or n == 1 then return first end
   end
   return nil
 end
@@ -172,12 +178,17 @@ end
 
 -- Find a live button node whose config.button == `name`. For a card action, `ref` is the target card
 -- and we match the button's config.ref_table by KEY/ID (object identity is unreliable across wrappers).
+-- The stable ID wins when both sides have one: many cards share a center KEY (every plain playing card is
+-- "c_base", every Bonus card "m_bonus"), so a key match can point at the wrong card (owner 2026-09-23: the
+-- overlay said take the 3 of Spades from a Standard pack, the self-player took a Jack). Key is the fallback
+-- for things with no id (shop boosters/vouchers).
 local function ref_matches(cfg_ref, ref)
   if ref == nil then return true end
   if cfg_ref == nil then return false end
   if cfg_ref == ref then return true end
+  local rid = cid(cfg_ref)
+  if ref.id ~= nil and rid ~= nil then return rid == ref.id end
   if ref.key and ckey(cfg_ref) == ref.key then return true end
-  if ref.id ~= nil and cid(cfg_ref) == ref.id then return true end
   return false
 end
 local function find_button(G, name, ref)
@@ -313,7 +324,9 @@ end
 local function pack_selected(G, target)
   if not (G.pack_cards and G.pack_cards.highlighted) then return false end
   for _, c in ipairs(G.pack_cards.highlighted) do
-    if (target.key and ckey(c) == target.key) or (target.id ~= nil and cid(c) == target.id) then return true end
+    if target.id ~= nil and cid(c) ~= nil then
+      if cid(c) == target.id then return true end                  -- exact card (see ref_matches)
+    elseif target.key and ckey(c) == target.key then return true end
   end
   return false
 end

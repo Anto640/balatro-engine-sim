@@ -325,7 +325,11 @@ function BES.apply_pack(gs, po)
       type = po.skip and "SKIP" or "PICK",
       -- carry the center key (+ id when present) so the auto-play actuator can match the live pack card;
       -- name alone is a display string that won't match a center key (ui/autoplay.lua).
-      target = pick and { name = pick.name or pick.key, key = pick.key, id = pick.id } or nil,
+      -- the id must be the CARD's own stable id: every plain playing card shares the center key "c_base"
+      -- (and every Bonus card "m_bonus"...), so a key-only match grabbed the FIRST such card in a Standard
+      -- pack -- the overlay said "take 3 of Spades", the self-player took a Jack (owner 2026-09-23).
+      target = pick and { name = pick.name or pick.key, key = pick.key,
+        id = pick.id or (pick.card and pick.card.id) or (pick.joker and pick.joker.id) } or nil,
       target_note = po.target_note,          -- "apply to AS, KS" in the BIG line (#10)
       target_cards = po.target_cards,        -- machine-readable target hand-card ids (auto-play selects them)
       reason = po.reason, confidence = 0.75,

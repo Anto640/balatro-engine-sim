@@ -158,4 +158,39 @@ return function(t)
     _G.love, _G.G = saved_love, saved_G
     Autoplay.enabled = false
   end
+
+  -- STANDARD-PACK PICK (owner 2026-09-23): every plain card shares the center key "c_base", so a key match
+  -- took the FIRST plain card (a Jack) instead of the engine's pick (3 of Spades). The pick must land on
+  -- the exact card by id.
+  do
+    local clock = 90
+    local saved_love, saved_G = _G.love, _G.G
+    _G.love = { timer = { getTime = function() return clock end } }
+    local used
+    local function pc(id, rank)
+      local c = { sort_id = id, rank = rank, config = { center = { key = "c_base" } } }
+      function c:click()
+        _G.G.pack_cards.highlighted = { self }
+        _G.G.STAGE_OBJECTS[1] = { config = { button = "use_card", ref_table = self } }   -- button appears once selected
+      end
+      return c
+    end
+    local jack, three = pc(501, "Jack"), pc(502, "3")
+    local G = {
+      STATES = {}, STATE = 0, GAME = { round = 9 },
+      pack_cards = { cards = { jack, three }, highlighted = {} },
+      jokers = { cards = {} }, consumeables = { cards = {} }, hand = { cards = {} },
+      STAGE_OBJECTS = {},
+      FUNCS = { use_card = function(e) used = e.config.ref_table end },
+    }
+    _G.G = G
+    Autoplay.enabled = true
+    Autoplay.locked_until, Autoplay.last_sig, Autoplay.pending_id, Autoplay.wait_sig = 0, nil, nil, nil
+    local best = { type = "PICK", target = { key = "c_base", id = 502, name = "3 of Spades" } }
+    local last = { ranked = { best = best }, gs = { pack = { items = { { key = "c_base" }, { key = "c_base" } } } } }
+    for _ = 1, 8 do if not used then Autoplay.tick(last, nil); clock = clock + 1 end end
+    t.ok(used == three, "autoplay: a Standard-pack pick takes the exact card (3 of Spades), not the first c_base")
+    _G.love, _G.G = saved_love, saved_G
+    Autoplay.enabled = false
+  end
 end
