@@ -686,6 +686,12 @@ local function scoring_gain(gs, sj, rng, pace)
   -- of a boss hand (vs the measured 0.04) and never saw any of the measured work. The modeled scalers
   -- already project internally, so we do NOT re-apply `proj`; pace still damps it (don't over-invest in a
   -- scaler's future when near-term survival is at risk). Econ deck-mods return 0 here (money, not score).
+  -- money-only joker (Delayed Gratification, Mail-In Rebate, Chaos...): it scores NOTHING, so no tier-prior
+  -- scoring gain -- its money is valued once, via Eval.joker_money in the buy value (see Eval.is_money_only).
+  if Eval.is_money_only(sj.key) then
+    local ed = (sj.edition == "negative") and Eval.negative_slot_fv(gs) or Eval.edition_score_bonus(sj.edition, true)
+    return ed
+  end
   local modeled = Eval.modeled_scoring_fraction(gs, sj.key, { rng = rng, samples = 8 })
   if modeled then
     local ed = (sj.edition == "negative") and Eval.negative_slot_fv(gs) or Eval.edition_score_bonus(sj.edition, false)
@@ -865,7 +871,7 @@ function SA.recommend(gs, opts)
     if JokerData.is_unmodelled(sj.key) then return end
     local cost = sj.cost or 0
     local sgain = scoring_gain(gs, sj, rng, pace)       -- measured (or prior); pace damps scaler projection
-    local econ = Eval.econ_value(gs, sj.key)            -- $/round, DECK-AWARE (Rough Gem by diamonds, Midas by faces)
+    local econ = Eval.joker_money(gs, sj.key)           -- $/round, DECK-AWARE (+ Chaos's reroll saving)
     -- first-scorer priority: a board with no scorer NEEDS one that scores NOW (flat); a
     -- board with only ONE still wants a second (survivors carry ~2 flat scorers, deaths ~1),
     -- so graduate the bonus -- strong at 0, smaller at 1, gone at 2+.

@@ -14,6 +14,7 @@ local JokerValue = require("engine.joker_value")
 local Mechanics = require("engine.mechanics")
 local VU = require("engine.value_units")
 local ConsumableValue = require("engine.consumable_value")
+local JokerEffects = require("engine.joker_effects")
 
 local Eval = {}
 
@@ -419,6 +420,36 @@ end
 -- returns ~0 SCORING jp for them -- dropping the tier floor, which otherwise DOUBLE-COUNTS with the econ.
 local DECK_MOD_ECON = { j_midas_mask = true, j_certificate = true }
 
+-- MONEY-ONLY jokers: no scoring hook (joker_effects VALUE_ONLY) and a money channel (catalogue econ > 0,
+-- or Chaos's free reroll). Their worth is the money -- priced ONCE via Eval.joker_money. They used to ALSO
+-- get a tier-prior SCORING value (tier x 0.5 jp sell-side, tier x 0.3 frac buy-side) for score they never
+-- produce: Delayed Gratification / Mail-In Rebate each read 1.5 jp of phantom score + $4, Chaos 3.0 jp from
+-- its tier alone, while the board's biggest real scorer (Smiley, MEASURED 0.75 of a boss hand) read 2.28 and
+-- was sold first (owner 2026-09-23, seed DGTW4TTP). The buy side said "Reserved Parking adds ~90% of a boss
+-- hand". Generators / utility jokers with no money channel are NOT money-only and keep their prior.
+function Eval.is_money_only(key)
+  if not JokerEffects.is_value_only(key) then return false end
+  if key == "j_chaos" then return true end
+  return (JokerData.resolve(key).econ or 0) > 0
+end
+
+-- Chaos the Clown: one free reroll per shop. Priced as the reroll money it saves, at the rate the engine
+-- actually takes a free reroll -- the share of shops whose reroll has positive GROSS value (reroll_value +
+-- reroll_cost), measured over 3458 sim shop screens (sim_out/hc_ab_after.jsonl, 2026-09-23): ante 1 0.45,
+-- 2 0.58, 3 0.86, 4 0.89, 5 0.91, 6 0.97, 7+ 1.00. Replaces the hand-set tier 6.
+Eval.CHAOS_REROLL_USE = { 0.45, 0.58, 0.86, 0.89, 0.91, 0.97, 1.0, 1.0 }
+Eval.BASE_REROLL_COST = 5
+function Eval.reroll_saving(gs, key)
+  if key ~= "j_chaos" then return 0 end
+  local a = math.max(1, math.min(8, (gs and gs.meta and gs.meta.ante) or 1))
+  return Eval.BASE_REROLL_COST * Eval.CHAOS_REROLL_USE[a]
+end
+
+-- $/round a joker is worth as MONEY: its passive income (deck-aware econ_value) + reroll savings.
+function Eval.joker_money(gs, key)
+  return Eval.econ_value(gs, key) + Eval.reroll_saving(gs, key)
+end
+
 -- DECK-GROWTH deck-modifiers (Marble adds Stone cards; DNA duplicates your best card). Both reduce to
 -- "value of adding a card to the deck", which ConsumableValue.card_add_value MEASURES deck-aware (score
 -- delta + dilution + any deck-size joker feed). Returns a measured jp, or nil (no deck / cheap path /
@@ -580,6 +611,10 @@ local function jp_from_measure(gs, key, edition, m, opts, owned)
   -- Econ-channel (Midas/Certificate): scoring jp ~0 -- their money is added via Eval.econ_value.
   if DECK_MOD_ECON[key] then
     return edition_jp(edition, false), true
+  end
+  -- money-only joker: no phantom scoring value (its money is added once, in jp_to_fv)
+  if Eval.is_money_only(key) then
+    return edition_jp(edition, true), true
   end
   -- Deck-growth (Marble/DNA): MEASURED via card_add_value; nil on the cheap/no-deck path -> tier floor.
   local dmj = deck_modifier_jp(gs, key, opts)
@@ -777,7 +812,7 @@ local function jp_to_fv(gs, j, jp, idx)
   -- it only ever informed spending headroom and run_strength. So a Rough Gem was priced
   -- identically on a 4-diamond deck and a 20-diamond one. It also routes the Oops! All 6s
   -- probability multiplier through, so a money joker is worth more once Oops is on the board.
-  local econ = Eval.econ_value(gs, j.key)
+  local econ = Eval.joker_money(gs, j.key)
   return FV_JOKER_WEIGHT * jp + 0.8 * econ - Downside.penalty(gs, j, idx)
 end
 
