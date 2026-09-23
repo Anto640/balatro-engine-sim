@@ -128,4 +128,34 @@ return function(t)
     t.ok(played ~= nil, "autoplay: a reorder that won't stick is capped, then the play proceeds")
     env.restore()
   end
+
+  -- SHOP LOAD GATE (owner crash 2026-09-23, game.lua:3294 'shop' nil): leaving the shop before its load
+  -- event has run removed G.shop under that event. The self-player must not act until the shop has slid
+  -- in and been stocked.
+  do
+    local clock = 50
+    local saved_love, saved_G = _G.love, _G.G
+    _G.love = { timer = { getTime = function() return clock end } }
+    local left = 0
+    local G = {
+      STATES = { SHOP = 5 }, STATE = 5, GAME = { round = 7, dollars = 10 },
+      shop = { T = { y = 20 }, VT = { y = 5 } },          -- still sliding in (|T.y - VT.y| >= 3)
+      shop_jokers = { cards = {} }, shop_booster = { cards = {} },
+      jokers = { cards = {} }, consumeables = { cards = {} },
+      STAGE_OBJECTS = { { config = { button = "toggle_shop" } } },
+      FUNCS = { toggle_shop = function() left = left + 1 end },
+    }
+    _G.G = G
+    Autoplay.enabled = true
+    Autoplay.locked_until, Autoplay.last_sig, Autoplay.pending_id = 0, nil, nil
+    Autoplay.wait_sig, Autoplay._shop_ready_visit, Autoplay._shop_seen_visit = nil, nil, nil
+    local last = { ranked = { best = { type = "SAVE" } }, gs = { shop = {}, economy = { dollars = 10 } } }
+    for _ = 1, 3 do Autoplay.tick(last, nil); clock = clock + 1 end
+    t.eq(left, 0, "autoplay: never leaves a shop that is still sliding in / unstocked")
+    G.shop.T.y = 5; G.shop_jokers.cards = { {}, {} }              -- slid in + stocked
+    for _ = 1, 6 do Autoplay.tick(last, nil); clock = clock + 1 end
+    t.eq(left, 1, "autoplay: once loaded (plus settle), SAVE leaves the shop exactly once")
+    _G.love, _G.G = saved_love, saved_G
+    Autoplay.enabled = false
+  end
 end

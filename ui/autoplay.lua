@@ -318,6 +318,32 @@ local function pack_selected(G, target)
   return false
 end
 
+-- SHOP LOAD GATE (owner crash 2026-09-23: "game.lua:3294: attempt to index field 'shop' (a nil value)").
+-- Entering the shop, Game:update_shop queues an event that waits for the shop panel to slide in
+-- (|G.shop.T.y - G.shop.VT.y| < 3) and THEN stocks it. When the engine's first shop answer was SAVE, we
+-- clicked "leave" ~1s in -- before that event ran -- which removed G.shop, and the pending event then
+-- crashed on it. Earlier shops always bought something first, which accidentally gave it time to load.
+-- So don't act in the shop until it has slid in AND been stocked, plus a short settle; latched per visit
+-- (G.GAME.round) so buying the shop empty can't re-block it, with a time fallback so it can never stall.
+Autoplay.SHOP_SETTLE = 0.5
+Autoplay.SHOP_MAX_WAIT = 4.0
+local function shop_ready(G)
+  local visit = G.GAME and G.GAME.round
+  if Autoplay._shop_ready_visit == visit then return true end
+  if Autoplay._shop_seen_visit ~= visit then Autoplay._shop_seen_visit = visit; Autoplay._shop_seen_at = now() end
+  local waited = now() - (Autoplay._shop_seen_at or now())
+  local sh = G.shop
+  local slid = sh and sh.T and sh.VT and math.abs((sh.T.y or 0) - (sh.VT.y or 0)) < 3
+  local stocked = (G.shop_jokers and G.shop_jokers.cards and #G.shop_jokers.cards > 0)
+    or (G.shop_booster and G.shop_booster.cards and #G.shop_booster.cards > 0)
+  if (slid and stocked) or (sh and waited > Autoplay.SHOP_MAX_WAIT) then
+    Autoplay._shop_ready_visit = visit
+    Autoplay.locked_until = now() + Autoplay.SHOP_SETTLE   -- let the load event finish its remaining work
+  end
+  return false
+end
+Autoplay._shop_ready = shop_ready   -- exposed for tests
+
 -- ---- settled / channel / freshness (lag guards) -----------------------------
 local function input_locked(G)
   local locked = false
@@ -444,6 +470,7 @@ function Autoplay.tick(last, logger)
   if input_locked(G) then return end
   local ch = channel(G)
   if not ch then return end
+  if ch == "shop" and not shop_ready(G) then return end   -- wait for the shop to finish loading
   local s = sig(G, ch)
   if s == Autoplay.last_sig then return end
   -- how long we've been on THIS state without acting (drives the deadlock-breaker below)
