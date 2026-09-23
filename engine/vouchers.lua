@@ -77,99 +77,183 @@ local function expected_joker_fv(gs, opts)
   return VU.frac_to_fv(frac)
 end
 
--- ---- Blank as an OPTION on Antimatter --------------------------------------
--- Blank does nothing by itself; its whole worth is that owning it makes Antimatter
--- (+1 joker slot) eligible to appear. Priced as an option rather than a flat prior:
---   P(Antimatter is ever offered) x (what Antimatter is worth) x a discount
--- One voucher is offered per ante, drawn ~uniformly from the eligible pool, so the
--- chance of seeing it across the remaining antes is 1 - (1 - 1/pool)^runway.
-V.BLANK_POOL_SIZE  = 13   -- ~eligible vouchers competing for the one slot -- VERIFY
-V.BLANK_OPTION_FRAC = 0.35 -- discount: you must still FIND, AFFORD and BUY Antimatter ($10 more)
-V.BLANK_MIN_RUNWAY  = 2   -- with fewer antes left there is no time to collect on the option
-V.BLANK_CAP         = 3.0 -- never let a do-nothing voucher outrank a real one outright
+-- ---- measured ENGINE behaviour rates (so economy vouchers are valued by what they'd actually save) ----
+-- From the 160-run paired sim batch sim_out/sv_ab_after.jsonl (2026-09-23): 590 Celestial packs over 846
+-- antes played; 457 rerolls over ~2022 shops; 2022 shops over 846 antes (3 blinds each).
+V.CELESTIAL_PACKS_PER_ANTE = 0.70
+V.REROLLS_PER_SHOP = 0.23
+V.SHOPS_PER_ROUND = 2022 / 846 / 3
+V.AVG_BLIND_REWARD = 4          -- game rule: Small $3 / Big $4 / Boss $5
+V.ANTIMATTER_COST = 10
+-- a normal Celestial pack shows 3 of the 12 planets: P(it lacks the planet for your hand) = 1 - 3/12
+V.CELESTIAL_MISS = 0.75
 
-function V.blank_option_fv(gs, opts)
-  local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
-  local runway = math.max(0, 8 - ante)          -- voucher slots left before the ante-8 race ends
-  if runway < V.BLANK_MIN_RUNWAY then return 0 end
-  local p = 1 - ((1 - 1 / V.BLANK_POOL_SIZE) ^ runway)
-  local antimatter = 8.0 + clamp(2 * expected_joker_fv(gs, opts), 0, 4)
-  return clamp(V.BLANK_OPTION_FRAC * p * antimatter, 0, V.BLANK_CAP)
+local function runway(gs) return math.max(0, 8 - math.floor((gs and gs.meta and gs.meta.ante) or 1)) end
+-- interest cap in INT-dollars ($ of interest per round). Live feeds DOLLARS (25/50/100), sim int (5/10/20).
+local function cap_int(gs)
+  local raw = (gs and gs.economy and gs.economy.interest_cap) or 5
+  return (raw >= 25) and math.floor(raw / 5) or raw
+end
+local function dollars(gs) return math.max(0, (gs and gs.economy and gs.economy.dollars) or 0) end
+local function interest(d, cap) return math.min(math.floor(d / 5), cap) end
+-- money coming in (and so, at steady state, going out) per round: blind reward + interest
+local function income_per_round(gs) return V.AVG_BLIND_REWARD + interest(dollars(gs), cap_int(gs)) end
+
+-- owned-voucher test that accepts both the live set ({key=true}) and the sim's list ({key,...})
+local function owns(gs, key)
+  local o = gs and gs.run and gs.run.vouchers_owned
+  if type(o) ~= "table" then return false end
+  if o[key] then return true end
+  for _, k in ipairs(o) do if k == key then return true end end
+  return false
+end
+
+-- tier-1 -> tier-2 pairs (the full Balatro voucher list): used to size the pool Antimatter competes in
+V.PAIRS = {
+  v_overstock_norm = "v_overstock_plus", v_clearance_sale = "v_liquidation", v_hone = "v_glow_up",
+  v_reroll_surplus = "v_reroll_glut", v_crystal_ball = "v_omen_globe", v_telescope = "v_observatory",
+  v_grabber = "v_nacho_tong", v_wasteful = "v_recyclomancy", v_tarot_merchant = "v_tarot_tycoon",
+  v_planet_merchant = "v_planet_tycoon", v_seed_money = "v_money_tree", v_blank = "v_antimatter",
+  v_magic_trick = "v_illusion", v_hieroglyph = "v_petroglyph", v_directors_cut = "v_retcon",
+  v_paint_brush = "v_palette",
+}
+-- how many vouchers would compete for the one voucher slot per ante once Blank is owned
+function V.pool_after_blank(gs)
+  local n = 0
+  for t1, t2 in pairs(V.PAIRS) do
+    if t1 == "v_blank" then n = n + 1                        -- Antimatter itself
+    elseif not owns(gs, t1) then n = n + 1                   -- tier 1 still available
+    elseif not owns(gs, t2) then n = n + 1 end               -- its tier 2 now available
+  end
+  return math.max(1, n)
+end
+
+-- Antimatter (+1 joker slot) is worth the joker the extra slot will hold, on the SAME scale as buying that
+-- joker: a joker buy is priced at 5 x its boss-hand fraction, frac_to_fv gives 2.5 x -> the 2 x bridge.
+function V.antimatter_fv(gs, opts) return 2 * expected_joker_fv(gs, opts) end
+
+-- Blank does nothing by itself; its worth is the option on Antimatter:
+--   P(Antimatter is offered in the antes left) x P(you can afford its $10 then) x Antimatter's value.
+-- The pool size comes from the real voucher list and what you own; affordability from the money you'd
+-- still have spare above the true interest cap after paying for Blank (owner 2026-09-23: "blank can be
+-- useful if you have money spare to allow for antimatter").
+function V.blank_option_fv(gs, opts, blank_cost)
+  local r = runway(gs)
+  if r < 1 then return 0 end
+  local p = 1 - ((1 - 1 / V.pool_after_blank(gs)) ^ r)
+  local spare = dollars(gs) - (blank_cost or 10) - cap_int(gs) * 5
+  local afford = clamp(spare / V.ANTIMATTER_COST, 0, 1)
+  return p * afford * V.antimatter_fv(gs, opts)
+end
+
+-- one extra DISCARD per round, MEASURED: the expected gain of one more smart dig (DiscardValue.best, the
+-- engine's own joker-aware discard) over simply playing the dealt hand.
+local DiscardValue = require("engine.discard_value")
+local HandEval = require("engine.hand_eval")
+local function extra_discard_fv(gs, opts)
+  opts = opts or {}
+  local deck = gs.deck
+  if not deck or #deck < 10 then return 0 end
+  local rng = opts.rng or math.random
+  local n = math.min(opts.samples or 6, 8)
+  local hs = (gs.run and gs.run.hand_size) or 8
+  local total = 0
+  for _ = 1, n do
+    local d = {}
+    for i, c in ipairs(deck) do d[i] = c end
+    for i = #d, 2, -1 do local j = math.floor(rng() * i) + 1; d[i], d[j] = d[j], d[i] end
+    local hand, pile = {}, {}
+    for i = 1, math.min(hs, #d) do hand[i] = d[i] end
+    for i = hs + 1, #d do pile[#pile + 1] = d[i] end
+    local g = {}; for k, v in pairs(gs) do g[k] = v end
+    g.hand, g.remaining = hand, pile
+    local b = HandEval.best_play(g, hand)
+    local dv = DiscardValue.best(g, { samples = 2, rng = rng })
+    if b and dv and dv.value then total = total + math.max(0, dv.value - b.score) end
+  end
+  return VU.frac_to_fv(total / n / need(gs))
 end
 
 local function entry(name, value, econ, note, sit)
   return { name = name, value = value, econ = econ or 0, note = note, sit = sit }
 end
 
+-- NO SET VALUES (owner 2026-09-23: "make sure none of the vouchers are bought just cause of set values").
+-- Every voucher is valued by what it DOES for this engine -- measured on your deck, or derived from game
+-- rules plus the engine's own measured behaviour -- or at 0 when the engine can't use the effect / it isn't
+-- modelled, so it is never bought on a guess (the same rule as unmodelled jokers, e.g. Matador). The flat
+-- bases this replaces (Antimatter 8.0, Observatory 5.0, Money Tree 7.0 + $10, Hieroglyph 5.0, ...) are gone.
+local UNUSED = "no modelled value for this engine -- not bought"
 local DATA = {
-  -- shop structure
-  v_overstock_norm = entry("Overstock", 2.5, 0, "+1 shop card slot"),
-  v_overstock_plus = entry("Overstock Plus", 2.5, 0, "+1 shop card slot"),
-  v_clearance_sale = entry("Clearance Sale", 2.0, 2, "25% off everything"),
-  v_liquidation    = entry("Liquidation", 3.5, 4, "50% off everything"),
-  -- rerolls
-  v_reroll_surplus = entry("Reroll Surplus", 2.0, 2, "rerolls cost $2 less"),
-  v_reroll_glut    = entry("Reroll Glut", 2.0, 2, "rerolls cost $2 less"),
-  -- consumable economy
-  v_crystal_ball   = entry("Crystal Ball", 2.5, 0, "+1 consumable slot"),
-  v_omen_globe     = entry("Omen Globe", 2.0, 0, "spectral in arcana packs"),
-  -- Telescope/Observatory scale with how much you lean on a single planet hand.
-  v_telescope      = entry("Telescope", 3.5, 0, "celestial = most-played planet",
-    function(gs, opts) return clamp(3 * top_freq(gs, opts), 0, 3) end),
-  v_observatory    = entry("Observatory", 5.0, 0, "planet consumables x1.5 mult",
-    function(gs, opts) return clamp(8 * planet_payoff_fv(gs, opts), 0, 6) end),
-  v_tarot_merchant = entry("Tarot Merchant", 1.5, 1, "tarots appear more"),
-  v_tarot_tycoon   = entry("Tarot Tycoon", 1.5, 1, "tarots appear much more"),
-  v_planet_merchant = entry("Planet Merchant", 1.5, 1, "planets appear more"),
-  v_planet_tycoon  = entry("Planet Tycoon", 1.5, 1, "planets appear much more"),
-  -- resources (scoring/survival relevant): +1 hand is worth a measured extra play,
-  -- worth more when survival is at risk.
-  v_grabber        = entry("Grabber", 4.0, 1, "+1 hand per round",
+  -- ---- modelled: economy (money per round via ECON below: game rules + measured behaviour) ----
+  v_seed_money     = entry("Seed Money", 0, 0, "interest cap $50"),
+  v_money_tree     = entry("Money Tree", 0, 0, "interest cap $100"),
+  v_clearance_sale = entry("Clearance Sale", 0, 0, "25% off everything"),
+  v_liquidation    = entry("Liquidation", 0, 0, "50% off everything"),
+  v_reroll_surplus = entry("Reroll Surplus", 0, 0, "rerolls cost $2 less"),
+  v_reroll_glut    = entry("Reroll Glut", 0, 0, "rerolls cost $2 less"),
+  -- ---- modelled: resources (measured on your deck) ----
+  -- +1 hand: one more average best play per round; an unneeded hand also pays $1 at round end (game rule).
+  v_grabber        = entry("Grabber", 0, 1, "+1 hand per round",
     function(gs, opts) return clamp(extra_hand_fv(gs, opts) * ((opts and opts.at_risk) and 1.5 or 1.0), 0, 4) end),
-  v_nacho_tong     = entry("Nacho Tong", 4.0, 1, "+1 hand per round",
+  v_nacho_tong     = entry("Nacho Tong", 0, 1, "+1 hand per round",
     function(gs, opts) return clamp(extra_hand_fv(gs, opts) * ((opts and opts.at_risk) and 1.5 or 1.0), 0, 4) end),
-  v_wasteful       = entry("Wasteful", 3.0, 0, "+1 discard per round",
-    function(gs, opts) return clamp(extra_hand_fv(gs, opts) * 0.4 * ((opts and opts.at_risk) and 1.5 or 1.0), 0, 2) end),
-  v_recyclomancy   = entry("Recyclomancy", 3.0, 0, "+1 discard per round",
-    function(gs, opts) return clamp(extra_hand_fv(gs, opts) * 0.4 * ((opts and opts.at_risk) and 1.5 or 1.0), 0, 2) end),
-  v_paint_brush    = entry("Paint Brush", 3.0, 0, "+1 hand size",
-    function(gs, opts) return clamp(4 * hand_size_gain_fv(gs, opts), 0, 4) end),
-  v_palette        = entry("Palette", 3.0, 0, "+1 hand size",
-    function(gs, opts) return clamp(4 * hand_size_gain_fv(gs, opts), 0, 4) end),
-  -- economy: worth more if you already bank near the cap (handled in V.value).
-  v_seed_money     = entry("Seed Money", 5.0, 5, "interest cap $10"),
-  v_money_tree     = entry("Money Tree", 7.0, 10, "interest cap $20"),
-  -- editions / power
-  v_hone           = entry("Hone", 3.0, 0, "foil/holo 2x more common"),
-  v_glow_up        = entry("Glow Up", 5.0, 0, "foil/holo/poly 4x more common"),
-  -- Antimatter (+1 joker slot): the slot is worth the joker it will hold. Base is a
-  -- strong structural prior; the situational term tilts it toward decks where the
-  -- shop pool measures strong.
-  v_antimatter     = entry("Antimatter", 8.0, 0, "+1 joker slot",
-    function(gs, opts) return clamp(2 * expected_joker_fv(gs, opts), 0, 4) end),
-  -- Blank does nothing ON ITS OWN, and 0.0 was the CORRECT value while the world could never
-  -- offer Antimatter. Now that upgrade vouchers generate (sim/content.lua UPGRADE_VOUCHERS),
-  -- 0.0 is wrong: Blank is the ONLY key to +1 joker slot, and the Phase A ceiling probe measured
-  -- the slot as the binding constraint (~+0.33 progress per slot; see WINRATE_V3_PLAN §5a).
-  -- Priced as an OPTION: a fraction of Antimatter's worth, decayed by the runway left to
-  -- actually be offered it (one voucher slot per ante), and worthless with no antes to spare.
-  v_blank          = entry("Blank", 0.0, 0, "unlocks Antimatter (+1 joker slot)",
-    function(gs, opts) return V.blank_option_fv(gs, opts) end),
+  v_wasteful       = entry("Wasteful", 0, 0, "+1 discard per round",
+    function(gs, opts) return extra_discard_fv(gs, opts) end),
+  v_recyclomancy   = entry("Recyclomancy", 0, 0, "+1 discard per round",
+    function(gs, opts) return extra_discard_fv(gs, opts) end),
+  -- +1 hand size: the measured per-hand lift, over the hands you play each round
+  v_paint_brush    = entry("Paint Brush", 0, 0, "+1 hand size",
+    function(gs, opts) return ((gs.blind and gs.blind.base_hands) or 4) * hand_size_gain_fv(gs, opts) end),
+  v_palette        = entry("Palette", 0, 0, "+1 hand size",
+    function(gs, opts) return ((gs.blind and gs.blind.base_hands) or 4) * hand_size_gain_fv(gs, opts) end),
+  -- ---- modelled: joker slot ----
+  v_antimatter     = entry("Antimatter", 0, 0, "+1 joker slot",
+    function(gs, opts) return V.antimatter_fv(gs, opts) end),
+  v_blank          = entry("Blank", 0, 0, "unlocks Antimatter (+1 joker slot)",
+    function(gs, opts) return V.blank_option_fv(gs, opts, opts and opts.cost) end),
+  -- ---- modelled: planets ----
+  -- Telescope makes every Celestial pack contain the planet for your most-played hand: worth one level of
+  -- that hand for each pack that would otherwise have lacked it, over the packs you'll open.
+  v_telescope      = entry("Telescope", 0, 0, "celestial packs always hold your hand's planet",
+    function(gs, opts)
+      return planet_payoff_fv(gs, opts) * V.CELESTIAL_MISS * V.CELESTIAL_PACKS_PER_ANTE * runway(gs)
+    end),
+  -- Observatory: x1.5 mult per planet HELD for the hand you play. The engine uses planets on sight and
+  -- never holds them, so the effect never fires for it.
+  v_observatory    = entry("Observatory", 0, 0, "x1.5 per HELD planet (the engine uses planets immediately)"),
+  -- ---- not usable / not modelled -> 0 (never bought) ----
+  v_overstock_norm = entry("Overstock", 0, 0, "+1 shop card slot (" .. UNUSED .. ")"),
+  v_overstock_plus = entry("Overstock Plus", 0, 0, "+1 shop card slot (" .. UNUSED .. ")"),
+  v_crystal_ball   = entry("Crystal Ball", 0, 0, "+1 consumable slot (" .. UNUSED .. ")"),
+  v_omen_globe     = entry("Omen Globe", 0, 0, "spectral in arcana packs (" .. UNUSED .. ")"),
+  v_tarot_merchant = entry("Tarot Merchant", 0, 0, "tarots appear more (" .. UNUSED .. ")"),
+  v_tarot_tycoon   = entry("Tarot Tycoon", 0, 0, "tarots appear much more (" .. UNUSED .. ")"),
+  v_planet_merchant = entry("Planet Merchant", 0, 0, "planets appear more (" .. UNUSED .. ")"),
+  v_planet_tycoon  = entry("Planet Tycoon", 0, 0, "planets appear much more (" .. UNUSED .. ")"),
+  v_hone           = entry("Hone", 0, 0, "editions 2x more common (" .. UNUSED .. ")"),
+  v_glow_up        = entry("Glow Up", 0, 0, "editions 4x more common (" .. UNUSED .. ")"),
+  v_hieroglyph     = entry("Hieroglyph", 0, 0, "-1 ante, -1 hand (" .. UNUSED .. ")"),
+  v_petroglyph     = entry("Petroglyph", 0, 0, "-1 ante, -1 discard (" .. UNUSED .. ")"),
+  v_directors_cut  = entry("Director's Cut", 0, 0, "reroll the boss (the self-player has no boss-reroll action)"),
+  v_retcon         = entry("Retcon", 0, 0, "reroll the boss (the self-player has no boss-reroll action)"),
   -- Magic Trick / Illusion only pay off if you BUY playing cards from the shop -- and the engine can't: shop
-  -- playing cards aren't even extracted (state_extraction reads only jokers/tarots/planets/spectrals from the
-  -- shop slots). Their one real effect is a COST: playing cards join the shop-slot pool, so jokers and
-  -- consumables are offered less often (~71% -> ~62% jokers). They were valued at a flat, hand-set 2.0/2.5,
-  -- so the self-player paid $10 for Magic Trick at ante 6 (owner 2026-09-23: "provides no value and only
-  -- blocks shop slots"). Worth 0 here -> never bought.
-  v_magic_trick    = entry("Magic Trick", 0.0, 0, "playing cards in shop (no value: the engine can't buy them)"),
-  v_illusion       = entry("Illusion", 0.0, 0, "enhanced shop playing cards (no value: the engine can't buy them)"),
-  -- ante / boss: skipping an ante is a big structural boon, more so when pressured.
-  v_hieroglyph     = entry("Hieroglyph", 5.0, 0, "-1 ante, -1 hand",
-    function(_, opts) return (opts and opts.at_risk) and 2.0 or 0.5 end),
-  v_petroglyph     = entry("Petroglyph", 5.0, 0, "-1 ante, -1 discard",
-    function(_, opts) return (opts and opts.at_risk) and 2.0 or 0.5 end),
-  v_directors_cut  = entry("Director's Cut", 3.0, 0, "reroll boss 1/round"),
-  v_retcon         = entry("Retcon", 4.0, 0, "reroll boss unlimited"),
+  -- playing cards aren't even extracted. Their one real effect is a COST (playing cards take shop slots).
+  v_magic_trick    = entry("Magic Trick", 0, 0, "playing cards in shop (no value: the engine can't buy them)"),
+  v_illusion       = entry("Illusion", 0, 0, "enhanced shop playing cards (no value: the engine can't buy them)"),
+}
+
+-- MONEY-per-round models for the economy vouchers (game rules + measured behaviour).
+local ECON = {
+  -- raises the interest cap: the extra interest your CURRENT bank would earn each round
+  v_seed_money  = function(gs) return interest(dollars(gs), 10) - interest(dollars(gs), cap_int(gs)) end,
+  v_money_tree  = function(gs) return interest(dollars(gs), 20) - interest(dollars(gs), math.max(cap_int(gs), 10)) end,
+  -- a discount on what you spend; at steady state you spend what you earn each round
+  v_clearance_sale = function(gs) return 0.25 * income_per_round(gs) end,
+  v_liquidation    = function(gs) return 0.25 * income_per_round(gs) end,   -- 25% -> 50%: another 25%
+  -- $2 off every reroll, at the rate the engine actually rerolls
+  v_reroll_surplus = function() return 2 * V.REROLLS_PER_SHOP * V.SHOPS_PER_ROUND end,
+  v_reroll_glut    = function() return 2 * V.REROLLS_PER_SHOP * V.SHOPS_PER_ROUND end,
 }
 
 function V.get(key) return key and DATA[key] or nil end
@@ -177,18 +261,19 @@ function V.get(key) return key and DATA[key] or nil end
 -- value(gs, key, opts) -> value(FV points), econ($/round), name, note
 function V.value(gs, key, opts)
   local e = DATA[key]
-  if not e then return 2.0, 0, "Voucher", "" end
-  local value = e.value
-  -- Seed Money / Money Tree are worth more if you already bank near the cap.
-  if (key == "v_seed_money" or key == "v_money_tree") and gs.economy then
-    if (gs.economy.dollars or 0) >= 20 then value = value + 1.5 end
+  if not e then return 0, 0, "Voucher", "unknown voucher -- not bought" end
+  local value, econ = e.value, e.econ
+  local ef = ECON[key]
+  if ef then
+    local ok, m = pcall(ef, gs)
+    if ok and type(m) == "number" then econ = econ + math.max(0, m) end
   end
-  -- situational measured bonus (0 when not measurable / no deck)
+  -- situational measured value (0 when not measurable / no deck)
   if e.sit then
     local ok, extra = pcall(e.sit, gs, opts)
-    if ok and type(extra) == "number" then value = value + extra end
+    if ok and type(extra) == "number" then value = value + math.max(0, extra) end
   end
-  return value, e.econ, e.name, e.note
+  return value, econ, e.name, e.note
 end
 
 return V

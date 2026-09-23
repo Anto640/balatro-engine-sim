@@ -130,30 +130,34 @@ return function(t)
     t.ok(Skip.recommend(gs) == nil, "cannot skip the boss")
   end
 
-  -- ---- voucher value ----
+  -- ---- voucher value: NO SET VALUES (owner 2026-09-23) ----
+  -- Every voucher is valued by what it does (measured / game rules + measured behaviour), or 0.
   do
-    local v1 = ({ Vouchers.value(GS.new{}, "v_antimatter") })[1]
-    local v2 = ({ Vouchers.value(GS.new{}, "v_blank") })[1]
-    t.ok(v1 > v2, "Antimatter (+joker slot) worth more than Blank")
-    local _, econ = Vouchers.value(GS.new{}, "v_money_tree")
-    t.ok(econ > 0, "Money Tree has recurring economy value")
+    local rich = GS.new{ meta = { ante = 2 }, economy = { dollars = 80, interest_cap = 25 } }
+    local poor = GS.new{ meta = { ante = 2 }, economy = { dollars = 10, interest_cap = 25 } }
+    t.ok(({ Vouchers.value(rich, "v_antimatter") })[1] > ({ Vouchers.value(rich, "v_blank") })[1],
+      "Antimatter (+joker slot) worth more than the option on it (Blank)")
+    local _, e_rich = Vouchers.value(rich, "v_money_tree")
+    local _, e_poor = Vouchers.value(poor, "v_money_tree")
+    t.ok(e_rich > 0, "Money Tree pays extra interest on a bank above $50")
+    t.eq(e_poor, 0, "Money Tree is worth nothing on a $10 bank (no extra interest)")
+    local _, seed = Vouchers.value(GS.new{ meta = { ante = 2 }, economy = { dollars = 40, interest_cap = 25 } }, "v_seed_money")
+    t.eq(seed, 3, "Seed Money on $40: interest 8 capped at 5 -> 8 = +$3/round")
+    for _, k in ipairs({ "v_magic_trick", "v_illusion", "v_hieroglyph", "v_observatory", "v_directors_cut" }) do
+      local v, e = Vouchers.value(rich, k)
+      t.eq(v + e, 0, k .. " has no set value (engine can't use it / not modelled)")
+    end
   end
 
-  -- ---- W-SLOT: Blank is an OPTION on Antimatter, not a flat zero ----------
-  -- 0.0 was CORRECT while the world could never offer Antimatter; once upgrade vouchers
-  -- generate (sim/content.lua UPGRADE_VOUCHERS) it is wrong -- Blank is the only key to the
-  -- +1 joker slot the Phase A probe measured as the binding constraint.
+  -- ---- Blank is an OPTION on Antimatter: offered in time AND affordable (owner 2026-09-23) ----
   do
-    local early = ({ Vouchers.value(GS.new{ meta = { ante = 1 } }, "v_blank") })[1]
-    local mid   = ({ Vouchers.value(GS.new{ meta = { ante = 4 } }, "v_blank") })[1]
-    local late  = ({ Vouchers.value(GS.new{ meta = { ante = 7 } }, "v_blank") })[1]
-    t.ok(early > 0, "Blank is worth something EARLY (runway to collect on the option)")
-    t.ok(early > mid, "Blank decays as the runway shrinks")
-    t.eq(late, 0, "Blank is worth NOTHING with no antes left to be offered Antimatter")
-    t.ok(early <= Vouchers.BLANK_CAP + 1e-9, "the Blank option is capped")
-    -- it must never out-value the thing it is an option ON
-    local anti = ({ Vouchers.value(GS.new{ meta = { ante = 1 } }, "v_antimatter") })[1]
-    t.ok(anti > early, "Antimatter always outranks the option on it")
+    local function blank(ante, d) return ({ Vouchers.value(GS.new{ meta = { ante = ante },
+      economy = { dollars = d, interest_cap = 25 } }, "v_blank") })[1] end
+    t.ok(blank(1, 60) > 0, "Blank is worth something early with money spare for Antimatter")
+    t.ok(blank(1, 60) > blank(5, 60), "Blank decays as the runway to be offered Antimatter shrinks")
+    t.eq(blank(8, 60), 0, "Blank is worth nothing with no antes left")
+    t.eq(blank(1, 20), 0, "Blank is worth nothing when you can't afford Antimatter's $10 on top")
+    t.ok(blank(1, 60) > blank(1, 42), "more spare money -> Antimatter more affordable -> Blank worth more")
   end
 
   -- ---- Phase 2: vouchers are SITUATIONAL, not a flat table ----
@@ -178,8 +182,10 @@ return function(t)
 
     -- Observatory (planet x1.5) carries a positive, measured bonus on a deck with a
     -- real planet hand -- it is NOT just the flat base prior.
+    -- Observatory only fires on planets HELD in the consumable area; the engine uses planets on sight, so
+    -- it is worth nothing to this engine (no set value, owner 2026-09-23).
     local obs = ({ Vouchers.value(gsd(flush_deck), "v_observatory", opt()) })[1]
-    t.ok(obs > 5.0, "Observatory's value rises above its base on a planet-capable deck (situational)")
+    t.eq(obs, 0, "Observatory is worth 0 to an engine that never holds planets")
 
     -- Telescope (celestial = most-played planet) is worth more when play is
     -- concentrated on one hand (the flush deck) than spread across a full deck.
@@ -194,7 +200,7 @@ return function(t)
 
     -- with NO deck the situational term is silent: just the base prior (so the
     -- deckless callers/tests above still see a stable number).
-    t.eq(({ Vouchers.value(GS.new{}, "v_observatory") })[1], 5.0, "no deck -> Observatory falls back to its base prior")
+    t.eq(({ Vouchers.value(GS.new{}, "v_hieroglyph") })[1], 0, "no set values: an unmodelled voucher is worth 0")
   end
 
   -- ---- measured planet / hand-frequency (deck-aware) ----
