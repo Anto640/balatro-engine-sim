@@ -155,8 +155,14 @@ local DATA = {
   -- actually be offered it (one voucher slot per ante), and worthless with no antes to spare.
   v_blank          = entry("Blank", 0.0, 0, "unlocks Antimatter (+1 joker slot)",
     function(gs, opts) return V.blank_option_fv(gs, opts) end),
-  v_magic_trick    = entry("Magic Trick", 2.0, 0, "playing cards in shop"),
-  v_illusion       = entry("Illusion", 2.5, 0, "shop cards can have enhancements"),
+  -- Magic Trick / Illusion only pay off if you BUY playing cards from the shop -- and the engine can't: shop
+  -- playing cards aren't even extracted (state_extraction reads only jokers/tarots/planets/spectrals from the
+  -- shop slots). Their one real effect is a COST: playing cards join the shop-slot pool, so jokers and
+  -- consumables are offered less often (~71% -> ~62% jokers). They were valued at a flat, hand-set 2.0/2.5,
+  -- so the self-player paid $10 for Magic Trick at ante 6 (owner 2026-09-23: "provides no value and only
+  -- blocks shop slots"). Worth 0 here -> never bought.
+  v_magic_trick    = entry("Magic Trick", 0.0, 0, "playing cards in shop (no value: the engine can't buy them)"),
+  v_illusion       = entry("Illusion", 0.0, 0, "enhanced shop playing cards (no value: the engine can't buy them)"),
   -- ante / boss: skipping an ante is a big structural boon, more so when pressured.
   v_hieroglyph     = entry("Hieroglyph", 5.0, 0, "-1 ante, -1 hand",
     function(_, opts) return (opts and opts.at_risk) and 2.0 or 0.5 end),
