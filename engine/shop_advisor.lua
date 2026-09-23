@@ -603,13 +603,9 @@ local function situation(gs, opts, rng)
   end
   local pc = Pacing.pace(gs, { rng = rng })
   if pc then
-    -- SAFE vs AT RISK now reads the CALIBRATED risk (Pacing.risk: P(die within 2 antes), fitted to real
-    -- outcomes), not the raw projection -- which called runs that died 70-80% of the time "on pace" and
-    -- relaxed into saving there (owner run NGMNBGP9: "on pace" at ante 4, stopped buying, died ante 6).
-    local risk = pc.risk or 0
     if pc.urgent then return false, 1.7, 0.4, pc            -- can't clear the next boss -> buy power now
-    elseif risk >= 0.5 then return false, 1.4, 0.7, pc      -- more likely than not to die soon -> scoring
-    elseif risk < 0.25 then return true, 0.9, 1.4, pc       -- genuinely comfortable -> economy
+    elseif not pc.on_pace then return false, 1.4, 0.7, pc   -- behind -> favour scoring
+    elseif pc.margin >= 1.5 then return true, 0.9, 1.4, pc  -- comfortably ahead -> economy
     else return true, 1.1, 1.2, pc end                      -- on pace -> slight economy tilt
   end
   return false, 1.0, 1.0 -- unmeasurable -> neutral
@@ -641,12 +637,12 @@ end
 local function pack_need(gs, kind, secure, pace, slots_free)
   local factor, why = 1.0, nil
   if pace then
-    local risk = pace.risk or 0                            -- calibrated P(die within 2 antes)
     if pace.urgent then factor = 1.0                       -- need power NOW
-    elseif risk >= 0.5 then factor = 0.9                   -- at risk -> still want it
-    elseif risk < 0.25 then
+    elseif not pace.on_pace then factor = 0.9              -- behind -> still want it
+    elseif (pace.margin or 0) >= 1.8 then
       factor, why = 0.45, "comfortably ahead — pack adds little"
-    else factor = 0.7 end                                  -- on pace, some cushion
+    elseif (pace.margin or 0) >= 1.3 then factor = 0.7     -- on pace, some cushion
+    else factor = 0.9 end
   elseif secure then
     factor = 0.6                                           -- secure (no pace model)
   end

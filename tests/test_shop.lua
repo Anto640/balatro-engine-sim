@@ -829,8 +829,7 @@ return function(t)
     }
     local r = SA.recommend(gs)
     t.ok(r.pace ~= nil, "pace assessment is computed in the shop")
-    t.ok(r.pace_hint ~= nil and r.pace_hint:find("At risk") ~= nil, "a flat engine late in a run is flagged at risk")
-    t.ok((r.pace.risk or 0) >= 0.5, "...with a calibrated death risk of 50%+ over the next two antes")
+    t.ok(r.pace_hint ~= nil and r.pace_hint:find("Behind") ~= nil, "a flat engine late in a run is flagged behind pace")
   end
 
   -- ---- E-13: endgame + behind pace collapses econ-joker value (near-win fix) ----
@@ -989,12 +988,9 @@ return function(t)
   -- wants it, balanced against the interest its cost forgoes.
   do
     -- pacing margin: comfortably ahead -> want power less than when behind.
-    -- the need gate reads the CALIBRATED risk (Pacing.risk: P(die within 2 antes)), not raw margin
-    local ahead  = SA.pack_need({}, "joker", true,  { on_pace = true,  margin = 8.0, risk = 0.15 }, 5)
-    local behind = SA.pack_need({}, "joker", false, { on_pace = false, margin = 0.6, risk = 0.80 }, 5)
-    local urgent = SA.pack_need({}, "joker", false, { urgent = true, on_pace = false, margin = 0.3, risk = 0.95 }, 5)
-    local onpace = SA.pack_need({}, "joker", true,  { on_pace = true,  margin = 2.0, risk = 0.60 }, 5)
-    t.ok(onpace > ahead, "an 'on pace' margin that still carries 60% death risk is NOT treated as comfortable")
+    local ahead  = SA.pack_need({}, "joker", true,  { on_pace = true,  margin = 2.0 }, 5)
+    local behind = SA.pack_need({}, "joker", false, { on_pace = false, margin = 0.6 }, 5)
+    local urgent = SA.pack_need({}, "joker", false, { urgent = true, on_pace = false, margin = 0.3 }, 5)
     t.ok(ahead < behind, "comfortably ahead -> pack pool valued LESS than when behind")
     t.ok(urgent >= behind, "can't clear the next boss -> full need for power")
     t.ok(ahead >= 0.3, "need factor is clamped, never zeroes a pack out")
