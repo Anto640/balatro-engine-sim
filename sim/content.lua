@@ -878,7 +878,12 @@ local function emit_shop(run, shop, ranked)
   for _, v in ipairs(shop.vouchers or {}) do ov[#ov + 1] = { key = v.key, cost = v.cost, value = val[v] } end
 
   local best = ranked and ranked.best
+  -- the shop's pace assessment (engine/pacing), so the "on pace / comfortably ahead" verdict that switches
+  -- the shop between saving and buying power can be CALIBRATED against how runs actually end (2026-09-23).
+  local pc = ranked and ranked.pace
   run._emit({ kind = "shop", ante = run.ante, dollars = run.economy.dollars,
+    pace_margin = pc and pc.margin or nil, pace_growth = pc and pc.growth or nil,
+    pace_capacity = pc and pc.capacity or nil, pace_on = pc and (pc.on_pace and true or false) or nil,
     reroll_cost = shop.reroll_cost, reroll_value = reroll_value,       -- P3c: always logged
     offer_jokers = Json.array(oj), offer_packs = Json.array(op),
     offer_consumables = Json.array(oc), offer_vouchers = Json.array(ov),
