@@ -1161,11 +1161,19 @@ function SA.recommend(gs, opts)
     local gate = (rcost == 0 and "free reroll") or (above_cap and "above interest cap")
       or (not secure and "at risk -- need a better joker") or "below cap & safe -- hold"
     if rnote ~= "" and rnote then gate = gate .. ", " .. rnote end
-    actions[#actions + 1] = {
+    local rentry = {
       type = "REROLL", cost = rcost, value = value,
       reason = string.format("Reroll ($%d) — expected best ~%.0f%% of a boss hand (+%.0f%% over current; %s).",
         rcost, math.max(0, e_best) * 100, improvement * 100, gate),
     }
+    if _G.BES_VALUE_DEBUG then   -- read-only decomposition (same pattern as the BUY_JOKER dbg)
+      rentry.dbg = { e_best = e_best, best_offer = best_offer, improvement = improvement, eff = eff_improvement,
+        appetite = appetite, escalation = escalation, realizable = realizable, w_score = w_score,
+        gain = appetite * escalation * realizable * SA.REROLL_DISCOUNT * w_score * 5 * eff_improvement,
+        net_cost = net_cost(rcost), floor = econ_floor_penalty(gs, rcost), secure = secure, above_cap = above_cap,
+        slots_free = ShopState.slots_free(gs) }
+    end
+    actions[#actions + 1] = rentry
   end
   end)
 
