@@ -234,7 +234,14 @@ function Extract.snapshot()
     consumables = consumables,
     economy = {
       dollars = GAME.dollars or 0,
-      interest_cap = GAME.interest_cap or 5,
+      -- The live game stores the interest cap in DOLLARS (25/50/100); the whole engine (and the sim) works in
+      -- INTEREST units (5/10/20, x5 = the max-interest bankroll). Read raw, live believed max interest needed
+      -- $125 -- it hoarded and barely rerolled. Converting HERE makes live see exactly what the sim sees.
+      -- Measured (2026-09-23): putting the live bug INTO the sim cost wins 28 -> 19 (19 vs 10 discordant,
+      -- p~0.14) and progress -0.208 (p~0.06) on 160 paired seeds; 4-seed smoke: rerolls 22 -> 3, $61 -> $143
+      -- hoarded. Owner decision: the sim outcome, not the winners' corpus, decides (the corpus had vetoed
+      -- this twice). Values < 25 are already interest units and pass through.
+      interest_cap = (function(c) c = c or 5; return (c >= 25) and math.floor(c / 5) or c end)(GAME.interest_cap),
     },
     blind = {
       name = blind.name or "",
