@@ -456,11 +456,24 @@ end
 local function can_afford(run, c) return dollars(run) + credit(run) >= (c or 0) end
 
 -- Build the POD gs the shop/pack advisors consume.
+-- BES_LIVE_CAP_BUG=1 (experiment only; inert otherwise): hand the ADVISORS the interest cap the way the LIVE
+-- game reports it -- in DOLLARS (25/50/100) instead of the sim's interest units (5/10/20) -- so the sim can
+-- measure what the live-only unit bug costs (the engine's reroll/pack spending keys off cap*5). A COPY, so the
+-- world's own interest payouts are untouched.
+local LIVE_CAP_BUG = os.getenv("BES_LIVE_CAP_BUG") == "1"
+local function advisor_economy(run)
+  if not LIVE_CAP_BUG then return run.economy end
+  local e = {}
+  for k, v in pairs(run.economy) do e[k] = v end
+  e.interest_cap = (run.economy.interest_cap or 5) * 5
+  return e
+end
+
 local function shop_gs(run, shop, pack)
   return GS.new{
     meta = { ante = run.ante, round = run.round, state = "SHOP", seed_hash = tostring(run.seed) },
     deck = run.deck, jokers = run.jokers, consumables = run.consumables,
-    economy = run.economy,
+    economy = advisor_economy(run),
     run = { hand_levels = run.hand_levels, vouchers_owned = run.vouchers_owned, tags = run.tags,
             hand_size = run.hand_size, consumable_slots = run.consumable_slots,
             joker_slots = run.joker_slots, boss_key = run._next_boss,
