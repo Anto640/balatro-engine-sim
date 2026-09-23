@@ -171,6 +171,11 @@ def main():
         else:
             k = 'eng_%s_human_%s' % (e[0].lower(), h[0].lower())
         SH[k] += 1
+        if os.environ.get('AGREE_DUMP_SHOP'):
+            with open(os.environ['AGREE_DUMP_SHOP'], 'a', encoding='utf-8') as fh:
+                fh.write(json.dumps({'seed': s, 'idx': r['idx'], 'ante': r.get('ante'),
+                                     'dollars': (r.get('gs') or {}).get('economy', {}).get('dollars'),
+                                     'engine': e[0], 'human': h[0], 'class': k}) + '\n')
         if k in ('eng_buy_human_save', 'buy_diff') and len(ex['shop']) < 16:
             ex['shop'].append((label[s], r.get('ante'), 'eng %s %s / human %s %s' % (e[0], e[1], h[0], h[1])))
 
