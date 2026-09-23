@@ -89,6 +89,23 @@ function P.growth_factor(gs)
   return math.max(1.0, math.min(g, 3.0))
 end
 
+-- CALIBRATED RISK (2026-09-23). The on/behind verdict above was used by the shop as SAFE vs AT RISK, but it
+-- is badly over-confident: in a 160-run batch (sim_out/pace_base.jsonl, pace logged per shop) runs judged
+-- "On pace (projects past ante 8)" at ante 4 still died within two antes 48% of the time, and the band the
+-- shop treated as "comfortably ahead" (margin 1.5-1.8) was the WORST: 72%. Part of the reason is circular --
+-- the growth estimate assumes the board keeps improving through purchases, then the verdict tells the shop
+-- to stop buying. So: P(die within the next two antes | margin, ante), a logistic FITTED to how those runs
+-- actually ended (824 first-shop-per-ante samples): per-ante intercept + a shared ln(margin) slope.
+-- Calibration (actual / fit, died within 2 antes): ante 4 margin<1 90%/85%, 1-1.8 70%/72%, 1.8-3 61%/57%,
+-- 3+ 33%/38%. Ante 7+ uses the ante-6 intercept (at ante 7 "within 2 antes" is simply "doesn't win").
+P.RISK_INTERCEPT = { -2.776, -0.529, 0.792, 1.281, 1.634, 1.073 }
+P.RISK_SLOPE = -1.164
+function P.risk(ante, margin)
+  local a = math.max(1, math.min(6, math.floor(ante or 1)))
+  local z = P.RISK_INTERCEPT[a] + P.RISK_SLOPE * math.log(math.max(margin or 0, 1e-3))
+  return 1 / (1 + math.exp(-z))
+end
+
 -- pace(gs, opts) -> assessment, or nil if capacity can't be measured (no deck).
 function P.pace(gs, opts)
   opts = opts or {}
@@ -112,15 +129,16 @@ function P.pace(gs, opts)
   local proj8 = cap * (g ^ math.max(0, P.TARGET_ANTE - ante))
   local on_pace = (fail == nil)
   local margin = proj8 / math.max(1, req8)
+  local risk = P.risk(ante, margin)
 
   return {
     ante = ante, growth = g, capacity = cap,
     on_pace = on_pace, fail_ante = fail,
     urgent = (fail ~= nil) and (fail <= ante + 1), -- can't clear current/next boss
-    projected_at_8 = proj8, required_at_8 = req8, margin = margin,
-    reason = on_pace
-      and string.format("On pace (engine ~%.1fx/ante; projects past ante 8)", g)
-      or string.format("Behind pace (~%.1fx/ante; falls off by ante %d) — build power", g, fail),
+    projected_at_8 = proj8, required_at_8 = req8, margin = margin, risk = risk,
+    reason = (risk >= 0.5)
+      and string.format("At risk (~%d%% chance to die within 2 antes) — build power", math.floor(risk * 100 + 0.5))
+      or string.format("On pace (~%d%% risk over the next 2 antes)", math.floor(risk * 100 + 0.5)),
   }
 end
 
