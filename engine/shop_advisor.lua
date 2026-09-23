@@ -455,6 +455,43 @@ local function synergy_bonus(gs, sj)
 end
 SA.synergy_bonus = synergy_bonus
 
+-- SURVIVAL-FIRST SELLING (owner 2026-09-23, seed DGTW4TTP). The sell side priced a joker's lost score
+-- LINEARLY against money: 0.75 of a boss hand read the same whether the board had 3x the score it needed or
+-- barely enough, so a $4/round econ joker (3.2 FV) outranked Smiley Face (2.28 FV) -- the board's biggest
+-- scorer, whose removal takes it from ~1165 to ~430 per hand against a ~1000 need (full engine: keeping it
+-- clears The House 40/40). Money is only worth anything if the run survives. So measure, per owned joker,
+-- how much selling it drops P(clear the boss) (Eval.clear_prob, fitted to the full engine's real clear
+-- rates) and push a sale that drops it by more than SURVIVAL_EPS behind every safe one, in proportion to
+-- the drop. A SWAP is judged on the board AFTER it (a sold scorer the bought joker replaces is fine), so
+-- genuine upgrades still happen. SURVIVAL_EPS is the tolerance below which a drop is treated as noise
+-- (the ratio is measured on SURVIVAL_SAMPLES paired hands).
+SA.SURVIVAL_EPS = 0.05
+SA.SURVIVAL_SAMPLES = 16
+SA.SURVIVAL_W = 100       -- FV per unit of clear-probability lost beyond EPS: survival dominates money
+function SA.sell_survival(gs)
+  local need = Mechanics.boss_per_hand_need(gs)
+  if not need or need <= 0 or #(gs.jokers or {}) == 0 then return nil end
+  -- own seeded stream: deterministic per state, and does not shift the shared valuation RNG
+  local o = { rng = lcg(state_seed(gs) + 7919), samples = SA.SURVIVAL_SAMPLES }
+  local base = JokerValue.avg_score(gs, o)
+  if not base then return nil end
+  local t = { ratio = base / need, loss = {} }
+  t.p0 = Eval.clear_prob(t.ratio)
+  for i = 1, #gs.jokers do
+    local d = JokerValue.remove_delta(gs, i, { rng = lcg(state_seed(gs) + 7919 + i), samples = SA.SURVIVAL_SAMPLES })
+    t.loss[i] = math.max(0, d or 0) / need
+  end
+  -- clear-probability lost by selling joker i and (optionally) adding `gain` of per-hand ratio back
+  function t.drop(i, gain)
+    local r = math.max(1e-3, t.ratio - (t.loss[i] or 0) + (gain or 0))
+    return math.max(0, t.p0 - Eval.clear_prob(r))
+  end
+  function t.penalty(i, gain) return SA.SURVIVAL_W * math.max(0, t.drop(i, gain) - SA.SURVIVAL_EPS) end
+  function t.unsafe(i, gain) return t.drop(i, gain) > SA.SURVIVAL_EPS end
+  t.need = need
+  return t
+end
+
 -- FV lost by removing one of our jokers (its marginal contribution). Now a
 -- DIRECT measured marginal (deck-aware, paired) instead of a tier-based
 -- future_value delta -- this is the fix that stops the advisor ranking the joker
@@ -775,6 +812,12 @@ function SA.recommend(gs, opts)
   -- (sell ranking, buy-upgrade delta), so leave-one-out marginals are computed
   -- once and reused across the sell loop instead of re-sampling per joker.
   local mopts = { rng = rng, cache = JokerValue.new_cache(), samples = 6 }
+  -- survival table for sell decisions, computed once on first use (see SA.sell_survival)
+  local surv_t
+  local function surv()
+    if surv_t == nil then surv_t = SA.sell_survival(gs) or false end
+    return surv_t or nil
+  end
   local credit = OwnedSynergy.credit(gs) -- Credit Card: spend down to -$credit
 
   local slots_free = ShopState.slots_free(gs)
@@ -1171,6 +1214,9 @@ function SA.recommend(gs, opts)
         -- disposable additive filler instead (BP.keep_bias). worst_c stays the REAL contribution
         -- (for the sell value); only the SELECTION uses the protected value.
         local c_eff = c + BuildPlan.keep_bias(jk.key, gs)
+        -- survival-first: a sale that drops P(clear) beyond EPS goes behind every safe one
+        local sv = sell_pressure and surv() or nil
+        if sv then c_eff = c_eff + sv.penalty(i) end
         if c_eff < worst_eff then worst_i, worst_c, worst_eff = i, c, c_eff end
       end
     end
@@ -1229,7 +1275,11 @@ function SA.recommend(gs, opts)
             -- weakens the near-term board -- only trade into a weak-measuring keystone when survival
             -- is assured (invest: behind pace but viable). A keystone that already measures positive
             -- (cur > 0) is admitted regardless.
-            if cur == nil or cur > 0 or (keystone and invest) then
+            -- survival of the SWAP: selling worst_i and adding sj must not leave a board materially
+            -- less likely to clear (the Smiley -> Blackboard trade). nil cur (money-only) adds no score.
+            local sv = surv()
+            local swap_ok = not (sv and sv.unsafe(worst_i, math.max(0, cur or 0) / sv.need))
+            if swap_ok and (cur == nil or cur > 0 or (keystone and invest)) then
               -- PLAN the swap toward the core too: on a full board of additive commons, a
               -- core piece (xmult that multiplies the base) is a real upgrade even if its
               -- raw marginal only edges the weakest -- and a redundant flat is damped.
@@ -1266,7 +1316,9 @@ function SA.recommend(gs, opts)
       if upgrade > 0 then
         value = money_w * eff_cash + SA.W_FV * (upgrade + nudge + sbonus + farm)   -- keep already charged in `upgrade`
       else
-        value = money_w * eff_cash + SA.W_FV * (nudge + sbonus + farm - worst_c)   -- pure sale: charge lost value once
+        local sv = sell_pressure and surv() or nil
+        local spen = sv and sv.penalty(worst_i) or 0
+        value = money_w * eff_cash + SA.W_FV * (nudge + sbonus + farm - worst_c - spen)   -- pure sale: charge lost value once
       end
       local why
       if farm > 0 and upgrade <= 0 then why = "frees a slot for your Joker-spawner (e.g. Riff-Raff) to farm next blind"
@@ -1395,7 +1447,8 @@ function SA.recommend(gs, opts)
         funders[#funders + 1] = { kind = "joker", name = j.name or j.key, target = j,
           cash = j.sell_value or 1, idx = i,
           contribution = contribution, live = funder_is_live(gs, j, contribution),
-          loss = math.max(contribution, floor) + BuildPlan.keep_bias(j.key, gs) }
+          loss = math.max(contribution, floor) + BuildPlan.keep_bias(j.key, gs)
+            + ((surv() and surv().penalty(i)) or 0) }
       end
     end
     if #(gs.consumables or {}) > 0 then

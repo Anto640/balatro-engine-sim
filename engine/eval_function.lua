@@ -445,6 +445,18 @@ function Eval.reroll_saving(gs, key)
   return Eval.BASE_REROLL_COST * Eval.CHAOS_REROLL_USE[a]
 end
 
+-- P(clear the boss) as a function of the board's per-hand SCORE RATIO = mean best single-hand score over
+-- random deals / the boss per-hand need (Mechanics.boss_per_hand_need). FITTED, not chosen: a binomial
+-- logistic in ln(ratio) over 307 real shop boards (32 states x current board + every leave-one-out,
+-- tools/rollout_calibration.lua, 2026-09-23), where the outcome is the FULL engine actually playing the
+-- boss round (World.play_blind). Calibration by bin: ratio~0.5 actual 0.45 / fit 0.49 (n=113), ~1.0
+-- 0.82 / 0.79 (n=69), ~1.5 0.95 / 0.89 (n=37). Used to make SELLING survival-aware (shop_advisor).
+Eval.CLEAR_FIT_A, Eval.CLEAR_FIT_B = 1.326, 1.966
+function Eval.clear_prob(ratio)
+  if not ratio or ratio <= 0 then return 0 end
+  return 1 / (1 + math.exp(-(Eval.CLEAR_FIT_A + Eval.CLEAR_FIT_B * math.log(ratio))))
+end
+
 -- $/round a joker is worth as MONEY: its passive income (deck-aware econ_value) + reroll savings.
 function Eval.joker_money(gs, key)
   return Eval.econ_value(gs, key) + Eval.reroll_saving(gs, key)

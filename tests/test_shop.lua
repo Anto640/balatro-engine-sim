@@ -1429,4 +1429,27 @@ return function(t)
     local ss = find(strong, "SELL_JOKER")
     if ss then t.ok(ss.value < 0, "any strong-board swap scores negative (protected by the strength keep)") end
   end
+
+  -- SURVIVAL-FIRST SELLING (owner 2026-09-23, DGTW4TTP): on a full board whose ONLY scorer is Smiley Face,
+  -- selling it collapses the per-hand score below the boss need while an economy joker costs no score. The
+  -- sell nomination must be an economy joker, never the board's scorer (it used to be Smiley: its linear
+  -- score value 2.28 sat below a $4/round joker's 3.20).
+  do
+    local World = require("sim.world")
+    local gs = GS.new{
+      meta = { ante = 3 }, deck = World.standard_deck(),
+      jokers = { joker{ key = "j_smiley", sell_value = 2 }, joker{ key = "j_delayed_grat", sell_value = 2 },
+                 joker{ key = "j_mail", sell_value = 2 }, joker{ key = "j_golden", sell_value = 3 },
+                 joker{ key = "j_cloud_9", sell_value = 3 } },
+      economy = { dollars = 3, interest_cap = 5 },
+      shop = { jokers = {}, vouchers = {}, reroll_cost = 5, joker_slots = 5 },
+      run = { hand_size = 8, joker_slots = 5 },
+    }
+    local sv = SA.sell_survival and SA.sell_survival(gs)
+    t.ok(sv ~= nil and sv.unsafe(1), "selling the only scorer (Smiley) is flagged survival-UNSAFE")
+    t.ok(sv ~= nil and not sv.unsafe(2), "selling an economy joker costs no survival")
+    local sell = find(SA.recommend(gs), "SELL_JOKER")
+    t.ok(sell == nil or sell.target.key ~= "j_smiley",
+      "full econ-heavy board: the sell nomination is never the board's only scorer")
+  end
 end
