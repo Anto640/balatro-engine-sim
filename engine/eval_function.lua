@@ -576,6 +576,149 @@ end
 -- otherwise ignores all of the above (it valued Ride the Bus at 3.78 vs the measured 0.04). The scalers
 -- already project internally (accrued counter / equilibrium), so the caller must NOT re-apply a projection.
 -- Econ-channel deck-mods (Midas/Certificate) return 0 here -- their value is MONEY, added via Eval.econ_value.
+-- ==== UTILITY JOKERS, MEASURED (R12b, 2026-09-24) ============================================================
+-- These jokers have no scoring hook (VALUE_ONLY) and used to be priced by their flat tier prior (tier x 0.5 jp)
+-- -- which is WHY the measured jokers need a tier floor at all: without it the unmodelled priors out-ranked
+-- every measured joker (sim r12: bought Drunkard 23x, wins 28 -> 15). Modelling them on the engine's own
+-- units removes that asymmetry for the two commonest families. Both return a boss-hand FRACTION (the unit
+-- of every other joker's value), deck- and board-aware.
+--
+-- LEVELING (Burnt, Space): a level every round / a 1-in-4 level per hand accrues like an event-fed scaler --
+-- the added per-hand score ramps ~linearly over the remaining blinds, so its average is half the total,
+-- times the per-hand worth of one level (frequency x CV.level_gain in board context, plus the build's
+-- planet credit -- the SAME quantity CV.best_planet ranks planets by).
+Eval.BURNT_AIM = 0.5   -- share of rounds whose first discard is AIMED at the best hand (the play engine does so
+                       -- when the clear is already in hand); the rest level the discarded chaff (Pair / High Card).
+                       -- OWNER-CALIBRATABLE -- not yet measured from the sim.
+local function level_worth(gs, hand, freq, bctx)
+  local f = freq[hand] or 0
+  if f <= 0 or not Mechanics.HAND_PLANET[hand] then return 0 end
+  local BuildPlan = require("engine.build_plan")
+  return f * ConsumableValue.level_gain(gs, hand, 1, bctx)
+    + BuildPlan.planet_credit(gs, hand) * Mechanics.boss_per_hand_need(gs)
+end
+local function leveling_fraction(gs, key, opts)
+  local need = Mechanics.boss_per_hand_need(gs)
+  if not need or need <= 0 then return nil end
+  local freq, bctx = ConsumableValue.hand_frequencies(gs, { samples = 8, rng = opts.rng })
+  if not freq then return nil end
+  local R = Eval.blinds_remaining(gs)
+  if R <= 0 then return 0 end
+  if key == "j_burnt" then
+    local base_d = ((gs.blind or {}).base_discards) or 3
+    if base_d <= 0 or owns_joker(gs, "j_burglar") then return 0 end     -- no discard -> no level
+    local best = 0
+    for hand in pairs(freq) do best = math.max(best, level_worth(gs, hand, freq, bctx)) end
+    local chaff = math.max(level_worth(gs, "Pair", freq, bctx), level_worth(gs, "High Card", freq, bctx))
+    local per_level = Eval.BURNT_AIM * best + (1 - Eval.BURNT_AIM) * chaff
+    return 0.5 * R * per_level / need                                   -- 1 level/round, linear ramp
+  elseif key == "j_space" then
+    local p = owns_joker(gs, "j_oops") and 0.5 or 0.25                  -- 1 in 4 (Oops doubles it)
+    local H = R * ACC_HANDS_PER_BLIND
+    local s = 0
+    for hand, f in pairs(freq) do
+      -- levels of `hand` gained over the horizon = p * f * H; the average in place is half that
+      if f > 0 then s = s + 0.5 * p * f * H * level_worth(gs, hand, freq, bctx) end
+    end
+    return s / need
+  end
+  return nil
+end
+
+-- RESOURCE jokers (hands / discards / hand size): measured by the rollout's expected fraction of a boss target
+-- reached (Sim.blind_output_frac, the policy CHASING the target so discards are used to dig) with and without
+-- the joker's resources, on common random numbers. A joker that lifts the blind's output by x% is worth what a
+-- joker adding x% to every hand is worth: frac = r0 x (out_with / out_without - 1), r0 the board's per-hand
+-- ratio. The target is the NEXT ante's boss -- a resource joker's worth is mostly in the blinds ahead, and the
+-- current boss saturates on a board that already clears it. Tried first and rejected: a clear RATE (saturates
+-- at 0 and 1; read 0 for every resource on an ante-6 board that could not clear either way), and total output
+-- with NO target (the policy then never digs, so every discard read ~0 -- Drunkard negative).
+-- The resource deltas are World.blind_resources' rules.
+-- DISCARDS ARE NOT MEASURED HERE: the greedy rollout wastes them (a 4th discard read -3%..+15% by seed at 96
+-- samples, and LOWERED output against a far target); the dig-aware policy is consistent in direction but costs
+-- 7-10 s per state and still swings +29%/-5% at 16 samples. So Drunkard (+1 discard) and Merry Andy (+3
+-- discards, -1 hand size) keep their tier prior, and Burglar is measured for its +3 HANDS only -- its lost
+-- discards keep the flat Downside penalty (Downside skips only the hand-size / hands / decay terms).
+local RESOURCE = {
+  j_juggler     = { hs = 1 },
+  j_troubadour  = { hs = 2, h = -1 },
+  j_turtle_bean = { hs = 5, decays = true },                 -- +5, -1 per round
+  j_burglar     = { h = 3, unbaked = true },   -- applied at blind start, never in base_hands (live or sim)
+}
+Eval.RESOURCE_SAMPLES = 24
+local function resource_fraction(gs, key, opts, owned, idx)
+  local spec = RESOURCE[key]
+  if not spec or not opts.rng then return nil end
+  local ckey = "_resource|" .. key .. "|" .. tostring(owned and idx or "add")
+  if opts.cache and opts.cache[ckey] ~= nil then return opts.cache[ckey] end
+  local need = Mechanics.boss_per_hand_need(gs)
+  if not need or need <= 0 then return nil end
+  local Sim = require("engine.simulation")
+  -- the board WITHOUT this joker (so Burglar's roster mod does not also apply), same deck
+  local rest = {}
+  for i, j in ipairs(gs.jokers or {}) do if not (owned and i == idx) and j.key ~= "j_burglar" then rest[#rest + 1] = j end end
+  local base = {}
+  for k, v in pairs(gs) do base[k] = v end
+  base.jokers = rest
+  local r0 = JokerValue.avg_score(base, { samples = 8, rng = opts.rng })
+  if not r0 or r0 <= 0 then return nil end
+  r0 = r0 / need
+  local b = gs.blind or {}
+  local hands, discards = b.base_hands or 4, b.base_discards or 3
+  local hs = (gs.run and gs.run.hand_size) or 8
+  local bonus = spec.hs or 0
+  if spec.decays then
+    local ab = owned and idx and gs.jokers[idx] and gs.jokers[idx].ability
+    bonus = (type(ab) == "table" and tonumber(ab.turtle)) or 5
+  end
+  -- current resources INCLUDE an owned joker's effect (live bakes them into the round resets / hand limit),
+  -- so an owned joker is measured as (current) vs (current minus it); a shop joker as (current plus it) vs current
+  local function res(with)
+    local sign = (owned and not spec.unbaked) and (with and 0 or -1) or (with and 1 or 0)
+    return math.max(1, hands + sign * (spec.h or 0)), math.max(0, discards + sign * (spec.d or 0)),
+      math.max(1, hs + sign * bonus)
+  end
+  local seed = math.floor(opts.rng() * 2147483646) + 1
+  local function lcg(x) return function() x = (x * 1103515245 + 12345) % 2147483648; return x / 2147483648 end end
+  local ante = math.floor((gs.meta and gs.meta.ante) or 1)
+  local target = Mechanics.blind_requirement(math.min(8, ante + 1), "Boss")
+  local function output(with)
+    local h, d, z = res(with)
+    local g = {}
+    for k, v in pairs(base) do g[k] = v end
+    local run = {}
+    for k, v in pairs(base.run or {}) do run[k] = v end
+    run.hand_size = z
+    g.run = run
+    return Sim.blind_output_frac(g, h, d, Eval.RESOURCE_SAMPLES, lcg(seed), nil, nil, target)
+  end
+  local o1, o0 = output(true), output(false)
+  if not o0 or o0 <= 0 then return nil end
+  local frac = r0 * (o1 / o0 - 1)
+  if spec.decays then
+    -- Turtle Bean's +N shrinks by 1 per round and is gone after N rounds: average bonus over the horizon
+    local R = math.max(1, Eval.blinds_remaining(gs))
+    local sum = 0
+    for k = 0, math.min(bonus, R) - 1 do sum = sum + (bonus - k) end
+    frac = frac * (sum / R) / math.max(1, bonus)
+  end
+  if opts.cache then opts.cache[ckey] = frac end
+  return frac
+end
+
+-- nil when `key` is not a modelled utility joker (the caller keeps its own valuation)
+function Eval.utility_fraction(gs, key, opts, owned, idx)
+  opts = opts or {}
+  if not opts.rng then return nil end
+  local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
+  if not deck or #deck < JokerValue.MIN_DECK then return nil end
+  if key == "j_burnt" or key == "j_space" then return leveling_fraction(gs, key, opts) end
+  if RESOURCE[key] then return resource_fraction(gs, key, opts, owned, idx) end
+  return nil
+end
+Eval.UTILITY_MODELLED = { j_burnt = true, j_space = true }
+for k in pairs(RESOURCE) do Eval.UTILITY_MODELLED[k] = true end
+
 function Eval.modeled_scoring_fraction(gs, key, opts)
   local e = JokerData.resolve(key)
   local need = Mechanics.boss_per_hand_need(gs)
@@ -597,6 +740,9 @@ function Eval.modeled_scoring_fraction(gs, key, opts)
     return Eval.invisible_copy_jp(gs, nil, opts) / JP_PER_FRAC
   elseif key == "j_ring_master" then
     return Eval.showman_jp(gs, opts) / JP_PER_FRAC
+  elseif Eval.UTILITY_MODELLED[key] then
+    local uf = Eval.utility_fraction(gs, key, opts, false)
+    if uf then return uf end
   end
   local dmj = deck_modifier_jp(gs, key, opts)
   return dmj and (dmj / JP_PER_FRAC) or nil
@@ -634,7 +780,9 @@ end
 -- So the floor stays for any joker that FIRES; it is dropped only for a joker measured to do NOTHING on
 -- this deck (a Mime with no held effect to retrigger, a suit joker whose suit is absent): m == 0 on every
 -- paired sample, after the refine re-measure -- the Y1U5TZWJ case, and nothing broader.
+Eval.NO_TIER_FLOOR = os.getenv and os.getenv("BES_NO_TIER_FLOOR") == "1"   -- A/B switch: floor-free for all modelled jokers
 function Eval.is_inert(key, m)
+  if Eval.NO_TIER_FLOOR then return Eval.floor_free(key) and m ~= nil end
   return Eval.floor_free(key) and m ~= nil and m <= 1e-9
 end
 function Eval.tier_floor_frac(key)
@@ -677,6 +825,10 @@ local function jp_from_measure(gs, key, edition, m, opts, owned)
   local dmj = deck_modifier_jp(gs, key, opts)
   if dmj then
     return dmj + edition_jp(edition, false), true
+  end
+  if Eval.UTILITY_MODELLED[key] and not m then
+    local uf = Eval.utility_fraction(gs, key, opts, owned, opts and opts._idx)
+    if uf then return uf * JP_PER_FRAC + edition_jp(edition, false), true end
   end
   local freq = JokerData.scale_trigger_hands(key) and hand_freq(gs, opts) or nil
   local proj = Eval.scaling_projection(gs, key, freq)
@@ -841,6 +993,10 @@ function Eval.joker_jp(gs, idx, opts)
       end
     end
   end
+  if Eval.UTILITY_MODELLED[j.key] then
+    local o = {}; for k, v in pairs(opts) do o[k] = v end; o._idx = idx
+    opts = o
+  end
   return jp_from_measure(gs, j.key, j.edition, m, opts, true)   -- owned: sell-side marginal
 end
 
@@ -879,7 +1035,7 @@ end
 -- FV points from a joker's jp + its passive econ - its situational downside. `j`
 -- is the real joker (so stickers/ability inform the downside); idx is its board
 -- position or nil for a not-yet-placed shop joker.
-local function jp_to_fv(gs, j, jp, idx)
+local function jp_to_fv(gs, j, jp, idx, measured)
   -- Eval.econ_value, NOT the raw catalogue number. This line read the flat prior, which meant
   -- the deck-aware econ model (Rough Gem by diamond density, Business Card and Reserved
   -- Parking by face density, Cloud 9 by nines) had NEVER reached the buy or sell decision --
@@ -887,7 +1043,10 @@ local function jp_to_fv(gs, j, jp, idx)
   -- identically on a 4-diamond deck and a 20-diamond one. It also routes the Oops! All 6s
   -- probability multiplier through, so a money joker is worth more once Oops is on the board.
   local econ = Eval.joker_money(gs, j.key)
-  return FV_JOKER_WEIGHT * jp + 0.8 * econ - Downside.penalty(gs, j, idx)
+  -- a MEASURED resource joker already has its hands/discards/hand-size trade-off inside jp (Eval.utility_fraction);
+  -- don't charge the flat resource downside a second time (the anti-synergies it can't see are still charged)
+  local dopts = (measured and Eval.UTILITY_MODELLED[j.key]) and { resource_measured = true } or nil
+  return FV_JOKER_WEIGHT * jp + 0.8 * econ - Downside.penalty(gs, j, idx, dopts)
 end
 
 -- FV-point marginal of OWNING joker idx (what selling it gives up). Measuring this
@@ -899,7 +1058,7 @@ function Eval.joker_marginal_fv(gs, idx, opts)
   local j = (gs.jokers or {})[idx]
   if not j then return 0, false end
   local jp, measured = Eval.joker_jp(gs, idx, opts)
-  return jp_to_fv(gs, j, jp, idx), measured
+  return jp_to_fv(gs, j, jp, idx, measured), measured
 end
 
 -- FV-point marginal of ADDING shop joker `sj` to the current board: one measured
@@ -913,8 +1072,8 @@ function Eval.add_joker_marginal_fv(gs, sj, opts)
       { samples = opts.samples or 6, rng = opts.rng, cache = opts.cache })
     m = Eval.refine_measure(gs, sj, m, opts)
   end
-  local jp = jp_from_measure(gs, sj.key, sj.edition, m, opts, false)   -- shop: add-side marginal
-  return jp_to_fv(gs, sj, jp, nil)
+  local jp, measured = jp_from_measure(gs, sj.key, sj.edition, m, opts, false)   -- shop: add-side marginal
+  return jp_to_fv(gs, sj, jp, nil, measured)
 end
 
 -- Scoring value (boss-hand FRACTION) of PICKING a candidate joker `sj` from a pack, on the SAME
@@ -932,6 +1091,10 @@ function Eval.joker_pick_frac(gs, sj, need, opts)
   local e = JokerData.resolve(key)
   local floor = Eval.tier_floor_frac(key)
   if not can_measure(gs, opts) then return floor, false end
+  if Eval.UTILITY_MODELLED[key] then                        -- measured utility joker (Burnt, Drunkard, ...)
+    local uf = Eval.utility_fraction(gs, key, opts, false)
+    if uf then return uf, true end
+  end
   local m = JokerValue.score_delta(gs, sj, { samples = opts.samples or 6, rng = opts.rng, cache = opts.cache })
   if not m then return floor, false end
   m = Eval.refine_measure(gs, sj, m, opts)

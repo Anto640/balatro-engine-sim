@@ -1509,4 +1509,35 @@ return function(t)
     local open_e, full_e = reroll_e_best(4), reroll_e_best(5)
     t.ok(open_e and full_e and full_e < open_e, "BES_SWAP_BAR on: a full board's reroll is priced net of replacing the weakest")
   end
+
+  -- R12b: UTILITY JOKERS MEASURED, not tier-prior. Burnt Joker is a level every round (priced like the planet
+  -- it gives, over the remaining runway), so it is worth MORE early than late; a resource joker's hand size is
+  -- measured by the rollout; Drunkard (discards: not measurable by the greedy rollout) keeps its prior.
+  do
+    local Eval = require("engine.eval_function")
+    local function lcg(s) s = s % 2147483647; if s <= 0 then s = s + 2147483646 end
+      return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end end
+    local function board(ante)
+      local d = {}
+      for _, su in ipairs({ "Spades", "Hearts", "Clubs", "Diamonds" }) do
+        for r = 2, 14 do d[#d + 1] = card{ id = #d + 1, rank_id = r, suit = su } end
+      end
+      return GS.new{ jokers = { joker{ key = "j_joker" } }, deck = d,
+        run = { hand_levels = {}, hand_size = 8 }, economy = { dollars = 10, interest_cap = 5 },
+        blind = { base_hands = 4, base_discards = 3 },
+        meta = { ante = ante, round = 1, state = "x", seed_hash = "" } }
+    end
+    local b2 = Eval.utility_fraction(board(2), "j_burnt", { rng = lcg(3) }, false)
+    local b7 = Eval.utility_fraction(board(7), "j_burnt", { rng = lcg(3) }, false)
+    t.ok(b2 and b7 and b2 > 0 and b2 > b7, "Burnt Joker: measured, and worth more early (more rounds to level) than late")
+    local jg = Eval.utility_fraction(board(3), "j_juggler", { rng = lcg(3) }, false)
+    t.ok(jg and jg > 0, "Juggler (+1 hand size): measured positive by the rollout")
+    t.eq(Eval.utility_fraction(board(3), "j_drunkard", { rng = lcg(3) }, false), nil,
+      "Drunkard: discards are not measurable by the greedy rollout -> keeps its prior (nil)")
+    local Down = require("engine.joker_downside")
+    local gs = board(3)
+    local tj = joker{ key = "j_troubadour" }
+    t.ok(Down.penalty(gs, tj, nil, { resource_measured = true }) < Down.penalty(gs, tj, nil),
+      "a MEASURED resource joker is not charged the flat hand-loss downside a second time")
+  end
 end

@@ -360,6 +360,24 @@ function Sim.survive_fresh(gs, target, base_hands, base_discards, samples, rng, 
   return wins / samples
 end
 
+-- Mean fraction of `target` reached (capped at 1) on a fresh blind with EXPLICIT resources, the policy
+-- chasing that target (so discards are used to DIG, as in play). Smooth where a clear rate saturates.
+function Sim.blind_output_frac(gs, hands, discards, samples, rng, eff, pol, target)
+  rng = rng or default_rng
+  samples = samples or 24
+  local hs = hand_size_of(gs)
+  hands, discards, hs = BossEffect.resources(eff, hands, discards, hs)
+  local sum = 0
+  for _ = 1, samples do
+    local deck = shuffled(gs.deck or {}, rng)
+    local start = {}
+    for _ = 1, math.min(hs, #deck) do start[#start + 1] = table.remove(deck) end
+    local chips = rollout(gs, start, deck, target, 0, hands, discards, hs, rng, eff, nil, nil, pol) or 0
+    sum = sum + math.min(1, chips / target)
+  end
+  return sum / samples
+end
+
 -- Remaining blinds of the current ante and their chip targets, using the real
 -- ante requirement table (engine/mechanics). The Boss uses the UPCOMING boss's
 -- actual multiplier + effect (gs.run.boss_key) when known -- so Wall (4x) /

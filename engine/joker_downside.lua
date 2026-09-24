@@ -74,9 +74,12 @@ local SPEC = {
 -- penalty(gs, joker, idx) -> future-value penalty (>= 0). idx is the joker's
 -- board position (needed for "destroys the joker to its right"); pass nil when
 -- valuing a shop joker not yet placed.
-function D.penalty(gs, j, idx)
+function D.penalty(gs, j, idx, opts)
   if not j then return 0 end
   local pen = 0
+  -- the joker's own resource trade-off was MEASURED (Eval.utility_fraction's rollout): skip the flat terms
+  -- for it (hand size / hands / decay) -- Burglar's lost discards and the anti-synergies below still apply
+  local measured = opts and opts.resource_measured
 
   -- ---- per-joker (keyed) downsides ----
   local spec = SPEC[j.key]
@@ -86,11 +89,11 @@ function D.penalty(gs, j, idx)
     if base_hands <= 0 then base_hands = 4 end
 
     -- hand-size loss: each lost card matters more the fewer you already hold
-    if spec.hand_size then
+    if spec.hand_size and not measured then
       pen = pen + spec.hand_size * 1.0 * clamp(8 / hs, 1, 2)
     end
     -- hand loss: a burned hand hurts more the fewer hands you get
-    if spec.hands then
+    if spec.hands and not measured then
       pen = pen + spec.hands * 1.2 * clamp(4 / base_hands, 1, 2)
     end
     -- discards removed (Burglar): the base cost of losing the discards themselves, PLUS the anti-synergy --
@@ -98,7 +101,7 @@ function D.penalty(gs, j, idx)
     -- their Tarot. Scales with how much your build actually leans on discarding.
     if spec.no_discards then
       local bd = (gs.blind and gs.blind.base_discards) or 3
-      pen = pen + math.max(0, bd) * 0.4
+      pen = pen + math.max(0, bd) * 0.4   -- always: the measurement values Burglar's +3 hands, not the lost discards
       for i, o in ipairs(gs.jokers or {}) do
         if i ~= idx and DISCARD_FED[o.key] then pen = pen + own_value(o.key) * 0.5 end
       end
@@ -139,7 +142,7 @@ function D.penalty(gs, j, idx)
     -- fragile (extinction): expected fraction of its own value lost
     if spec.fragile then pen = pen + own_value(j.key) * spec.fragile * 1.5 end
     -- decaying/temporary: a small standing discount (still strong while it lasts)
-    if spec.decay then pen = pen + 0.6 end
+    if spec.decay and not (measured and j.key == "j_turtle_bean") then pen = pen + 0.6 end
   end
 
   -- symmetric anti-synergy: a DISCARD-FED joker is worth much less when Burglar (no discards) is on the
