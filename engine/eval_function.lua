@@ -627,6 +627,16 @@ function Eval.floor_free(key)
   if key == "j_dusk" then return false end
   return true
 end
+-- ⚠ SIM VERDICT (r12, paired n=160 vs risk_after): dropping the floor for EVERY modelled joker cost wins
+-- 28 -> 15 (sign 64/84). The floor also sets the SCALE of measured jokers against the tier-PRIOR ones
+-- (Drunkard/Credit Card/Burnt keep their full prior): without it the engine bought Drunkard 23x and cut
+-- Hanging Chad 27 -> 17, and sold held-card scorers (Shoot the Moon 12x) that measure low on a thin board.
+-- So the floor stays for any joker that FIRES; it is dropped only for a joker measured to do NOTHING on
+-- this deck (a Mime with no held effect to retrigger, a suit joker whose suit is absent): m == 0 on every
+-- paired sample, after the refine re-measure -- the Y1U5TZWJ case, and nothing broader.
+function Eval.is_inert(key, m)
+  return Eval.floor_free(key) and m ~= nil and m <= 1e-9
+end
 function Eval.tier_floor_frac(key)
   local f = (JokerData.has_tag(key, "retrigger") or JokerData.has_tag(key, "enh:steel")) and 0.9 or 0.6
   return f * (JokerData.resolve(key).tier or 3) * 0.3
@@ -721,7 +731,7 @@ local function jp_from_measure(gs, key, edition, m, opts, owned)
   local an = conditional_xmult_marginal(gs, key, opts, owned)
   if an and an > m then m = an end
   local frac = m / Mechanics.boss_per_hand_need(gs)
-  if not Eval.floor_free(key) then frac = math.max(frac, Eval.tier_floor_frac(key)) end
+  if not Eval.is_inert(key, m) then frac = math.max(frac, Eval.tier_floor_frac(key)) end
   -- measured path: foil/holo/poly already in the delta, add only the slot
   return frac * JP_PER_FRAC * proj + edition_jp(edition, false), true
 end
@@ -748,6 +758,7 @@ function Eval.joker_fires(gs, idx, opts)
   without.jokers = rest
   local m = JokerValue.score_delta(without, j, { samples = opts.samples or 6, rng = opts.rng, cache = opts.cache })
   if m == nil then return nil end
+  m = Eval.refine_measure(without, j, m, opts)   -- a rare trigger must not read as "does nothing"
   return m > 1e-9
 end
 
@@ -927,7 +938,7 @@ function Eval.joker_pick_frac(gs, sj, need, opts)
   local an = conditional_xmult_marginal(gs, key, opts, false)   -- add-side (X-1)*base, like a buy
   if an and an > m then m = an end
   local frac = m / (need or Mechanics.boss_per_hand_need(gs))
-  if Eval.floor_free(key) then return frac, true end
+  if Eval.is_inert(key, m) then return frac, true end
   return math.max(frac, floor), true
 end
 

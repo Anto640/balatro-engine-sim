@@ -629,6 +629,7 @@ end
 -- keep_bias). Returned in boss-hand FRACTION (the unit of the joker pool / reroll e_best). nil when a slot
 -- is free or nothing is sellable.
 local function full_board_swap_bar(gs, mopts)
+  if _G.BES_NO_SWAP_BAR or os.getenv and os.getenv("BES_NO_SWAP_BAR") == "1" then return nil end   -- A/B switch
   if ShopState.slots_free(gs) > 0 then return nil end
   local best
   for i, jk in ipairs(gs.jokers or {}) do
@@ -799,10 +800,10 @@ local function scoring_gain(gs, sj, rng, pace)
     -- classes the sampler is known to suppress -- held-value (Steel) and retrigger
     -- jokers -- so a real combo piece isn't passed over for measurement noise.
     -- measurement already includes foil/holo/poly; add only the slot (negative)
-    -- R12: a joker HandEval models is valued at its (refined) measurement -- no tier floor
-    -- (Eval.floor_free; the floor inflated a Mime with nothing to retrigger to 1.62 of a boss hand).
-    -- Scalers and Dusk, whose value this per-hand sample cannot see, keep the floor.
-    if not Eval.floor_free(sj.key) then
+    -- R12: the tier floor applies unless the joker is measured to do NOTHING on this deck (Eval.is_inert:
+    -- the floor inflated a Mime with nothing to retrigger to 1.62 of a boss hand). See Eval.is_inert for
+    -- why the broader "no floor for any modelled joker" was reverted (sim wins 28 -> 15).
+    if not Eval.is_inert(sj.key, measured) then
       local floor_frac = 0.6
       if JokerData.has_tag(sj.key, "retrigger") or JokerData.has_tag(sj.key, "enh:steel") then
         floor_frac = 0.9
