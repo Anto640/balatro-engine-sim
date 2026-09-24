@@ -587,9 +587,13 @@ end
 -- the added per-hand score ramps ~linearly over the remaining blinds, so its average is half the total,
 -- times the per-hand worth of one level (frequency x CV.level_gain in board context, plus the build's
 -- planet credit -- the SAME quantity CV.best_planet ranks planets by).
-Eval.BURNT_AIM = 0.5   -- share of rounds whose first discard is AIMED at the best hand (the play engine does so
-                       -- when the clear is already in hand); the rest level the discarded chaff (Pair / High Card).
-                       -- OWNER-CALIBRATABLE -- not yet measured from the sim.
+-- MEASURED (tools/burnt_aim.lua, 80 sim seeds with Burnt kept all run, 1265 Burnt rounds, 2026-09-24):
+--   BURNT_QUALITY = mean worth(the hand the first discard actually levels) / worth(levelling the BEST hand)
+--                   = 0.560, flat across antes (0.50-0.64) -- 20% of first discards are the aimed clear-in-hand
+--                   discard, the rest are digs that level their chaff;
+--   BURNT_FIRE    = share of Burnt rounds with ANY discard = 0.831 (16.9% end without one).
+Eval.BURNT_QUALITY = 0.560
+Eval.BURNT_FIRE    = 0.831
 local function level_worth(gs, hand, freq, bctx)
   local f = freq[hand] or 0
   if f <= 0 or not Mechanics.HAND_PLANET[hand] then return 0 end
@@ -610,8 +614,7 @@ local function leveling_fraction(gs, key, opts)
     if base_d <= 0 or owns_joker(gs, "j_burglar") then return 0 end     -- no discard -> no level
     local best = 0
     for hand in pairs(freq) do best = math.max(best, level_worth(gs, hand, freq, bctx)) end
-    local chaff = math.max(level_worth(gs, "Pair", freq, bctx), level_worth(gs, "High Card", freq, bctx))
-    local per_level = Eval.BURNT_AIM * best + (1 - Eval.BURNT_AIM) * chaff
+    local per_level = Eval.BURNT_FIRE * Eval.BURNT_QUALITY * best
     return 0.5 * R * per_level / need                                   -- 1 level/round, linear ramp
   elseif key == "j_space" then
     local p = owns_joker(gs, "j_oops") and 0.5 or 0.25                  -- 1 in 4 (Oops doubles it)
