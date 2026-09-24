@@ -255,6 +255,7 @@ function Extract.snapshot()
       played_hand_types = played_hand_types,  -- hand types played THIS blind (Mouth/Eye legality)
       hands_left = cur.hands_left or 0,
       discards_left = cur.discards_left or 0,
+      discards_used = cur.discards_used,     -- this round (Burnt Joker: the FIRST discard levels its hand; card.lua:3214)
       base_hands = resets.hands or 0,
       base_discards = resets.discards or 0,
     },

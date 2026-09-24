@@ -750,7 +750,7 @@ function CV.card_value(gs, set, key, freq, need, rng, samples, hand_ctx)
       for _, j in ipairs(gs.jokers or {}) do
         if j.edition ~= "negative" then
           eligible = eligible + 1
-          if (BuildPlan.keep_bias(j.key, gs) or 0) >= BuildPlan.CORE_KEEP then stick = stick + 1 end
+          if BuildPlan.is_keeper(j.key, gs) then stick = stick + 1 end
         end
       end
       if eligible == 0 then

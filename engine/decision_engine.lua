@@ -324,6 +324,85 @@ local function owns(gs, key)
   return false
 end
 
+-- BURNT JOKER (R12, owner 2026-09-24, seed Y1U5TZWJ: "it didn't use Burnt Joker ... if it already had the
+-- winning hand"). Burnt upgrades the level of the FIRST discarded poker hand each round (card.lua:3214,
+-- current_round.discards_used <= 0; the sim models it in World discard_effects) -- a free planet every round
+-- that the play engine never aimed. When the clear is already in hand, discard FIRST a subset whose poker
+-- hand is the most valuable one to level -- valued EXACTLY as a planet for it (CV.best_planet: frequency x
+-- level_gain + the build's planet credit) -- then play the clear. A subset that leaves the clear's cards in
+-- hand is safe by construction; one that breaks the winner (discarding the flush itself) must pass the
+-- strict aggressive-farm survival gate. Returns a DISCARD action or nil.
+DE.BURNT_SUBSET_MAX = 5
+local function first_discard(gs)
+  local b = gs.blind or {}
+  if b.discards_used ~= nil then return b.discards_used <= 0 end
+  return (b.discards_left or 0) >= (b.base_discards or 1) and (b.base_discards or 0) > 0
+end
+local function burnt_discard(gs, hand, play_cards, hands_left, remaining)
+  local BuildPlan = require("engine.build_plan")
+  local freq, bctx = ConsumableValue.hand_frequencies(gs, { samples = 12, rng = lcg(disc_seed(gs) + 131) })
+  if not freq then return nil end
+  local in_play = {}
+  for _, c in ipairs(play_cards or {}) do in_play[c] = true end
+  local need = Mechanics.boss_per_hand_need(gs)
+  local vcache = {}
+  local function hand_value(ht)
+    if vcache[ht] == nil then
+      local f = freq[ht] or 0
+      vcache[ht] = (Mechanics.HAND_PLANET[ht] and f > 0)
+        and (f * ConsumableValue.level_gain(gs, ht, 1, bctx) + BuildPlan.planet_credit(gs, ht) * need) or 0
+    end
+    return vcache[ht]
+  end
+  -- per poker hand: the cheapest subset forming it, preferring one that keeps the clear intact
+  local best = {}
+  local n, sel = #hand, {}
+  local function consider()
+    local ht = (HandEval.analyze(sel, {}))
+    if not ht or hand_value(ht) <= 0 then return end
+    local cost, overlap = 0, false
+    for _, c in ipairs(sel) do
+      cost = cost + DiscardValue.keep_value(c, gs)
+      if in_play[c] then overlap = true end
+    end
+    local cur = best[ht]
+    if not cur or (cur.overlap and not overlap) or (cur.overlap == overlap and cost < cur.cost) then
+      local copy = {}; for i, c in ipairs(sel) do copy[i] = c end
+      best[ht] = { cards = copy, cost = cost, overlap = overlap }
+    end
+  end
+  local function rec(start)
+    if #sel > 0 then consider() end
+    if #sel >= DE.BURNT_SUBSET_MAX then return end
+    for i = start, n do sel[#sel + 1] = hand[i]; rec(i + 1); sel[#sel] = nil end
+  end
+  rec(1)
+  -- the most valuable hand to level, among subsets that are SAFE to discard
+  local names = {}
+  for ht in pairs(best) do names[#names + 1] = ht end
+  table.sort(names, function(a, b)
+    local va, vb = hand_value(a), hand_value(b)
+    if va ~= vb then return va > vb end
+    return a < b
+  end)
+  for _, ht in ipairs(names) do
+    local c = best[ht]
+    local safe = not c.overlap
+    if not safe and hands_left >= 1 then
+      local vs = Simulation.survive_after(gs, { kind = "DISCARD", cards = c.cards }, DE.AGGRO_SAMPLES,
+        lcg(disc_seed(gs) + 137), false)
+      safe = vs and vs.frac and vs.frac >= 1 - DE.AGGRO_SURV_TOL
+    end
+    if safe then
+      return { type = "DISCARD", cards = c.cards, burnt = true, burnt_hand = ht,
+        reason = string.format("Discard your %s first — Burnt Joker levels it (+1 %s level, free)%s.", ht, ht,
+          c.overlap and "; you still clear after the redraw" or "; the clear stays in hand") }
+    end
+  end
+  return nil
+end
+DE._burnt_discard = burnt_discard   -- exposed for tests
+
 -- Are there enough face cards in the deck to make searching for a Faceless (3-face) discard worthwhile?
 -- Pareidolia makes every card a face, so always yes. Otherwise require >=3 faces to exist at all.
 local function deck_has_faces(gs, pareidolia)
@@ -935,6 +1014,15 @@ function DE.decide(gs, opts)
       best = dig_action
     else
       best = milk_action or dig_action or play_action
+    end
+    -- Burnt Joker: the round's FIRST discard is a free level for its poker hand -- take it before playing
+    -- the clear (or before the money dig, which the next decision resumes).
+    -- Not when a discard costs something: Delayed Gratification pays $2/discard only if NONE is used, and
+    -- Green Joker / Ramen lose value per discard (DiscardFuel.bleeds_scaler).
+    if owns(gs, "j_burnt") and discards_left > 0 and #hand > 0 and first_discard(gs)
+       and not owns(gs, "j_delayed_grat") and not DiscardFuel.bleeds_scaler(gs) then
+      local ba = burnt_discard(gs, hand, play_cards, hands_left, remaining)
+      if ba then ba.value = (play_action.value or 0) + 2; best = ba end
     end
   elseif forced_play then
     -- last hand with discards left: E-6 (the corrected F3). The old mean-rule dug only

@@ -81,7 +81,8 @@ local function pack_pod(pk)
   local items = Json.array({})
   for _, it in ipairs(pk.items or {}) do
     items[#items + 1] = { set = it.set, key = it.key,
-                          card = it.card and card_pod(it.card) or nil }
+                          card = it.card and card_pod(it.card) or nil,
+                          joker = it.joker and joker_pod(it.joker) or nil }
   end
   return { items = items, pick = pk.pick, picks_left = pk.picks_left, kind = pk.kind }
 end
@@ -109,7 +110,7 @@ function RF.fixture_of(gs, choice, idx, kind)
       blind = { name = b.name, blind_type = b.blind_type, boss = b.boss or nil,
                 boss_effect_key = b.boss_effect_key, target_chips = b.target_chips,
                 chips_scored = b.chips_scored, hands_left = b.hands_left,
-                discards_left = b.discards_left, base_hands = b.base_hands,
+                discards_left = b.discards_left, discards_used = b.discards_used, base_hands = b.base_hands,
                 base_discards = b.base_discards, played_hand_types = deep(b.played_hand_types),
                 skip_tag = b.skip_tag, skip_tag_hand = b.skip_tag_hand },   -- for the SKIP decision replay (blind-select)
       run = { hand_levels = deep(r.hand_levels), vouchers_owned = deep(r.vouchers_owned),
@@ -133,6 +134,14 @@ function RF.rehydrate(fix)
     shop = g.shop, pack = g.pack, blind = g.blind or {}, run = g.run or {},
   }
   for _, j in ipairs(gs.jokers) do j.ability = j.ability or { extra = {} } end
+  -- a pack joker: live state carries its read joker (item.joker); fixtures written before 2026-09-24
+  -- stored only the key, so rebuild it (the pack advisor's full-board swap only sees items with .joker)
+  for _, it in ipairs((gs.pack or {}).items or {}) do
+    if it.set == "Joker" and it.key then
+      it.joker = it.joker or { key = it.key }
+      it.joker.ability = it.joker.ability or { extra = {} }
+    end
+  end
   local r = gs.run
   r.hand_levels = r.hand_levels or {}
   r.vouchers_owned = r.vouchers_owned or {}

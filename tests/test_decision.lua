@@ -1098,4 +1098,38 @@ return function(t)
     local faith = DE.decide(flint_gs(true)).best
     t.eq(live.type, faith.type, "Flint: live decision == boss-faithful decision (gs.boss_effect derived)")
   end
+
+  -- R12 BURNT JOKER (owner 2026-09-24, seed Y1U5TZWJ): Burnt levels the FIRST discarded poker hand each round.
+  -- With the clear already in hand, the engine must spend the first discard on a level before playing --
+  -- and only on the round's first discard, and not when a discard costs something (Delayed Gratification).
+  do
+    local function burnt_state(jokers, used)
+      local d = {}
+      for _, su in ipairs({ "Spades", "Hearts", "Clubs", "Diamonds" }) do
+        for r = 2, 14 do d[#d + 1] = card{ id = 200 + #d, rank_id = r, rank = tostring(r), suit = su } end
+      end
+      return GS.new{
+        jokers = jokers,
+        hand = {
+          card{ id = 1, rank = "2", suit = "Clubs" }, card{ id = 2, rank = "3", suit = "Clubs" },
+          card{ id = 3, rank = "4", suit = "Clubs" }, card{ id = 4, rank = "5", suit = "Clubs" },
+          card{ id = 5, rank = "7", suit = "Clubs" },
+          card{ id = 6, rank = "King", suit = "Hearts" }, card{ id = 7, rank = "King", suit = "Diamonds" },
+          card{ id = 8, rank = "9", suit = "Spades" },
+        },
+        deck = d,
+        run = { hand_levels = {}, hand_size = 8 },
+        blind = { target_chips = 30, chips_scored = 0, hands_left = 4, discards_left = 3, discards_used = used,
+                  base_hands = 4, base_discards = 3, played_hand_types = {} },
+      }
+    end
+    local b = DE.decide(burnt_state({ joker{ key = "j_burnt" } }, 0)).best
+    t.eq(b.type, "DISCARD", "Burnt: a locked clear + the round's first discard -> discard to level a hand first")
+    t.ok(b.burnt == true and b.burnt_hand ~= nil, "Burnt: the discard names the hand it levels")
+    t.eq(DE.decide(burnt_state({ joker{ key = "j_burnt" } }, 1)).best.type, "PLAY",
+      "Burnt: after the first discard of the round there is no level -> play the clear")
+    t.eq(DE.decide(burnt_state({}, 0)).best.type, "PLAY", "no Burnt -> a locked clear plays immediately")
+    t.eq(DE.decide(burnt_state({ joker{ key = "j_burnt" }, joker{ key = "j_delayed_grat" } }, 0)).best.type, "PLAY",
+      "Burnt + Delayed Gratification: a discard forfeits the $2/discard payout -> no Burnt discard")
+  end
 end

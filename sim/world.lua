@@ -153,6 +153,7 @@ local function build_gs(run, blind, hand, draw_pile, eff)
       boss_effect_key = blind.boss_key,
       hands_left = blind.hands_left, discards_left = blind.discards_left,
       base_hands = blind.base_hands, base_discards = blind.base_discards,
+      discards_used = blind._first_discard_done and 1 or 0,   -- Burnt Joker: is the next discard the first?
       played_hand_types = blind.played_types,   -- K2: hand types played THIS blind (Card Sharp)
     },
     run = {

@@ -188,6 +188,10 @@ local function joker_pool(gs, opts)
     -- must draw among them with EQUAL weight. Storing the rarity weight here re-applied it,
     -- making the effective pick probability ~w^2 -- clipping the rare tail (Rares ~0.25% instead
     -- of ~5%) and systematically under-valuing Buffoon-pack / reroll EV and the rarity tags.
+    -- full board (opts.swap_bar, fraction): a new joker only counts for what it beats the joker it must
+    -- replace by (shop_advisor.full_board_swap_bar) -- otherwise a reroll/Buffoon pack is priced as if a
+    -- slot were free and the engine rerolls for jokers it will then refuse to swap in.
+    if opts.swap_bar then v = v - opts.swap_bar end
     items[#items + 1] = { v = math.max(0, v), w = 1 }
   end
   return items

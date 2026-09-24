@@ -862,10 +862,12 @@ return function(t)
       end
       return nil
     end
-    local r3, r7 = SA.recommend(endgame_gs(3)), SA.recommend(endgame_gs(7))
-    local adv3 = val(r3, "j_even_steven") - val(r3, "j_golden")
+    -- R12: the flat scorer is now MEASURED (no tier floor), and +4 Mult on a bare board is worth almost
+    -- nothing against an ante-7 blind -- so "the advantage GROWS" was the floor, not E-13. E-13's claim is
+    -- that econ does not outrank power when behind late: the scorer must still beat the pure-econ joker.
+    local r7 = SA.recommend(endgame_gs(7))
     local adv7 = val(r7, "j_even_steven") - val(r7, "j_golden")
-    t.ok(adv7 > adv3, "E-13: a scorer's advantage over a pure-econ joker GROWS in the endgame (behind, ante 7)")
+    t.ok(adv7 > 0, "E-13: behind at ante 7, a scorer still outranks a pure-econ joker")
   end
 
   -- 23. Interest breakpoints: the $5 curve + the "spend down to the boundary for
@@ -1429,9 +1431,13 @@ return function(t)
     local strong = SA.recommend(shop_board({ joker{ key = "j_baron", sell_value = 6 },
       joker{ key = "j_cavendish", sell_value = 6, ability = { x_mult = 3 } }, joker{ key = "j_blueprint", sell_value = 6 },
       joker{ key = "j_baron", sell_value = 6 }, joker{ key = "j_photograph", sell_value = 4 } }), { rng = lcg(9) })
-    t.ok(strong.best.type ~= "SELL_JOKER", "strong board: does NOT churn a strong joker for a keystone")
+    -- R12: with the tier floor gone the board is valued as MEASURED -- two Barons share the deck's four
+    -- Kings, so one reads ~2.7 FV while The Trio (frequent trips in this 7/8/9-heavy deck) reads ~10.8, and
+    -- swapping THAT Baron is a measured upgrade. What must hold is the strength keep: the board's strong
+    -- pieces (Cavendish x3, Blueprint) are never the ones churned for the keystone.
     local ss = find(strong, "SELL_JOKER")
-    if ss then t.ok(ss.value < 0, "any strong-board swap scores negative (protected by the strength keep)") end
+    t.ok(not ss or (ss.target.key ~= "j_cavendish" and ss.target.key ~= "j_blueprint"),
+      "strong board: never churns a STRONG piece (Cavendish / Blueprint) for a keystone")
   end
 
   -- SURVIVAL-FIRST SELLING (owner 2026-09-23, DGTW4TTP): on a full board whose ONLY scorer is Smiley Face,
@@ -1455,5 +1461,52 @@ return function(t)
     local sell = find(SA.recommend(gs), "SELL_JOKER")
     t.ok(sell == nil or sell.target.key ~= "j_smiley",
       "full econ-heavy board: the sell nomination is never the board's only scorer")
+  end
+
+  -- R12 (seed Y1U5TZWJ): MEASURED, NOT FLOORED. A Mime with nothing to retrigger (no held-effect card) was
+  -- priced at its tier floor, 1.62 boss hands, and bought at ante 1. It must now read ~0 on a plain deck and
+  -- clearly positive once the deck holds Steel cards (the measurement sees held retriggers since 7874b55).
+  -- And a FULL board's reroll is priced net of replacing the weakest joker (it rerolled $91 -> $29 at a6).
+  do
+    local Eval = require("engine.eval_function")
+    local function lcg(s) s = s % 2147483647; if s <= 0 then s = s + 2147483646 end
+      return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end end
+    local function deck_with(nsteel)
+      local d = {}
+      for _, su in ipairs({ "Spades", "Hearts", "Clubs", "Diamonds" }) do
+        for r = 2, 14 do
+          local c = card{ id = #d + 1, rank_id = r, suit = su }
+          if #d < nsteel then c.enhancement = "m_steel" end
+          d[#d + 1] = c
+        end
+      end
+      return d
+    end
+    local function mime_fv(nsteel)
+      local gs = GS.new{ jokers = { joker{ key = "j_droll" } }, deck = deck_with(nsteel),
+        run = { hand_levels = {}, hand_size = 8 }, economy = { dollars = 10, interest_cap = 5 },
+        meta = { ante = 2, round = 1, state = "x", seed_hash = "" } }
+      return Eval.add_joker_marginal_fv(gs, joker{ key = "j_mime" }, { rng = lcg(4), samples = 24 })
+    end
+    local plain, steel = mime_fv(0), mime_fv(10)
+    t.ok(plain < 0.2, "Mime with nothing to retrigger is worth ~0 (no tier floor)")
+    t.ok(steel > plain + 0.4, "Mime on a Steel deck is measured clearly positive")
+
+    local function reroll_e_best(njokers)
+      local jk = {}
+      for i = 1, njokers do jk[i] = joker{ key = "j_joker", sell_value = 1 } end
+      local gs = GS.new{ jokers = jk, deck = deck_with(0),
+        run = { hand_levels = {}, hand_size = 8, joker_slots = 5 }, economy = { dollars = 60, interest_cap = 5 },
+        meta = { ante = 3, round = 1, state = "x", seed_hash = "" },
+        shop = { jokers = {}, vouchers = {}, boosters = {}, reroll_cost = 5, joker_slots = 5 } }
+      _G.BES_VALUE_DEBUG = true
+      local r = SA.recommend(gs, { rng = lcg(6) })
+      _G.BES_VALUE_DEBUG = nil
+      local pool = { r.best }
+      for _, a in ipairs(r.alternatives or {}) do pool[#pool + 1] = a end
+      for _, a in ipairs(pool) do if a.type == "REROLL" and a.dbg then return a.dbg.e_best end end
+    end
+    local open_e, full_e = reroll_e_best(4), reroll_e_best(5)
+    t.ok(open_e and full_e and full_e < open_e, "full board: the reroll's expected joker is net of replacing the weakest")
   end
 end

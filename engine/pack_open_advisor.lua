@@ -173,9 +173,20 @@ local function weakest_owned_joker(gs, mopts)
     -- Mirrors shop_advisor's sell keep_bias. Without this, executing the swap churned the winners'
     -- scaler cores (p5_packswap: wins 2->0, tail shed) -- the world under-delivery was an implicit
     -- anti-over-swap guardrail (the C1 pattern).
-    local protected = (BuildPlan.keep_bias(j.key, gs) or 0) > 0
-    if not eternal and not protected then
-      local fv = (Eval.joker_marginal_fv(gs, i, mopts))
+    -- R12: no longer an EXCLUSION by category (a Mime retriggering nothing was unsellable here, so the
+    -- only swap candidate was Splash and Lucky Cat / Half Joker were skipped). Rank by the measured
+    -- marginal + keep_bias (category bias only for a joker that measurably FIRES), as the shop's sell does;
+    -- the caller survival-checks the swap. Returns the bar (FV) a pick must beat.
+    -- The bar is the SHOP's full-board upgrade test (shop_advisor SELL_JOKER): keep = c*(1+SLOPE*c) plus
+    -- max(UPGRADE_MARGIN, keep_bias) -- so a pick must CLEARLY beat what it replaces (a 6-sample reading of
+    -- the same joker varies by ~3 FV; without hysteresis it swapped Lusty Joker for another Lusty Joker).
+    if not eternal then
+      local ok, SA = pcall(require, "engine.shop_advisor")
+      local slope = ok and SA.SWAP_KEEP_SLOPE or 0.5
+      local margin = ok and SA.UPGRADE_MARGIN or 1.2
+      local c = math.max(0, (Eval.joker_marginal_fv(gs, i, mopts)))
+      local kb = BuildPlan.keep_bias(j.key, gs, Eval.joker_fires(gs, i, mopts)) or 0
+      local fv = c * (1 + slope * c) + math.max(margin, kb)
       if fv < wfv then wi, wname, wfv = i, (j.name or j.key), fv end
     end
   end
@@ -411,20 +422,42 @@ function PO.recommend(gs, opts)
   local jcap = (gs.run and gs.run.joker_slots) or 5
   if #(gs.jokers or {}) >= jcap then
     -- best pack joker by FV (what you'd actually slot), not just use-order first.
+    -- R12: over EVERY joker in the pack (`valued`), not just the chosen picks -- the pick ranking and this
+    -- swap measure differently (a scaler keeps its tier floor in the ranking), so the ranking's top joker
+    -- (Lucky Cat, 0.58 FV here) could fail the bar while another (Half Joker, 2.58) clears it (Y1U5TZWJ a4).
     local jpick, jpick_fv
-    for _, pk in ipairs(ordered) do
+    for _, pk in ipairs(valued) do
       if pk.it.set == "Joker" and pk.it.joker then
         local fv = Eval.add_joker_marginal_fv(gs, pk.it.joker, mopts)
         if not jpick or fv > jpick_fv then jpick, jpick_fv = pk, fv end
       end
     end
     local wi, wname, wfv = weakest_owned_joker(gs, mopts)
-    if jpick and wi and jpick_fv > wfv then
+    -- survival-first (SA.sell_survival): the swap must not leave a board materially less likely to clear
+    -- the boss -- judged on the board AFTER it (the pick's measured gain added back). Lazy require: the
+    -- shop advisor is a sibling module. Skipped on the cheap pass (no measurement).
+    local swap_safe = true
+    if jpick and wi and jpick_fv > wfv and not (mopts and mopts.measure == false) then
+      local ok, SA = pcall(require, "engine.shop_advisor")
+      local sv = ok and SA.sell_survival and SA.sell_survival(gs) or nil
+      if sv and sv.unsafe(wi, VU.fv_to_frac(math.max(0, jpick_fv))) then swap_safe = false end
+    end
+    if jpick and wi and jpick_fv > wfv and swap_safe then
       -- (a) carry the make-room joker's IDENTITY (key/id) + what it makes room FOR, so the overlay can
       -- promote the SELL to its OWN primary action and the actuator can address the live joker.
       local wj = gs.jokers[wi]
       sell = { name = wname, index = wi, key = wj and wj.key, id = wj and wj.id,
                for_name = jpick.name, for_key = jpick.key }
+      -- the swap's joker IS the joker pick: if the ranking chose a different one, take jpick instead
+      local ji
+      for i, pk in ipairs(ordered) do if pk.it.set == "Joker" then ji = i; break end end
+      if ji and ordered[ji] ~= jpick then
+        ordered[ji] = jpick
+        if ji == 1 then reason = string.format("Take %s (clears the swap bar)", jpick.name) end
+      elseif not ji then
+        table.insert(ordered, 1, jpick)
+        reason = string.format("Take %s (clears the swap bar)", jpick.name)
+      end
       reason = reason .. string.format(" — Joker slots full: sell %s (your weakest) to make room for %s.",
         wname, jpick.name)
     elseif ordered[1] and ordered[1].it.set == "Joker" then

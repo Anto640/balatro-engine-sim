@@ -618,9 +618,33 @@ end
 -- Value of opening a booster pack: best K-of-N from the pack's content pool,
 -- valued for this run (see engine/packs). Returns value(fraction-of-boss-hand),
 -- and a note describing the see/pick mechanics.
-local function pack_value(gs, pk, rng)
-  return Packs.value(gs, pk, { samples = 8, rng = rng })
+local function pack_value(gs, pk, rng, swap_bar)
+  return Packs.value(gs, pk, { samples = 8, rng = rng, swap_bar = swap_bar })
 end
+
+-- FULL-BOARD SWAP BAR (R12, seed Y1U5TZWJ: ante 5-6 rerolled ~14 times, $91 -> $29, buying nothing, each
+-- roll quoting "expected best ~100% of a boss hand" while every surfaced joker then failed the swap test).
+-- On a full board a new joker is worth only what it BEATS the cheapest-to-replace owned joker by, under the
+-- SAME test the SELL_JOKER upgrade applies: keep = c*(1+SLOPE*c) plus sell_margin = max(UPGRADE_MARGIN,
+-- keep_bias). Returned in boss-hand FRACTION (the unit of the joker pool / reroll e_best). nil when a slot
+-- is free or nothing is sellable.
+local function full_board_swap_bar(gs, mopts)
+  if ShopState.slots_free(gs) > 0 then return nil end
+  local best
+  for i, jk in ipairs(gs.jokers or {}) do
+    local ab = jk.ability
+    local ex = (type(ab) == "table" and type(ab.extra) == "table") and ab.extra or nil
+    local eternal = type(ab) == "table" and (ab.eternal or (ex and ex.eternal))
+    if not eternal then
+      local c = math.max(0, joker_contribution(gs, i, mopts))
+      local kb = BuildPlan.keep_bias(jk.key, gs, Eval.joker_fires(gs, i, mopts))
+      local bar = c * (1 + SA.SWAP_KEEP_SLOPE * c) + math.max(SA.UPGRADE_MARGIN, kb)
+      if not best or bar < best then best = bar end
+    end
+  end
+  return best and VU.fv_to_frac(best) or nil
+end
+SA.full_board_swap_bar = full_board_swap_bar
 
 -- How much we still NEED what a pack offers, as a multiplier in [0.3, 1] on its
 -- pool value. A pack is a SPECULATIVE buy -- you pay up front, then gamble on the
@@ -759,7 +783,12 @@ local function scoring_gain(gs, sj, rng, pace)
   -- not the fresh-blind maximum; a no-op for discard-independent jokers.
   local gs_score = with_discards(gs, SA.expected_discards_left(gs, pace))
   local measured = JokerValue.score_delta(gs_score, sj, { samples = 8, rng = rng })
+  measured = Eval.refine_measure(gs_score, sj, measured, { samples = 8, rng = rng })
   if measured then
+    -- a conditional xmult (Trio/Tribe/...) fires too rarely for a small sample to see: take the analytic
+    -- P(trigger) x (X-1) x base when it is higher (the same estimate the sell/pack paths use)
+    local an = Eval.conditional_xmult_marginal(gs_score, sj.key, { rng = rng, samples = 8 }, false)
+    if an and an > measured then measured = an end
     local per_hand_need = Mechanics.boss_per_hand_need(gs)
     local m = measured / per_hand_need
     -- The greedy sampler often PLAYS the very cards a held/conditional joker
@@ -770,14 +799,20 @@ local function scoring_gain(gs, sj, rng, pace)
     -- classes the sampler is known to suppress -- held-value (Steel) and retrigger
     -- jokers -- so a real combo piece isn't passed over for measurement noise.
     -- measurement already includes foil/holo/poly; add only the slot (negative)
-    local floor_frac = 0.6
-    if JokerData.has_tag(sj.key, "retrigger") or JokerData.has_tag(sj.key, "enh:steel") then
-      floor_frac = 0.9
+    -- R12: a joker HandEval models is valued at its (refined) measurement -- no tier floor
+    -- (Eval.floor_free; the floor inflated a Mime with nothing to retrigger to 1.62 of a boss hand).
+    -- Scalers and Dusk, whose value this per-hand sample cannot see, keep the floor.
+    if not Eval.floor_free(sj.key) then
+      local floor_frac = 0.6
+      if JokerData.has_tag(sj.key, "retrigger") or JokerData.has_tag(sj.key, "enh:steel") then
+        floor_frac = 0.9
+      end
+      m = math.max(m, floor_frac * prior)
     end
     -- a negative-edition joker is SLOT-FREE (+1 permanent slot); price that slot board-awarely
     -- (GRAND_AUDIT P1) instead of the flat 0.5 the edition helper falls back to.
     local ed = (sj.edition == "negative") and Eval.negative_slot_fv(gs) or Eval.edition_score_bonus(sj.edition, false)
-    return math.max(m, floor_frac * prior) * proj + ed
+    return m * proj + ed
   end
   -- prior: tier (consideration, not truth) + the joker's edition value
   local ed = (sj.edition == "negative") and Eval.negative_slot_fv(gs) or Eval.edition_score_bonus(sj.edition, true)
@@ -816,6 +851,11 @@ function SA.recommend(gs, opts)
   -- (sell ranking, buy-upgrade delta), so leave-one-out marginals are computed
   -- once and reused across the sell loop instead of re-sampling per joker.
   local mopts = { rng = rng, cache = JokerValue.new_cache(), samples = 6 }
+  local swap_bar_memo
+  local function swap_bar()   -- lazy + memoised: only the full-board reroll / Buffoon paths need it
+    if swap_bar_memo == nil then swap_bar_memo = full_board_swap_bar(gs, mopts) or false end
+    return swap_bar_memo or nil
+  end
   -- survival table for sell decisions, computed once on first use (see SA.sell_survival)
   local surv_t
   local function surv()
@@ -1067,7 +1107,7 @@ function SA.recommend(gs, opts)
     local kind = Packs.size_of(pk.key or pk.name)             -- joker/tarot/planet/...
     local sbonus, snote = OwnedSynergy.pack_bonus(gs, kind)   -- jokers you own that fire on opening
     local cost = OwnedSynergy.pack_free(gs, kind) and 0 or (pk.cost or 4) -- Astronomer: Celestial free
-    local pv, pnote = pack_value(gs, pk, rng)
+    local pv, pnote = pack_value(gs, pk, rng, kind == "joker" and swap_bar() or nil)
     -- B1: a Celestial pack is leveling -> amplify by the board's core (see BUY_CONSUMABLE).
     if kind == "planet" then pv = pv * BuildPlan.level_amplifier(gs) + BuildPlan.level_need(gs) end
     -- pv is in "fraction of a boss hand" units, the SAME scale as a joker's
@@ -1134,7 +1174,8 @@ function SA.recommend(gs, opts)
   local rbonus, rnote = OwnedSynergy.reroll_bonus(gs)
   if rcost and ShopState.affordable(gs, rcost, credit) and (dollars(gs) - rcost) >= reserve - credit then
     local n_slots = math.max(2, #(shop.jokers or {}) + #(shop.consumables or {}))
-    local e_best = Packs.expected_shop_joker(gs, n_slots, { samples = 3, measure_count = 6, rng = rng }) or 0
+    local bar = swap_bar()
+    local e_best = Packs.expected_shop_joker(gs, n_slots, { samples = 3, measure_count = 6, rng = rng, swap_bar = bar }) or 0
     -- realisable only to the extent you can still buy a joker after rerolling
     local buy_budget = dollars(gs) - rcost - reserve
     local realizable = clamp(buy_budget / SA.TYPICAL_JOKER_COST, 0, 1)
@@ -1168,7 +1209,7 @@ function SA.recommend(gs, opts)
     local rentry = {
       type = "REROLL", cost = rcost, value = value,
       reason = string.format("Reroll ($%d) — expected best ~%.0f%% of a boss hand (+%.0f%% over current; %s).",
-        rcost, math.max(0, e_best) * 100, improvement * 100, gate),
+        rcost, math.max(0, e_best) * 100, improvement * 100, bar and (gate .. "; net of replacing your weakest") or gate),
     }
     if _G.BES_VALUE_DEBUG then   -- read-only decomposition (same pattern as the BUY_JOKER dbg)
       rentry.dbg = { e_best = e_best, best_offer = best_offer, improvement = improvement, eff = eff_improvement,
@@ -1225,7 +1266,7 @@ function SA.recommend(gs, opts)
         -- measures low on a still-weak board is the compounding future, so bias the sale toward
         -- disposable additive filler instead (BP.keep_bias). worst_c stays the REAL contribution
         -- (for the sell value); only the SELECTION uses the protected value.
-        local c_eff = c + BuildPlan.keep_bias(jk.key, gs)
+        local c_eff = c + BuildPlan.keep_bias(jk.key, gs, Eval.joker_fires(gs, i, sell_mopts))
         -- survival-first: a sale that drops P(clear) beyond EPS goes behind every safe one
         local sv = sell_pressure and surv() or nil
         if sv then c_eff = c_eff + sv.penalty(i) end
@@ -1308,7 +1349,8 @@ function SA.recommend(gs, opts)
         -- three real human wins KEPT these while the engine kept advising selling them for
         -- junk (Trio->Loyalty, Brainstorm->Ramen). Require the replacement to beat the sold
         -- piece's PROTECTED value (keep_bias), so only a clear dominator disrupts the core.
-        local sell_margin = math.max(SA.UPGRADE_MARGIN, BuildPlan.keep_bias(gs.jokers[worst_i].key, gs))
+        local sell_margin = math.max(SA.UPGRADE_MARGIN,
+          BuildPlan.keep_bias(gs.jokers[worst_i].key, gs, Eval.joker_fires(gs, worst_i, sell_mopts)))
         -- STRENGTH-PROPORTIONAL keep (see SA.SWAP_KEEP_SLOPE): the keystone must beat the sold
         -- joker by C*(1 + SLOPE*C) -- weak filler swaps ~freely, a strong joker demands a much
         -- better replacement. Charged ONCE here (was the flat 2*C); pure sales charge it once below.
@@ -1454,12 +1496,15 @@ function SA.recommend(gs, opts)
         -- joker's TIER so a decent piece (tier>3) isn't treated as disposable; true filler (tier<=3)
         -- stays freely sellable. TIER_FUNDER_FLOOR is in the same units as keep_bias/marginal_fv.
         local tier = (JokerData.resolve(j.key).tier or 0)
-        local floor = math.max(0, tier - 3) * SA.TIER_FUNDER_FLOOR
+        local fires = Eval.joker_fires(gs, i, mopts)
+        -- (R12) the tier floor is for jokers whose worth the scorer can't see; a modelled joker MEASURED
+        -- to do nothing on this deck (fires == false: a Mime with nothing to retrigger) gets none
+        local floor = (fires == false) and 0 or math.max(0, tier - 3) * SA.TIER_FUNDER_FLOOR
         local contribution = Eval.joker_marginal_fv(gs, i, mopts)
         funders[#funders + 1] = { kind = "joker", name = j.name or j.key, target = j,
           cash = j.sell_value or 1, idx = i,
           contribution = contribution, live = funder_is_live(gs, j, contribution),
-          loss = math.max(contribution, floor) + BuildPlan.keep_bias(j.key, gs)
+          loss = math.max(contribution, floor) + BuildPlan.keep_bias(j.key, gs, fires)
             + ((surv() and surv().penalty(i)) or 0) }
       end
     end

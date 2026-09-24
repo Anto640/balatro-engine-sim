@@ -436,7 +436,22 @@ local function is_flat_scorer(key)
   local c = JokerData.resolve(key).cat
   return c == "flat_mult" or c == "flat_chips"
 end
-function BP.keep_bias(key, gs)
+-- "Is this joker a board KEEPER?" -- the category predicate (commitment-aligned, or xmult/scaler/
+-- retrigger). No longer the SELL protection (see keep_bias below, R12); kept for callers that ask how
+-- much of the board is likely to STAY (Ectoplasm's contingent slot, consumable_value).
+function BP.is_keeper(key, gs)
+  local c = gs and BP.anchored_commitment(gs)
+  if c and c.kind == "hand" then
+    for _, hand in ipairs(hand_tags(key)) do
+      if BP.hand_matches(c.hand, hand) then return true end
+    end
+  elseif c and c.kind == "economy" then
+    if key == "j_bull" or key == "j_bootstraps" or JokerData.resolve(key).cat == "economy" then return true end
+  end
+  return BP.is_core(key)
+end
+
+function BP.keep_bias(key, gs, fires)
   local c = gs and BP.anchored_commitment(gs)
   if c and c.kind == "hand" then
     for _, hand in ipairs(hand_tags(key)) do
@@ -447,8 +462,17 @@ function BP.keep_bias(key, gs)
       return BP.CORE_KEEP
     end
   end
-  if BP.is_core(key) then return BP.CORE_KEEP end
-  if is_flat_scorer(key) then return BP.SCORER_KEEP end
+  -- R12 (2026-09-24, owner: "excluding 'core' jokers is a weakness, considering how core is classed"):
+  -- protection used to follow the CATEGORY label alone, so seed Y1U5TZWJ kept a Mime that retriggered
+  -- NOTHING (measured 0.00 in every sample -- no held-effect card in the deck) all run as "core" and passed
+  -- Lucky Cat / Half Joker for it. The label keeps ONE measurable rationale: a multiplier's worth scales
+  -- with the base it multiplies, so on a still-weak board it measures low although it WORKS (Baron with
+  -- Kings on an empty board). So `fires` (Eval.joker_fires: does it change the score at all on this deck?)
+  -- decides -- a multiplier/retrigger/flat scorer that fires keeps its bias; one that does NOTHING gets
+  -- none. fires == nil (not measured / measurement structurally blind: scalers, Dusk) keeps the old bias.
+  if JokerData.is_scaling(key) then return BP.CORE_KEEP end
+  if BP.is_core(key) then return (fires == false) and 0 or BP.CORE_KEEP end
+  if is_flat_scorer(key) then return (fires == false) and 0 or BP.SCORER_KEEP end
   return 0
 end
 

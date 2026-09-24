@@ -609,6 +609,41 @@ end
 -- sampler suppresses (Mime, Baron, Steel) is never valued at ~0. Scaling jokers
 -- are projected forward either way -- condition-locked scalers gated by how often
 -- their trigger hand appears (only those sample frequencies). Returns (jp, measured?).
+-- MEASURED, NOT FLOORED (R12, 2026-09-24, live seed Y1U5TZWJ). The tier floor (0.6 x prior, 0.9 for
+-- retrigger/Steel) was a guard against a measurement that could not SEE held-card and retrigger effects:
+-- the shop scored nothing as held (fixed 7874b55), so Mime/Baron/Steel read 0 on every deck. With that
+-- fixed the measurement is right -- Mime reads 0.00 on a deck with no held effects and 1.65 / 4.6 / 21
+-- boss-hand fractions with 3 / 6 / 10 Steel cards -- and the floor only INFLATED jokers doing nothing:
+-- a Mime with nothing to retrigger was priced at 1.62 (the board's highest), bought at ante 1, and kept
+-- all run while measured offers could never beat the floored board. So a joker whose effect HandEval
+-- models is valued at its measurement; a low reading is re-measured with more samples (noise, not a
+-- floor, is the answer to an under-sampled conditional). The floor stays ONLY where the per-hand shop
+-- measurement is structurally blind: scalers (value is future accrual; owned-core sell protection) and
+-- Dusk (fires on the last hand only, which the shop sample never plays).
+Eval.REFINE_SAMPLES = 24
+function Eval.floor_free(key)
+  local e = JokerData.resolve(key)
+  if JokerData.is_scaling(key) or e.inc or e.feed_fuel or e.reset_on or e.deck_buff then return false end
+  if key == "j_dusk" then return false end
+  return true
+end
+function Eval.tier_floor_frac(key)
+  local f = (JokerData.has_tag(key, "retrigger") or JokerData.has_tag(key, "enh:steel")) and 0.9 or 0.6
+  return f * (JokerData.resolve(key).tier or 3) * 0.3
+end
+-- m: a score_delta already taken on ctx_gs at opts.samples. Returns m, re-measured at REFINE_SAMPLES
+-- when it reads below the old floor for a floor-free joker (only then: the cost lands on the jokers
+-- whose low reading now decides their value).
+function Eval.refine_measure(ctx_gs, j, m, opts)
+  opts = opts or {}
+  if not m or not Eval.floor_free(j.key) or (opts.samples or 6) >= Eval.REFINE_SAMPLES then return m end
+  if m / Mechanics.boss_per_hand_need(ctx_gs) >= Eval.tier_floor_frac(j.key) then return m end
+  local m2 = JokerValue.score_delta(ctx_gs, j, { samples = Eval.REFINE_SAMPLES, rng = opts.rng })
+  return m2 or m
+end
+
+Eval.conditional_xmult_marginal = conditional_xmult_marginal
+
 local function jp_from_measure(gs, key, edition, m, opts, owned)
   local e = JokerData.resolve(key)
   -- DECK-BUFF scaler (Hiker): no joker counter, no scoring model, so m is always nil -- value it MEASURED
@@ -686,12 +721,7 @@ local function jp_from_measure(gs, key, edition, m, opts, owned)
   local an = conditional_xmult_marginal(gs, key, opts, owned)
   if an and an > m then m = an end
   local frac = m / Mechanics.boss_per_hand_need(gs)
-  local prior_frac = (e.tier or 3) * 0.3
-  local floor_frac = 0.6
-  if JokerData.has_tag(key, "retrigger") or JokerData.has_tag(key, "enh:steel") then
-    floor_frac = 0.9
-  end
-  frac = math.max(frac, floor_frac * prior_frac)
+  if not Eval.floor_free(key) then frac = math.max(frac, Eval.tier_floor_frac(key)) end
   -- measured path: foil/holo/poly already in the delta, add only the slot
   return frac * JP_PER_FRAC * proj + edition_jp(edition, false), true
 end
@@ -701,6 +731,26 @@ local function can_measure(gs, opts)
   local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
   return deck and #deck >= JokerValue.MIN_DECK
 end
+
+-- Does owned joker idx change the score AT ALL on this deck? (R12 -- the input to BP.keep_bias.) A
+-- retrigger with nothing to retrigger / an xmult whose condition the deck never meets reads exactly 0 on
+-- every paired sample; one that works on a weak board reads small but POSITIVE. nil when the measurement
+-- is structurally blind (scalers, Dusk -- Eval.floor_free) or unavailable (no deck / value-only joker),
+-- so the caller keeps the category bias. Uses the recommend-scoped cache, so it is ~free after joker_jp.
+function Eval.joker_fires(gs, idx, opts)
+  opts = opts or {}
+  local j = (gs.jokers or {})[idx]
+  if not j or not Eval.floor_free(j.key) or not can_measure(gs, opts) then return nil end
+  local rest = {}
+  for k, jj in ipairs(gs.jokers) do if k ~= idx then rest[#rest + 1] = jj end end
+  local without = {}
+  for k, v in pairs(gs) do without[k] = v end
+  without.jokers = rest
+  local m = JokerValue.score_delta(without, j, { samples = opts.samples or 6, rng = opts.rng, cache = opts.cache })
+  if m == nil then return nil end
+  return m > 1e-9
+end
+
 
 local INVISIBLE_DELAY_DAMP = 0.75   -- 3-round wait before you can sell-to-copy (dead weight meanwhile)
 -- Invisible Joker: after 3 rounds, SELL it to DUPLICATE a random OTHER owned joker (the copy inherits the
@@ -764,6 +814,7 @@ function Eval.joker_jp(gs, idx, opts)
     without.jokers = rest
     m = JokerValue.score_delta(without, j,
       { samples = opts.samples or 6, rng = opts.rng, cache = opts.cache })
+    m = Eval.refine_measure(without, j, m, opts)
     if m == nil then
       -- j has no scoring model of its own (e.g. value-only Oops! All 6s), so its
       -- worth normally falls back to the tier prior. But REMOVING it can still
@@ -849,6 +900,7 @@ function Eval.add_joker_marginal_fv(gs, sj, opts)
   if can_measure(gs, opts) then
     m = JokerValue.score_delta(gs, sj,
       { samples = opts.samples or 6, rng = opts.rng, cache = opts.cache })
+    m = Eval.refine_measure(gs, sj, m, opts)
   end
   local jp = jp_from_measure(gs, sj.key, sj.edition, m, opts, false)   -- shop: add-side marginal
   return jp_to_fv(gs, sj, jp, nil)
@@ -867,16 +919,16 @@ function Eval.joker_pick_frac(gs, sj, need, opts)
   opts = opts or {}
   local key = sj.key
   local e = JokerData.resolve(key)
-  local prior_frac = (e.tier or 3) * 0.3
-  local floor_frac = 0.6
-  if JokerData.has_tag(key, "retrigger") or JokerData.has_tag(key, "enh:steel") then floor_frac = 0.9 end
-  local floor = floor_frac * prior_frac
+  local floor = Eval.tier_floor_frac(key)
   if not can_measure(gs, opts) then return floor, false end
   local m = JokerValue.score_delta(gs, sj, { samples = opts.samples or 6, rng = opts.rng, cache = opts.cache })
   if not m then return floor, false end
+  m = Eval.refine_measure(gs, sj, m, opts)
   local an = conditional_xmult_marginal(gs, key, opts, false)   -- add-side (X-1)*base, like a buy
   if an and an > m then m = an end
-  return math.max(m / (need or Mechanics.boss_per_hand_need(gs)), floor), true
+  local frac = m / (need or Mechanics.boss_per_hand_need(gs))
+  if Eval.floor_free(key) then return frac, true end
+  return math.max(frac, floor), true
 end
 
 -- Deck composition counts (excluding stone cards): total, diamonds, faces, nines.

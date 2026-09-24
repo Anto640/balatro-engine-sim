@@ -467,26 +467,30 @@ return function(t)
     for _, pk in ipairs(r.picks) do t.eq(pk.it.set, "Planet", "...and each pick is a planet") end
   end
 
-  -- ---- opened Buffoon pack, joker slots FULL, all-SCORER board -> CORE-PROTECTED (no sell) ----
-  -- The pack-swap sell target now excludes compounding cores AND flat scorers (keep_bias > 0):
-  -- selling a scorer to slot a pack joker churns the build (the p5_packswap batch lost both wins
-  -- doing exactly this). A board of only flat-mult scorers therefore names NO sell -- the pick is
-  -- declined and the board stays intact. (Disposable econ/utility filler IS still sellable: see the
-  -- Mail-In Rebate test below.)
+  -- ---- opened Buffoon pack, joker slots FULL, flat-scorer board (R12: MEASURED, not category-excluded) ----
+  -- The pack swap used to EXCLUDE every core/flat scorer from sale (p5_packswap churned the winners' cores),
+  -- which also shielded jokers doing NOTHING (seed Y1U5TZWJ: a Mime with nothing to retrigger kept all run).
+  -- Now a joker's protection follows whether it FIRES on this deck, and a swap must clear the shop's
+  -- hysteresis bar. (a) Wrathful (Spades) on an all-Hearts deck never fires -> sold for the Lusty pick.
+  -- (b) both jokers live -> a lateral Lusty-for-Lusty swap is NOT taken (tail safety).
   do
-    local deck = {}
-    for r = 2, 14 do deck[#deck + 1] = card{ id = r, rank_id = r, suit = "Hearts" } end
-    for r = 2, 14 do deck[#deck + 1] = card{ id = 100 + r, rank_id = r, suit = "Hearts" } end
-    local gs = GS.new{
-      deck = deck,
-      jokers = { joker{ key = "j_lusty_joker", name = "Lusty Joker" },
-                 joker{ key = "j_wrathful_joker", name = "Wrathful Joker" } },
-      run = { hand_levels = {}, hand_size = 8, joker_slots = 2 },
-      pack = { items = {
-        { set = "Joker", key = "j_lusty_joker", name = "Lusty Joker", joker = joker{ key = "j_lusty_joker" } },
-      }, picks_left = 1 } }
-    local r = PackOpen.recommend(gs)
-    t.eq(r.sell, nil, "all-flat-scorer full board -> core protection names NO sell (tail safety)")
+    local function board(other, suit2)
+      local deck = {}
+      for r = 2, 14 do deck[#deck + 1] = card{ id = r, rank_id = r, suit = "Hearts" } end
+      for r = 2, 14 do deck[#deck + 1] = card{ id = 100 + r, rank_id = r, suit = suit2 } end
+      return GS.new{
+        deck = deck,
+        jokers = { joker{ key = "j_lusty_joker", name = "Lusty Joker" }, joker{ key = other, name = other } },
+        run = { hand_levels = {}, hand_size = 8, joker_slots = 2 },
+        pack = { items = {
+          { set = "Joker", key = "j_lusty_joker", name = "Lusty Joker", joker = joker{ key = "j_lusty_joker" } },
+        }, picks_left = 1 } }
+    end
+    local dead = PackOpen.recommend(board("j_wrathful_joker", "Hearts"))
+    t.ok(dead.sell ~= nil and dead.sell.key == "j_wrathful_joker",
+      "full board: a joker that never fires on this deck (Wrathful, all Hearts) is sold for the pick")
+    local live = PackOpen.recommend(board("j_greedy_joker", "Diamonds"))
+    t.eq(live.sell, nil, "full board of LIVE scorers: no lateral swap (tail safety)")
   end
 
   -- ---- full board with a VALUE-ONLY econ joker: it must be sellable, not "unbeatable"
