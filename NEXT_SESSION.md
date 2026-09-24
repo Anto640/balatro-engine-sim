@@ -1,5 +1,38 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## ⭐⭐⭐ 2026-09-24 — R12: INERT JOKERS, MEASURED CORE PROTECTION, BURNT JOKER (read FIRST, then R11 below)
+
+Live seed **Y1U5TZWJ** (owner): bought Mime at ante 1 with nothing to retrigger, kept it all run, skipped Lucky
+Cat / Half Joker for it, rerolled $91 -> $29 at antes 5-6 buying nothing, never used Burnt Joker, died a6.
+Replayed from `bes_fixtures.jsonl` (scratch scripts `y1_*.lua`). Root causes:
+- **Tier floor on an inert joker.** Mime measured 0.00 (no held-effect card) but was floored at 0.9 x tier 6 x
+  0.3 = 1.62 boss hands -- the board's highest. Every owned joker sat on its floor, so measured offers never won.
+- **Category "core" protection.** keep_bias / the pack-swap EXCLUSION protected Mime as a retrigger regardless of
+  whether it did anything; in packs even flat scorers were unswappable (only Splash was eligible).
+- **Burnt Joker** was never used by the play engine (the sim already modelled it).
+- The a6 death itself was NOT a play bug: out of discards, playing 4s to keep bonus Aces had 21% clear vs 1%.
+
+**Shipped + deployed (`685ed72`, `835f18e`; sim r12c vs risk_after n=160: +0.056, sign 74/68, wins 28->24
+McNemar 19/23 p 0.64, reach-8 33->32 -- neutral):**
+1. `Eval.is_inert`: no tier floor ONLY when a modelled joker's refined (24-sample) measurement is exactly 0.
+2. `BP.keep_bias(key, gs, fires)` + `Eval.joker_fires`: category protection only for a joker that fires on this
+   deck; `BP.is_keeper` keeps the old predicate for Ectoplasm's contingent slot. Funder tier floor skips inert.
+3. Pack full-board swap: ranks EVERY pack joker against the shop's upgrade bar (keep c(1+0.5c) + max(1.2, kb)),
+   survival-checked (`SA.sell_survival`); the swap's joker becomes the pick. Fixtures now carry pack jokers.
+4. Burnt Joker: with the clear in hand, the round's FIRST discard (live `current_round.discards_used`, sim flag)
+   levels the most valuable hand, priced like a planet -- from SPARE cards only, never the winning hand (owner
+   rule). Skipped with Delayed Gratification / Green Joker / Ramen.
+5. Shop scoring_gain takes the analytic conditional-xmult estimate; refine measure cached (shop 4.8s -> 3.0s).
+
+**Refuted (sim):** floor removal for EVERY modelled joker (r12: wins 28->15, sign 64/84) -- the floor sets the
+scale vs tier-PRIOR jokers (bought Drunkard 23x, Hanging Chad 27->17, sold Shoot the Moon 12x). Full-board reroll
+swap bar (r12b: -0.071, wins 21) -- rerolls also surface packs/consumables e_best never prices; now opt-in
+`BES_SWAP_BAR=1`. Arms: `sim_out/{r12,r12b,r12c}.jsonl`.
+
+**Open:** unmodelled jokers (Drunkard, Burnt, Credit Card) are priced by full tier prior -- the real reason a
+floor is needed at all; modelling them (Burnt = a planet/round) would let the floor go. Watch live: Mime-like
+buys, pack swaps, Burnt discards.
+
 ## ⭐⭐⭐ 2026-09-22/24 — R11: SELL/BUY VALUATION OVERHAUL + LIVE FIXES (read this block FIRST)
 
 Driven by the owner's live F11 runs (seeds DGTW4TTP, NGMNBGP9). Everything below is committed, pushed, and

@@ -28,7 +28,10 @@ plus a large correctness/coverage/strategy pass.
 > "only Mult" measurement was invalid because the sampled hand contained no Diamonds at all. **Replay the
 > recorded state; do not rebuild it from the description.**
 >
-> ### ⭐⭐⭐ LATEST (2026-09-24): R11 sell/buy valuation overhaul — read the TOP block of `NEXT_SESSION.md` first.
+> ### ⭐⭐⭐ LATEST (2026-09-24): R12 inert jokers + measured core protection + Burnt Joker, on top of R11 — read the TOP
+> ### blocks of `NEXT_SESSION.md` first. ⚠ The tier floor is NOT removable wholesale (sim wins 28->15): it scales measured
+> ### jokers against tier-PRIOR (unmodelled) ones; only INERT jokers (measured exactly 0) lose it.
+> ### R11 sell/buy valuation overhaul:
 > Shipped + deployed: held-card context bug, money-only jokers, survival-first selling, effect-based vouchers,
 > calibrated pace risk, live interest-cap fix, and live pack/shop fixes. **Owner rule: the 7-win corpus is the
 > owner's playstyle, not ground truth — sim OUTCOMES (wins/reach-8) decide; replicate on fresh seeds.** Run A/B
