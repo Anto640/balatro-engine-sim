@@ -1136,4 +1136,28 @@ return function(t)
     t.eq(DE.decide(burnt_state({ joker{ key = "j_burnt" }, joker{ key = "j_delayed_grat" } }, 0)).best.type, "PLAY",
       "Burnt + Delayed Gratification: a discard forfeits the $2/discard payout -> no Burnt discard")
   end
+
+  -- 2026-09-25 SIXTH SENSE: with the clear in hand, the round's first discard is a spare lone 8 (-> a Spectral),
+  -- never a card of the clearing play, and only with a free consumable slot.
+  do
+    local d = {}
+    for _, su in ipairs({ "Spades", "Hearts", "Clubs", "Diamonds" }) do
+      for r = 2, 14 do d[#d + 1] = card{ id = 300 + #d, rank_id = r, rank = tostring(r), suit = su } end
+    end
+    local function st(js, cons)
+      return GS.new{ jokers = js, consumables = cons or {},
+        hand = { card{ id = 1, rank = "2", suit = "Clubs" }, card{ id = 2, rank = "3", suit = "Clubs" },
+          card{ id = 3, rank = "4", suit = "Clubs" }, card{ id = 4, rank = "5", suit = "Clubs" },
+          card{ id = 5, rank = "7", suit = "Clubs" }, card{ id = 6, rank = "8", suit = "Hearts" },
+          card{ id = 7, rank = "King", suit = "Diamonds" }, card{ id = 8, rank = "9", suit = "Spades" } },
+        deck = d, run = { hand_levels = {}, hand_size = 8, consumable_slots = 2 },
+        blind = { target_chips = 30, chips_scored = 0, hands_left = 4, discards_left = 3, discards_used = 0,
+                  base_hands = 4, base_discards = 3, played_hand_types = {} } }
+    end
+    local b = DE.decide(st({ joker{ key = "j_sixth_sense" } })).best
+    t.ok(b.type == "DISCARD" and b.sixth_sense and #b.cards == 1 and b.cards[1].id == 6,
+      "Sixth Sense: a locked clear -> discard the spare 8 alone first (for a Spectral)")
+    local full = DE.decide(st({ joker{ key = "j_sixth_sense" } }, { { key = "c_fool", set = "Tarot" }, { key = "c_moon", set = "Tarot" } })).best
+    t.ok(not full.sixth_sense, "Sixth Sense: no free consumable slot -> the 8 would be destroyed for nothing, so no")
+  end
 end

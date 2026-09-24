@@ -1011,9 +1011,32 @@ function DE.decide(gs, opts)
     end
     -- Burnt Joker: the round's FIRST discard is a free level for its poker hand -- take it before playing
     -- the clear (or before the money dig, which the next decision resumes).
+    -- SIXTH SENSE (2026-09-25): the round's first discard, if it is a SINGLE 8, destroys it and makes a Spectral
+    -- (sim/world discard_effects; the card is destroyed even with no room, so only with a free consumable slot).
+    -- With the clear in hand that discard is free -- pitch a spare 8 (never one of the clearing cards) first.
+    -- It takes precedence over a Burnt discard (a lone 8 still levels High Card for Burnt).
+    local sixth_done = false
+    if owns(gs, "j_sixth_sense") and discards_left > 0 and first_discard(gs)
+       and ((gs.run and gs.run.consumable_slots) or 2) > #(gs.consumables or {})
+       and not owns(gs, "j_delayed_grat") and not DiscardFuel.bleeds_scaler(gs) then
+      local in_play = {}
+      for _, c in ipairs(play_cards or {}) do in_play[c] = true end
+      local eight, eight_v
+      for _, c in ipairs(hand) do
+        if not in_play[c] and Cards.rank_id(c) == 8 then
+          local v = DiscardValue.keep_value(c, gs)
+          if not eight or v < eight_v then eight, eight_v = c, v end
+        end
+      end
+      if eight then
+        best = { type = "DISCARD", cards = { eight }, sixth_sense = true, value = (play_action.value or 0) + 2,
+          reason = "Discard the spare 8 alone first — Sixth Sense turns it into a Spectral card; the clear stays in hand." }
+        sixth_done = true
+      end
+    end
     -- Not when a discard costs something: Delayed Gratification pays $2/discard only if NONE is used, and
     -- Green Joker / Ramen lose value per discard (DiscardFuel.bleeds_scaler).
-    if owns(gs, "j_burnt") and discards_left > 0 and #hand > 0 and first_discard(gs)
+    if not sixth_done and owns(gs, "j_burnt") and discards_left > 0 and #hand > 0 and first_discard(gs)
        and not owns(gs, "j_delayed_grat") and not DiscardFuel.bleeds_scaler(gs) then
       local ba = burnt_discard(gs, hand, play_cards, hands_left, remaining)
       if ba then ba.value = (play_action.value or 0) + 2; best = ba end

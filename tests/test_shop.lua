@@ -1542,4 +1542,26 @@ return function(t)
     t.ok(Down.penalty(gs, tj, nil, { resource_measured = true }) < Down.penalty(gs, tj, nil),
       "a MEASURED resource joker is not charged the flat hand-loss downside a second time")
   end
+
+  -- 2026-09-25 GENERATORS priced by what they make (Eval.utility_fraction): Cartomancer's Tarot stream is worth
+  -- less late (fewer rounds left); Seance is worthless on a deck that never makes a Straight Flush.
+  do
+    local Eval = require("engine.eval_function")
+    local function lcg(s) s = s % 2147483647; if s <= 0 then s = s + 2147483646 end
+      return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end end
+    local function board(ante)
+      local d = {}
+      for _, su in ipairs({ "Spades", "Hearts", "Clubs", "Diamonds" }) do
+        for r = 2, 14 do d[#d + 1] = card{ id = #d + 1, rank_id = r, suit = su } end
+      end
+      return GS.new{ jokers = { joker{ key = "j_joker" } }, deck = d,
+        run = { hand_levels = {}, hand_size = 8, consumable_slots = 2 }, economy = { dollars = 10, interest_cap = 5 },
+        blind = { base_hands = 4, base_discards = 3 }, meta = { ante = ante, round = 1, state = "x", seed_hash = "" } }
+    end
+    local c2 = Eval.utility_fraction(board(2), "j_cartomancer", { rng = lcg(3) }, false)
+    local c7 = Eval.utility_fraction(board(7), "j_cartomancer", { rng = lcg(3) }, false)
+    t.ok(c2 and c7 and c2 > 0 and c2 > c7, "Cartomancer: measured by its Tarot stream, worth more early than late")
+    local se = Eval.utility_fraction(board(3), "j_seance", { rng = lcg(3) }, false)
+    t.ok(se and se < 0.05, "Seance: ~0 on a deck that never makes a Straight Flush")
+  end
 end

@@ -710,6 +710,87 @@ local function resource_fraction(gs, key, opts, owned, idx)
   return frac
 end
 
+-- CONSUMABLE GENERATORS (2026-09-25): priced by what they MAKE, the same shape as Burnt Joker -- items per
+-- round x the remaining rounds x 0.5 (a card made later has less runway left to pay back) x the mean value of a
+-- RANDOM card of that type (Packs.mean_random: the pack pools' own measured per-card values), times whether the
+-- output has a consumable slot to land in (a full tray is transient -- the engine uses cards -- so it is damped,
+-- not zeroed; see CLAUDE.md "Created things need a SLOT"). Rates per round, deck- and board-aware:
+--   Cartomancer  1 Tarot per blind selected
+--   8 Ball       1 in 4 per scored 8        -> hands x 8s scored per hand x 1/4
+--   Superposition Tarot on a Straight with an Ace -> hands x P(Straight/Straight Flush) x 2/10 rank windows
+--   Seance       Spectral on a Straight Flush -> hands x P(Straight Flush)
+--   Hallucination 1 in 2 per booster opened -> packs per round x 1/2 (MEASURED: 2315 packs / 2218 rounds in the
+--                sim, ~1.0 per round)
+--   Vagabond     Tarot per hand played at <= $4 -> hands x Generators.fire_rate (the existing $ proxy)
+--   Sixth Sense  Spectral when the round's first discard is a lone 8 -- the play engine now makes that discard
+--                when the clear is in hand and a spare 8 is held -> share of rounds with the clear in hand at the
+--                first decision (MEASURED 0.167 = 20.1% aimed first discards x 83.1% of rounds with any discard,
+--                tools/burnt_aim.lua) x P(a spare 8 among ~3 spare cards)
+--   Perkeo       a Negative copy of a random HELD consumable at each shop end -> 1 per round while holding one:
+--                the mean value of the cards held now, else a random Tarot x PERKEO_HOLD (share of shop ends with
+--                a card held -- an ESTIMATE, not measured: the engine mostly uses cards at once)
+-- Oops! All 6s doubles every "1 in N". Riff-Raff (makes 2 Commons) is priced separately below: its output is JOKERS.
+Eval.PACKS_PER_ROUND = 1.0
+Eval.CLEAR_IN_HAND_SHARE = 0.167
+Eval.PERKEO_HOLD = 0.3
+local GENERATOR = {
+  j_cartomancer   = { kind = "Tarot" },
+  j_8_ball        = { kind = "Tarot" },
+  j_superposition = { kind = "Tarot" },
+  j_seance        = { kind = "Spectral" },
+  j_hallucination = { kind = "Tarot" },
+  j_vagabond      = { kind = "Tarot" },
+  j_sixth_sense   = { kind = "Spectral" },
+  j_perkeo        = { kind = "Tarot" },
+}
+local function generator_rate(gs, key, freq)
+  local oops = owns_joker(gs, "j_oops") and 2 or 1
+  local H = ACC_HANDS_PER_BLIND
+  if key == "j_cartomancer" then return 1 end
+  if key == "j_8_ball" then return math.min(1, H * SCORED_PER_HAND * deck_rank_frac(gs, 8) * 0.25 * oops) end
+  if key == "j_superposition" then
+    local p = ((freq and freq["Straight"]) or 0) + ((freq and freq["Straight Flush"]) or 0)
+    return H * p * 0.2
+  end
+  if key == "j_seance" then return H * ((freq and freq["Straight Flush"]) or 0) end
+  if key == "j_hallucination" then return Eval.PACKS_PER_ROUND * math.min(1, 0.5 * oops) end
+  if key == "j_vagabond" then return H * Generators.fire_rate(gs, key) end
+  if key == "j_sixth_sense" then
+    local spare = math.max(1, ((gs.run and gs.run.hand_size) or 8) - 5)
+    return Eval.CLEAR_IN_HAND_SHARE * (1 - (1 - deck_rank_frac(gs, 8)) ^ spare)
+  end
+  if key == "j_perkeo" then return 1 end
+  return 0
+end
+local function generator_fraction(gs, key, opts, owned)
+  local spec = GENERATOR[key]
+  if not spec then return nil end
+  local R = Eval.blinds_remaining(gs)
+  if R <= 0 then return 0 end
+  local Packs = require("engine.packs")
+  local freq = ConsumableValue.hand_frequencies(gs, { samples = 8, rng = opts.rng })
+  local rate = generator_rate(gs, key, freq)
+  if rate <= 0 then return 0 end
+  local ckey = "_mean_random|" .. spec.kind
+  local mean = opts.cache and opts.cache[ckey]
+  if mean == nil then
+    mean = Packs.mean_random(gs, spec.kind, { rng = opts.rng, tarot_samples = 3 })
+    if opts.cache then opts.cache[ckey] = mean end
+  end
+  local fit = (Generators.output_room_free(gs, key, owned) > 0) and 1 or 0.6
+  if key == "j_perkeo" then
+    -- the copy is of a card you HOLD (and is Negative: no slot needed)
+    local held, n = 0, 0
+    for _, c in ipairs(gs.consumables or {}) do
+      local v, g = ConsumableValue.card_value(gs, c.set or "Tarot", c.key, nil, Mechanics.boss_per_hand_need(gs), opts.rng, 3)
+      held = held + math.max(0, (v or 0) + VU.income_frac(gs, g or 0)); n = n + 1
+    end
+    mean = (n > 0) and (held / n) or (mean * Eval.PERKEO_HOLD)
+    fit = 1
+  end
+  return 0.5 * rate * R * mean * fit
+end
+
 -- nil when `key` is not a modelled utility joker (the caller keeps its own valuation)
 function Eval.utility_fraction(gs, key, opts, owned, idx)
   opts = opts or {}
@@ -718,10 +799,21 @@ function Eval.utility_fraction(gs, key, opts, owned, idx)
   if not deck or #deck < JokerValue.MIN_DECK then return nil end
   if key == "j_burnt" or key == "j_space" then return leveling_fraction(gs, key, opts) end
   if RESOURCE[key] then return resource_fraction(gs, key, opts, owned, idx) end
+  if GENERATOR[key] then return generator_fraction(gs, key, opts, owned) end
+  if key == "j_riff_raff" then
+    -- 2 random Commons at blind select, into FREE joker slots (Generators.output_fit: a made room counts 0.1).
+    -- A filled board stops it producing, so it is priced as the fill it can deliver now, not per round.
+    local Packs = require("engine.packs")
+    local common = Packs.expected_joker_of_rarity(gs, "Common", { rng = opts.rng, samples = 3, measure_count = 6 })
+    if not common then return nil end
+    return 2 * Generators.output_fit(gs, key, owned) * common
+  end
   return nil
 end
 Eval.UTILITY_MODELLED = { j_burnt = true, j_space = true }
 for k in pairs(RESOURCE) do Eval.UTILITY_MODELLED[k] = true end
+for k in pairs(GENERATOR) do Eval.UTILITY_MODELLED[k] = true end
+Eval.UTILITY_MODELLED.j_riff_raff = true
 
 function Eval.modeled_scoring_fraction(gs, key, opts)
   local e = JokerData.resolve(key)

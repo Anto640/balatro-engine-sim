@@ -259,6 +259,17 @@ local function spectral_pool(gs, opts)
   return items
 end
 
+-- Mean value of ONE RANDOM Tarot / Spectral (not a best-of-N pick): what a generator joker hands you
+-- (Cartomancer, 8 Ball, Seance, ...). Same measured per-card values the pack pools use; a card worth
+-- less than nothing floors at 0 (you would sell or skip it).
+function P.mean_random(gs, kind, opts)
+  local items = (kind == "Spectral") and spectral_pool(gs, opts) or tarot_pool(gs, opts)
+  if #items == 0 then return 0 end
+  local s = 0
+  for _, it in ipairs(items) do s = s + it.v end
+  return s / #items
+end
+
 local function mkcard(rank_id, suit, enh, edition, seal)
   return { id = -1, rank_id = rank_id, suit = suit, enhancement = enh, edition = edition, seal = seal }
 end
