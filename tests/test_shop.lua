@@ -1499,14 +1499,14 @@ return function(t)
         run = { hand_levels = {}, hand_size = 8, joker_slots = 5 }, economy = { dollars = 60, interest_cap = 5 },
         meta = { ante = 3, round = 1, state = "x", seed_hash = "" },
         shop = { jokers = {}, vouchers = {}, boosters = {}, reroll_cost = 5, joker_slots = 5 } }
-      _G.BES_VALUE_DEBUG = true
+      _G.BES_VALUE_DEBUG = true; _G.BES_SWAP_BAR = true   -- opt-in experiment (off by default, sim-negative)
       local r = SA.recommend(gs, { rng = lcg(6) })
-      _G.BES_VALUE_DEBUG = nil
+      _G.BES_VALUE_DEBUG = nil; _G.BES_SWAP_BAR = nil
       local pool = { r.best }
       for _, a in ipairs(r.alternatives or {}) do pool[#pool + 1] = a end
       for _, a in ipairs(pool) do if a.type == "REROLL" and a.dbg then return a.dbg.e_best end end
     end
     local open_e, full_e = reroll_e_best(4), reroll_e_best(5)
-    t.ok(open_e and full_e and full_e < open_e, "full board: the reroll's expected joker is net of replacing the weakest")
+    t.ok(open_e and full_e and full_e < open_e, "BES_SWAP_BAR on: a full board's reroll is priced net of replacing the weakest")
   end
 end

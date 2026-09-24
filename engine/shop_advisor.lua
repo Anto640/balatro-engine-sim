@@ -629,7 +629,11 @@ end
 -- keep_bias). Returned in boss-hand FRACTION (the unit of the joker pool / reroll e_best). nil when a slot
 -- is free or nothing is sellable.
 local function full_board_swap_bar(gs, mopts)
-  if _G.BES_NO_SWAP_BAR or os.getenv and os.getenv("BES_NO_SWAP_BAR") == "1" then return nil end   -- A/B switch
+  -- ⚠ OFF BY DEFAULT (sim verdict 2026-09-24): with the bar, paired n=160 vs risk_after went -0.071 (sign
+  -- 67/76, wins 21) against +0.056 (sign 74/68, wins 24) without it -- it cut rerolls ~60%, and a reroll
+  -- also surfaces packs/consumables that this joker-only e_best never prices (the same mechanism that
+  -- reverted the 2026-08-11 reroll feasibility gate). Kept as an opt-in experiment: BES_SWAP_BAR=1.
+  if not (_G.BES_SWAP_BAR or (os.getenv and os.getenv("BES_SWAP_BAR") == "1")) then return nil end
   if ShopState.slots_free(gs) > 0 then return nil end
   local best
   for i, jk in ipairs(gs.jokers or {}) do
