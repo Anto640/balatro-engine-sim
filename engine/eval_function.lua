@@ -629,27 +629,47 @@ local function leveling_fraction(gs, key, opts)
   return nil
 end
 
--- RESOURCE jokers (hands / discards / hand size): measured by the rollout's expected fraction of a boss target
--- reached (Sim.blind_output_frac, the policy CHASING the target so discards are used to dig) with and without
--- the joker's resources, on common random numbers. A joker that lifts the blind's output by x% is worth what a
--- joker adding x% to every hand is worth: frac = r0 x (out_with / out_without - 1), r0 the board's per-hand
--- ratio. The target is the NEXT ante's boss -- a resource joker's worth is mostly in the blinds ahead, and the
--- current boss saturates on a board that already clears it. Tried first and rejected: a clear RATE (saturates
--- at 0 and 1; read 0 for every resource on an ante-6 board that could not clear either way), and total output
--- with NO target (the policy then never digs, so every discard read ~0 -- Drunkard negative).
--- The resource deltas are World.blind_resources' rules.
--- DISCARDS ARE NOT MEASURED HERE: the greedy rollout wastes them (a 4th discard read -3%..+15% by seed at 96
--- samples, and LOWERED output against a far target); the dig-aware policy is consistent in direction but costs
--- 7-10 s per state and still swings +29%/-5% at 16 samples. So Drunkard (+1 discard) and Merry Andy (+3
--- discards, -1 hand size) keep their tier prior, and Burglar is measured for its +3 HANDS only -- its lost
--- discards keep the flat Downside penalty (Downside skips only the hand-size / hands / decay terms).
+-- RESOURCE jokers (hands / discards / hand size), priced from a FULL-ENGINE measurement (tools/resource_value.lua,
+-- 2026-09-24): 88 recorded shop boards played the NEXT ante's boss with the real decision engine under +1 discard /
+-- +1 hand size / +1 hand on paired round seeds. The relative gain in output (fraction of the target reached)
+-- depends almost entirely on how strong the board already is, which the per-hand score ratio against the next
+-- ante's boss (r_next) predicts cleanly -- so the gain is a lookup, costs nothing at shop time, and needs no
+-- rollout. A joker that lifts the blind's output by x% is worth what a joker adding x% to every hand is worth:
+-- frac = r0 x gain, r0 the board's per-hand ratio against THIS ante's need (the unit of every joker value).
+--
+-- History: the first version priced these with the cheap greedy rollout. Against the full engine it OVER-valued
+-- hand size (+15.2% vs +9.3%) and hands (+11.2% vs +5.8%) and UNDER-valued discards (+3.0% vs +4.6%; it wastes
+-- them) -- which is why discards were left on the tier prior. This table replaces it for all six jokers.
+--
+-- gain per ONE unit, isotonic (monotone non-increasing), linearly interpolated in r_next between band centres:
+Eval.RESOURCE_R  = { 0.10,  0.275, 0.425, 0.60,  0.85,  1.25,  2.00 }
+Eval.GAIN_DISC   = { 0.094, 0.090, 0.090, 0.023, 0.016, 0.005, 0.001 }
+Eval.GAIN_HSIZE  = { 0.302, 0.178, 0.134, 0.029, 0.021, 0.008, 0.000 }
+Eval.GAIN_HAND   = { 0.123, 0.114, 0.114, 0.024, 0.024, 0.005, 0.001 }
+local function interp(xs, ys, x)
+  if x <= xs[1] then return ys[1] end
+  for k = 2, #xs do
+    if x <= xs[k] then
+      local t = (x - xs[k - 1]) / (xs[k] - xs[k - 1])
+      return ys[k - 1] + t * (ys[k] - ys[k - 1])
+    end
+  end
+  return ys[#ys]
+end
+function Eval.resource_gain(kind, r_next)
+  local ys = (kind == "discard" and Eval.GAIN_DISC) or (kind == "hand_size" and Eval.GAIN_HSIZE) or Eval.GAIN_HAND
+  return interp(Eval.RESOURCE_R, ys, r_next)
+end
+-- per-unit deltas (World.blind_resources' rules). Multi-unit effects (Merry Andy +3 discards, Turtle Bean +5 hand
+-- size, Burglar +3 hands) are EXTRAPOLATED linearly from the measured +1 -- an upper bound, since returns diminish.
 local RESOURCE = {
+  j_drunkard    = { d = 1 },
   j_juggler     = { hs = 1 },
+  j_merry_andy  = { d = 3, hs = -1 },
   j_troubadour  = { hs = 2, h = -1 },
   j_turtle_bean = { hs = 5, decays = true },                 -- +5, -1 per round
-  j_burglar     = { h = 3, unbaked = true },   -- applied at blind start, never in base_hands (live or sim)
+  j_burglar     = { h = 3, lose_discards = true },           -- +3 hands, ALL discards lost
 }
-Eval.RESOURCE_SAMPLES = 24
 local function resource_fraction(gs, key, opts, owned, idx)
   local spec = RESOURCE[key]
   if not spec or not opts.rng then return nil end
@@ -657,55 +677,35 @@ local function resource_fraction(gs, key, opts, owned, idx)
   if opts.cache and opts.cache[ckey] ~= nil then return opts.cache[ckey] end
   local need = Mechanics.boss_per_hand_need(gs)
   if not need or need <= 0 then return nil end
-  local Sim = require("engine.simulation")
-  -- the board WITHOUT this joker (so Burglar's roster mod does not also apply), same deck
+  -- the board WITHOUT this joker, same deck
   local rest = {}
-  for i, j in ipairs(gs.jokers or {}) do if not (owned and i == idx) and j.key ~= "j_burglar" then rest[#rest + 1] = j end end
+  for i, j in ipairs(gs.jokers or {}) do if not (owned and i == idx) then rest[#rest + 1] = j end end
   local base = {}
   for k, v in pairs(gs) do base[k] = v end
   base.jokers = rest
-  local r0 = JokerValue.avg_score(base, { samples = 8, rng = opts.rng })
-  if not r0 or r0 <= 0 then return nil end
-  r0 = r0 / need
-  local b = gs.blind or {}
-  local hands, discards = b.base_hands or 4, b.base_discards or 3
-  local hs = (gs.run and gs.run.hand_size) or 8
-  local bonus = spec.hs or 0
+  local score = JokerValue.avg_score(base, { samples = 8, rng = opts.rng })
+  if not score or score <= 0 then return nil end
+  local r0 = score / need
+  local ante = math.floor((gs.meta and gs.meta.ante) or 1)
+  local nb = { meta = { ante = math.min(8, ante + 1) }, blind = gs.blind, run = gs.run }
+  local need_next = Mechanics.boss_per_hand_need(nb)
+  local r_next = (need_next and need_next > 0) and (score / need_next) or r0
+  local gd, gz, gh = Eval.resource_gain("discard", r_next), Eval.resource_gain("hand_size", r_next),
+    Eval.resource_gain("hand", r_next)
+  local hs_units = spec.hs or 0
   if spec.decays then
     local ab = owned and idx and gs.jokers[idx] and gs.jokers[idx].ability
-    bonus = (type(ab) == "table" and tonumber(ab.turtle)) or 5
-  end
-  -- current resources INCLUDE an owned joker's effect (live bakes them into the round resets / hand limit),
-  -- so an owned joker is measured as (current) vs (current minus it); a shop joker as (current plus it) vs current
-  local function res(with)
-    local sign = (owned and not spec.unbaked) and (with and 0 or -1) or (with and 1 or 0)
-    return math.max(1, hands + sign * (spec.h or 0)), math.max(0, discards + sign * (spec.d or 0)),
-      math.max(1, hs + sign * bonus)
-  end
-  local seed = math.floor(opts.rng() * 2147483646) + 1
-  local function lcg(x) return function() x = (x * 1103515245 + 12345) % 2147483648; return x / 2147483648 end end
-  local ante = math.floor((gs.meta and gs.meta.ante) or 1)
-  local target = Mechanics.blind_requirement(math.min(8, ante + 1), "Boss")
-  local function output(with)
-    local h, d, z = res(with)
-    local g = {}
-    for k, v in pairs(base) do g[k] = v end
-    local run = {}
-    for k, v in pairs(base.run or {}) do run[k] = v end
-    run.hand_size = z
-    g.run = run
-    return Sim.blind_output_frac(g, h, d, Eval.RESOURCE_SAMPLES, lcg(seed), nil, nil, target)
-  end
-  local o1, o0 = output(true), output(false)
-  if not o0 or o0 <= 0 then return nil end
-  local frac = r0 * (o1 / o0 - 1)
-  if spec.decays then
+    local cur = (type(ab) == "table" and tonumber(ab.turtle)) or 5
     -- Turtle Bean's +N shrinks by 1 per round and is gone after N rounds: average bonus over the horizon
     local R = math.max(1, Eval.blinds_remaining(gs))
     local sum = 0
-    for k = 0, math.min(bonus, R) - 1 do sum = sum + (bonus - k) end
-    frac = frac * (sum / R) / math.max(1, bonus)
+    for k = 0, math.min(cur, R) - 1 do sum = sum + (cur - k) end
+    hs_units = sum / R
   end
+  local d_units = spec.d or 0
+  if spec.lose_discards then d_units = -(((gs.blind or {}).base_discards) or 3) end
+  local gain = d_units * gd + hs_units * gz + (spec.h or 0) * gh
+  local frac = r0 * gain
   if opts.cache then opts.cache[ckey] = frac end
   return frac
 end

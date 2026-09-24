@@ -78,7 +78,7 @@ function D.penalty(gs, j, idx, opts)
   if not j then return 0 end
   local pen = 0
   -- the joker's own resource trade-off was MEASURED (Eval.utility_fraction's rollout): skip the flat terms
-  -- for it (hand size / hands / decay) -- Burglar's lost discards and the anti-synergies below still apply
+  -- for it (hand size / hands / Burglar's lost discards / decay) -- the anti-synergies below still apply
   local measured = opts and opts.resource_measured
 
   -- ---- per-joker (keyed) downsides ----
@@ -101,7 +101,7 @@ function D.penalty(gs, j, idx, opts)
     -- their Tarot. Scales with how much your build actually leans on discarding.
     if spec.no_discards then
       local bd = (gs.blind and gs.blind.base_discards) or 3
-      pen = pen + math.max(0, bd) * 0.4   -- always: the measurement values Burglar's +3 hands, not the lost discards
+      if not measured then pen = pen + math.max(0, bd) * 0.4 end   -- measured: the lost discards are in the value
       for i, o in ipairs(gs.jokers or {}) do
         if i ~= idx and DISCARD_FED[o.key] then pen = pen + own_value(o.key) * 0.5 end
       end

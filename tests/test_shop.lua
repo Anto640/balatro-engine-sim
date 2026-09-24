@@ -1512,7 +1512,7 @@ return function(t)
 
   -- R12b: UTILITY JOKERS MEASURED, not tier-prior. Burnt Joker is a level every round (priced like the planet
   -- it gives, over the remaining runway), so it is worth MORE early than late; a resource joker's hand size is
-  -- measured by the rollout; Drunkard (discards: not measurable by the greedy rollout) keeps its prior.
+  -- priced from the full-engine resource table (tools/resource_value.lua), Drunkard's discard included.
   do
     local Eval = require("engine.eval_function")
     local function lcg(s) s = s % 2147483647; if s <= 0 then s = s + 2147483646 end
@@ -1532,8 +1532,10 @@ return function(t)
     t.ok(b2 and b7 and b2 > 0 and b2 > b7, "Burnt Joker: measured, and worth more early (more rounds to level) than late")
     local jg = Eval.utility_fraction(board(3), "j_juggler", { rng = lcg(3) }, false)
     t.ok(jg and jg > 0, "Juggler (+1 hand size): measured positive by the rollout")
-    t.eq(Eval.utility_fraction(board(3), "j_drunkard", { rng = lcg(3) }, false), nil,
-      "Drunkard: discards are not measurable by the greedy rollout -> keeps its prior (nil)")
+    local dk = Eval.utility_fraction(board(3), "j_drunkard", { rng = lcg(3) }, false)
+    t.ok(dk and dk >= 0, "Drunkard (+1 discard): priced from the full-engine resource table")
+    t.ok(Eval.resource_gain("discard", 0.2) > Eval.resource_gain("discard", 1.5),
+      "a discard is worth more to a board far from the next boss than to one that already clears it")
     local Down = require("engine.joker_downside")
     local gs = board(3)
     local tj = joker{ key = "j_troubadour" }
