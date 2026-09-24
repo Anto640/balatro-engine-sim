@@ -1126,6 +1126,10 @@ return function(t)
     local b = DE.decide(burnt_state({ joker{ key = "j_burnt" } }, 0)).best
     t.eq(b.type, "DISCARD", "Burnt: a locked clear + the round's first discard -> discard to level a hand first")
     t.ok(b.burnt == true and b.burnt_hand ~= nil, "Burnt: the discard names the hand it levels")
+    -- owner rule: never discard the winning hand itself -- the club flush (ids 1-5) stays in hand
+    local touches_clear = false
+    for _, c in ipairs(b.cards or {}) do if c.id <= 5 then touches_clear = true end end
+    t.ok(not touches_clear, "Burnt: the discard never uses the clearing play's cards")
     t.eq(DE.decide(burnt_state({ joker{ key = "j_burnt" } }, 1)).best.type, "PLAY",
       "Burnt: after the first discard of the round there is no level -> play the clear")
     t.eq(DE.decide(burnt_state({}, 0)).best.type, "PLAY", "no Burnt -> a locked clear plays immediately")

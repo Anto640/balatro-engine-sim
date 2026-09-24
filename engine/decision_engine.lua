@@ -329,9 +329,9 @@ end
 -- current_round.discards_used <= 0; the sim models it in World discard_effects) -- a free planet every round
 -- that the play engine never aimed. When the clear is already in hand, discard FIRST a subset whose poker
 -- hand is the most valuable one to level -- valued EXACTLY as a planet for it (CV.best_planet: frequency x
--- level_gain + the build's planet credit) -- then play the clear. A subset that leaves the clear's cards in
--- hand is safe by construction; one that breaks the winner (discarding the flush itself) must pass the
--- strict aggressive-farm survival gate. Returns a DISCARD action or nil.
+-- level_gain + the build's planet credit) -- then play the clear. Owner rule (2026-09-24): NEVER discard
+-- the winning hand itself -- the discard is drawn only from cards OUTSIDE the clearing play, so the clear
+-- stays in hand by construction. Returns a DISCARD action or nil.
 DE.BURNT_SUBSET_MAX = 5
 local function first_discard(gs)
   local b = gs.blind or {}
@@ -354,30 +354,29 @@ local function burnt_discard(gs, hand, play_cards, hands_left, remaining)
     end
     return vcache[ht]
   end
-  -- per poker hand: the cheapest subset forming it, preferring one that keeps the clear intact
+  -- per poker hand: the cheapest subset of the SPARE cards (outside the clearing play) forming it
   local best = {}
-  local n, sel = #hand, {}
+  local spare = {}
+  for _, c in ipairs(hand) do if not in_play[c] then spare[#spare + 1] = c end end
+  local n, sel = #spare, {}
   local function consider()
     local ht = (HandEval.analyze(sel, {}))
     if not ht or hand_value(ht) <= 0 then return end
-    local cost, overlap = 0, false
-    for _, c in ipairs(sel) do
-      cost = cost + DiscardValue.keep_value(c, gs)
-      if in_play[c] then overlap = true end
-    end
+    local cost = 0
+    for _, c in ipairs(sel) do cost = cost + DiscardValue.keep_value(c, gs) end
     local cur = best[ht]
-    if not cur or (cur.overlap and not overlap) or (cur.overlap == overlap and cost < cur.cost) then
+    if not cur or cost < cur.cost then
       local copy = {}; for i, c in ipairs(sel) do copy[i] = c end
-      best[ht] = { cards = copy, cost = cost, overlap = overlap }
+      best[ht] = { cards = copy, cost = cost }
     end
   end
   local function rec(start)
     if #sel > 0 then consider() end
     if #sel >= DE.BURNT_SUBSET_MAX then return end
-    for i = start, n do sel[#sel + 1] = hand[i]; rec(i + 1); sel[#sel] = nil end
+    for i = start, n do sel[#sel + 1] = spare[i]; rec(i + 1); sel[#sel] = nil end
   end
   rec(1)
-  -- the most valuable hand to level, among subsets that are SAFE to discard
+  -- the most valuable hand to level from the spare cards
   local names = {}
   for ht in pairs(best) do names[#names + 1] = ht end
   table.sort(names, function(a, b)
@@ -385,21 +384,11 @@ local function burnt_discard(gs, hand, play_cards, hands_left, remaining)
     if va ~= vb then return va > vb end
     return a < b
   end)
-  for _, ht in ipairs(names) do
-    local c = best[ht]
-    local safe = not c.overlap
-    if not safe and hands_left >= 1 then
-      local vs = Simulation.survive_after(gs, { kind = "DISCARD", cards = c.cards }, DE.AGGRO_SAMPLES,
-        lcg(disc_seed(gs) + 137), false)
-      safe = vs and vs.frac and vs.frac >= 1 - DE.AGGRO_SURV_TOL
-    end
-    if safe then
-      return { type = "DISCARD", cards = c.cards, burnt = true, burnt_hand = ht,
-        reason = string.format("Discard your %s first — Burnt Joker levels it (+1 %s level, free)%s.", ht, ht,
-          c.overlap and "; you still clear after the redraw" or "; the clear stays in hand") }
-    end
-  end
-  return nil
+  local ht = names[1]
+  if not ht then return nil end
+  return { type = "DISCARD", cards = best[ht].cards, burnt = true, burnt_hand = ht,
+    reason = string.format("Discard your %s first — Burnt Joker levels it (+1 %s level, free); the clear stays in hand.",
+      ht, ht) }
 end
 DE._burnt_discard = burnt_discard   -- exposed for tests
 
