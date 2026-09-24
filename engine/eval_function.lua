@@ -638,7 +638,7 @@ function Eval.refine_measure(ctx_gs, j, m, opts)
   opts = opts or {}
   if not m or not Eval.floor_free(j.key) or (opts.samples or 6) >= Eval.REFINE_SAMPLES then return m end
   if m / Mechanics.boss_per_hand_need(ctx_gs) >= Eval.tier_floor_frac(j.key) then return m end
-  local m2 = JokerValue.score_delta(ctx_gs, j, { samples = Eval.REFINE_SAMPLES, rng = opts.rng })
+  local m2 = JokerValue.score_delta(ctx_gs, j, { samples = Eval.REFINE_SAMPLES, rng = opts.rng, cache = opts.cache })
   return m2 or m
 end
 
