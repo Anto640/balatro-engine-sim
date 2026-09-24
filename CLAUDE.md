@@ -28,6 +28,12 @@ plus a large correctness/coverage/strategy pass.
 > "only Mult" measurement was invalid because the sampled hand contained no Diamonds at all. **Replay the
 > recorded state; do not rebuild it from the description.**
 >
+> ### ⭐⭐⭐ LATEST (2026-09-24): R11 sell/buy valuation overhaul — read the TOP block of `NEXT_SESSION.md` first.
+> Shipped + deployed: held-card context bug, money-only jokers, survival-first selling, effect-based vouchers,
+> calibrated pace risk, live interest-cap fix, and live pack/shop fixes. **Owner rule: the 7-win corpus is the
+> owner's playstyle, not ground truth — sim OUTCOMES (wins/reach-8) decide; replicate on fresh seeds.** Run A/B
+> arms sequentially at ≤9 workers (memory reaping). Unit tests: plain `lua tests/runner.lua` (1244 pass).
+>
 > ### ⭐ CURRENT FOCUS (2026-08-31): ADVICE QUALITY, driven by the IN-GAME SELF-PLAYER + owner review + the AGREEMENT A/B.
 > **The in-game self-player** (`ui/autoplay.lua`, **F11**) translates the engine's live advice into REAL
 > Balatro inputs and plays whole runs unattended — a real-game bug-finder for the overlay. The owner watches

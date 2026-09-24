@@ -1,5 +1,57 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## ⭐⭐⭐ 2026-09-22/24 — R11: SELL/BUY VALUATION OVERHAUL + LIVE FIXES (read this block FIRST)
+
+Driven by the owner's live F11 runs (seeds DGTW4TTP, NGMNBGP9). Everything below is committed, pushed, and
+DEPLOYED to the install. **Owner rule adopted this session (memory `corpus-is-not-ground-truth`): the 7-win
+agreement corpus is the owner's own playstyle — a secondary signal / bug-finder, NOT a veto. Sim OUTCOMES
+(wins, reach-8) decide; report stats honestly and replicate out-of-sample (`BES_SEED_OFF=7`).**
+
+**Shipped (measured; paired n=160 unless noted; baselines chain hc→mo→sv→vo→pace_base→risk_after):**
+1. **Self-player executes the card reorder** (`ea897de`, confirmed live). Mod does NOT hot-reload — restart the game.
+2. **Held-card context bug** (`7874b55`): HandEval read held cards from `gs.hand` (EMPTY in the shop) → Blackboard's
+   x3 fired on every sampled hand, Raised Fist/Shoot the Moon/Baron/Steel measured 0. Fixed at `HandEval.hand_ctx`.
+   Sim +0.200 (p 0.02), wins 10→15. Root cause of the Smiley→Blackboard sale.
+3. **Card Sharp never fired in the survival rollout** (`58f0c06`).
+4. **Money-only jokers had phantom scoring value** (`721fcc1`): econ jokers got tier-prior score + their money;
+   Chaos valued by tier only. Now score 0, money via `Eval.joker_money` (Chaos = $5 × measured free-reroll rate).
+   Sim +0.343, SIGN 79/41 (p 0.0007) — strongest result.
+5. **Survival-first selling** (`ca6e873`): `Eval.clear_prob` (logistic P(clear) vs per-hand score ratio, FITTED to
+   the full engine on 307 calibration boards) + `SA.sell_survival`; a sale dropping P(clear) > 5 points is pushed
+   behind safe ones; swaps judged on the board AFTER. Sim +0.163, SIGN 47/23 (p 0.006).
+6. **Vouchers: no set values** (`9733089`): each valued by its effect (game rules + measured engine rates) or 0 if
+   unusable/unmodelled (Magic Trick, Observatory, Director's Cut, Hieroglyph, Overstock, ...). Blank = P(Antimatter
+   offered) × P(affordable above the interest reserve) × Antimatter. Sim neutral, agreement better.
+7. **Calibrated pace risk** (`c2cdf2e`, owner decision): the "On pace (projects past ante 8)" verdict was badly
+   over-confident (ante 4: 48% still died within 2 antes; the "comfortably ahead" band was the WORST, 72%).
+   `Pacing.risk` = fitted P(die within 2 antes); the shop saves only when risk < 25%, buys power when ≥ 50%.
+   Sim wins 20→28; fresh seeds 23→27; pooled 314 pairs 36 vs 24 wins-only (p~0.16) — consistent modest lean.
+8. **Live interest-cap unit bug, fixed globally** (`927f45d`): live G.GAME.interest_cap is in DOLLARS; now
+   converted at `state_extraction` so live == sim. Injecting the bug INTO the sim (`BES_LIVE_CAP_BUG=1`) cost
+   wins 28→19 (p~0.14). The corpus had vetoed this twice; the sim overruled it.
+9. **Live-only bugs:** shop-load crash (`1d339e9`, left the shop before its load event ran → game.lua:3294);
+   wrong-card Standard-pack pick (`a123f2c`, all plain cards share key `c_base`); Orbital tag valued as your BEST
+   hand instead of the hand on the tag (`a123f2c`).
+
+**Refuted / not shipped:** uniform dig bias +0.05 (sim SIGN 38/61 worse, p 0.03 — stays off). Greedy survival
+rollout is badly pessimistic and a smart-dig rollout fixes accuracy but NOT ranking (calibration tool below).
+
+**New tools:** `tools/rollout_calibration.{lua,sh}` (rank cheap measures vs the full engine; `run`/`rescore`/
+`remeasure`/`report`); `agreement.py` `AGREE_DUMP_PACK` / `AGREE_DUMP_SHOP`; sim shop records log `pace_margin/
+pace_growth/pace_capacity/pace_on`; `BES_LIVE_CAP_BUG` switch; `BES_VALUE_DEBUG` reroll decomposition.
+
+**⚠ Ops:** running the agreement corpus + an 11-worker sim TOGETHER reaps on low memory (worse while the owner
+plays). Run arms SEQUENTIALLY at ≤9 workers. Unit tests: `lua tests/runner.lua` (1244 pass); LuaJIT aborts
+`test_shop` (`table.unpack`) — use plain `lua`.
+
+**OPEN / next:**
+- Watch the owner's next F11 run on the full set: it should spend surplus on packs/rerolls (not hoard), keep
+  scorers (sell econ jokers first), take exact Standard-pack cards, no Orbital skips for unplayed hands.
+- The Blackboard BUY is still priced by the tier FLOOR (`max(measured, 0.6·tier·0.3)`) — the floor's rationale was
+  largely the held-card bug; replace with more samples for condition-dependent jokers (owner prefers measuring).
+- Dig-aware per-hand measure ranks sells slightly better (5/0 on large gaps) at ~15× cost — optional.
+- Chariot/Steel-deck long-run value (winners pick it; engine values one card's immediate effect).
+
 ## ⭐⭐ 2026-09-20 — R9 LIVE-REVIEW FIXES + the REPLAY-AUDIT plan (read the `r9-live-review-2026-09-20` memory)
 
 Owner played a full live run (F11), it DIED to The Mouth, and owner flagged several decisions. All traced via
