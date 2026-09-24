@@ -29,6 +29,16 @@ scale vs tier-PRIOR jokers (bought Drunkard 23x, Hanging Chad 27->17, sold Shoot
 swap bar (r12b: -0.071, wins 21) -- rerolls also surface packs/consumables e_best never prices; now opt-in
 `BES_SWAP_BAR=1`. Arms: `sim_out/{r12,r12b,r12c}.jsonl`.
 
+**R12b (`8ee9991`, deployed): utility jokers MEASURED.** Burnt/Space as leveling (event-fed-scaler ramp x the
+per-hand worth of a level, as CV.best_planet ranks planets; `Eval.BURNT_AIM` 0.5 is an UNMEASURED estimate);
+Juggler/Troubadour/Turtle Bean/Burglar(+3 hands) by `Sim.blind_output_frac` (expected fraction of the NEXT
+ante's boss, policy chasing it, common random numbers). Downside skips the double-counted resource terms.
+Sim u vs r12c: -0.008 (p 0.92), 99/160 tied, wins 24=24, reach-8 32->35 -- neutral, shipped.
+Discards NOT measurable yet (greedy rollout wastes them; dig policy 7-10 s/state and noisy) -> Drunkard / Merry
+Andy keep the prior. u2 (+ floor removed, `BES_NO_TIER_FLOOR=1`): -0.221, wins 24->18, Drunkard bought 20x,
+Hanging Chad 27->18 -- the floor must stay until DISCARD value is measurable (the next lever) and the generators
+(8 Ball, Cartomancer, Seance, ...) are modelled.
+
 **Open:** unmodelled jokers (Drunkard, Burnt, Credit Card) are priced by full tier prior -- the real reason a
 floor is needed at all; modelling them (Burnt = a planet/round) would let the floor go. Watch live: Mime-like
 buys, pack swaps, Burnt discards.
