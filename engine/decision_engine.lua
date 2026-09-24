@@ -360,8 +360,12 @@ local function burnt_discard(gs, hand, play_cards, hands_left, remaining)
   for _, c in ipairs(hand) do if not in_play[c] then spare[#spare + 1] = c end end
   local n, sel = #spare, {}
   local function consider()
+    -- any real poker hand qualifies, even one whose level reads 0 (a hand this deck rarely plays best): the
+    -- discard is FREE with the clear in hand and a level never hurts, so the first discard is never wasted
+    -- (owner 2026-09-24; the sim showed clear-in-hand rounds playing straight through when every spare hand
+    -- read 0). Ranking below still takes the most valuable level first, then the cheapest cards.
     local ht = (HandEval.analyze(sel, {}))
-    if not ht or hand_value(ht) <= 0 then return end
+    if not ht or not Mechanics.HAND_PLANET[ht] then return end
     local cost = 0
     for _, c in ipairs(sel) do cost = cost + DiscardValue.keep_value(c, gs) end
     local cur = best[ht]
@@ -382,6 +386,7 @@ local function burnt_discard(gs, hand, play_cards, hands_left, remaining)
   table.sort(names, function(a, b)
     local va, vb = hand_value(a), hand_value(b)
     if va ~= vb then return va > vb end
+    if best[a].cost ~= best[b].cost then return best[a].cost < best[b].cost end   -- then the cheapest cards
     return a < b
   end)
   local ht = names[1]

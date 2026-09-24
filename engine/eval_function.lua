@@ -597,6 +597,7 @@ local function level_worth(gs, hand, freq, bctx)
   return f * ConsumableValue.level_gain(gs, hand, 1, bctx)
     + BuildPlan.planet_credit(gs, hand) * Mechanics.boss_per_hand_need(gs)
 end
+Eval._level_worth = level_worth   -- for tools/burnt_aim.lua (the measurement of BURNT_AIM)
 local function leveling_fraction(gs, key, opts)
   local need = Mechanics.boss_per_hand_need(gs)
   if not need or need <= 0 then return nil end
