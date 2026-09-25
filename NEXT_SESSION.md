@@ -27,7 +27,8 @@ jokers keep a flat tier prior; removing it with them unmodelled cost wins (r12 2
 - z1 FORWARD VALUE FOR EVERY JOKER (projected deck + hand levels at the run midpoint, growth anchored to a plain
   +4 Mult Joker so the joker-vs-money scale holds): vs y1 +0.108 (sign 77/59, reach-7 +11); OUT-OF-SAMPLE
   (BES_SEED_OFF=7) +0.098 (wins 26->32, reach-7 +7) -- SHIPPED ON (BES_FWD_ALL=0 disables). Then sped up (12 samples,
-  top-6 per-card mix, per-decision caches: heavy shops 10.6 s -> 5.6 s) -- the fast version f1 is being re-checked.
+  top-6 per-card mix, per-decision caches: heavy shops 10.6 s -> 5.6 s); the fast version f1 vs y1: +0.009, wins 32 -> 36,
+  reach-8 40 -> 47 (vs the slow z1: -0.100 n.s., wins +4) -- KEPT, live.
 - w1 Astronomer/Gift (measured $), Oops (measured), Chicot/Luchador (full-engine boss-cost table, tools/boss_cost.lua):
   vs y1 141 tied, -0.042 -- SHIPPED. Oops 9->0, Luchador 3->0 buys (no longer bought with nothing to double/disable).
 - FLOOR REMOVAL re-tested at every step (g2, r2, y2, z2): never neutral; z2 vs z1 -0.256 (p 0.049). Keep the floor.
