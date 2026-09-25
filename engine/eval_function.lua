@@ -1076,9 +1076,15 @@ function Eval.projected_deck(gs, target_ante)
   return deck
 end
 -- m (measured on ctx_gs) -> the retrigger's value at the midpoint of the remaining run. Identity for anything else.
+-- LIMITED-LIFE jokers get NO forward projection: they will not be on the board for the deck/board the projection
+-- values (sim r1 vs g1: Seltzer -- 10 hands of retriggers, then gone -- was bought 12 -> 18 once projected to the
+-- run's midpoint deck).
+Eval.LIMITED_LIFE = { j_selzer = true, j_ramen = true, j_ice_cream = true, j_popcorn = true, j_gros_michel = true,
+                      j_turtle_bean = true }
 function Eval.forward_measure(ctx_gs, j, m, opts)
   opts = opts or {}
   m = Eval.refine_measure(ctx_gs, j, m, opts)
+  if Eval.LIMITED_LIFE[j.key] then return m end
   if m and m > 0 and JokerData.is_xmult(j.key) then
     -- scale by the board the xmult will multiply (ctx_gs = the board it joins / the rest of the board)
     local ro = { rng = opts.rng, samples = opts.samples, cache = nil }
