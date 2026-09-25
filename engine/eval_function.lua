@@ -841,6 +841,48 @@ function Eval.utility_fraction(gs, key, opts, owned, idx)
   if key == "j_burnt" or key == "j_space" then return leveling_fraction(gs, key, opts) end
   if RESOURCE[key] then return resource_fraction(gs, key, opts, owned, idx) end
   if GENERATOR[key] then return generator_fraction(gs, key, opts, owned) end
+  if key == "j_oops" then
+    -- Oops! All 6s doubles every listed probability. MEASURED as: (a) the board's mean score with vs without it on
+    -- the SAME sampled hands (HandEval applies it to Lucky cards), plus (b) the lift in every owned odds-driven
+    -- joker the utility models price (8 Ball, Space, Hallucination, Sixth Sense, ...), minus (c) Gros Michel's
+    -- doubled extinction (1/6 -> 1/3 a round). Money odds (Lucky $, Business Card) are not in score (not counted).
+    local need = Mechanics.boss_per_hand_need(gs)
+    if not need or need <= 0 then return nil end
+    local with = {}
+    for k, v in pairs(gs) do with[k] = v end
+    local js = {}
+    for i, oj in ipairs(gs.jokers or {}) do if not (owned and i == idx) then js[#js + 1] = oj end end
+    local base = {}
+    for k, v in pairs(gs) do base[k] = v end
+    base.jokers = js
+    local wj = {}
+    for i, oj in ipairs(js) do wj[i] = oj end
+    wj[#wj + 1] = { key = "j_oops", ability = { extra = {} } }
+    with.jokers = wj
+    local seed = math.floor(opts.rng() * 2147483646) + 1
+    local function lcg(x) return function() x = (x * 1103515245 + 12345) % 2147483648; return x / 2147483648 end end
+    local s1 = JokerValue.avg_score(with, { samples = 16, rng = lcg(seed) })
+    local s0 = JokerValue.avg_score(base, { samples = 16, rng = lcg(seed) })
+    local frac = ((s1 or 0) - (s0 or 0)) / need
+    for _, oj in ipairs(js) do
+      if Eval.UTILITY_MODELLED[oj.key] and oj.key ~= "j_oops" then
+        local a = Eval.utility_fraction(with, oj.key, { rng = lcg(seed + 1), cache = nil }, false)
+        local b = Eval.utility_fraction(base, oj.key, { rng = lcg(seed + 1), cache = nil }, false)
+        if a and b then frac = frac + (a - b) end
+      end
+      if oj.key == "j_gros_michel" then
+        -- extinction 1/6 -> 1/3 a round halves its expected remaining life: lose half its measured worth
+        local rest = {}
+        for _, x in ipairs(js) do if x ~= oj then rest[#rest + 1] = x end end
+        local g0 = {}
+        for k, v in pairs(base) do g0[k] = v end
+        g0.jokers = rest
+        local gm = JokerValue.score_delta(g0, oj, { samples = 8, rng = lcg(seed + 2) })
+        if gm then frac = frac - 0.5 * gm / need end
+      end
+    end
+    return frac
+  end
   if key == "j_riff_raff" then
     -- 2 random Commons at blind select, into FREE joker slots (Generators.output_fit: a made room counts 0.1).
     -- A filled board stops it producing, so it is priced as the fill it can deliver now, not per round.
@@ -855,6 +897,7 @@ Eval.UTILITY_MODELLED = { j_burnt = true, j_space = true }
 for k in pairs(RESOURCE) do Eval.UTILITY_MODELLED[k] = true end
 for k in pairs(GENERATOR) do Eval.UTILITY_MODELLED[k] = true end
 Eval.UTILITY_MODELLED.j_riff_raff = true
+Eval.UTILITY_MODELLED.j_oops = true
 
 function Eval.modeled_scoring_fraction(gs, key, opts)
   local e = JokerData.resolve(key)
