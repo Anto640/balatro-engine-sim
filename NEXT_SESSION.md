@@ -19,6 +19,21 @@ jokers keep a flat tier prior; removing it with them unmodelled cost wins (r12 2
    (PERKEO_HOLD 0.3 is an ESTIMATE). Arms g1 (floor) / g2 (no floor).
 4. `d16d9d3` retriggers valued on the deck projected to the run midpoint (measured live growth: enhanced 0 ->
    14.4 by ante 8, mix Gold .385 Lucky .262 ...). Hanging Chad a1 0.32 -> 1.04; Mime stays 0. Arms r1 / r2.
+**2026-09-25 day results (all paired n=160; install = `0ed0a6d`):**
+- g1 generators vs v1: +0.137, wins 26->33 -- SHIPPED. y1 retrigger projection (deck + per-card jokers a board typically
+  gains, owner idea) vs g1: -0.044, 124 tied, Hanging Chad 29->37 -- SHIPPED (neutral). r1 found a Seltzer bug
+  (limited-life jokers now excluded from projections).
+- x1 xmult-only forward scaling: -0.188, sign 31/52 -- REJECTED (off, BES_XMULT_FWD=1). Acrobat 11->18, Blueprint 14->8.
+- z1 FORWARD VALUE FOR EVERY JOKER (projected deck + hand levels at the run midpoint, growth anchored to a plain
+  +4 Mult Joker so the joker-vs-money scale holds): vs y1 +0.108 (sign 77/59, reach-7 +11); OUT-OF-SAMPLE
+  (BES_SEED_OFF=7) +0.098 (wins 26->32, reach-7 +7) -- SHIPPED ON (BES_FWD_ALL=0 disables). Then sped up (12 samples,
+  top-6 per-card mix, per-decision caches: heavy shops 10.6 s -> 5.6 s) -- the fast version f1 is being re-checked.
+- w1 Astronomer/Gift (measured $), Oops (measured), Chicot/Luchador (full-engine boss-cost table, tools/boss_cost.lua):
+  vs y1 141 tied, -0.042 -- SHIPPED. Oops 9->0, Luchador 3->0 buys (no longer bought with nothing to double/disable).
+- FLOOR REMOVAL re-tested at every step (g2, r2, y2, z2): never neutral; z2 vs z1 -0.256 (p 0.049). Keep the floor.
+  Still on the tier prior: Mr Bones, Diet Cola, Credit Card (one-shots, hard to price honestly).
+- Boss-cost table: Wall/Mouth/Water/Plant/Needle/Flint cost most; Wheel/Fish/House/Mark read 0 (engine sees face-down).
+
 Compare g1/r1 vs `sim_out/v1.jsonl` and g2/r2 vs `sim_out/v2.jsonl` (all in the main tree's sim_out once copied).
 ⚠ Ops: Claude Code reaps background shells on low memory; orphan luajit workers keep running and their shard
 files survive -- merge by hand, verify unique seeds BEFORE deleting anything (a merge-then-rm lost v1 once).
