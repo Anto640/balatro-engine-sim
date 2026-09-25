@@ -429,7 +429,7 @@ local DECK_MOD_ECON = { j_midas_mask = true, j_certificate = true }
 -- hand". Generators / utility jokers with no money channel are NOT money-only and keep their prior.
 function Eval.is_money_only(key)
   if not JokerEffects.is_value_only(key) then return false end
-  if key == "j_chaos" then return true end
+  if key == "j_chaos" or key == "j_astronomer" or key == "j_gift" then return true end
   return (JokerData.resolve(key).econ or 0) > 0
 end
 
@@ -458,8 +458,20 @@ function Eval.clear_prob(ratio)
 end
 
 -- $/round a joker is worth as MONEY: its passive income (deck-aware econ_value) + reroll savings.
+-- MONEY jokers whose $ is a SAVING or a sell-value accrual, MEASURED from the sim's own behaviour (sim_out/y1.jsonl,
+-- 160 runs, 2311 rounds, 2026-09-25):
+--   Astronomer: every planet and Celestial pack is free. The engine opens 0.215 Celestial packs per round (~$5 each)
+--     and buys ~0.034 loose planets per round (half of its 0.068 consumable buys, $3) -> ~$1.18/round saved; a LOWER
+--     bound (free packs would be opened more), and the planet share is an estimate.
+--   Gift Card: +$1 sell value per joker per round, realised only when a joker is sold: 0.106 sales per round x 4.45
+--     rounds held on average -> ~$0.47/round.
+Eval.ASTRONOMER_SAVING = 0.215 * 5 + 0.034 * 3
+Eval.GIFT_REALISED = 0.106 * 4.45
+local SAVING = { j_astronomer = function() return Eval.ASTRONOMER_SAVING end,
+                 j_gift = function() return Eval.GIFT_REALISED end }
 function Eval.joker_money(gs, key)
-  return Eval.econ_value(gs, key) + Eval.reroll_saving(gs, key)
+  local sv = SAVING[key]
+  return Eval.econ_value(gs, key) + Eval.reroll_saving(gs, key) + (sv and sv() or 0)
 end
 
 -- DECK-GROWTH deck-modifiers (Marble adds Stone cards; DNA duplicates your best card). Both reduce to
