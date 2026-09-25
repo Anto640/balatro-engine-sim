@@ -988,6 +988,11 @@ end
 -- measurement is structurally blind: scalers (value is future accrual; owned-core sell protection) and
 -- Dusk (fires on the last hand only, which the shop sample never plays).
 Eval.REFINE_SAMPLES = 24
+-- the forward/projection measurements (projected deck, levels, per-card jokers) run at half the refine samples and
+-- use the top of the per-card mix only: they are averaged with the present value, and at 24 samples x 11 per-card
+-- jokers they were 80% of an 8-10 s shop decision (profiled on the Y1U5TZWJ late shops).
+Eval.FWD_SAMPLES = 12
+Eval.PERCARD_TOP = 6
 function Eval.floor_free(key)
   local e = JokerData.resolve(key)
   if JokerData.is_scaling(key) or e.inc or e.feed_fuel or e.reset_on or e.deck_buff then return false end
@@ -1257,28 +1262,36 @@ function Eval.forward_measure(ctx_gs, j, m, opts)
         local dkey = "_proj_deck|" .. tostring(ctx_gs.deck) .. "|" .. mid
         local pdeck = cache and cache[dkey]
         if not pdeck then pdeck = Eval.projected_deck(ctx_gs, mid); if cache then cache[dkey] = pdeck end end
-        local freq = ConsumableValue.hand_frequencies(ctx_gs, { samples = 8, rng = opts.rng })
+        -- hand frequencies + the projected levels depend on the deck, not on which joker is being valued: one per
+        -- decision (was recomputed for every leave-one-out board -- the bulk of an 8.7 s shop decision)
+        local lkey = "_fwd_levels|" .. tostring(ctx_gs.deck) .. "|" .. mid
+        local plevels = cache and cache[lkey]
+        if not plevels then
+          local freq = ConsumableValue.hand_frequencies(ctx_gs, { samples = 8, rng = opts.rng })
+          plevels = Eval.projected_levels(ctx_gs, mid, freq)
+          if cache then cache[lkey] = plevels end
+        end
         fctx = {}
         for k, v in pairs(ctx_gs) do fctx[k] = v end
         fctx.deck = pdeck
         local run = {}
         for k, v in pairs(ctx_gs.run or {}) do run[k] = v end
-        run.hand_levels = Eval.projected_levels(ctx_gs, mid, freq)
+        run.hand_levels = plevels
         fctx.run = run
         if cache then cache[ckey] = fctx end
       end
-      local mf = JokerValue.score_delta(fctx, j, { samples = Eval.REFINE_SAMPLES, rng = opts.rng, cache = cache })
+      local mf = JokerValue.score_delta(fctx, j, { samples = Eval.FWD_SAMPLES, rng = opts.rng, cache = cache })
       -- ANCHORED to a plain Joker (+4 Mult) measured in the same two contexts: the projection keeps the CURRENT
       -- jokers while real boards also upgrade them, so raw mid-run shares deflate EVERY joker against money/packs
       -- (Half Joker 5.07 -> 2.77 FV on a replayed ante-2 board). Only the RELATIVE growth is used: a joker whose
       -- share holds up better than +Mult's (a multiplier) gains, one that dilutes faster (+Chips) loses, and the
       -- joker-vs-money scale is unchanged.
-      local rkey = "_fwd_ref|" .. ckey
+      local rkey = "_fwd_ref|" .. tostring(ctx_gs.deck) .. "|" .. mid   -- one reference per decision (board-insensitive enough)
       local ref = cache and cache[rkey]
       if ref == nil then
         local pj = { key = "j_joker", ability = { extra = {} } }
-        local r0 = JokerValue.score_delta(ctx_gs, pj, { samples = Eval.REFINE_SAMPLES, rng = opts.rng, cache = cache })
-        local r1 = JokerValue.score_delta(fctx, pj, { samples = Eval.REFINE_SAMPLES, rng = opts.rng, cache = cache })
+        local r0 = JokerValue.score_delta(ctx_gs, pj, { samples = Eval.FWD_SAMPLES, rng = opts.rng, cache = cache })
+        local r1 = JokerValue.score_delta(fctx, pj, { samples = Eval.FWD_SAMPLES, rng = opts.rng, cache = cache })
         ref = (r0 and r1 and r0 > 0) and (r1 / r0) or false
         if cache then cache[rkey] = ref end
       end
@@ -1306,7 +1319,7 @@ function Eval.forward_measure(ctx_gs, j, m, opts)
   local pgs = {}
   for k, v in pairs(ctx_gs) do pgs[k] = v end
   pgs.deck = pdeck
-  local m2 = JokerValue.score_delta(pgs, j, { samples = Eval.REFINE_SAMPLES, rng = opts.rng, cache = cache }) or m
+  local m2 = JokerValue.score_delta(pgs, j, { samples = Eval.FWD_SAMPLES, rng = opts.rng, cache = cache }) or m
   -- PROJECTED BOARD (owner 2026-09-25: "retriggers can be very good together with jokers that use them -- taking
   -- Hanging Chad with the possibility in the future to get Photograph or Business Card or Scholar"). A retrigger
   -- fires every PER-CARD joker again, and boards GAIN per-card jokers: MEASURED on all live shop states, the count
@@ -1323,7 +1336,8 @@ function Eval.forward_measure(ctx_gs, j, m, opts)
   local n_add = math.min(2, math.max(0, want - have))
   if n_add > 0 then
     local sum, wsum = 0, 0
-    for _, e in ipairs(Eval.PERCARD_MIX) do
+    for ei, e in ipairs(Eval.PERCARD_MIX) do
+      if ei > Eval.PERCARD_TOP then break end   -- the top 6 of the mix carry ~87% of its weight
       local mk = m2
       if e[1] ~= "j_business" then
         local g2 = {}
@@ -1332,7 +1346,7 @@ function Eval.forward_measure(ctx_gs, j, m, opts)
         for i, oj in ipairs(pgs.jokers or {}) do js[i] = oj end
         js[#js + 1] = { key = e[1], ability = { extra = {} } }
         g2.jokers = js
-        mk = JokerValue.score_delta(g2, j, { samples = Eval.REFINE_SAMPLES, rng = opts.rng, cache = cache }) or m2
+        mk = JokerValue.score_delta(g2, j, { samples = Eval.FWD_SAMPLES, rng = opts.rng, cache = cache }) or m2
       end
       sum = sum + e[2] * mk; wsum = wsum + e[2]
     end
