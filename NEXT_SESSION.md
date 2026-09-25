@@ -1,5 +1,28 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## ⭐⭐⭐ 2026-09-25 — R13: MEASURE THE UNMODELLED JOKERS (so the tier floor can go) — read FIRST
+
+Goal (owner): every joker priced by measurement, then drop the tier floor. The floor exists because unmodelled
+jokers keep a flat tier prior; removing it with them unmodelled cost wins (r12 28->15, u2 24->18).
+**Measured / shipped this block (install = `b89a643`, v1):**
+1. Burnt: always spends the first discard when the clear is in hand (spare cards only); valued with MEASURED
+   BURNT_QUALITY 0.560 / BURNT_FIRE 0.831 (`tools/burnt_aim.lua`, 1265 sim rounds).
+2. Resource jokers from a FULL-ENGINE table (`tools/resource_value.lua`, 88 recorded boards, next-ante boss):
+   +1 discard +4.6%, +1 hand size +9.3%, +1 hand +5.8% output, by board strength (`Eval.resource_gain`). The greedy
+   rollout was off 1.7x (hand size/hands high, discards low). Drunkard/Merry Andy/Juggler/Troubadour/Turtle/
+   Burglar priced by lookup. v1 vs u: +0.048, 94 tied, wins 24->26, reach-7 +5 -- SHIPPED.
+   v2 (same + floor removed): -0.075 (p 0.60), sign 61/65, wins 24->19 -- much better than u2 (-0.221) but still
+   leans negative; Hanging Chad bought 27 -> 18 (retrigger future value, next item).
+**Committed, sim arms queued (not deployed):**
+3. `b4056af` generators by what they make (items/round x rounds x 0.5 x mean random card); Sixth Sense play
+   (discard a spare lone 8 first when the clear is in hand); Riff-Raff (2 x output_fit x E[Common]); Perkeo
+   (PERKEO_HOLD 0.3 is an ESTIMATE). Arms g1 (floor) / g2 (no floor).
+4. `d16d9d3` retriggers valued on the deck projected to the run midpoint (measured live growth: enhanced 0 ->
+   14.4 by ante 8, mix Gold .385 Lucky .262 ...). Hanging Chad a1 0.32 -> 1.04; Mime stays 0. Arms r1 / r2.
+Compare g1/r1 vs `sim_out/v1.jsonl` and g2/r2 vs `sim_out/v2.jsonl` (all in the main tree's sim_out once copied).
+⚠ Ops: Claude Code reaps background shells on low memory; orphan luajit workers keep running and their shard
+files survive -- merge by hand, verify unique seeds BEFORE deleting anything (a merge-then-rm lost v1 once).
+
 ## ⭐⭐⭐ 2026-09-24 — R12: INERT JOKERS, MEASURED CORE PROTECTION, BURNT JOKER (read FIRST, then R11 below)
 
 Live seed **Y1U5TZWJ** (owner): bought Mime at ante 1 with nothing to retrigger, kept it all run, skipped Lucky
