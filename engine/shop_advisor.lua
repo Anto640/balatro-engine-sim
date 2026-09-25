@@ -788,7 +788,7 @@ local function scoring_gain(gs, sj, rng, pace)
   -- not the fresh-blind maximum; a no-op for discard-independent jokers.
   local gs_score = with_discards(gs, SA.expected_discards_left(gs, pace))
   local measured = JokerValue.score_delta(gs_score, sj, { samples = 8, rng = rng })
-  measured = Eval.refine_measure(gs_score, sj, measured, { samples = 8, rng = rng })
+  measured = Eval.forward_measure(gs_score, sj, measured, { samples = 8, rng = rng })
   if measured then
     -- a conditional xmult (Trio/Tribe/...) fires too rarely for a small sample to see: take the analytic
     -- P(trigger) x (X-1) x base when it is higher (the same estimate the sell/pack paths use)

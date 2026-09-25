@@ -1564,4 +1564,27 @@ return function(t)
     local se = Eval.utility_fraction(board(3), "j_seance", { rng = lcg(3) }, false)
     t.ok(se and se < 0.05, "Seance: ~0 on a deck that never makes a Straight Flush")
   end
+
+  -- 2026-09-25 RETRIGGER FORWARD VALUE: a retrigger is valued on the deck projected to the midpoint of the run
+  -- (measured live enhancement growth), so an early Hanging Chad is worth more than its bare-deck reading.
+  do
+    local Eval = require("engine.eval_function")
+    local JV = require("engine.joker_value")
+    local function lcg(s) s = s % 2147483647; if s <= 0 then s = s + 2147483646 end
+      return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end end
+    local d = {}
+    for _, su in ipairs({ "Spades", "Hearts", "Clubs", "Diamonds" }) do
+      for r = 2, 14 do d[#d + 1] = card{ id = #d + 1, rank_id = r, suit = su } end
+    end
+    local gs = GS.new{ jokers = { joker{ key = "j_joker" } }, deck = d, run = { hand_levels = {}, hand_size = 8 },
+      economy = { dollars = 10, interest_cap = 5 }, meta = { ante = 1, round = 1, state = "x", seed_hash = "" } }
+    local pd = Eval.projected_deck(gs, 4.5)
+    local ne = 0
+    for _, c in ipairs(pd) do if c.enhancement then ne = ne + 1 end end
+    t.ok(ne >= 4 and #pd == #d, "projected deck (ante 1 -> 4.5): the measured enhancement growth, same size")
+    local hc = joker{ key = "j_hanging_chad" }
+    local m = JV.score_delta(gs, hc, { samples = 24, rng = lcg(2) })
+    local f = Eval.forward_measure(gs, hc, m, { rng = lcg(2), samples = 24, cache = JV.new_cache() })
+    t.ok(f > m, "Hanging Chad at ante 1: forward value (projected enhanced deck) exceeds the bare-deck reading")
+  end
 end

@@ -990,6 +990,88 @@ local function can_measure(gs, opts)
   return deck and #deck >= JokerValue.MIN_DECK
 end
 
+-- RETRIGGER FORWARD VALUE (2026-09-25). A retrigger (Hanging Chad, Sock and Buskin, Hack, Seltzer, Mime) is worth
+-- what the cards it retriggers carry -- and decks GAIN enhanced / sealed / edition cards as the run goes, which the
+-- present-deck measurement cannot see (the same blind spot that keeps the tier floor on scalers). MEASURED growth,
+-- from every recorded live deck (bes_fixtures.jsonl shop states, per ante): enhanced 0 / 0.6 / 2.4 / 3.4 / 7.9 /
+-- 10.3 / 11.4 / 14.4 cards at antes 1-8, seals 0 -> 4.7, editions 0 -> 2.7; mix (ante >= 4) Gold .385, Lucky .262,
+-- Mult .106, Bonus .081, Wild .054, Stone .048, Glass .034, Steel .029; seals Purple .383, Gold .296, Blue .174,
+-- Red .148; editions foil .562, holo .391, polychrome .047. A retrigger is valued on the deck PROJECTED to the
+-- midpoint of the remaining run (its average over the horizon, like a scaler's ramp) -- the current deck plus the
+-- typical gain between now and then, applied to plain cards in the measured mix, deterministically.
+Eval.DECK_GROWTH = { -- per ante: { enhanced, sealed, edition }
+  { 0, 0, 0 }, { 0.6, 0, 0 }, { 2.4, 0.2, 0 }, { 3.4, 0.7, 0.35 },
+  { 7.9, 1.9, 0.9 }, { 10.3, 2.6, 1.3 }, { 11.4, 3.6, 2.4 }, { 14.4, 4.7, 2.7 } }
+Eval.ENH_MIX  = { { "m_gold", .385 }, { "m_lucky", .262 }, { "m_mult", .106 }, { "m_bonus", .081 },
+                  { "m_wild", .054 }, { "m_stone", .048 }, { "m_glass", .034 }, { "m_steel", .029 } }
+Eval.SEAL_MIX = { { "Purple", .383 }, { "Gold", .296 }, { "Blue", .174 }, { "Red", .148 } }
+Eval.ED_MIX   = { { "foil", .562 }, { "holo", .391 }, { "polychrome", .047 } }
+local function growth_at(a)
+  local lo = math.max(1, math.min(8, math.floor(a)))
+  local hi = math.min(8, lo + 1)
+  local t = a - lo
+  local g1, g2 = Eval.DECK_GROWTH[lo], Eval.DECK_GROWTH[hi]
+  return g1[1] + t * (g2[1] - g1[1]), g1[2] + t * (g2[2] - g1[2]), g1[3] + t * (g2[3] - g1[3])
+end
+-- n items spread over a mix by largest remainder (deterministic, no RNG)
+local function spread(mix, n)
+  local out, rems, used = {}, {}, 0
+  for i, e in ipairs(mix) do
+    local x = e[2] * n
+    out[i] = math.floor(x); used = used + out[i]; rems[#rems + 1] = { i = i, r = x - out[i] }
+  end
+  table.sort(rems, function(a, b) if a.r ~= b.r then return a.r > b.r end return a.i < b.i end)
+  for k = 1, math.min(#rems, math.max(0, n - used)) do out[rems[k].i] = out[rems[k].i] + 1 end
+  local list = {}
+  for i, e in ipairs(mix) do for _ = 1, out[i] do list[#list + 1] = e[1] end end
+  return list
+end
+function Eval.projected_deck(gs, target_ante)
+  local ante = (gs.meta and gs.meta.ante) or 1
+  local e0, s0, d0 = growth_at(ante)
+  local e1, s1, d1 = growth_at(target_ante)
+  local ne, ns, nd = math.floor(e1 - e0 + 0.5), math.floor(s1 - s0 + 0.5), math.floor(d1 - d0 + 0.5)
+  local deck = {}
+  for i, c in ipairs(gs.deck or {}) do local x = {}; for k, v in pairs(c) do x[k] = v end; deck[i] = x end
+  if ne + ns + nd <= 0 then return deck end
+  -- plain cards, in a fixed order (by id) spread evenly across the deck
+  local plain = {}
+  for _, c in ipairs(deck) do if not c.enhancement then plain[#plain + 1] = c end end
+  table.sort(plain, function(a, b) return (a.id or 0) < (b.id or 0) end)
+  local function pick(k, n) return plain[math.floor((k - 1) * #plain / math.max(1, n)) + 1] end
+  for k, enh in ipairs(spread(Eval.ENH_MIX, ne)) do local c = pick(k, ne); if c then c.enhancement = enh end end
+  local unsealed = {}
+  for _, c in ipairs(deck) do if not c.seal then unsealed[#unsealed + 1] = c end end
+  for k, sl in ipairs(spread(Eval.SEAL_MIX, ns)) do
+    local c = unsealed[math.floor((k - 1) * #unsealed / math.max(1, ns)) + 1]; if c then c.seal = sl end
+  end
+  local plain_ed = {}
+  for _, c in ipairs(deck) do if not c.edition then plain_ed[#plain_ed + 1] = c end end
+  for k, ed in ipairs(spread(Eval.ED_MIX, nd)) do
+    local c = plain_ed[#plain_ed - math.floor((k - 1) * #plain_ed / math.max(1, nd))]; if c then c.edition = ed end
+  end
+  return deck
+end
+-- m (measured on ctx_gs) -> the retrigger's value at the midpoint of the remaining run. Identity for anything else.
+function Eval.forward_measure(ctx_gs, j, m, opts)
+  opts = opts or {}
+  m = Eval.refine_measure(ctx_gs, j, m, opts)
+  if not m or not JokerData.has_tag(j.key, "retrigger") or not Eval.floor_free(j.key) then return m end
+  if not can_measure(ctx_gs, opts) then return m end
+  local ante = (ctx_gs.meta and ctx_gs.meta.ante) or 1
+  local mid = ante + (8 - ante) / 2
+  if mid <= ante then return m end
+  local cache = opts.cache
+  local dkey = "_proj_deck|" .. tostring(ctx_gs.deck) .. "|" .. mid
+  local pdeck = cache and cache[dkey]
+  if not pdeck then pdeck = Eval.projected_deck(ctx_gs, mid); if cache then cache[dkey] = pdeck end end
+  local pgs = {}
+  for k, v in pairs(ctx_gs) do pgs[k] = v end
+  pgs.deck = pdeck
+  local m2 = JokerValue.score_delta(pgs, j, { samples = Eval.REFINE_SAMPLES, rng = opts.rng, cache = cache })
+  return math.max(m, m2 or m)   -- a projected deck only ADDS retrigger targets; noise must not cut the present
+end
+
 -- Does owned joker idx change the score AT ALL on this deck? (R12 -- the input to BP.keep_bias.) A
 -- retrigger with nothing to retrigger / an xmult whose condition the deck never meets reads exactly 0 on
 -- every paired sample; one that works on a weak board reads small but POSITIVE. nil when the measurement
@@ -1073,7 +1155,7 @@ function Eval.joker_jp(gs, idx, opts)
     without.jokers = rest
     m = JokerValue.score_delta(without, j,
       { samples = opts.samples or 6, rng = opts.rng, cache = opts.cache })
-    m = Eval.refine_measure(without, j, m, opts)
+    m = Eval.forward_measure(without, j, m, opts)
     if m == nil then
       -- j has no scoring model of its own (e.g. value-only Oops! All 6s), so its
       -- worth normally falls back to the tier prior. But REMOVING it can still
@@ -1166,7 +1248,7 @@ function Eval.add_joker_marginal_fv(gs, sj, opts)
   if can_measure(gs, opts) then
     m = JokerValue.score_delta(gs, sj,
       { samples = opts.samples or 6, rng = opts.rng, cache = opts.cache })
-    m = Eval.refine_measure(gs, sj, m, opts)
+    m = Eval.forward_measure(gs, sj, m, opts)
   end
   local jp, measured = jp_from_measure(gs, sj.key, sj.edition, m, opts, false)   -- shop: add-side marginal
   return jp_to_fv(gs, sj, jp, nil, measured)
@@ -1193,7 +1275,7 @@ function Eval.joker_pick_frac(gs, sj, need, opts)
   end
   local m = JokerValue.score_delta(gs, sj, { samples = opts.samples or 6, rng = opts.rng, cache = opts.cache })
   if not m then return floor, false end
-  m = Eval.refine_measure(gs, sj, m, opts)
+  m = Eval.forward_measure(gs, sj, m, opts)
   local an = conditional_xmult_marginal(gs, key, opts, false)   -- add-side (X-1)*base, like a buy
   if an and an > m then m = an end
   local frac = m / (need or Mechanics.boss_per_hand_need(gs))
