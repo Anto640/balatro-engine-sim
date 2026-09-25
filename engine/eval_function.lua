@@ -1022,6 +1022,14 @@ end
 -- Red .148; editions foil .562, holo .391, polychrome .047. A retrigger is valued on the deck PROJECTED to the
 -- midpoint of the remaining run (its average over the horizon, like a scaler's ramp) -- the current deck plus the
 -- typical gain between now and then, applied to plain cards in the measured mix, deterministically.
+Eval.PERCARD_GROWTH = { 0, 0.45, 0.91, 1.0, 1.1, 1.4, 1.7, 1.6 }   -- per-card jokers on the board, antes 1-8 (live)
+Eval.PERCARD_MIX = { { "j_photograph", .202 }, { "j_scary_face", .182 }, { "j_business", .162 }, { "j_scholar", .141 },
+  { "j_smiley", .101 }, { "j_even_steven", .071 }, { "j_greedy_joker", .071 }, { "j_fibonacci", .030 },
+  { "j_lusty_joker", .020 }, { "j_odd_todd", .010 }, { "j_wrathful_joker", .010 } }
+Eval.PERCARD = {}
+for _, e in ipairs(Eval.PERCARD_MIX) do Eval.PERCARD[e[1]] = true end
+for _, k in ipairs({ "j_gluttonous_joker", "j_gluttenous_joker", "j_arrowhead", "j_onyx_agate", "j_rough_gem",
+  "j_bloodstone", "j_ancient", "j_idol", "j_walkie_talkie", "j_triboulet" }) do Eval.PERCARD[k] = true end
 Eval.DECK_GROWTH = { -- per ante: { enhanced, sealed, edition }
   { 0, 0, 0 }, { 0.6, 0, 0 }, { 2.4, 0.2, 0 }, { 3.4, 0.7, 0.35 },
   { 7.9, 1.9, 0.9 }, { 10.3, 2.6, 1.3 }, { 11.4, 3.6, 2.4 }, { 14.4, 4.7, 2.7 } }
@@ -1102,8 +1110,39 @@ function Eval.forward_measure(ctx_gs, j, m, opts)
   local pgs = {}
   for k, v in pairs(ctx_gs) do pgs[k] = v end
   pgs.deck = pdeck
-  local m2 = JokerValue.score_delta(pgs, j, { samples = Eval.REFINE_SAMPLES, rng = opts.rng, cache = cache })
-  return math.max(m, m2 or m)   -- a projected deck only ADDS retrigger targets; noise must not cut the present
+  local m2 = JokerValue.score_delta(pgs, j, { samples = Eval.REFINE_SAMPLES, rng = opts.rng, cache = cache }) or m
+  -- PROJECTED BOARD (owner 2026-09-25: "retriggers can be very good together with jokers that use them -- taking
+  -- Hanging Chad with the possibility in the future to get Photograph or Business Card or Scholar"). A retrigger
+  -- fires every PER-CARD joker again, and boards GAIN per-card jokers: MEASURED on all live shop states, the count
+  -- on the board is 0 / 0.45 / 0.91 / 1.0 / 1.1 / 1.4 / 1.7 / 1.6 at antes 1-8, and which ones (PERCARD_MIX) is
+  -- Photograph .202, Scary Face .182, Business Card .162, Scholar .141, Smiley .101, Even Steven .071, Greedy .071,
+  -- Fibonacci .030, Lusty .020, Odd Todd .010, Wrathful .010. So the retrigger is also measured with each likely
+  -- per-card joker added (weighted by that mix) and credited for the expected number the board will have gained
+  -- by the run's midpoint. Business Card's payout is MONEY, which score_delta does not see -- it adds 0 here.
+  local have = 0
+  for _, oj in ipairs(pgs.jokers or {}) do if Eval.PERCARD[oj.key] then have = have + 1 end end
+  local lo = math.max(1, math.min(8, math.floor(mid)))
+  local t = mid - lo
+  local want = Eval.PERCARD_GROWTH[lo] + t * (Eval.PERCARD_GROWTH[math.min(8, lo + 1)] - Eval.PERCARD_GROWTH[lo])
+  local n_add = math.min(2, math.max(0, want - have))
+  if n_add > 0 then
+    local sum, wsum = 0, 0
+    for _, e in ipairs(Eval.PERCARD_MIX) do
+      local mk = m2
+      if e[1] ~= "j_business" then
+        local g2 = {}
+        for k, v in pairs(pgs) do g2[k] = v end
+        local js = {}
+        for i, oj in ipairs(pgs.jokers or {}) do js[i] = oj end
+        js[#js + 1] = { key = e[1], ability = { extra = {} } }
+        g2.jokers = js
+        mk = JokerValue.score_delta(g2, j, { samples = Eval.REFINE_SAMPLES, rng = opts.rng, cache = cache }) or m2
+      end
+      sum = sum + e[2] * mk; wsum = wsum + e[2]
+    end
+    m2 = m2 + n_add * (sum / wsum - m2)
+  end
+  return math.max(m, m2)   -- a projected deck/board only ADDS retrigger targets; noise must not cut the present
 end
 
 -- Does owned joker idx change the score AT ALL on this deck? (R12 -- the input to BP.keep_bias.) A
