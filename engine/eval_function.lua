@@ -1145,6 +1145,54 @@ function Eval.projected_deck(gs, target_ante)
   return deck
 end
 -- m (measured on ctx_gs) -> the retrigger's value at the midpoint of the remaining run. Identity for anything else.
+-- FORWARD VALUE FOR EVERY JOKER (2026-09-25, experiment, BES_FWD_ALL=1). Boards fill to ~5 jokers by ante 3 (live:
+-- 0 / 2.1 / 4.3 / 4.7 / 4.8 / 5.1 / 5.1 / 5.3), so after that a board grows through its DECK (projected_deck) and
+-- its HAND LEVELS -- MEASURED on all live shop states, extra levels total 0 / .17 / 1.26 / 3.0 / 6.7 / 10.5 / 16.7 /
+-- 18.3 at antes 1-8, about half on the most-played hand. Every joker is valued as the average of its share of the
+-- boss per-hand need NOW and at the run's midpoint, the latter measured on the SAME board with the projected deck and
+-- levels against the midpoint need. Same unit at both ends, same treatment for every joker -- unlike the rejected
+-- xmult-only scaling (x1), which inflated one class against the rest.
+Eval.FWD_ALL = os.getenv and os.getenv("BES_FWD_ALL") == "1"
+Eval.LEVEL_GROWTH = { 0, 0.17, 1.26, 3.0, 6.7, 10.5, 16.7, 18.3 }
+Eval.TOP_HAND_LEVEL_SHARE = 0.5
+local function interp_ante(tbl, a)
+  local lo = math.max(1, math.min(8, math.floor(a)))
+  local hi = math.min(8, lo + 1)
+  return tbl[lo] + (a - lo) * (tbl[hi] - tbl[lo])
+end
+function Eval.projected_levels(gs, target_ante, freq)
+  local ante = (gs.meta and gs.meta.ante) or 1
+  local add = math.max(0, interp_ante(Eval.LEVEL_GROWTH, target_ante) - interp_ante(Eval.LEVEL_GROWTH, ante))
+  local lv = {}
+  for k, v in pairs((gs.run and gs.run.hand_levels) or {}) do lv[k] = v end
+  if add <= 0 or not freq then return lv end
+  local top, topf, total = nil, -1, 0
+  local names = {}
+  for h, f in pairs(freq) do if Mechanics.HAND_PLANET[h] and f > 0 then names[#names + 1] = h; total = total + f end end
+  table.sort(names)
+  for _, h in ipairs(names) do if freq[h] > topf then top, topf = h, freq[h] end end
+  if not top then return lv end
+  local rest = total - topf
+  for _, h in ipairs(names) do
+    local k = (h == top) and (add * Eval.TOP_HAND_LEVEL_SHARE + ((rest <= 0) and add * (1 - Eval.TOP_HAND_LEVEL_SHARE) or 0))
+      or ((rest > 0) and add * (1 - Eval.TOP_HAND_LEVEL_SHARE) * freq[h] / rest or 0)
+    if k > 0 then
+      local inc = Mechanics.HAND_PLANET[h]
+      local cur = lv[h] or { level = 1, chips = inc.base_chips or 0, mult = inc.base_mult or 0 }
+      lv[h] = { level = (cur.level or 1) + k, chips = (cur.chips or 0) + inc.dchips * k, mult = (cur.mult or 0) + inc.dmult * k }
+    end
+  end
+  return lv
+end
+local function mid_need(gs, mid)
+  local hands = (gs.blind and gs.blind.base_hands) or (gs.run and gs.run.base_hands) or 4
+  if not hands or hands <= 0 then hands = 4 end
+  local lo = math.max(1, math.min(8, math.floor(mid)))
+  local hi = math.min(8, lo + 1)
+  local a, b = Mechanics.blind_requirement(lo, "Boss"), Mechanics.blind_requirement(hi, "Boss")
+  return math.max(1, (a + (mid - lo) * (b - a)) / hands)
+end
+
 -- LIMITED-LIFE jokers get NO forward projection: they will not be on the board for the deck/board the projection
 -- values (sim r1 vs g1: Seltzer -- 10 hands of retriggers, then gone -- was bought 12 -> 18 once projected to the
 -- run's midpoint deck).
@@ -1154,6 +1202,50 @@ function Eval.forward_measure(ctx_gs, j, m, opts)
   opts = opts or {}
   m = Eval.refine_measure(ctx_gs, j, m, opts)
   if Eval.LIMITED_LIFE[j.key] then return m end
+  if Eval.FWD_ALL and m and Eval.floor_free(j.key) and not JokerData.has_tag(j.key, "retrigger")
+     and can_measure(ctx_gs, opts) then
+    local ante = (ctx_gs.meta and ctx_gs.meta.ante) or 1
+    local mid = ante + (8 - ante) / 2
+    if mid > ante then
+      local cache = opts.cache
+      local ckey = "_fwd_ctx|" .. tostring(ctx_gs.deck) .. "|" .. tostring(ctx_gs.jokers) .. "|" .. mid
+      local fctx = cache and cache[ckey]
+      if not fctx then
+        local dkey = "_proj_deck|" .. tostring(ctx_gs.deck) .. "|" .. mid
+        local pdeck = cache and cache[dkey]
+        if not pdeck then pdeck = Eval.projected_deck(ctx_gs, mid); if cache then cache[dkey] = pdeck end end
+        local freq = ConsumableValue.hand_frequencies(ctx_gs, { samples = 8, rng = opts.rng })
+        fctx = {}
+        for k, v in pairs(ctx_gs) do fctx[k] = v end
+        fctx.deck = pdeck
+        local run = {}
+        for k, v in pairs(ctx_gs.run or {}) do run[k] = v end
+        run.hand_levels = Eval.projected_levels(ctx_gs, mid, freq)
+        fctx.run = run
+        if cache then cache[ckey] = fctx end
+      end
+      local mf = JokerValue.score_delta(fctx, j, { samples = Eval.REFINE_SAMPLES, rng = opts.rng, cache = cache })
+      -- ANCHORED to a plain Joker (+4 Mult) measured in the same two contexts: the projection keeps the CURRENT
+      -- jokers while real boards also upgrade them, so raw mid-run shares deflate EVERY joker against money/packs
+      -- (Half Joker 5.07 -> 2.77 FV on a replayed ante-2 board). Only the RELATIVE growth is used: a joker whose
+      -- share holds up better than +Mult's (a multiplier) gains, one that dilutes faster (+Chips) loses, and the
+      -- joker-vs-money scale is unchanged.
+      local rkey = "_fwd_ref|" .. ckey
+      local ref = cache and cache[rkey]
+      if ref == nil then
+        local pj = { key = "j_joker", ability = { extra = {} } }
+        local r0 = JokerValue.score_delta(ctx_gs, pj, { samples = Eval.REFINE_SAMPLES, rng = opts.rng, cache = cache })
+        local r1 = JokerValue.score_delta(fctx, pj, { samples = Eval.REFINE_SAMPLES, rng = opts.rng, cache = cache })
+        ref = (r0 and r1 and r0 > 0) and (r1 / r0) or false
+        if cache then cache[rkey] = ref end
+      end
+      if mf and ref and m > 0 then
+        local rel = (mf / m) / ref                      -- this joker's growth relative to +Mult's
+        m = m * (0.5 + 0.5 * math.max(0, math.min(3, rel)))
+      end
+    end
+    return m
+  end
   if m and m > 0 and JokerData.is_xmult(j.key) then
     -- scale by the board the xmult will multiply (ctx_gs = the board it joins / the rest of the board)
     local ro = { rng = opts.rng, samples = opts.samples, cache = nil }
