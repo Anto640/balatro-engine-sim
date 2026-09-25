@@ -1193,7 +1193,9 @@ end
 -- boss per-hand need NOW and at the run's midpoint, the latter measured on the SAME board with the projected deck and
 -- levels against the midpoint need. Same unit at both ends, same treatment for every joker -- unlike the rejected
 -- xmult-only scaling (x1), which inflated one class against the rest.
-Eval.FWD_ALL = os.getenv and os.getenv("BES_FWD_ALL") == "1"
+-- ON by default since 2026-09-25: z1 vs y1 +0.108 (sign 77/59, reach-7 +11), replicated out of sample (BES_SEED_OFF=7:
+-- +0.098, sign 68/64, wins 26 -> 32, reach-7 +7); pooled ~+0.10 over 320 pairs, never negative. BES_FWD_ALL=0 disables.
+Eval.FWD_ALL = not (os.getenv and os.getenv("BES_FWD_ALL") == "0")
 Eval.LEVEL_GROWTH = { 0, 0.17, 1.26, 3.0, 6.7, 10.5, 16.7, 18.3 }
 Eval.TOP_HAND_LEVEL_SHARE = 0.5
 local function interp_ante(tbl, a)
