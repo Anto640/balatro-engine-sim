@@ -570,7 +570,13 @@ local function board_ratio(gs, opts)
   if not base or base <= 0 or not need or need <= 0 then return nil end
   return base / need
 end
+-- ❌ OFF BY DEFAULT (sim x1 vs g1, paired n=160: -0.188, p 0.06, sign 31/52, wins 33 -> 26, reach-8 42 -> 34).
+-- Scaling ONLY the multipliers up to 3x distorted the ranking against everything left unscaled: Acrobat (last-hand
+-- x3) bought 11 -> 18, Blueprint (a copier, unscaled) 14 -> 8. The typical-board-ratio measurement stands; applying
+-- it to one class alone does not. Opt-in for experiments: BES_XMULT_FWD=1.
+Eval.XMULT_FWD = os.getenv and os.getenv("BES_XMULT_FWD") == "1"
 function Eval.xmult_forward_scale(gs, key, opts)
+  if not Eval.XMULT_FWD then return 1 end
   if not JokerData.is_xmult(key) or JokerData.is_scaling(key) or not Eval.floor_free(key) then return 1 end
   local r = board_ratio(gs, opts)
   if not r then return 1 end
