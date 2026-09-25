@@ -832,6 +832,44 @@ local function generator_fraction(gs, key, opts, owned)
   return 0.5 * rate * R * mean * fit
 end
 
+-- BOSS DISABLERS (Chicot: every boss; Luchador: sell to disable the current one). A disabled boss is a plain x2 blind
+-- (blind.lua Blind:disable: The Wall's chips /2, Violet Vessel /3, every other effect removed). MEASURED with the full
+-- engine (tools/boss_cost.lua, 30 recorded boards x 8 paired rounds per boss, next ante): the relative OUTPUT gain
+-- (fraction of target reached) from disabling each boss. The Wheel / Fish / House / Mark read 0 because the engine sees
+-- face-down cards (known limitation); Pillar / Serpent / Ox read 0 too. frac = r0 x gain, the resource-table convention
+-- (also measured at the boss). Chicot averages the known upcoming boss with the eligible pool of every later ante;
+-- Luchador is one use on the upcoming boss, spread over the bosses left.
+Eval.BOSS_DISABLE_GAIN = {
+  bl_wall = .586, bl_mouth = .576, bl_water = .454, bl_plant = .744, bl_needle = .389, bl_flint = .484,
+  bl_goad = .148, bl_eye = .178, bl_window = .083, bl_manacle = .121, bl_club = .141, bl_head = .062,
+  bl_arm = .028, bl_psychic = .007, bl_tooth = 0, bl_wheel = 0, bl_fish = 0, bl_ox = 0, bl_pillar = 0,
+  bl_serpent = 0, bl_house = 0, bl_mark = 0, bl_hook = .003 }
+Eval.BOSS_MIN_ANTE = {   -- mirrors sim/world World.BOSS_MIN_ANTE (engine must not require sim/)
+  bl_hook = 1, bl_club = 1, bl_psychic = 1, bl_goad = 1, bl_window = 1, bl_head = 1, bl_pillar = 1, bl_manacle = 1,
+  bl_house = 2, bl_wall = 2, bl_wheel = 2, bl_arm = 2, bl_fish = 2, bl_water = 2, bl_mouth = 2, bl_mark = 2,
+  bl_needle = 2, bl_flint = 2, bl_eye = 3, bl_tooth = 3, bl_plant = 4, bl_serpent = 5, bl_ox = 6 }
+local function pool_gain(ante)
+  local s, n = 0, 0
+  for k, a in pairs(Eval.BOSS_MIN_ANTE) do if a <= ante then s = s + (Eval.BOSS_DISABLE_GAIN[k] or 0); n = n + 1 end end
+  return (n > 0) and (s / n) or 0
+end
+local function boss_disable_fraction(gs, key, opts)
+  local need = Mechanics.boss_per_hand_need(gs)
+  if not need or need <= 0 then return nil end
+  local base = board_base(gs, opts)
+  if not base or base <= 0 then return nil end
+  local r0 = base / need
+  local ante = math.floor((gs.meta and gs.meta.ante) or 1)
+  local known = gs.run and gs.run.boss_key
+  local g_now = (known and Eval.BOSS_DISABLE_GAIN[known]) or pool_gain(ante)
+  local gains = { g_now }
+  for a = ante + 1, 8 do gains[#gains + 1] = pool_gain(a) end
+  if key == "j_luchador" then return r0 * g_now / #gains end
+  local s = 0
+  for _, g in ipairs(gains) do s = s + g end
+  return r0 * s / #gains
+end
+
 -- nil when `key` is not a modelled utility joker (the caller keeps its own valuation)
 function Eval.utility_fraction(gs, key, opts, owned, idx)
   opts = opts or {}
@@ -841,6 +879,7 @@ function Eval.utility_fraction(gs, key, opts, owned, idx)
   if key == "j_burnt" or key == "j_space" then return leveling_fraction(gs, key, opts) end
   if RESOURCE[key] then return resource_fraction(gs, key, opts, owned, idx) end
   if GENERATOR[key] then return generator_fraction(gs, key, opts, owned) end
+  if key == "j_chicot" or key == "j_luchador" then return boss_disable_fraction(gs, key, opts) end
   if key == "j_oops" then
     -- Oops! All 6s doubles every listed probability. MEASURED as: (a) the board's mean score with vs without it on
     -- the SAME sampled hands (HandEval applies it to Lucky cards), plus (b) the lift in every owned odds-driven
@@ -898,6 +937,8 @@ for k in pairs(RESOURCE) do Eval.UTILITY_MODELLED[k] = true end
 for k in pairs(GENERATOR) do Eval.UTILITY_MODELLED[k] = true end
 Eval.UTILITY_MODELLED.j_riff_raff = true
 Eval.UTILITY_MODELLED.j_oops = true
+Eval.UTILITY_MODELLED.j_chicot = true
+Eval.UTILITY_MODELLED.j_luchador = true
 
 function Eval.modeled_scoring_fraction(gs, key, opts)
   local e = JokerData.resolve(key)
