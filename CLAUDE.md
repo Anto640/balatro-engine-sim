@@ -28,14 +28,17 @@ plus a large correctness/coverage/strategy pass.
 > "only Mult" measurement was invalid because the sampled hand contained no Diamonds at all. **Replay the
 > recorded state; do not rebuild it from the description.**
 >
-> ### ⭐⭐⭐ LATEST (2026-09-24): R12 inert jokers + measured core protection + Burnt Joker, on top of R11 — read the TOP
+> ### ⭐⭐⭐⭐ LATEST (2026-09-25): read the "START HERE" block at the top of `NEXT_SESSION.md` — live install `0ed0a6d`,
+> ### sim win rate 22.5% (36/160, was 6.2% on 09-23), the win-rate checkpoint table, and the prioritised next sessions.
+> ### Every joker is now MEASURED except Mr Bones / Diet Cola / Credit Card; forward valuation ON; the tier floor STAYS.
+> ### (previous) 2026-09-24: R12 inert jokers + measured core protection + Burnt Joker, on top of R11 — read the TOP
 > ### blocks of `NEXT_SESSION.md` first. ⚠ The tier floor is NOT removable wholesale (sim wins 28->15): it scales measured
 > ### jokers against tier-PRIOR (unmodelled) ones; only INERT jokers (measured exactly 0) lose it.
 > ### R11 sell/buy valuation overhaul:
 > Shipped + deployed: held-card context bug, money-only jokers, survival-first selling, effect-based vouchers,
 > calibrated pace risk, live interest-cap fix, and live pack/shop fixes. **Owner rule: the 7-win corpus is the
 > owner's playstyle, not ground truth — sim OUTCOMES (wins/reach-8) decide; replicate on fresh seeds.** Run A/B
-> arms sequentially at ≤9 workers (memory reaping). Unit tests: plain `lua tests/runner.lua` (1244 pass).
+> arms sequentially at ≤9 workers (memory reaping). Unit tests: plain `lua tests/runner.lua` (1264 pass).
 >
 > ### ⭐ CURRENT FOCUS (2026-08-31): ADVICE QUALITY, driven by the IN-GAME SELF-PLAYER + owner review + the AGREEMENT A/B.
 > **The in-game self-player** (`ui/autoplay.lua`, **F11**) translates the engine's live advice into REAL

@@ -1,5 +1,51 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## ⭐⭐⭐ START HERE (2026-09-25 end of session) — STATE, WIN-RATE HISTORY, AND THE NEXT FEW SESSIONS
+
+**Live install = `0ed0a6d`** (restart Balatro after any deploy -- no hot reload). Tests: `lua tests/runner.lua` (1264 pass).
+Everything below the "R13" and "R12/R11" blocks is the detailed audit trail.
+
+### Sim win-rate checkpoints (autonomous engine, red deck / white stake, same 160-seed pool unless noted)
+One seed = 0.6 pp; paired differences under ~3 pp are noise. Earlier eras are NOT strictly comparable (the sim world
+itself changed -- e.g. 2026-08-28 faithful jokers HALVED the rate 5% -> 2.5%).
+| date | build / arm | win rate |
+|---|---|---|
+| 2026-08-12 | first human-vs-engine dataset (engine 12/960) | 1.3% (human 7/8 = 87.5%) |
+| 2026-08-25 | `slotfix_base` baseline (rich10 probe: 23.8%) | 2.5% |
+| 2026-09-02 | `wire_base160` | 5.6% |
+| 2026-09-18 | WINRATE V4 fresh baseline `v4_base` | 8.1% |
+| 2026-09-23 | R11 start `hc_ab_before` | 6.2% |
+| 2026-09-23 | held-card fix -> money-only -> vouchers (`vo_ab_after`) | 9.4% -> 10.6% -> 12.5% |
+| 2026-09-23 | calibrated pace risk `risk_after` (OOS pool: 18.1%) | 17.5% |
+| 2026-09-24 | R12 inert jokers / core protection `r12c` | 15.0% |
+| 2026-09-25 | resource table `v1` -> generators `g1` -> retrigger projection `y1` | 16.2% -> 20.6% -> 20.0% |
+| 2026-09-25 | **forward valuation, fast `f1` (LIVE)** (OOS pool, slow version: 20.0%) | **22.5%** |
+
+### What the next few sessions should do (in rough priority)
+1. **Live F11 run on `0ed0a6d` and review it** (the replay loop in CLAUDE.md). A lot shipped at once: watch the Burnt
+   first-discard and Sixth Sense lone-8 discards (spare cards only, never the clearing hand), Hanging Chad valued
+   higher (forward/per-card projection), no Oops/Luchador/Mime buys with nothing to use them on, shop speed (~4-6 s
+   on heavy late shops -- was 8.7-10.6 s before the speed-up).
+2. **Money in the retrigger projection**: Business Card (and Rough Gem) pay MONEY per scored card, which score_delta
+   cannot see -- so Hanging Chad x Business Card is still undervalued (owner's example). Price retriggered per-card $.
+3. **Burnt aiming during digs**: 80% of first discards are digs (no clear in hand) that level their chaff (quality
+   0.56). Steer the dig's discard set toward a hand worth levelling when the dig value is ~equal.
+4. **Last three tier priors**: Mr Bones (one-shot death save -- 98% of deaths qualify; the open question is what a
+   saved blind is worth), Diet Cola (free Double Tag on sale), Credit Card (-$20 loan). Low frequency.
+5. **Refinements with an estimate inside them** (measure, don't guess): Perkeo `PERKEO_HOLD` 0.3; Merry Andy / Turtle
+   Bean multi-unit resource gains extrapolated linearly from +1; Chicot uses the board-AVERAGED boss cost (scale it by
+   board strength like the resource table); flip bosses (Wheel/Fish/House/Mark) read 0 because the engine sees
+   face-down cards (known limitation, owner: do not fix).
+6. **The tier floor stays.** Every removal test lost wins (latest z2 vs z1: -0.256, p 0.049). The remaining gap is
+   early CONDITIONAL multipliers (Photograph / The Order / The Tribe) whose worth is the board they will multiply --
+   the board-as-a-SET problem. Only retry with a genuinely new model (not a constant, not one class scaled alone:
+   x1 proved that distorts the ranking).
+7. **Ops**: run A/B arms from a git worktree at <= 6 workers while the owner is using the PC (Claude Code reaps
+   background shells on low memory; the PC itself crashed once); 11 workers when idle. The luajit workers survive a
+   reap and `tools/sim_par.sh`'s wrapper may too -- VERIFY unique finished seeds before deleting anything; resume an
+   interrupted batch with `tools/run_seeds.lua` (deterministic, verified identical). Tools added: `burnt_aim.lua`,
+   `resource_value.lua`, `boss_cost.lua`, `run_seeds.lua`.
+
 ## ⭐⭐⭐ 2026-09-25 — R13: MEASURE THE UNMODELLED JOKERS (so the tier floor can go) — read FIRST
 
 Goal (owner): every joker priced by measurement, then drop the tier floor. The floor exists because unmodelled
