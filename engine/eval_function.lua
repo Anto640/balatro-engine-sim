@@ -554,6 +554,29 @@ local CONTAINS_TRIGGER = {
 -- (1-1/X)*base -- same absolute marginal, expressed against the base each call site sees.
 -- P(trigger) is measured WITHOUT the joker so it is CONSERVATIVE (owning it would raise it).
 -- Returns nil for non-conditional-xmult jokers (fast) and when frequencies aren't samplable.
+-- XMULT FORWARD VALUE (2026-09-25). A multiplier's worth is proportional to the base it multiplies, and a still-weak
+-- board's base is not what it will multiply for most of the run: boards grow IN STEP with the blinds. MEASURED on every
+-- recorded live shop state (bes_fixtures.jsonl, JokerValue.avg_score, 16 samples): the board's per-hand score / the
+-- boss per-hand need averages 0.82 at ante 1 and 1.79 / 1.82 / 1.36 / 1.52 / 1.65 at antes 2-6 (antes 7-8 read ~8 but
+-- only WINNING boards reach them -- selection-biased, excluded). So an xmult on a board below that typical ratio is
+-- valued as if its base were at it -- capped at XMULT_FWD_CAP -- and a board already at/above it is unchanged. This is
+-- what the tier floor was standing in for: without it the engine stopped buying Photograph (28 -> 13), The Order
+-- (9 -> 1), Duo, Tribe (sim g2 vs g1) -- the winners' keystones, measured low only because the board was weak NOW.
+Eval.BOARD_RATIO_TYPICAL = 1.63
+Eval.XMULT_FWD_CAP = 3
+local function board_ratio(gs, opts)
+  local base = board_base(gs, opts)
+  local need = Mechanics.boss_per_hand_need(gs)
+  if not base or base <= 0 or not need or need <= 0 then return nil end
+  return base / need
+end
+function Eval.xmult_forward_scale(gs, key, opts)
+  if not JokerData.is_xmult(key) or JokerData.is_scaling(key) or not Eval.floor_free(key) then return 1 end
+  local r = board_ratio(gs, opts)
+  if not r then return 1 end
+  return math.max(1, math.min(Eval.XMULT_FWD_CAP, Eval.BOARD_RATIO_TYPICAL / math.max(r, 1e-6)))
+end
+
 local function conditional_xmult_marginal(gs, key, opts, owned)
   local cx = COND_XMULT[key]
   if not cx then return nil end
@@ -566,7 +589,7 @@ local function conditional_xmult_marginal(gs, key, opts, owned)
   local base = board_base(gs, opts)
   if not base or base <= 0 then return nil end
   local factor = owned and (1 - 1 / cx.x) or (cx.x - 1)
-  return p * factor * base
+  return p * factor * base * Eval.xmult_forward_scale(gs, key, opts)
 end
 
 -- The measured SCORING value (fraction of a boss hand) of a joker the measured-scaler / deck-modifier
@@ -1056,6 +1079,11 @@ end
 function Eval.forward_measure(ctx_gs, j, m, opts)
   opts = opts or {}
   m = Eval.refine_measure(ctx_gs, j, m, opts)
+  if m and m > 0 and JokerData.is_xmult(j.key) then
+    -- scale by the board the xmult will multiply (ctx_gs = the board it joins / the rest of the board)
+    local ro = { rng = opts.rng, samples = opts.samples, cache = nil }
+    m = m * Eval.xmult_forward_scale(ctx_gs, j.key, ro)
+  end
   if not m or not JokerData.has_tag(j.key, "retrigger") or not Eval.floor_free(j.key) then return m end
   if not can_measure(ctx_gs, opts) then return m end
   local ante = (ctx_gs.meta and ctx_gs.meta.ante) or 1
