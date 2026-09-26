@@ -1,5 +1,16 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## ⭐⭐⭐ 2026-09-26 (evening) — R16 LIVE REVIEW (seed BQ63E388, died ante 6 by ~200 chips, $40-65 most of the run)
+| owner observation | verdict | fix |
+|---|---|---|
+| picked one tarot then switched to Strength; Black Hole shown then Mercury taken | (a) Justice was SELECTED on the empty-hand state (Arcana/Spectral packs deal the hand a beat after opening) -- a self-player hole; (b) Black Hole -> Mercury was the overlay moving from the provisional to the measured pick | `08fde99` pre-deal tarot/spectral pack decisions are provisional (LIVE); (b) see next row |
+| Mercury over Black Hole | REAL: the committed-Pair planet_credit went to Mercury only; Black Hole levels Pair too | `3cb4fe9` Packs.black_hole_value adds every hand's credit (BH .574 vs Mercury .435) |
+| never bought vouchers; skipped Overstock while rerolling ~20x at $40-65 | REAL: Overstock was hard 0 ("not modelled"); Reroll Surplus used a flat 0.23 rerolls/shop (measured by bankroll: <$15 .02, 15-24 .06, 25-39 .23, 40+ .88) | `3cb4fe9` Overstock = the reroll's measured gross per-card value x shop views left x 0.5; Reroll Surplus bankroll-aware |
+| bought planets but held them (blocks the same planet from the shop) | REAL (game rule: a held card isn't re-offered; Showman lifts it) | `3cb4fe9` shop proposes USE for held planets (not with Observatory/Perkeo); `f359a04` sim now enforces the no-duplicate rule |
+| Emperor not bought (2nd time) | it is back on the flat 0.25 prior (audit batch reverted): -1.60 at $27 | pending the audit retry. The sim does NOT log Emperor-created tarots, so their realised value can't be measured yet -- add that logging first |
+| Neptune bought / Mercury-heavy with Ancient Joker; Investment skip at $27; Gros Michel / Bloodstone / Death skipped; purple-seal cards kept; board unchanged 5 antes | judgement calls / the build-assembly wall; Neptune/Mercury partly the old frequency model (live was on dig-aware freq) | none this round |
+Arms: `b16` = f359a04 (engine as live + sim no-duplicate rule), `r16` = 3cb4fe9 (the engine fixes). Verdict: see below (fill in).
+
 ## ⭐⭐⭐ 2026-09-26 (later) — R15 LIVE REVIEW (seed 978TLFTS, died ante 5) — LIVE INSTALL `3cc50c6`
 | owner observation | verdict | fix |
 |---|---|---|
