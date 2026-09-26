@@ -1224,6 +1224,19 @@ function SA.recommend(gs, opts)
         slots_free = ShopState.slots_free(gs) }
     end
     actions[#actions + 1] = rentry
+    -- OVERSTOCK (+1 card in every shop view for the rest of the run): the reroll just measured what new cards are
+    -- worth to this board -- its GROSS gain per card, before the reroll's price and before the appetite damping
+    -- (an Overstock card costs nothing). Over the views left (blinds remaining x views per blind at this bankroll),
+    -- halved for runway like the generator jokers (a card seen later has less run left to pay back).
+    local per_card = SA.REROLL_DISCOUNT * w_score * 5 * improvement * realizable / Vouchers.SHOP_CARD_SLOTS
+    local horizon = 0.5 * Eval.blinds_remaining(gs) * Vouchers.views_per_blind(gs)
+    for _, e in ipairs(priced) do
+      if e.type == "BUY_VOUCHER" and e.target and Vouchers.OVERSTOCK[e.target.key] then
+        e.value = e.value + per_card * horizon
+        e.reason = string.format("Buy %s ($%d) — +1 card in every shop view (~%.0f views left this run).",
+          e.name or "Overstock", e.cost or 10, horizon * 2)
+      end
+    end
   end
   end)
 
@@ -1637,6 +1650,34 @@ function SA.recommend(gs, opts)
         reason = string.format("Sell %s (+$%d) to afford %s — the gain beats keeping it.",
           best.f.name, best.f.cash, best.p.name or "the shop item"),
       }
+    end
+  end)
+
+  -- USE A HELD PLANET NOW (live BQ63E388, 2026-09-26: planets were bought and HELD until the next blind). A level is
+  -- permanent, so using it now loses nothing -- and holding it takes a consumable slot and keeps that planet out of
+  -- the shop pool (the game does not offer a card you already hold), the very planet the engine wanted more of.
+  -- Holding has value only with Observatory (a held planet gives x1.5 to its hand) or Perkeo (copies a held card
+  -- at shop end), so those keep the old behaviour.
+  try(function()
+    local vo = (gs.run and gs.run.vouchers_owned) or {}
+    local held_value = vo.v_observatory and true or false          -- live: a set { key = true }
+    for _, k in ipairs(vo) do if k == "v_observatory" then held_value = true end end   -- sim: a list
+    for _, j in ipairs(gs.jokers or {}) do if j.key == "j_perkeo" then held_value = true end end
+    if held_value then return end
+    local hfreq, hctx
+    for _, c in ipairs(gs.consumables or {}) do
+      if c.set == "Planet" or c.key == "c_black_hole" then
+        if not hfreq then hfreq, hctx = ConsumableValue.hand_frequencies(gs, { rng = rng }) end
+        local vfrac = ConsumableValue.card_value(gs, c.set or "Planet", c.key, hfreq, cneed, rng, nil, hctx) or 0
+        local hand = ConsumableValue.PLANET_KEY_HAND[c.key]
+        if hand then vfrac = vfrac + BuildPlan.planet_credit(gs, hand) end
+        actions[#actions + 1] = {
+          type = "USE_CONSUMABLE", target = c, cost = 0, use_keys = { c.key }, hand_type = hand,
+          value = math.max(1e-3, w_score * SA.JOKER_SCORE_WEIGHT * vfrac),
+          reason = string.format("Use %s now — the level is permanent, and holding it blocks a slot and keeps that planet out of the shop.",
+            c.name or c.key),
+        }
+      end
     end
   end)
 

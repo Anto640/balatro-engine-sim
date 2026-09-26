@@ -229,7 +229,12 @@ function P.black_hole_value(gs, opts)
   if not freq then return nil end
   local total = 0
   for hand, f in pairs(freq) do total = total + f * ConsumableValue.level_gain(gs, hand, 1, bctx) end
-  return P.level_scale(gs) * total / per_hand_need(gs)  -- leveling persists (see planet_pool)
+  -- Black Hole levels EVERY hand, so it also earns every hand's commitment credit -- the same credit a planet
+  -- for the committed hand gets (planet_pool, pack picks). Without it a committed-Pair board took Mercury over
+  -- Black Hole (live BQ63E388: BH 0.374 vs Mercury 0.235 measured, but Mercury carried the Pair credit).
+  local credit = 0
+  for _, h in ipairs(ConsumableValue.HAND_NAMES) do credit = credit + BuildPlan.planet_credit(gs, h) end
+  return P.level_scale(gs) * total / per_hand_need(gs) + credit  -- leveling persists (see planet_pool)
 end
 
 -- Spectrals: value each the SAME measured way a LOOSE spectral is valued in the shop

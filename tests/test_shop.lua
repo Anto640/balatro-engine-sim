@@ -1090,11 +1090,18 @@ return function(t)
     t.ok(r.best.then_buy and r.best.then_buy.type == "BUY_PACK", "the funded purchase is recorded (the pack)")
     t.ok(r.best.reason:find("Buffoon"), "the reason names what the sale funds")
 
-    -- with enough money it just buys the pack (no needless sale)
-    t.eq(SA.recommend(shop_with{ dollars = 8,
+    -- with enough money it never sells to fund the pack: it USES the held planet (2026-09-26: a held planet is used
+    -- in the shop, a level being permanent) and buys the pack outright
+    local rr = SA.recommend(shop_with{ dollars = 8,
       consumables = { { set = "Planet", key = "c_jupiter", name = "Jupiter", sell_cost = 1 } },
-      boosters = { { key = "p_buffoon_normal", name = "Buffoon Pack", cost = 4 } } }).best.type,
-      "BUY_PACK", "affordable -> buy outright, never sell to fund it")
+      boosters = { { key = "p_buffoon_normal", name = "Buffoon Pack", cost = 4 } } })
+    t.eq(rr.best.type, "USE_CONSUMABLE", "affordable -> the held planet is used, never sold to fund the pack")
+    local sells, buys = false, false
+    for _, a in ipairs(rr.alternatives) do
+      if a.type == "SELL_TO_BUY" and (a.value or 0) > 0 then sells = true end
+      if a.type == "BUY_PACK" and (a.value or 0) > 0 then buys = true end
+    end
+    t.ok(buys and not sells, "affordable -> buy outright, never sell to fund it")
 
     -- a VALUABLE held item (Judgement creates a joker) is NOT sold for a cheap pack
     t.eq(SA.recommend(shop_with{ dollars = 3,
