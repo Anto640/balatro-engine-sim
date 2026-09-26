@@ -36,7 +36,13 @@ lower: measure realised tarot value per random tarot in the sim before pricing a
 Summit bought 0->14 at the measured 36%-at-0-discards mixture -- that share comes from boards WITHOUT Mystic; check
 whether the Mystic timing policy (dig to 0) costs more than it earns. Code is in the reverted commits (git show).
 **LIVE INSTALL = `f22edfc`** (s2 + dig-aware frequencies; the fid commit is sim-only). Verified 0 diffs. Branch engine
-== f22edfc. Confirmation arms running: `f1fid` (0ed0a6d + fid, in-sample), `f1fid7` / `hf7` (BES_SEED_OFF=7).
+== f22edfc.
+**✅ CONFIRMED (same corrected sim = fid on both sides; old live `0ed0a6d`+fid vs live `f22edfc`):**
+| pool | old live | live f22edfc | progress | sign | reach-8 |
+|---|---|---|---|---|---|
+| in-sample (s*1000+3) | 32/160 (20.0%) | **38/160 (23.8%)** | +0.230 (p 0.28) | 77/72 | 45 -> 50 |
+| **OOS (s*1000+7)** | 28/160 (17.5%) | **49/160 (30.6%)** | **+0.477 (p 0.022)** | 86/62 | **35 -> 56 (McNemar p 0.009)** |
+Pooled 320 seeds: **60 -> 87 wins (18.8% -> 27.2%)**. Files: sim_out/{f1fid,hf,f1fid7,hf7}.jsonl (the new baselines).
 Mechanisms fire (s1 vs f1): Strength used 22->70, Death 11->80, purple-seal picks 23->70, 82 buy-before-reroll.
 (was live `7d0ca6a` earlier on 2026-09-26.) Sim win rate 43/160 = **26.9%** (in-sample).
 Queued arms (worktrees `../bes_wt_*`): `fid` b984dc9 (sim shop sees the discard budget -- fidelity, kept regardless),
@@ -75,7 +81,9 @@ itself changed -- e.g. 2026-08-28 faithful jokers HALVED the rate 5% -> 2.5%).
 | 2026-09-23 | calibrated pace risk `risk_after` (OOS pool: 18.1%) | 17.5% |
 | 2026-09-24 | R12 inert jokers / core protection `r12c` | 15.0% |
 | 2026-09-25 | resource table `v1` -> generators `g1` -> retrigger projection `y1` | 16.2% -> 20.6% -> 20.0% |
-| 2026-09-25 | **forward valuation, fast `f1` (LIVE)** (OOS pool, slow version: 20.0%) | **22.5%** |
+| 2026-09-25 | forward valuation, fast `f1` (OOS pool, slow version: 20.0%) | 22.5% |
+| 2026-09-26 | sim FIDELITY fix (shop sees discards) re-baselines f1 -> `f1fid` | 20.0% (OOS 17.5%) |
+| 2026-09-26 | **R14 `f22edfc` (LIVE): buy-before-reroll, seals, Strength, paired cards, discards, dig-aware freq** | **23.8% (OOS 30.6%)** |
 
 ### What the next few sessions should do (in rough priority)
 1. **Live F11 run on `0ed0a6d` and review it** (the replay loop in CLAUDE.md). A lot shipped at once: watch the Burnt
