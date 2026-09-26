@@ -1659,6 +1659,7 @@ function SA.recommend(gs, opts)
   -- Holding has value only with Observatory (a held planet gives x1.5 to its hand) or Perkeo (copies a held card
   -- at shop end), so those keep the old behaviour.
   try(function()
+    if os.getenv("BES_NO_SHOP_PLANET_USE") == "1" then return end   -- A/B switch (arm r16c)
     local vo = (gs.run and gs.run.vouchers_owned) or {}
     local held_value = vo.v_observatory and true or false          -- live: a set { key = true }
     for _, k in ipairs(vo) do if k == "v_observatory" then held_value = true end end   -- sim: a list
