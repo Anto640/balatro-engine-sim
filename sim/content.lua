@@ -474,6 +474,12 @@ local function shop_gs(run, shop, pack)
     meta = { ante = run.ante, round = run.round, state = "SHOP", seed_hash = tostring(run.seed) },
     deck = run.deck, jokers = run.jokers, consumables = run.consumables,
     economy = advisor_economy(run),
+    -- the round's resource BUDGET, as the live shop state carries it (state_extraction reads the last blind:
+    -- base_discards 4 / discards_left 4 on a red deck). Without it GS.new defaulted both to 0, so every shop
+    -- valuation that reads the discard budget (Banner/Mystic Summit expected discards, Burnt, Burglar, the
+    -- resource table, seals, hand frequencies) saw a ZERO-discard game in the sim but 4 live (2026-09-26).
+    blind = { base_hands = run.base_hands, base_discards = run.base_discards,
+              hands_left = run.base_hands, discards_left = run.base_discards, discards_used = 0 },
     run = { hand_levels = run.hand_levels, vouchers_owned = run.vouchers_owned, tags = run.tags,
             hand_size = run.hand_size, consumable_slots = run.consumable_slots,
             joker_slots = run.joker_slots, boss_key = run._next_boss,
