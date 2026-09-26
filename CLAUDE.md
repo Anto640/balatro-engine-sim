@@ -99,11 +99,11 @@ thing **headless-testable**. See the Layout section in `README.md` for the per-f
 - **Tool index:** `tools/README.md` — 31 analysis tools grouped by the QUESTION each answers.
   Read it before writing a new one; most read existing telemetry and cost nothing to run.
 - **Tests (do this after every change):** `lua tests/runner.lua` (run via the Bash
-  tool). Lua 5.1+/LuaJIT, no `love`/`G`/Steamodded needed. Currently **1209 pass** (+ 604 sim).
+  tool). Lua 5.1+/LuaJIT, no `love`/`G`/Steamodded needed. Currently **1267 pass** (+ 605 sim, all green 2026-09-26).
   Failures print `FAIL  <case>  (got X, want Y)`; exit code is non-zero on failure.
   ⚠ **Two known, pre-existing conditions — don't mistake either for a regression you caused:**
-  (1) the sim suite has **one** standing failure, `test_world` *"no overflow on a full disposable board"*
-  (verified on clean HEAD in a scratch worktree, 2026-09-04); (2) `tests/test_shop.lua` calls
+  (1) the sim suite's standing failures are gone (2026-09-26: the CORE-PROTECTED pack-swap test was restated for
+  the R13 swap-at-the-shop-bar rule; all 605 pass) -- a sim-suite FAIL is now a real regression; (2) `tests/test_shop.lua` calls
   `table.unpack` (~line 1048), which is **nil under LuaJIT**, so that suite aborts there if you run it
   standalone with `luajit`. It is fine under `lua tests/runner.lua`, which is how it is meant to run.
 - **Phase-1 simulator suites are SEPARATE** (they drive the real engine per hand and
