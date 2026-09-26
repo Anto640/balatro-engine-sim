@@ -291,8 +291,20 @@ function Content.gen_common_joker(run, rng)
 end
 
 -- A standalone shop consumable (Tarot or Planet) item. Base $3 (Clearance-discounted). -- VERIFY
+-- Game rule: a card you already HOLD is not offered again (get_current_pool skips G.GAME.used_jokers, which covers
+-- consumables too; Showman lifts it) -- so holding a bought planet keeps that planet out of the shop. -- VERIFY
 function Content.gen_consumable(set, rng, run)
-  local key = (set == "Planet") and pick_uniform(rng, Content.planet_pool(run)) or pick_uniform(rng, Content.TAROTS)
+  local list = (set == "Planet") and Content.planet_pool(run) or Content.TAROTS
+  local held = {}
+  for _, c in ipairs((run and run.consumables) or {}) do held[c.key] = true end
+  local showman = false
+  for _, j in ipairs((run and run.jokers) or {}) do if j.key == "j_ring_master" then showman = true end end
+  local key
+  for _ = 1, 6 do
+    local cand = pick_uniform(rng, list)
+    if cand and (showman or not held[cand]) then key = cand; break end
+    key = key or cand
+  end
   return { set = set, key = key, name = key, cost = run and priced(run, 3) or 3 }
 end
 
