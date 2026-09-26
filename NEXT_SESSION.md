@@ -21,6 +21,11 @@ Owner report -> what the replay loop found (`bes_fixtures.jsonl`, 236 states; `b
 |---|---|---|---|---|---|---|
 | `s1` e2aef5a | f1 (live) | +0.226 (p 0.17) | 74/56 | 36 -> **42** | 61->67 / 47->48 | KEPT (correctness, positive) |
 | `s2` 7d0ca6a | s1 | +0.139 (p 0.27) | 47/40, 73 tied | 42 -> **43** | 67->75 / 48->52 | KEPT |
+| `fid` b984dc9 | s2 | -0.130 (p 0.33) | 51/54 | 43 -> 39 | 75->67 / 52->48 | FIDELITY (sim shop had 0 discards; live 4) -- kept; the honest baseline from here |
+| `hf` f22edfc | fid | +0.046 (p 0.81) | 69/79, 12 tied | 39 -> 38 | 67->70 / 48->50 | KEPT (correctness; null). Levels moved High Card .13->.05, Pair .18->.11, Straight .13->.21, Flush .10->.16 |
+fid exposed a guessed constant: Banner buys 0 -> 28 once the sim shop saw discards, because the "discards held at play"
+was assumed = the full budget unless the board digs. MEASURED (4061 sim plays): 36.4% of plays at 0 discards, else 75%
+of budget held, flat across builds -> `e74d263` prices Banner/Mystic Summit at that mixture in JokerValue.score_delta.
 Mechanisms fire (s1 vs f1): Strength used 22->70, Death 11->80, purple-seal picks 23->70, 82 buy-before-reroll.
 **LIVE INSTALL = `7d0ca6a`** (deployed 2026-09-26, verified 0 diffs). Sim win rate 43/160 = **26.9%** (in-sample).
 Queued arms (worktrees `../bes_wt_*`): `fid` b984dc9 (sim shop sees the discard budget -- fidelity, kept regardless),
