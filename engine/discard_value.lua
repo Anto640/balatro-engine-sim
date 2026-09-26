@@ -184,6 +184,37 @@ function DV.best(gs, opts)
     end
   end
 
+  -- (2b) BOARD-AWARE (2026-09-26, live seed 5XX3FFG3: Queens held for Shoot the Moon were pitched). Candidates
+  -- (1) and (2) are joker-blind -- chips/enhancement order, and "keep the scoring cards" throws every HELD
+  -- card, so a hand that keeps the cards the board rewards (Shoot the Moon/Baron held ranks, Photograph faces,
+  -- Walkie 10s/4s, a committed flush suit) was never even measured. Offer those sets too -- the chaff order
+  -- with board-rewarded cards kept, and the best play's scoring cards plus them -- and let the same real-draw
+  -- measurement below decide. Only widens the search; adds no weight.
+  do
+    local rel = require("engine.tarot").card_relevance_fn(gs)
+    if rel then
+      local keep_rel = {}
+      for _, c in ipairs(hand) do if rel(c) > 0 then keep_rel[c] = true end end
+      local plain = {}
+      for _, c in ipairs(order) do if not keep_rel[c] then plain[#plain + 1] = c end end
+      if #plain < #order then
+        for k = 1, math.min(maxk, #plain) do
+          local d = {}
+          for i = 1, k do d[i] = plain[i] end
+          add(d)
+        end
+        local ev0 = HandEval.best_play(gs, hand)
+        if ev0 and ev0.scoring_cards and #ev0.scoring_cards > 0 then
+          local keepset = {}
+          for _, c in ipairs(ev0.scoring_cards) do keepset[c] = true end
+          local d = {}
+          for _, c in ipairs(plain) do if not keepset[c] and #d < 5 then d[#d + 1] = c end end
+          add(d)
+        end
+      end
+    end
+  end
+
   -- (3) externally-supplied candidate discard sets (e.g. the heuristic's flush/
   -- straight draw), so a suit-blind keep-value ordering doesn't miss "discard the
   -- HIGH offsuit card to complete the flush" -- measured realistically here so it
