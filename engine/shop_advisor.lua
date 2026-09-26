@@ -1657,6 +1657,33 @@ function SA.recommend(gs, opts)
     end
   end
 
+  -- BUY-BEFORE-REROLL (2026-09-26, live seed 5XX3FFG3: rerolled away an Emperor valued +1.95 and a Strength
+  -- valued +1.15 because the reroll ranked higher). A reroll REPLACES every joker/tarot/planet in the shop
+  -- slots, so a positive-value slot item it outranks is simply destroyed -- the two are not alternatives
+  -- when you can afford both. If the top pick is a paid or free REROLL and a positive slot buy still leaves
+  -- the reroll affordable (same reserve test the reroll itself passed), buy it first; the next evaluation
+  -- re-decides the reroll on the smaller bankroll. A joker buy must leave a joker slot free (the reroll is
+  -- looking for a joker); packs and vouchers survive a reroll, so they are left alone.
+  do
+    local top = actions[1]
+    if top and top.type == "REROLL" then
+      local rc = top.cost or 0
+      local pick, pick_idx
+      for i, a in ipairs(actions) do
+        if (a.type == "BUY_JOKER" or a.type == "BUY_CONSUMABLE") and (a.value or 0) > 0
+           and (a.type ~= "BUY_JOKER" or (slots_free or 0) >= 2)
+           and (dollars(gs) - (a.cost or 0) - rc) >= (reserve - credit) then
+          if not pick or a.value > pick.value then pick, pick_idx = a, i end
+        end
+      end
+      if pick and pick_idx > 1 then
+        table.remove(actions, pick_idx)
+        table.insert(actions, 1, pick)
+        pick.reason = (pick.reason or "") .. "  [Buy this BEFORE rerolling — a reroll replaces it, and you can afford both.]"
+      end
+    end
+  end
+
   local best = actions[1]
   local alternatives = {}
   for i = 2, #actions do alternatives[#alternatives + 1] = actions[i] end

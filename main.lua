@@ -623,7 +623,9 @@ function BES.scene_of(gs)
     for _, j in ipairs(gs.shop.jokers or {}) do oj[#oj + 1] = { key = j.key or "?", cost = j.cost } end
     local op = {}
     for _, p in ipairs(gs.shop.boosters or {}) do op[#op + 1] = p.name or p.key or "?" end
-    scene.shop = { reroll_cost = gs.shop.reroll_cost, offer_jokers = oj, offer_packs = op }
+    local oc = {}
+    for _, c in ipairs(gs.shop.consumables or {}) do oc[#oc + 1] = { key = c.key or "?", cost = c.cost } end
+    scene.shop = { reroll_cost = gs.shop.reroll_cost, offer_jokers = oj, offer_consumables = oc, offer_packs = op }
   end
   if gs.pack then
     local items = {}

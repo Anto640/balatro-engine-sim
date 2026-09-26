@@ -354,6 +354,7 @@ end
 local function shop_signature(shop)
   local parts = { "r" .. tostring(shop.reroll_cost) }
   for _, j in ipairs(shop.offer_jokers or {}) do parts[#parts + 1] = (j.key or "?") .. "@" .. tostring(j.cost) end
+  for _, c in ipairs(shop.offer_consumables or {}) do parts[#parts + 1] = "c:" .. (c.key or "?") end
   for _, p in ipairs(shop.offer_packs or {}) do parts[#parts + 1] = "p:" .. tostring(p) end
   table.sort(parts)
   return table.concat(parts, "|")
@@ -470,6 +471,7 @@ function Telemetry:trace(scene)
       self.emit({ kind = "shop", seed = scene.seed, t = now, ante = scene.ante,
         dollars = scene.dollars, reroll_cost = scene.shop.reroll_cost,
         offer_jokers = Json.array(scene.shop.offer_jokers or {}),
+        offer_consumables = Json.array(scene.shop.offer_consumables or {}),
         offer_packs = Json.array(scene.shop.offer_packs or {}),
         ranked = scene.ranked and Json.array(scene.ranked) or nil,
         advice = scene.advice })

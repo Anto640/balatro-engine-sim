@@ -286,22 +286,54 @@ local function dollars(gs) return (gs.economy and gs.economy.dollars) or 0 end
 -- evaluations of the SAME state -- which is the documented cause of the live panel flickering
 -- (CLAUDE.md, Determinism). Callers that have a seeded stream hand it in; the fallback keeps
 -- old behaviour for callers that do not.
+-- SEALS THAT MAKE CONSUMABLES (2026-09-26, owner: "there shouldn't at all be any flat scores"; live seed
+-- 5XX3FFG3 skipped a Purple-seal Stone card at a flat +0.10 with 5 discards a round). Priced exactly like the
+-- generator jokers (Eval.generator_fraction): items per round x the remaining rounds x 0.5 (a card made later
+-- has less runway) x the value of one item x whether a consumable slot is free to land it in. Rates per round
+-- come from how many cards pass through the hand, MEASURED on the live self-player (bes_autoplay.log, 171
+-- blinds; bes_runs blind_result, 400 blinds): 1.62 plays of 4.26 cards and 1.88 discards of 3.79 cards per
+-- blind, 63% of the discard budget used, a discard made in 70% of blinds.
+--   Purple: a Tarot when DISCARDED -> P(drawn this round) x P(a discard follows) (the play engine pitches a
+--           purple seal first when a slot is free, discard_value). Item = a random Tarot (Packs.mean_random).
+--   Blue:   a Planet for the last played hand when HELD at round end -> P(still in hand after the final play)
+--           = (hand size - cards in that play) / deck (the play engine does not aim to hold Blue seals).
+--           Item = the best planet's measured value (as before -- the old x0.5 was one round's worth).
+CV.CARDS_PER_PLAY, CV.CARDS_PER_DISCARD = 4.26, 3.79
+CV.PLAYS_PER_BLIND, CV.DISCARD_BUDGET_USED, CV.BLINDS_WITH_DISCARD = 1.62, 0.63, 0.70
+local seal_cache = setmetatable({}, { __mode = "k" })   -- per gs: the random-Tarot mean is ~130 best_plays
+function CV.seal_generator_value(gs, seal, rng)
+  local Eval = require("engine.eval_function")
+  local R = Eval.blinds_remaining(gs)
+  local deck = gs.deck or {}
+  if R <= 0 or #deck < 5 then return 0 end
+  local hs = (gs.run and gs.run.hand_size) or 8
+  local rate, item
+  if seal == "Purple" then
+    local b = gs.blind or {}
+    local budget = b.base_discards or ((b.discards_left or 3) + (b.discards_used or 0))
+    local drawn = hs + CV.DISCARD_BUDGET_USED * budget * CV.CARDS_PER_DISCARD
+      + (CV.PLAYS_PER_BLIND - 1) * CV.CARDS_PER_PLAY
+    rate = math.min(1, drawn / #deck) * CV.BLINDS_WITH_DISCARD
+    local c = seal_cache[gs] or {}
+    seal_cache[gs] = c
+    if c.tarot == nil then c.tarot = require("engine.packs").mean_random(gs, "Tarot", { rng = rng, tarot_samples = 3 }) end
+    item = c.tarot
+  else
+    rate = math.max(0, hs - CV.CARDS_PER_PLAY) / #deck
+    local bp = CV.best_planet(gs, { samples = 6, rng = rng })
+    item = bp and (bp.value / Mechanics.boss_per_hand_need(gs)) or 0
+  end
+  local free = ((gs.run and gs.run.consumable_slots) or 2) - #(gs.consumables or {})
+  local fit = (free > 0) and 1 or 0.6          -- same transient-tray damp as the generator jokers
+  return 0.5 * rate * R * item * fit
+end
+
 function CV.card_econ_value(gs, card, rng)
   local v, enh, seal = 0, card.enhancement, card.seal
   if enh == "m_gold" then v = v + VU.dollars_to_frac(gs, 3 * 0.6) end    -- $3 if held at round end
   if enh == "m_lucky" then v = v + VU.dollars_to_frac(gs, 20 / 15) end   -- expected $ (1 in 15 -> $20)
   if seal == "Gold" then v = v + VU.dollars_to_frac(gs, 3 * 0.35) end    -- $3 when played
-  if seal == "Blue" then
-    -- B2: a Blue seal spawns a Planet if the card is HELD at end of round. best_planet().value
-    -- is a RAW score (freq x level_gain, ~10-150), but card_econ_value is a BOSS-HAND FRACTION
-    -- sum (~0.02) -- so adding it raw made ANY Blue-seal card ~100x over-valued and auto-dominate
-    -- a Standard-pack pick. Normalise to the fraction scale by dividing by boss_per_hand_need.
-    local bp = CV.best_planet(gs, { samples = 6, rng = rng })
-    local frac = bp and (bp.value / Mechanics.boss_per_hand_need(gs)) or 0.2
-    v = v + frac * 0.5                                            -- x0.5: only if held at round end
-  elseif seal == "Purple" then
-    v = v + 0.10                                                  -- spawns a Tarot on discard
-  end
+  if seal == "Blue" or seal == "Purple" then v = v + CV.seal_generator_value(gs, seal, rng) end
   return v
 end
 
@@ -317,19 +349,42 @@ function CV.card_add_value(gs, card, opts)
   if not deck or #deck < CV.MIN_DECK then return nil end
   local need = opts.need or 1
   local samples = mc(opts.samples or 12)
+  local rng = opts.rng or math.random
+  local hs = math.min((gs.run and gs.run.hand_size) or 8, #deck)
 
+  -- PAIRED (2026-09-26). E[best play | deck + card] - E[best play | deck] is exactly
+  --   P(the card is in the hand) x E[score(hand with a random card replaced by it) - score(hand)],
+  -- P = hs / (N + 1). The old estimate measured the two decks on INDEPENDENT hands, and one card in ~52
+  -- barely moves an 8-card average, so the difference was noise: live seed 5XX3FFG3 priced a foil King
+  -- at -0.41 and a Steel 3 at -0.21 on a Photograph/Hack board and skipped the pack as "bloat". Scoring
+  -- the SAME hand with and without the card measures the same quantity (bloat included -- the card
+  -- displaces one you'd have drawn) without that noise.
+  local base_sum, delta_sum = 0, 0
+  for _ = 1, samples do
+    local sh = {}
+    for k = 1, #deck do sh[k] = deck[k] end
+    for k = #sh, 2, -1 do
+      local r = math.floor(rng() * k) + 1
+      if r > k then r = k end
+      sh[k], sh[r] = sh[r], sh[k]
+    end
+    local hand = {}
+    for k = 1, hs do hand[k] = sh[k] end
+    local b = HandEval.best_play(gs, hand)
+    local bs = (b and b.score) or 0
+    local slot = math.min(hs, math.floor(rng() * hs) + 1)
+    local h2 = {}
+    for k = 1, hs do h2[k] = hand[k] end
+    h2[slot] = card
+    local w = HandEval.best_play(gs, h2)
+    base_sum = base_sum + bs
+    delta_sum = delta_sum + (((w and w.score) or 0) - bs)
+  end
   local base = opts.base
-  if base == nil then base = JokerValue.avg_score(gs, { samples = samples, rng = opts.rng }) or 0 end
+  if base == nil then base = base_sum / samples end
+  local delta = (hs / (#deck + 1)) * delta_sum / samples
 
-  local with = {}
-  for i = 1, #deck do with[i] = deck[i] end
-  with[#with + 1] = card
-  local gs_with = {}
-  for k, v in pairs(gs) do gs_with[k] = v end
-  gs_with.deck = with
-  local withv = JokerValue.avg_score(gs_with, { samples = samples, rng = opts.rng }) or 0
-
-  return (withv - base) / need + CV.card_econ_value(gs, card, opts.rng) + CV.add_card_feed(gs, base, need)
+  return delta / need + CV.card_econ_value(gs, card, opts.rng) + CV.add_card_feed(gs, base, need)
 end
 
 -- Extra value of ADDING a playing card to the deck when you own a joker FED by deck size. The measured

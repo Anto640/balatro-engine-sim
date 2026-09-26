@@ -70,7 +70,13 @@ local function shop_pod(sh)
   for _, v in ipairs(sh.vouchers or {}) do
     vouchers[#vouchers + 1] = { key = v.key, name = v.name, cost = v.cost }
   end
-  return { jokers = jokers_pod(sh.jokers), boosters = boosters, vouchers = vouchers,
+  -- tarots/planets/spectrals for sale share the joker slots (a reroll replaces them too); without them a
+  -- replayed shop can never reproduce a consumable buy (live seed 5XX3FFG3: Emperor/Strength/planets)
+  local consumables = Json.array({})
+  for _, c in ipairs(sh.consumables or {}) do
+    consumables[#consumables + 1] = { key = c.key, name = c.name, set = c.set, cost = c.cost }
+  end
+  return { jokers = jokers_pod(sh.jokers), consumables = consumables, boosters = boosters, vouchers = vouchers,
            reroll_cost = sh.reroll_cost, joker_slots = sh.joker_slots,
            free_rerolls = sh.free_rerolls }
 end

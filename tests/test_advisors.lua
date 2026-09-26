@@ -336,7 +336,7 @@ return function(t)
       -- each is non-negative and priced by its real effect (Blue's Planet value scales with the board's
       -- xmult -- Duo x2 * Cavendish x3 here -- so it is not bounded to <1; see the B2 note below).
       for _, k in ipairs({ "c_talisman", "c_deja_vu", "c_trance", "c_medium" }) do
-        t.ok(seals[k] >= 0 and seals[k] < 5, k .. " is priced by its real seal effect (deck-aware, finite)")
+        t.ok(seals[k] >= 0 and seals[k] < 50, k .. " is priced by its real seal effect (deck-aware, finite)")
       end
       local sig = ({ CV.card_value(built, "Spectral", "c_sigil", nil, need, lcg(4), 8) })[1]
       t.ok(sig and sig >= 0 and sig < 5, "Sigil is measured off the deck (finite flush value), not a flat 0.3")
@@ -717,7 +717,20 @@ return function(t)
     t.ok(CV.card_econ_value(gs, card{ enhancement = "m_gold" }) > 0, "Gold enhancement: $ economy")
     t.ok(CV.card_econ_value(gs, card{ enhancement = "m_lucky" }) > 0, "Lucky enhancement: $ economy")
     t.ok(CV.card_econ_value(gs, card{ seal = "Gold" }) > 0, "Gold seal: $ when played")
-    t.ok(CV.card_econ_value(gs, card{ seal = "Purple" }) > 0, "Purple seal: spawns a tarot")
+    t.eq(CV.card_econ_value(gs, card{ seal = "Purple" }), 0, "Purple seal: no deck -> nothing to draw it from")
+    -- 2026-09-26: Purple/Blue are priced like the generator jokers (items/round x rounds left x item value x
+    -- slot fit), not a flat +0.10 -- so more discards (more cards drawn) make a Purple seal worth more.
+    local deck = {}
+    for _, su in ipairs({ "Spades", "Hearts", "Clubs", "Diamonds" }) do
+      for r = 2, 14 do deck[#deck + 1] = card{ id = #deck + 1, rank_id = r, suit = su } end
+    end
+    local d3 = GS.new{ deck = deck, blind = { base_discards = 3 } }
+    local d5 = GS.new{ deck = deck, blind = { base_discards = 5 } }
+    local p3 = CV.card_econ_value(d3, card{ seal = "Purple" }, lcg(3))
+    local p5 = CV.card_econ_value(d5, card{ seal = "Purple" }, lcg(3))
+    t.ok(p3 > 0, "Purple seal: spawns a tarot")
+    t.ok(p5 > p3, "Purple seal: more discards -> more tarots -> worth more")
+    t.ok(math.abs(p3 - 0.10) > 1e-6, "Purple seal is modelled, not the old flat 0.10")
   end
 
   -- ---- cost matters: cheaper item of equal effect is preferred ----

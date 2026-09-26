@@ -164,9 +164,44 @@ local function shuffled(list, rng)
   return a
 end
 
+-- STRENGTH targets (2026-09-26, live seed 5XX3FFG3). +1 rank is worth what the NEW rank earns from the board
+-- minus what the old rank did: 3->4 gains Walkie Talkie + Even Steven and keeps Hack, J->Q gains Shoot the Moon,
+-- while 10->J LOSES Walkie Talkie. The old rule (the most build-relevant / highest-chip cards) aimed straight at
+-- the cards the board already rewards -- the worst targets. Ranks non-Ace, non-Stone cards by the change in
+-- joker triggers (T.card_relevance_fn), then chips; with no board preference it is the old highest-chips rule.
+-- Shared by the value (apply_to_hand, shop_value), the advice (best_targets) and the sim world, so the card that
+-- is valued is the card the self-player selects.
+function T.strength_targets(pool, gs, n)
+  local rel = gs and T.card_relevance_fn(gs) or nil
+  local cand = {}
+  for _, c in ipairs(pool or {}) do
+    local r = Cards.rank_id(c) or 0
+    if not Cards.is_stone(c) and r > 0 and r < 14 then
+      local d = 0
+      if rel then
+        local up = {}
+        for k, v in pairs(c) do up[k] = v end
+        up.rank_id = r + 1
+        d = rel(up) - rel(c)
+      end
+      cand[#cand + 1] = { c = c, d = d }
+    end
+  end
+  table.sort(cand, function(a, b)
+    if a.d ~= b.d then return a.d > b.d end
+    local ca, cb = Cards.chips(a.c), Cards.chips(b.c)
+    if ca ~= cb then return ca > cb end
+    return (a.c.id or 0) < (b.c.id or 0)
+  end)
+  local out = {}
+  for k = 1, math.min(n or 2, #cand) do out[k] = cand[k].c end
+  return out
+end
+
 -- Return a NEW hand list with the tarot applied to its best targets (highest
--- chip cards), or nil if `key` isn't a card-modifying tarot.
-function T.apply_to_hand(hand, key)
+-- chip cards), or nil if `key` isn't a card-modifying tarot. `gs` (optional) makes
+-- Strength build-aware (T.strength_targets).
+function T.apply_to_hand(hand, key, gs)
   local spec = T.ENH[key]
   if spec then
     local order = {}
@@ -200,23 +235,15 @@ function T.apply_to_hand(hand, key)
     end
     return new
   end
-  -- Strength: +1 rank to the 2 highest non-Ace cards (Ace would wrap; skip it). Boosts
-  -- high-card / can complete straights and pairs -- the replay in best_use captures it.
+  -- Strength: +1 rank to 2 non-Ace cards (Ace would wrap), aimed by T.strength_targets.
   if key == "c_strength" then
-    local cand = {}
-    for i, c in ipairs(hand) do
-      if not Cards.is_stone(c) and (Cards.rank_id(c) or 0) < 14 then cand[#cand + 1] = i end
-    end
-    if #cand == 0 then return nil end
-    table.sort(cand, function(a, b)
-      local ca, cb = Cards.chips(hand[a]), Cards.chips(hand[b])
-      if ca ~= cb then return ca > cb end
-      return (hand[a].id or 0) < (hand[b].id or 0)
-    end)
+    local tg = T.strength_targets(hand, gs, 2)
+    if #tg == 0 then return nil end
+    local hit = {}
+    for _, c in ipairs(tg) do hit[c] = true end
     local new = {}
-    for i, c in ipairs(hand) do new[i] = c end
-    for k = 1, math.min(2, #cand) do
-      local i = cand[k]; new[i] = copy_card(hand[i]); new[i].rank_id = Cards.rank_id(hand[i]) + 1
+    for i, c in ipairs(hand) do
+      if hit[c] then new[i] = copy_card(c); new[i].rank_id = Cards.rank_id(c) + 1 else new[i] = c end
     end
     return new
   end
@@ -317,7 +344,7 @@ function T.best_targets(gs, key, pool)
   end
   -- RANK — Strength: +1 rank to the 2 highest NON-ACE cards (Ace would wrap). Mirrors apply_to_hand.
   if key == "c_strength" then
-    local out = top_n(function(c) return (Cards.rank_id(c) or 0) < 14 end, 2)
+    local out = T.strength_targets(pool, gs, 2)
     return (#out > 0) and out or nil
   end
   -- RANK — Death: select the 2 highest; the lower becomes a copy of the higher (a pair). Both are chosen.
@@ -457,7 +484,7 @@ function T.best_use(gs, base_ev, remaining, dollar_value, filter)
           end
         end
       else
-        local nh = T.apply_to_hand(hand, c.key)
+        local nh = T.apply_to_hand(hand, c.key, gs)
         if nh then
           local ev2, cards2 = HandEval.best_play_target(with_hand(gs, nh), nh, remaining, filter)
           local gain = ev2 and ((ev2.score or 0) - base) or 0
@@ -490,7 +517,7 @@ end
 -- apply it to sampled hands and measure the best-play gain. nil for money tarots
 -- or when there's no deck to sample.
 function T.shop_value(gs, key, opts)
-  if not (T.ENH[key] or T.SUIT[key]) then return nil end
+  if not (T.ENH[key] or T.SUIT[key] or T.RANK[key]) then return nil end
   opts = opts or {}
   local rng = opts.rng or math.random
   local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
@@ -503,7 +530,7 @@ function T.shop_value(gs, key, opts)
     local h = {}
     for i = 1, hs do h[i] = s[i] end
     local b = HandEval.best_play(gs, h)
-    local nh = T.apply_to_hand(h, key) or h
+    local nh = T.apply_to_hand(h, key, gs) or h
     local w = HandEval.best_play(gs, nh)
     total = total + ((w and w.score or 0) - (b and b.score or 0))
   end
