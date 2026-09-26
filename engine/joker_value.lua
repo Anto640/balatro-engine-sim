@@ -88,7 +88,46 @@ end
 -- sampled from the deck (paired: the SAME hand is scored with and without the
 -- joker, so the difference is purely the joker's contribution). Returns nil if
 -- it cannot be measured (no deck / joker has no scoring model) -> use a prior.
+-- DISCARD READERS outside a blind (2026-09-26). Banner (+30 chips per discard LEFT) and Mystic Summit (+15 mult at
+-- 0 discards left) read the discards you still hold when you play -- but a shop state carries the fresh budget, so
+-- both were priced at their best/worst case (Banner at all 4 kept, an owned Mystic Summit inert). Measured on the
+-- sim's own play (sim_out/fid.jsonl, 4061 plays): 36.4% of plays are made at 0 discards, and the rest hold 75% of
+-- the budget on average (mean held 1.94 of ~4.05) -- flat across builds (Banner boards 2.00, discard-joker boards
+-- 1.85). So outside a blind these two are the exact two-point mixture of that distribution (Banner is linear in
+-- discards, Mystic a step at 0), measured on common hands.
+JV.PLAY_AT_ZERO_DISCARDS = 0.364
+JV.HELD_FRAC_NONZERO = 0.75
+local DISCARD_READERS = { j_banner = true, j_mystic_summit = true }
+local score_delta_raw
 function JV.score_delta(gs, joker, opts)
+  local st = gs.meta and gs.meta.state
+  if not (joker and DISCARD_READERS[joker.key]) or st == "SELECTING_HAND" or not JV.can_measure(gs, joker) then
+    return score_delta_raw(gs, joker, opts)
+  end
+  opts = opts or {}
+  local rng = opts.rng or math.random
+  local seed = math.floor(rng() * 2147483646) + 1
+  local function at(dl)
+    local g = {}
+    for k, v in pairs(gs) do g[k] = v end
+    local b = {}
+    for k, v in pairs(gs.blind or {}) do b[k] = v end
+    b.discards_left = dl
+    g.blind = b
+    local o = {}
+    for k, v in pairs(opts) do o[k] = v end
+    local st2 = seed
+    o.rng = function() st2 = (st2 * 16807) % 2147483647; return (st2 - 1) / 2147483646 end
+    return score_delta_raw(g, joker, o)
+  end
+  local b = gs.blind or {}
+  local base = b.base_discards or ((b.discards_left or 0) + (b.discards_used or 0))
+  local z, nz = at(0), at(math.floor(base * JV.HELD_FRAC_NONZERO + 0.5))
+  if z == nil or nz == nil then return z or nz end
+  return JV.PLAY_AT_ZERO_DISCARDS * z + (1 - JV.PLAY_AT_ZERO_DISCARDS) * nz
+end
+
+function score_delta_raw(gs, joker, opts)
   if not JV.can_measure(gs, joker) then return nil end
   opts = opts or {}
   local rng = opts.rng or math.random
@@ -101,7 +140,7 @@ function JV.score_delta(gs, joker, opts)
   if cache then
     ckey = "delta|" .. samples .. "|" .. hs .. "|"
       .. (joker.key or "?") .. ":" .. (joker.edition or "") .. "|"
-      .. jokers_sig(gs.jokers) .. "|" .. deck_sig(deck, cache)
+      .. jokers_sig(gs.jokers) .. "|" .. deck_sig(deck, cache) .. "|d" .. tostring(gs.blind and gs.blind.discards_left)
     local hit = cache[ckey]
     if hit ~= nil then return hit end
   end
