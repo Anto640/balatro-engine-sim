@@ -1,5 +1,13 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## ⭐⭐⭐ 2026-09-26 (later) — R15 LIVE REVIEW (seed 978TLFTS, died ante 5) — LIVE INSTALL `3cc50c6`
+| owner observation | verdict | fix |
+|---|---|---|
+| Hex used on a FULL board, destroyed 4 jokers (incl. the Hanging Chad just bought) | REAL -- a SELF-PLAYER bug, not valuation: the measured pass said SKIP (Hex -4.2); the skip click failed (button not rendered), the re-evaluation surfaced the INSTANT priors-only pass ("Take Hex", flat 0.6) and the stuck-state deadlock-breaker forced it through | `9df76ae`: the instant pack pass is marked provisional; Autoplay never executes it (own 20 s valve, not bypassed by `forced`); the cheap pass prices Hex/Ankh by their real formula. Regression test verified to FAIL without the gate |
+| Riff-Raff: never sold weak jokers to make room | REAL: on a full board the dead spawner was itself the weakest joker, so the flat-constant farm rule never fired | `3cc50c6`: farm sale = weakest NON-spawner, credited with the measured Common a freed slot lands + cash (flat 0.5/0.3 retired) |
+| Foil 2 / Foil Ace over Gold-seal cards (Hanging Chad) | close calls on that board: Foil 2 .082 vs Gold-seal 7 .073; Foil Ace .226 (Scholar pays Aces) vs Gold-seal Mult 4 .105; Chad was bought AFTER both packs | none. Open: the Gold-seal $ in card_econ_value ignores a Chad retrigger (the in-blind money model is retrigger-aware; the card valuation is not) -- fold into the no-flat audit retry |
+| died ante 5, meh jokers, no xmult | the known build-assembly wall | none |
+
 ## ⭐⭐⭐ 2026-09-26 — R14 LIVE REVIEW (seed 5XX3FFG3, died ante 5 on a flat-mult board) — read with START HERE below
 
 Owner report -> what the replay loop found (`bes_fixtures.jsonl`, 236 states; `bes_autoplay.log` 00:21-00:45):

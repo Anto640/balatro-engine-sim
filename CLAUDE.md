@@ -28,7 +28,7 @@ plus a large correctness/coverage/strategy pass.
 > "only Mult" measurement was invalid because the sampled hand contained no Diamonds at all. **Replay the
 > recorded state; do not rebuild it from the description.**
 >
-> ### ⭐⭐⭐⭐⭐ LATEST (2026-09-26): R14 live review — install `f22edfc`, CONFIRMED vs old live in the corrected sim: 32->38/160 in-sample, 28->49/160 OOS (p 0.022); read the R14 block atop `NEXT_SESSION.md`.
+> ### ⭐⭐⭐⭐⭐ LATEST (2026-09-26): R15 — install `3cc50c6` (R14 + self-player never executes a provisional pack pick + Riff-Raff farm). R14 live review — engine `f22edfc`, CONFIRMED vs old live in the corrected sim: 32->38/160 in-sample, 28->49/160 OOS (p 0.022); read the R14 block atop `NEXT_SESSION.md`.
 > ### (previous) 2026-09-25: read the "START HERE" block of `NEXT_SESSION.md` — live install `0ed0a6d`,
 > ### sim win rate 22.5% (36/160, was 6.2% on 09-23), the win-rate checkpoint table, and the prioritised next sessions.
 > ### Every joker is now MEASURED except Mr Bones / Diet Cola / Credit Card; forward valuation ON; the tier floor STAYS.
