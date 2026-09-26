@@ -306,6 +306,16 @@ BES.job = nil            -- in-flight background job: { thread, gs, sig, finish 
 -- `provisional` = this is the instant priors-only pass; the measured refine will replace it. The self-player must
 -- never EXECUTE a provisional pick (live 978TLFTS: the measured pass said SKIP, a re-evaluation surfaced the cheap
 -- pass's flat-prior 'Take Hex', and the self-player used it on a full board -- four jokers destroyed).
+-- Arcana / Spectral packs DEAL your hand a moment after they open (the card tarots target it). A pack decision
+-- made before that deal is judged on an EMPTY hand -- live BQ63E388: Justice was selected on the empty-hand state,
+-- then Strength once the 8 cards arrived. Such a decision is provisional too.
+function BES.pack_awaits_hand(gs)
+  if gs.hand and #gs.hand > 0 then return false end
+  for _, it in ipairs((gs.pack and gs.pack.items) or {}) do
+    if it.set == "Tarot" or it.set == "Spectral" then return true end
+  end
+  return false
+end
 function BES.apply_pack(gs, po, provisional)
   local pick = po.best
   local action
@@ -338,7 +348,8 @@ function BES.apply_pack(gs, po, provisional)
       reason = po.reason, confidence = 0.75,
     }
   end
-  BES.last = { gs = gs, ranked = { best = action }, pack = true, provisional = provisional or nil }
+  BES.last = { gs = gs, ranked = { best = action }, pack = true,
+    provisional = (provisional or BES.pack_awaits_hand(gs)) or nil }
   if Overlay then Overlay.set({ best = action }) end
   Log.info("PACK: " .. (po.reason or ""))
 end
