@@ -727,6 +727,18 @@ local function apply_action(run, shop, a, rng)
       if c == a.target then run.economy.dollars = run.economy.dollars + 1; table.remove(run.consumables, i); return true end
     end
     return false
+  elseif tp == "USE_CONSUMABLE" and a.target and a.kind ~= "income" then
+    -- using a held Planet / Black Hole in the shop (the live self-player can; 2026-09-26 the engine proposes it). Was
+    -- unexecutable here, and a refused action ENDS the shop loop -- so every such proposal silently cost the rest of
+    -- that shop visit (arm r16 bought 5% fewer packs for exactly this reason).
+    local uses = {}
+    local consumed = require("sim.world")._use_consumable(run,
+      { use_names = a.use_keys or a.use_names or { a.target.key } }, uses, nil, nil, nil)
+    if consumed and uses[1] then
+      local u = uses[1]
+      trace(run, { kind = "consumable_use", key = u.key, set = u.set, levels = u.levels, via = "shop" })
+    end
+    return consumed
   elseif tp == "USE_CONSUMABLE" and a.target and a.kind == "income" then
     -- F6 shop funding: cash an owned Hermit/Temperance, then re-run the advisor
     -- so the now-affordable measured purchase is taken on the next loop.
