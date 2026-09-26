@@ -26,8 +26,10 @@ Owner report -> what the replay loop found (`bes_fixtures.jsonl`, 236 states; `b
 fid exposed a guessed constant: Banner buys 0 -> 28 once the sim shop saw discards, because the "discards held at play"
 was assumed = the full budget unless the board digs. MEASURED (4061 sim plays): 36.4% of plays at 0 discards, else 75%
 of budget held, flat across builds -> `e74d263` prices Banner/Mystic Summit at that mixture in JokerValue.score_delta.
+| `au` e74d263 | hf | -0.194 (p 0.29) | 66/73 | 38 -> 33 | 70->59 / 50->44 | NOT deployed -- split into `at` (b816068, audit batch 1 alone) and `bm` (hf + Banner/Mystic alone) to find the cost. Emperor use 18->73 (2 x mean random tarot, which carries Hermit's $) displaced Strength 78->51 / Hierophant 84->57; Mystic Summit buys 0->14 |
+**LIVE INSTALL = `f22edfc`** (s2 + dig-aware frequencies; the fid commit is sim-only). Verified 0 diffs.
 Mechanisms fire (s1 vs f1): Strength used 22->70, Death 11->80, purple-seal picks 23->70, 82 buy-before-reroll.
-**LIVE INSTALL = `7d0ca6a`** (deployed 2026-09-26, verified 0 diffs). Sim win rate 43/160 = **26.9%** (in-sample).
+(was live `7d0ca6a` earlier on 2026-09-26.) Sim win rate 43/160 = **26.9%** (in-sample).
 Queued arms (worktrees `../bes_wt_*`): `fid` b984dc9 (sim shop sees the discard budget -- fidelity, kept regardless),
 `hf` f22edfc (dig-aware hand frequencies, vs fid), `au` b816068 (no-flat audit batch 1, vs hf). Then an OOS
 replication (BES_SEED_OFF=7) of the final stack vs f1 before calling the gain real.
