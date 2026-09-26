@@ -1588,4 +1588,27 @@ return function(t)
     local f = Eval.forward_measure(gs, hc, m, { rng = lcg(2), samples = 24, cache = JV.new_cache() })
     t.ok(f > m, "Hanging Chad at ante 1: forward value (projected enhanced deck) exceeds the bare-deck reading")
   end
+
+  -- ---- SPAWNER FARM (live 978TLFTS, 2026-09-26): on a full board a dead Riff-Raff was itself the weakest joker, so
+  -- the only sale ever considered was Riff-Raff. The farm sale is its own candidate: a NON-spawner joker, credited
+  -- with the measured Common the freed slot lands. ----
+  do
+    local deck = {}
+    for _, su in ipairs({ "Spades", "Hearts", "Clubs", "Diamonds" }) do
+      for r = 2, 14 do deck[#deck + 1] = { id = #deck + 1, rank_id = r, suit = su } end
+    end
+    local function jk(key, id) return { key = key, id = id, name = key, sell_value = 2, ability = { extra = {} } } end
+    local gs = GS.new{ deck = deck, economy = { dollars = 10, interest_cap = 5 }, meta = { ante = 2 },
+      jokers = { jk("j_riff_raff", 1), jk("j_joker", 2), jk("j_joker", 3), jk("j_joker", 4), jk("j_joker", 5) },
+      run = { hand_levels = {}, hand_size = 8, joker_slots = 5, consumable_slots = 2 },
+      blind = { base_discards = 3, base_hands = 4 },
+      shop = { jokers = {}, consumables = {}, vouchers = {}, boosters = {}, reroll_cost = 5, joker_slots = 5 } }
+    local s = 17
+    local r = SA.recommend(gs, { rng = function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end })
+    local farm
+    for _, a in ipairs({ r.best, table.unpack and table.unpack(r.alternatives) or unpack(r.alternatives) }) do
+      if a.type == "SELL_JOKER" and a.target and a.target.key ~= "j_riff_raff" and (a.reason or ""):find("spawner") then farm = a end
+    end
+    t.ok(farm ~= nil, "a full board with Riff-Raff offers a farm sale of a NON-spawner joker")
+  end
 end

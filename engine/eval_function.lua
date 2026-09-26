@@ -22,6 +22,7 @@ local Eval = {}
 -- put a boss-hand fraction on the SAME scale as the tier path (no downstream
 -- retune). 1 fraction is worth VU.FV_PER_FRAC FV points, and FV = weight*jp, so:
 local FV_JOKER_WEIGHT = 1.5
+Eval.FV_JOKER_WEIGHT = FV_JOKER_WEIGHT   -- frac -> FV for callers pricing a hypothetical joker
 local JP_PER_FRAC = VU.FV_PER_FRAC / FV_JOKER_WEIGHT   -- == 0.5/0.3 (tier*0.5 jp vs tier*0.3 frac)
 
 -- Total situational downside (future-value units) across owned jokers. Subtracted

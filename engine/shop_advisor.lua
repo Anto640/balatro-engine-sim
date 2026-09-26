@@ -93,13 +93,13 @@ SA.CREATES_JOKER = { c_judgement = true }
 -- Value of a RANDOM created joker (Judgement) when the board is FULL: making room means selling a kept
 -- joker for a random one, a poor trade, so credit it low. Full value applies only with a free slot.
 SA.CREATE_FULL_BOARD_CREDIT = 0.1
--- Per-blind joker GENERATORS: they spawn a Joker at blind start ONLY if a slot is free, so on a full
--- board the spawn overflows and is WASTED. Owning one makes an OPEN slot recurring value -> sell a
--- disposable common to reopen a slot and farm the generator (a common to cash each blind + a shot at a
--- keeper). SLOT_FARM_JOKER is the FV value of one reopened slot; FARM_MAX_CONTRIB gates it to genuinely
--- low-value jokers so a working board is never disturbed. (Owner-reported: Riff-Raff run.)
-SA.SLOT_FARM_JOKER = { j_riff_raff = 0.5 }
-SA.FARM_MAX_CONTRIB = 0.3
+-- Per-blind joker GENERATORS (Riff-Raff): they spawn Jokers at blind start ONLY into FREE slots, so on a full
+-- board they are dead -- and the spawner itself then reads as the board's weakest joker, so the only sale
+-- ever considered was the spawner (live 978TLFTS: Riff-Raff filled the board once at ante 1, sat dead, and was
+-- sold). The farm sale is its own candidate below: the weakest joker OTHER than the spawner, credited with
+-- the MEASURED joker a freed slot lands (an expected Common) plus its cash. (Was a flat 0.5 credit gated by a
+-- flat 0.3 contribution cap -- owner rule: no flat scores.)
+SA.SLOT_SPAWNER = { j_riff_raff = "Common" }
 -- Proactive-sell nudge (future-value units) for jokers that DECAY to nothing or
 -- carry a downside, so converting them to cash/another joker before they expire
 -- is often right. Heuristic + extensible; joker-destruction interactions
@@ -1364,13 +1364,7 @@ function SA.recommend(gs, opts)
       end
       local nudge = SA.SELL_NUDGE[j.key] or 0      -- decay/downside proactive credit
       local sbonus, sbnote = OwnedSynergy.sell_bonus(gs) -- Campfire etc: selling itself is valuable
-      -- RIFF-RAFF SLOT FARMING (SA.SLOT_FARM_JOKER): on a FULL board, selling a disposable common reopens
-      -- a slot so an owned per-blind generator can spawn again. Only when slots are full AND the weakest
-      -- joker is genuinely low-value, so a working board is never disturbed.
-      local farm = 0
-      if slots_free <= 0 and worst_c <= SA.FARM_MAX_CONTRIB then
-        for _, jk in ipairs(gs.jokers) do farm = farm + (SA.SLOT_FARM_JOKER[jk.key] or 0) end
-      end
+      local farm = 0   -- the spawner farm sale is its own candidate (SA.SLOT_SPAWNER, below)
       local value
       if upgrade > 0 then
         value = money_w * eff_cash + SA.W_FV * (upgrade + nudge + sbonus + farm)   -- keep already charged in `upgrade`
@@ -1392,6 +1386,41 @@ function SA.recommend(gs, opts)
         type = "SELL_JOKER", target = j, cost = 0, value = value,
         reason = string.format("Sell %s (+$%d) — %s.", j.name or j.key or "joker", cash, why),
       }
+    end
+    -- SPAWNER FARM: a full board with a per-blind joker spawner (Riff-Raff). Sell the weakest joker that is
+    -- NOT a spawner; the freed slot lands one spawned joker next blind (value measured on this board) and
+    -- the sale's cash is real. Same protected selection (keep_bias, survival penalty) as the sale above.
+    if slots_free <= 0 then
+      local rarity
+      for _, jk in ipairs(gs.jokers) do rarity = rarity or SA.SLOT_SPAWNER[jk.key] end
+      if rarity then
+        local fi, fc, feff = nil, math.huge, math.huge
+        for i = 1, #gs.jokers do
+          local jk = gs.jokers[i]
+          local ab = jk.ability
+          local ex = (type(ab) == "table" and type(ab.extra) == "table") and ab.extra or nil
+          local eternal = type(ab) == "table" and (ab.eternal or (ex and ex.eternal))
+          if not eternal and not SA.SLOT_SPAWNER[jk.key] then
+            local c = joker_contribution(gs, i, sell_mopts)
+            local c_eff = c + BuildPlan.keep_bias(jk.key, gs, Eval.joker_fires(gs, i, sell_mopts))
+            local sv = sell_pressure and surv() or nil
+            if sv then c_eff = c_eff + sv.penalty(i) end
+            if c_eff < feff then fi, fc, feff = i, c, c_eff end
+          end
+        end
+        local spawned = fi and Packs.expected_joker_of_rarity(gs, rarity, { rng = rng, samples = 3, measure_count = 6 })
+        if fi and spawned then
+          local fj = gs.jokers[fi]
+          local fcash = fj.sell_value or 1
+          local fmoney = SA.DOLLAR_UTIL * (secure and 0.6 or 1.2) * fcash
+          local fvalue = fmoney + SA.W_FV * (Eval.FV_JOKER_WEIGHT * spawned - (feff - fc) - fc)
+          actions[#actions + 1] = {
+            type = "SELL_JOKER", target = fj, cost = 0, value = fvalue,
+            reason = string.format("Sell %s (+$%d) — frees a slot for your Joker-spawner (Riff-Raff) to fill next blind.",
+              fj.name or fj.key or "joker", fcash),
+          }
+        end
+      end
     end
   end
   end)
