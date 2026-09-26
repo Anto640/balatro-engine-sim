@@ -92,18 +92,93 @@ end
 -- per-CALL caches (eval cache._hand_freq) already capture within-call repeats and the
 -- board changes between shop buys so cross-call hit rate is low. A real speedup needs a
 -- CHEAP, invalidation-aware deck signature (deck mutates in place on card buys), not this.
+-- ⭐ DIG-AWARE (2026-09-26, live seed 5XX3FFG3 bought Pluto/Mercury/Venus from the shop). This used to be the
+-- best play of ONE 8-card deal with no discards, which is not the hand anyone plays: measured over the sim's
+-- ante-1 plays (f1, 713 plays) the engine plays Full House .21 / Straight .20 / Two Pair .20 / Flush .19 / Pair
+-- .09, but the first deal says Two Pair .34 / Pair .32 / Straight .09 / FH .07 / Flush .06 -- weak-hand planets
+-- priced ~3x too high, Straight/Flush/FH ~2-3x too low (L1 error 0.82). Each sample now DIGS first: the expected
+-- number of discards used (budget x the live-measured CV.DISCARD_BUDGET_USED 0.63), each thrown by the play
+-- engine's own cheap draw heuristic (Heuristics.best_discard -- flush/straight/set draws, the same one the
+-- survival rollout digs with), then records the best play of the hand it reaches (L1 error 0.33).
+-- It costs ~8x a plain deal, so the result is MEMOISED by the state's CONTENT (cards, jokers, levels, hand size,
+-- discards, boss), and sampled with an RNG seeded from that content: a pure function of the state, so a cached
+-- value is the value, and it is identical across sim worker processes (the caller's rng is not consumed).
+local HF_CACHE, HF_N = {}, 0
+local function lcg_rng(seed)
+  local st = math.floor(seed) % 2147483647
+  if st <= 0 then st = st + 2147483646 end
+  return function() st = (st * 16807) % 2147483647; return (st - 1) / 2147483646 end
+end
+CV.HAND_NAMES = { "High Card", "Pair", "Two Pair", "Three of a Kind", "Straight", "Flush", "Full House",
+  "Four of a Kind", "Straight Flush", "Five of a Kind", "Flush House", "Flush Five" }
+local function num_sig(t)
+  if type(t) ~= "table" then return tostring(t) end
+  local ks = {}
+  for k, v in pairs(t) do if type(v) == "number" or type(v) == "string" or type(v) == "boolean" then ks[#ks + 1] = k end end
+  table.sort(ks, function(a, b) return tostring(a) < tostring(b) end)
+  local out = {}
+  for n, k in ipairs(ks) do out[n] = tostring(k) .. "=" .. tostring(t[k]) end
+  if type(t.extra) == "table" then out[#out + 1] = "{" .. num_sig(t.extra) .. "}" end
+  return table.concat(out, ",")
+end
+local function card_sig(c)
+  return (Cards.rank_id(c) or 0) .. (c.suit or "") .. (c.enhancement or "") .. (c.edition or "")
+    .. (c.seal or "") .. (c.perma_chips or "") .. (c.debuffed and "d" or "")
+end
+-- One sample count for every caller (they asked for 6-12, which reads a 12-way distribution at 1/8 steps --
+-- Pluto flipped buy/skip on that alone). Affordable because the result is memoised per state.
+CV.FREQ_SAMPLES = 24
 function CV.hand_frequencies(gs, opts)
   opts = opts or {}
-  local rng = opts.rng or math.random
-  local samples = mc(opts.samples or 12)
+  local samples = mc(CV.FREQ_SAMPLES)
   local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
   if not deck or #deck < CV.MIN_DECK then return nil end
   local hs = math.min((gs.run and gs.run.hand_size) or 8, #deck)
+  local b = gs.blind or {}
+  local budget = b.base_discards or ((b.discards_left or 3) + (b.discards_used or 0))
+  local D = math.floor(budget * CV.DISCARD_BUDGET_USED + 0.5)
+
+  -- canonical (sorted) deck so equal content samples identically regardless of order
+  local sigs, order = {}, {}
+  for k = 1, #deck do order[k] = k; sigs[k] = card_sig(deck[k]) end
+  table.sort(order, function(a, c) if sigs[a] ~= sigs[c] then return sigs[a] < sigs[c] end return a < c end)
+  local cdeck, dparts = {}, {}
+  for k, idx in ipairs(order) do cdeck[k] = deck[idx]; dparts[k] = sigs[idx] end
+  local jparts = {}
+  for k, jk in ipairs(gs.jokers or {}) do jparts[k] = (jk.key or "?") .. ":" .. (jk.edition or "") .. ":" .. num_sig(jk.ability) end
+  local lparts = {}
+  local lv = (gs.run and gs.run.hand_levels) or {}
+  for _, h in ipairs(CV.HAND_NAMES) do
+    local e = lv[h]
+    lparts[#lparts + 1] = (type(e) == "table") and ((e.level or 1) .. "/" .. (e.chips or "") .. "/" .. (e.mult or "")) or tostring(e or 1)
+  end
+  local key = table.concat(dparts, ",") .. "|" .. table.concat(jparts, ";") .. "|" .. table.concat(lparts, ",")
+    .. "|" .. hs .. "|" .. D .. "|" .. samples .. "|" .. tostring(gs.boss_effect and gs.boss_effect.key or b.boss_key)
+  local hit = HF_CACHE[key]
+  if hit then return hit[1], hit[2] end
+
+  local seed = 5381
+  for k = 1, #key, 7 do seed = (seed * 33 + key:byte(k)) % 2147483647 end
+  local rng = lcg_rng(seed)
+  local Heuristics = require("engine.heuristics")
   local counts, ctx = {}, {}
   for _ = 1, samples do
-    local s = shuffled(deck, rng)
-    local hand = {}
-    for i = 1, hs do hand[i] = s[i] end
+    local sh = shuffled(cdeck, rng)
+    local hand, p = {}, hs + 1
+    for i = 1, hs do hand[i] = sh[i] end
+    for _ = 1, D do
+      local g = {}
+      for k, v in pairs(gs) do g[k] = v end
+      g.hand = hand
+      local d = Heuristics.best_discard(g)
+      if not d or not d.cards or #d.cards == 0 or #d.cards >= #hand then break end
+      local drop = {}
+      for _, c in ipairs(d.cards) do drop[c] = true end
+      local nh = {}
+      for _, c in ipairs(hand) do if not drop[c] then nh[#nh + 1] = c end end
+      while #nh < hs and p <= #sh do nh[#nh + 1] = sh[p]; p = p + 1 end
+      hand = nh
+    end
     local ev = HandEval.best_play(gs, hand)
     if ev then
       counts[ev.hand_type] = (counts[ev.hand_type] or 0) + 1
@@ -125,6 +200,8 @@ function CV.hand_frequencies(gs, opts)
   for _, c in pairs(ctx) do
     c.chips = c.chips / c.n; c.mult = c.mult / c.n; c.xmult = c.xmult / c.n
   end
+  if HF_N >= 512 then HF_CACHE, HF_N = {}, 0 end
+  HF_CACHE[key] = { freq, ctx }; HF_N = HF_N + 1
   return freq, ctx
 end
 
