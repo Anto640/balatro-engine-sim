@@ -377,7 +377,6 @@ local function dollars(gs) return (gs.economy and gs.economy.dollars) or 0 end
 --           Item = the best planet's measured value (as before -- the old x0.5 was one round's worth).
 CV.CARDS_PER_PLAY, CV.CARDS_PER_DISCARD = 4.26, 3.79
 CV.PLAYS_PER_BLIND, CV.DISCARD_BUDGET_USED, CV.BLINDS_WITH_DISCARD = 1.62, 0.63, 0.70
-local seal_cache = setmetatable({}, { __mode = "k" })   -- per gs: the random-Tarot mean is ~130 best_plays
 function CV.seal_generator_value(gs, seal, rng)
   local Eval = require("engine.eval_function")
   local R = Eval.blinds_remaining(gs)
@@ -391,10 +390,7 @@ function CV.seal_generator_value(gs, seal, rng)
     local drawn = hs + CV.DISCARD_BUDGET_USED * budget * CV.CARDS_PER_DISCARD
       + (CV.PLAYS_PER_BLIND - 1) * CV.CARDS_PER_PLAY
     rate = math.min(1, drawn / #deck) * CV.BLINDS_WITH_DISCARD
-    local c = seal_cache[gs] or {}
-    seal_cache[gs] = c
-    if c.tarot == nil then c.tarot = require("engine.packs").mean_random(gs, "Tarot", { rng = rng, tarot_samples = 3 }) end
-    item = c.tarot
+    item = CV.mean_random_tarot(gs, rng)
   else
     rate = math.max(0, hs - CV.CARDS_PER_PLAY) / #deck
     local bp = CV.best_planet(gs, { samples = 6, rng = rng })
@@ -405,11 +401,32 @@ function CV.seal_generator_value(gs, seal, rng)
   return 0.5 * rate * R * item * fit
 end
 
+-- Per-round chances that ONE given deck card is drawn / scored / still held at round end, from the live-measured
+-- flow of cards through the hand (see the constants above) and this state's hand size, discard budget and deck.
+function CV.card_round_rates(gs)
+  local deck = gs.deck or {}
+  local n = math.max(#deck, 1)
+  local hs = (gs.run and gs.run.hand_size) or 8
+  local b = gs.blind or {}
+  local budget = b.base_discards or ((b.discards_left or 3) + (b.discards_used or 0))
+  local drawn = hs + CV.DISCARD_BUDGET_USED * budget * CV.CARDS_PER_DISCARD + (CV.PLAYS_PER_BLIND - 1) * CV.CARDS_PER_PLAY
+  local played = CV.PLAYS_PER_BLIND * CV.CARDS_PER_PLAY
+  local p_drawn = math.min(1, drawn / n)
+  return {
+    drawn = p_drawn,
+    scored = math.min(1, played / n),                          -- a card in a played hand
+    held_end = p_drawn * math.max(0, 1 - played / drawn),      -- drawn and not played (kept to round end)
+  }
+end
+
 function CV.card_econ_value(gs, card, rng)
   local v, enh, seal = 0, card.enhancement, card.seal
-  if enh == "m_gold" then v = v + VU.dollars_to_frac(gs, 3 * 0.6) end    -- $3 if held at round end
-  if enh == "m_lucky" then v = v + VU.dollars_to_frac(gs, 20 / 15) end   -- expected $ (1 in 15 -> $20)
-  if seal == "Gold" then v = v + VU.dollars_to_frac(gs, 3 * 0.35) end    -- $3 when played
+  -- $ per round at the measured rates (2026-09-26: were guesses -- Gold held 60% of rounds, Gold seal played 35%,
+  -- Lucky scored EVERY round; measured ~25% / ~13% / ~13% on a 52-card red-deck game)
+  local rr = CV.card_round_rates(gs)
+  if enh == "m_gold" then v = v + VU.dollars_to_frac(gs, 3 * rr.held_end) end     -- $3 if held at round end
+  if enh == "m_lucky" then v = v + VU.dollars_to_frac(gs, 20 / 15 * rr.scored) end -- 1 in 15 -> $20, when scored
+  if seal == "Gold" then v = v + VU.dollars_to_frac(gs, 3 * rr.scored) end        -- $3 when scored
   if seal == "Blue" or seal == "Purple" then v = v + CV.seal_generator_value(gs, seal, rng) end
   return v
 end
@@ -596,32 +613,50 @@ end
 -- flush direction the conversion naturally builds) and pair-measure the flush gain -- then damp for the
 -- random suit you don't get to pick. Flat 0.3 before, blind to whether you can flush at all.
 function CV.sigil_value(gs, need, opts)
+  return CV.hand_convert_value(gs, need, "suit", opts)
+end
+
+-- SIGIL (all cards in hand -> one RANDOM suit) and OUIJA (all cards in hand -> one RANDOM rank) are PERMANENT deck
+-- changes, valued like the suit tarots (deck-level): a hand's worth of random cards converted, the deck measured
+-- against itself on the same shuffles, AVERAGED over the random outcome -- all 4 suits for Sigil, 4 sampled ranks for
+-- Ouija (2026-09-26: Sigil aimed at the dominant suit then took a flat x0.8 for the randomness; Ouija was a flat 0.3
+-- before its measured hand-size cost). Can be negative (Ouija breaks straights; an off-build suit dilutes).
+local SUITS4 = { "Spades", "Hearts", "Clubs", "Diamonds" }
+function CV.hand_convert_value(gs, need, mode, opts)
   opts = opts or {}
   need = (need and need > 0) and need or 1
   local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
-  if not deck or #deck < CV.MIN_DECK then return CV.SPECTRAL_BASE.c_sigil or 0.3 end
-  local SUITS = { "Spades", "Hearts", "Clubs", "Diamonds" }
-  local counts = {}
-  for _, c in ipairs(deck) do
-    if not Cards.is_stone(c) then for _, s in ipairs(SUITS) do if Cards.is_suit(c, s) then counts[s] = (counts[s] or 0) + 1 end end end
-  end
-  local suit, bestn = "Spades", -1
-  for _, s in ipairs(SUITS) do if (counts[s] or 0) > bestn then bestn = counts[s] or 0; suit = s end end
-  local idxs = {}
-  for i, c in ipairs(deck) do if not Cards.is_stone(c) and not Cards.is_suit(c, suit) then idxs[#idxs + 1] = i end end
-  if #idxs == 0 then return 0.0 end
-  table.sort(idxs, function(a, b) return (Cards.chips(deck[a]) or 0) > (Cards.chips(deck[b]) or 0) end)
-  local hs = (gs.run and gs.run.hand_size) or 8
-  local newdeck = {}; for i, c in ipairs(deck) do newdeck[i] = c end
-  for k = 1, math.min(hs, #idxs) do
-    local i = idxs[k]; local nc = {}; for kk, vv in pairs(deck[i]) do nc[kk] = vv end; nc.suit = suit; newdeck[i] = nc
-  end
+  if not deck or #deck < CV.MIN_DECK then return 0 end
+  local rng = opts.rng or math.random
+  local hs = math.min((gs.run and gs.run.hand_size) or 8, #deck)
   local samples = mc(opts.samples or 8)
   local seed = #deck * 40503 + 91
   local base = JokerValue.avg_score(gs, { samples = samples, rng = lcg(seed) }) or 0
-  local g2 = {}; for k, v in pairs(gs) do g2[k] = v end; g2.deck = newdeck
-  local with = JokerValue.avg_score(g2, { samples = samples, rng = lcg(seed) }) or 0
-  return math.max(0, with - base) / need * 0.8   -- x0.8: the suit is RANDOM, not chosen
+  local total = 0
+  for t = 1, 4 do
+    local to = (mode == "suit") and SUITS4[t] or (math.min(12, math.floor(rng() * 13)) + 2)
+    local order = shuffled(deck, rng)
+    local conv = {}
+    local n = 0
+    for _, c in ipairs(order) do
+      if n >= hs then break end
+      if not Cards.is_stone(c) then conv[c] = true; n = n + 1 end
+    end
+    local newdeck = {}
+    for i, c in ipairs(deck) do
+      if conv[c] then
+        local nc = {}
+        for k, v in pairs(c) do nc[k] = v end
+        if mode == "suit" then nc.suit = to else nc.rank_id = to; nc.rank = nil end
+        newdeck[i] = nc
+      else newdeck[i] = c end
+    end
+    local g2 = {}
+    for k, v in pairs(gs) do g2[k] = v end
+    g2.deck = newdeck
+    total = total + ((JokerValue.avg_score(g2, { samples = samples, rng = lcg(seed) }) or 0) - base)
+  end
+  return (total / 4) / need
 end
 
 -- ===== TIER 2 spectrals (real modelling, not just wiring): Soul, Cryptid, Aura, and the destroy-and-add
@@ -735,6 +770,79 @@ function CV.fool_target(gs)
   return nil
 end
 
+-- Consumables a generator tarot (High Priestess / Emperor) actually LANDS: both are created at once, one per free
+-- consumable slot after the generator itself is used (its own slot frees if it is held).
+function CV.created_consumables_land(gs, key, n)
+  local held, self_held = #(gs.consumables or {}), false
+  for _, c in ipairs(gs.consumables or {}) do if c.key == key then self_held = true end end
+  local free = ((gs.run and gs.run.consumable_slots) or 2) - held + (self_held and 1 or 0)
+  return math.max(0, math.min(n, free))
+end
+-- Mean value of a RANDOM Tarot / Planet (the pack pools' own measured per-card values), memoised per state. The
+-- Emperor makes random tarots and is itself one: its nested self-value is taken as 0 (no recursion).
+local mean_cache = setmetatable({}, { __mode = "k" })
+local in_emperor = false
+function CV.mean_random_tarot(gs, rng)
+  local c = mean_cache[gs] or {}
+  mean_cache[gs] = c
+  if c.tarot == nil then
+    local was = in_emperor
+    in_emperor = true
+    c.tarot = require("engine.packs").mean_random(gs, "Tarot", { rng = rng, tarot_samples = 3 })
+    in_emperor = was
+  end
+  return c.tarot
+end
+function CV.mean_random_planet(gs, rng)
+  local c = mean_cache[gs] or {}
+  mean_cache[gs] = c
+  if c.planet == nil then c.planet = require("engine.packs").mean_random(gs, "Planet", { rng = rng }) end
+  return c.planet
+end
+-- Wheel of Fortune: 1 in 4, a random edition on a random joker WITHOUT one (the game's guaranteed, no-negative
+-- poll_edition: polychrome 15% / holographic 35% / foil 50%). Measured: the board's best plays over sampled hands,
+-- re-scored with that edition on each eligible joker in turn (the edition's effect depends on where the joker sits
+-- in the scoring order, so it is not a flat +50 chips / +10 mult / x1.5).
+CV.WHEEL_EDITIONS = { { "polychrome", 0.15 }, { "holo", 0.35 }, { "foil", 0.50 } }
+function CV.wheel_value(gs, need, rng)
+  local jokers = gs.jokers or {}
+  local elig = {}
+  for i, j in ipairs(jokers) do if not j.edition then elig[#elig + 1] = i end end
+  if #elig == 0 then return 0 end
+  local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
+  if not deck or #deck < CV.MIN_DECK then return 0 end
+  rng = rng or math.random
+  local hs = math.min((gs.run and gs.run.hand_size) or 8, #deck)
+  local total, n = 0, 0
+  for _ = 1, 6 do
+    local sh = shuffled(deck, rng)
+    local hand = {}
+    for i = 1, hs do hand[i] = sh[i] end
+    local ev0, sel = HandEval.best_play(gs, hand)
+    local ev = sel and HandEval.score(gs, sel)   -- re-score the same play so both arms use one scorer
+    if ev and sel then
+      for _, idx in ipairs(elig) do
+        for _, ed in ipairs(CV.WHEEL_EDITIONS) do
+          local js = {}
+          for i, j in ipairs(jokers) do js[i] = j end
+          local cj = {}
+          for k2, v2 in pairs(jokers[idx]) do cj[k2] = v2 end
+          cj.edition = ed[1]
+          js[idx] = cj
+          local g = {}
+          for k2, v2 in pairs(gs) do g[k2] = v2 end
+          g.jokers = js
+          local e2 = HandEval.score(g, sel)
+          total = total + ed[2] * ((e2 and e2.score or 0) - ev.score)
+        end
+        n = n + 1
+      end
+    end
+  end
+  if n == 0 then return 0 end
+  return 0.25 * (total / n) / (need or 1)
+end
+
 function CV.card_value(gs, set, key, freq, need, rng, samples, hand_ctx)
   need = need or 1
   -- The Fool with nothing to copy is worth ZERO, not its prior (see CV.fool_target).
@@ -761,6 +869,7 @@ function CV.card_value(gs, set, key, freq, need, rng, samples, hand_ctx)
     end
     return 0.3, 0, "planet"
   elseif set == "Tarot" then
+    if key == "c_emperor" and in_emperor then return 0, 0, "tarot" end
     if key == "c_hermit" then
       local g = math.min(dollars(gs), 20)        -- doubles money, max +$20
       return 0, g, string.format("double money +$%d", g)
@@ -775,6 +884,22 @@ function CV.card_value(gs, set, key, freq, need, rng, samples, hand_ctx)
       local v, tgt = DeckPlan.delete_value(gs, 2, "best")
       return v, 0, (tgt.archetype == "flush" and "cut 2 off-suit cards" or "thin 2 weakest cards")
     end
+    -- GENERATOR tarots (2026-09-26, owner: no flat scores; live 5XX3FFG3 took High Priestess at a flat 0.40 over a
+    -- Strength that fit the board). Priced by what they make, landed in the consumable slots they need:
+    if key == "c_high_priestess" or key == "c_emperor" then
+      -- inside an open pack the pack advisor applies the landing itself (gen_fit, with make-room credit)
+      local landed = gs.pack and 2 or CV.created_consumables_land(gs, key, 2)
+      if landed <= 0 then return 0, 0, "no free consumable slot for its output" end
+      local mean = (key == "c_high_priestess") and CV.mean_random_planet(gs, rng) or CV.mean_random_tarot(gs, rng)
+      return landed * mean, 0, string.format("%d random %s", landed, key == "c_high_priestess" and "planets" or "tarots")
+    elseif key == "c_judgement" then
+      local ok, Packs = pcall(require, "engine.packs")
+      local v = ok and Packs.expected_shop_joker and Packs.expected_shop_joker(gs, 1, { rng = rng, samples = 4 }) or 0
+      local free = ((gs.run and gs.run.joker_slots) or 5) - #(gs.jokers or {})
+      return v * (free >= 1 and 1 or 0.7), 0, "a random joker"          -- same full-board haircut as Soul
+    elseif key == "c_wheel_of_fortune" then
+      return CV.wheel_value(gs, need, rng), 0, "1 in 4: an edition on a random joker"
+    end
     -- suit-conversion tarots: flush-plan-aware (only worth much when their fixed
     -- suit is your flush direction; a tarot fighting another-suit flush is ~0).
     if Tarot.SUIT[key] then
@@ -784,9 +909,16 @@ function CV.card_value(gs, set, key, freq, need, rng, samples, hand_ctx)
     -- enhancement tarots: value by the SCORE they'd add to your deck this blind
     -- (measured) -- this is what makes "buy the Empress to use in the blind" get
     -- valued for your actual hand, not a flat number.
-    local sv = Tarot.shop_value(gs, key, { rng = rng, samples = samples or 6 })
-    if sv and sv > 0 then
-      return sv / need, 0, string.format("enhance ~+%d score", math.floor(sv))
+    local sv = Tarot.shop_value(gs, key, { rng = rng, samples = samples or 12 })   -- 6 read the same card 0.08..0.37
+    if sv then
+      -- the MEASUREMENT stands even when it is ~0 (2026-09-26: a measured 0 used to fall back to the flat prior,
+      -- so a tarot that scored nothing on this deck beat one measured slightly positive -- Empress 0.20 flat vs a
+      -- measured 0.04). Money enhancements add their $ (Devil's Gold, Magician's Lucky), which a score delta
+      -- cannot see.
+      local econ = 0
+      local spec = Tarot.ENH[key]
+      if spec then econ = spec.n * CV.card_econ_value(gs, { enhancement = spec.enh }, rng) end
+      return math.max(0, sv) / need + econ, 0, string.format("enhance ~+%d score", math.floor(math.max(0, sv)))
     end
     return CV.TAROT_BASE[key] or 0.15, 0, "tarot"
   elseif set == "Spectral" then
@@ -832,8 +964,13 @@ function CV.card_value(gs, set, key, freq, need, rng, samples, hand_ctx)
     end
     if key == "c_wraith" then
       -- the free rare joker, MINUS the purchasing power forfeited by zeroing your $.
+      -- (2026-09-26: the Rare joker is MEASURED like Soul's Legendary, and the wiped $ is priced by the same
+      -- conversion a money tarot's gain uses -- were flat 0.8 and 0.04/$)
       local d = math.max(0, (gs.economy and gs.economy.dollars) or 0)
-      local v = CV.WRAITH_JOKER - d * CV.WRAITH_PER_DOLLAR
+      local ok, Packs = pcall(require, "engine.packs")
+      local rare = ok and Packs.expected_joker_of_rarity and Packs.expected_joker_of_rarity(gs, "Rare", { rng = rng, samples = samples }) or CV.WRAITH_JOKER
+      local free = ((gs.run and gs.run.joker_slots) or 5) - #(gs.jokers or {})
+      local v = rare * (free >= 1 and 1 or 0.7) - VU.income_frac(gs, d)
       return v, 0, string.format("spawns a rare Joker but ZEROES your $%d", d)
     end
     if key == "c_ouija" then
@@ -843,7 +980,8 @@ function CV.card_value(gs, set, key, freq, need, rng, samples, hand_ctx)
       -- Incantation case). The charge is now MEASURED off the deck (CV.hand_size_cost)
       -- instead of the flat 0.3 that was fitted to net this one card to ~0.
       local hcost = CV.hand_size_cost(gs, need, { rng = rng, samples = samples }) or CV.HAND_SIZE_COST
-      return (CV.SPECTRAL_BASE.c_ouija or 0.3) - hcost, 0, "one rank, but -1 hand size (permanent)"
+      return CV.hand_convert_value(gs, need, "rank", { rng = rng, samples = samples }) - hcost, 0,
+        "one rank, but -1 hand size (permanent)"
     end
     if key == "c_ectoplasm" then
       -- Ectoplasm puts NEGATIVE on a RANDOM joker (+1 permanent joker slot) and PERMANENTLY

@@ -203,6 +203,20 @@ end
 -- Strength build-aware (T.strength_targets).
 function T.apply_to_hand(hand, key, gs)
   local spec = T.ENH[key]
+  if spec and gs then
+    -- the SAME targets the advice names (T.best_targets: build-aware, Tower on the worst card, Steel/Gold on a
+    -- HELD card), so the card that is valued is the card the self-player selects (was: highest chips always --
+    -- Tower was valued Stoning the BEST card while the advice aimed it at the worst)
+    local tg = T.best_targets(gs, key, hand) or {}
+    if #tg == 0 then return nil end
+    local hit = {}
+    for _, c in ipairs(tg) do hit[c] = true end
+    local new = {}
+    for i, c in ipairs(hand) do
+      if hit[c] then new[i] = copy_card(c); new[i].enhancement = spec.enh else new[i] = c end
+    end
+    return new
+  end
   if spec then
     local order = {}
     for i, c in ipairs(hand) do if not Cards.is_stone(c) then order[#order + 1] = i end end
@@ -284,16 +298,31 @@ function T.best_targets(gs, key, pool)
   if spec then
     local order = {}
     for _, c in ipairs(pool) do if not Cards.is_stone(c) then order[#order + 1] = c end end
-    local lowest = (key == "c_tower")   -- Stone wipes the card -> apply to the worst
+    -- Stone wipes the card -> the worst. Gold ($3 held) and Steel (x1.5 held) pay only while HELD, and they are
+    -- permanent: the best home is a card you will not want to play -- your weakest spare, not your best card.
+    local lowest = (key == "c_tower") or spec.enh == "m_gold" or spec.enh == "m_steel"
+    local use_rel = (key ~= "c_tower") and spec.enh ~= "m_gold"   -- Steel still follows held-card jokers (Baron)
+    -- Steel (x1.5) and Gold ($3) pay while HELD, not when played: in a drawn hand, prefer cards outside the hand's
+    -- best play (2026-09-26 -- a Steel on the card you are about to play does nothing this round)
+    local played
+    if (spec.enh == "m_steel" or spec.enh == "m_gold") and gs and #pool <= 12 then
+      local _, sel = HandEval.best_play(gs, pool)
+      played = {}
+      for _, c in ipairs(sel or {}) do played[c] = true end
+    end
     table.sort(order, function(a, b)
       -- never overwrite an existing enhancement when a plain card is available
       local ea, eb = a.enhancement ~= nil, b.enhancement ~= nil
       if ea ~= eb then return not ea end
+      if played then
+        local pa, pb = played[a] and 1 or 0, played[b] and 1 or 0
+        if pa ~= pb then return pa < pb end
+      end
       -- BUILD-AWARE (owner 2026-09-20): an enhancement pays off when the card SCORES, so put it on the
       -- card the build rewards most (probed from the owned jokers' own scoring hooks -- Greedy Diamond,
       -- Photograph face, Odd Todd odd, Wee 2, Baron King...), not the highest raw chips. Skipped for
       -- Tower (wants the worst card to Stone) and when the build has no card preference.
-      if not lowest and rel then
+      if use_rel and rel then
         local ra, rb = rel(a), rel(b)
         if ra ~= rb then return ra > rb end
       end
@@ -417,6 +446,7 @@ function T.target_note(gs, key, pool)
   local spec = T.ENH[key]
   if spec then
     if key == "c_tower" then return "apply to your weakest card" end  -- Stone wipes rank/suit
+    if spec.enh == "m_gold" or spec.enh == "m_steel" then return "apply to a spare card you will HOLD, not play" end
     return string.format("apply to your %d highest-value card%s", spec.n, spec.n == 1 and "" or "s")
   end
   local s = T.SUIT[key]
