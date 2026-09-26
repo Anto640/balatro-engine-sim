@@ -193,4 +193,41 @@ return function(t)
     _G.love, _G.G = saved_love, saved_G
     Autoplay.enabled = false
   end
+
+  -- PROVISIONAL PICK GATE (live 978TLFTS, 2026-09-26): the measured pass said SKIP a Spectral pack, the skip
+  -- button wasn't rendered yet, the re-evaluation surfaced the INSTANT priors-only pass ("Take Hex", flat 0.6),
+  -- and the stuck-state deadlock-breaker forced it through -- Hex destroyed four jokers. A provisional pick must
+  -- never be executed, even when `forced` (the stuck clock) has long expired; the measured pick then is.
+  do
+    local clock = 200
+    local saved_love, saved_G = _G.love, _G.G
+    _G.love = { timer = { getTime = function() return clock end } }
+    local used
+    local hex = { sort_id = 601, config = { center = { key = "c_hex" } } }
+    function hex:click()
+      _G.G.pack_cards.highlighted = { self }
+      _G.G.STAGE_OBJECTS[1] = { config = { button = "use_card", ref_table = self } }
+    end
+    local G = {
+      STATES = {}, STATE = 0, GAME = { round = 11 },
+      pack_cards = { cards = { hex }, highlighted = {} },
+      jokers = { cards = {} }, consumeables = { cards = {} }, hand = { cards = {} },
+      STAGE_OBJECTS = {},
+      FUNCS = { use_card = function(e) used = e.config.ref_table end },
+    }
+    _G.G = G
+    Autoplay.enabled = true
+    Autoplay.locked_until, Autoplay.last_sig, Autoplay.pending_id = 0, nil, nil
+    Autoplay._prov_sig, Autoplay._prov_since = nil, nil
+    Autoplay.wait_sig, Autoplay.wait_since = nil, 0          -- a long-expired stuck clock (forced = true)
+    local best = { type = "PICK", target = { key = "c_hex", name = "Hex" } }
+    local prov = { ranked = { best = best }, gs = { pack = { items = { { key = "c_hex" } } } }, provisional = true }
+    for _ = 1, 10 do if not used then Autoplay.tick(prov, nil); clock = clock + 1 end end
+    t.ok(used == nil, "autoplay: never executes a PROVISIONAL (priors-only) pack pick, even when forced")
+    local measured = { ranked = { best = best }, gs = prov.gs }
+    for _ = 1, 10 do if not used then Autoplay.tick(measured, nil); clock = clock + 1 end end
+    t.ok(used == hex, "autoplay: the MEASURED pick is executed")
+    _G.love, _G.G = saved_love, saved_G
+    Autoplay.enabled = false
+  end
 end

@@ -180,7 +180,7 @@ function BES.evaluate(with_sim, gs)
   if gs.pack and PackOpenAdvisor then
     local ok, po = pcall(PackOpenAdvisor.recommend, gs, { cheap = not with_sim })
     if ok and po and po.reason then
-      BES.apply_pack(gs, po)
+      BES.apply_pack(gs, po, not with_sim)
       return
     end
   end
@@ -303,7 +303,10 @@ BES.job = nil            -- in-flight background job: { thread, gs, sig, finish 
 
 -- Build + push the overlay action for a pack recommendation (shared by the cheap
 -- instant pass and the measured background refine).
-function BES.apply_pack(gs, po)
+-- `provisional` = this is the instant priors-only pass; the measured refine will replace it. The self-player must
+-- never EXECUTE a provisional pick (live 978TLFTS: the measured pass said SKIP, a re-evaluation surfaced the cheap
+-- pass's flat-prior 'Take Hex', and the self-player used it on a full board -- four jokers destroyed).
+function BES.apply_pack(gs, po, provisional)
   local pick = po.best
   local action
   if po.sell and po.sell.key and not po.skip then
@@ -335,7 +338,7 @@ function BES.apply_pack(gs, po)
       reason = po.reason, confidence = 0.75,
     }
   end
-  BES.last = { gs = gs, ranked = { best = action }, pack = true }
+  BES.last = { gs = gs, ranked = { best = action }, pack = true, provisional = provisional or nil }
   if Overlay then Overlay.set({ best = action }) end
   Log.info("PACK: " .. (po.reason or ""))
 end

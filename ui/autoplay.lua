@@ -23,7 +23,7 @@
 
 local Autoplay = { enabled = false, locked_until = 0, last_sig = nil,
                    STABLE_HOLD = 0.6, pending_id = nil, pending_since = 0,
-                   MAX_WAIT = 3.0, wait_sig = nil, wait_since = 0 }
+                   MAX_WAIT = 3.0, wait_sig = nil, wait_since = 0, PROVISIONAL_MAX = 20.0 }
 
 local function now() return (love and love.timer and love.timer.getTime()) or 0 end
 local function flog(msg)
@@ -526,6 +526,14 @@ function Autoplay.tick(last, logger)
       .. " fresh=" .. tostring(isfresh) .. (forced and " FORCED" or ""))
   end
   if not isfresh and not forced then return end
+  -- NEVER execute a PROVISIONAL (priors-only) pack pick: wait for the measured refine. Not bypassed by `forced` --
+  -- that clock can already be running from an earlier action on the same screen (live 978TLFTS: a failed skip
+  -- click, then the cheap pass's flat-prior Hex was forced through and destroyed four jokers). Own safety valve:
+  -- if no measured result arrives within PROVISIONAL_MAX of this pick appearing, act (a failed job can't stall).
+  if last.provisional then
+    if Autoplay._prov_sig ~= s then Autoplay._prov_sig = s; Autoplay._prov_since = now() end
+    if (now() - (Autoplay._prov_since or now())) < Autoplay.PROVISIONAL_MAX then return end
+  end
 
   -- DECISION-STABILITY GATE: the engine's Monte-Carlo refine can CHANGE the recommendation a couple of
   -- seconds after the cheap pass, so acting instantly risks executing a decision it's about to revise.

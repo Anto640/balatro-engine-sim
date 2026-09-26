@@ -129,6 +129,11 @@ local function value_item(gs, it, need, freq, base, rng, cheap, hctx)
     local v = ({ ConsumableValue.card_value(gs, "Planet", it.key, freq, need, rng, nil, hctx) })[1]
     return v + BuildPlan.planet_credit(gs, hand), true
   elseif it.set == "Tarot" or it.set == "Spectral" then
+    if cheap and (it.key == "c_hex" or it.key == "c_ankh") then
+      -- destructive spectrals: their real formula is measurement-free (it prices the jokers destroyed), so even
+      -- the instant pass must not show a flat positive "Take Hex" on a board it would wipe
+      return (ConsumableValue.card_value(gs, it.set, it.key, freq, need, rng)), false
+    end
     if cheap then
       -- priors only: still reflect money tarots (Hermit/Temperance) in real $.
       local base_v = ConsumableValue.TAROT_BASE[it.key] or ConsumableValue.SPECTRAL_BASE[it.key] or 0.15
