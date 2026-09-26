@@ -15,8 +15,17 @@ Owner report -> what the replay loop found (`bes_fixtures.jsonl`, 236 states; `b
 | Shop recorder | fixtures/telemetry never recorded shop TAROTS/PLANETS, so consumable buys could not be replayed | `e2aef5a` (replay_fixture, main, run_telemetry) |
 
 **Sim arms (n=160, vs `sim_out/f1.jsonl` = live 0ed0a6d):** `s1` = `e2aef5a` (shop/seal/Strength/paired), `s2` = `7d0ca6a`
-(s1 + discard candidates). Worktrees `../bes_wt_s1`, `../bes_wt_s2`. Results + verdict: see the R14 result line below
-(fill in). NOT deployed until they land. Owner rule: sim OUTCOMES decide; replicate OOS if kept on a mean.
+(s1 + discard candidates). Owner rule: sim OUTCOMES decide; replicate OOS if kept on a mean.
+**R14 RESULTS (n=160 paired):**
+| arm | vs | progress | sign | wins | reach-7 / reach-8 | verdict |
+|---|---|---|---|---|---|---|
+| `s1` e2aef5a | f1 (live) | +0.226 (p 0.17) | 74/56 | 36 -> **42** | 61->67 / 47->48 | KEPT (correctness, positive) |
+| `s2` 7d0ca6a | s1 | +0.139 (p 0.27) | 47/40, 73 tied | 42 -> **43** | 67->75 / 48->52 | KEPT |
+Mechanisms fire (s1 vs f1): Strength used 22->70, Death 11->80, purple-seal picks 23->70, 82 buy-before-reroll.
+**LIVE INSTALL = `7d0ca6a`** (deployed 2026-09-26, verified 0 diffs). Sim win rate 43/160 = **26.9%** (in-sample).
+Queued arms (worktrees `../bes_wt_*`): `fid` b984dc9 (sim shop sees the discard budget -- fidelity, kept regardless),
+`hf` f22edfc (dig-aware hand frequencies, vs fid), `au` b816068 (no-flat audit batch 1, vs hf). Then an OOS
+replication (BES_SEED_OFF=7) of the final stack vs f1 before calling the gain real.
 
 **Next, in priority:**
 1. **Planet frequency is FIRST-DRAW, not PLAYED.** `CV.hand_frequencies` = best play of ONE 8-card draw, no discards.
