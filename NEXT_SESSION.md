@@ -1,5 +1,36 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## ⭐⭐⭐ 2026-09-26 — R14 LIVE REVIEW (seed 5XX3FFG3, died ante 5 on a flat-mult board) — read with START HERE below
+
+Owner report -> what the replay loop found (`bes_fixtures.jsonl`, 236 states; `bes_autoplay.log` 00:21-00:45):
+| owner observation | verdict | fix |
+|---|---|---|
+| Emperor offered with surplus $, not bought | REAL: valued +1.95, but a reroll (+3.34) ranked higher and REPLACED it; same for Strength (+1.15) | `e2aef5a` buy-before-reroll (shop_advisor, mirrors pack-first) |
+| Skipped a Standard pack with a Purple-seal Stone Queen | REAL: Purple seal was a FLAT +0.10; card-add values were NOISE (foil King -0.41 on a Photograph board) | `e2aef5a` seals priced like generator jokers (live-measured cards drawn/blind); `card_add_value` PAIRED (same hand +/- the card x P(drawn)) -> Stone/Purple +0.477 taken, foil King +0.029 |
+| Strength ignored (3->4 for Hack/Walkie/Even Steven; J->Q for Shoot the Moon) | REAL: Strength/Death were FLAT priors (0.15/0.12), and Strength was aimed at the most build-relevant card (a 10 -> J LOSES Walkie) | `e2aef5a` `T.strength_targets` (gain in joker triggers from the rank-up), used by value/advice/sim; rank tarots measured -> 0.758, taken over High Priestess |
+| Discarded Queens with Shoot the Moon | PLAUSIBLE: discard candidates were joker-blind (keep-scoring-cards pitched every held card) | `7d0ca6a` board-aware discard candidates (MC still decides; no weight) |
+| Bought ~3 planets from the shop early (Pluto/Mercury/Venus) | REAL, and SYSTEMIC -- see item 1 below | NOT fixed yet |
+| First blind: played a 260/300 Straight with 4 discards (a hand = $1) | marginal: 2nd hand is a certain clear; a dig clears in one hand only ~half the time -> ~$0.5 EV. Dig objective rewrites measured neutral twice (09-19) | none |
+| Took Green Joker | it was FREE (Top-up tag) and sold soon after -- fine | none |
+| Shop recorder | fixtures/telemetry never recorded shop TAROTS/PLANETS, so consumable buys could not be replayed | `e2aef5a` (replay_fixture, main, run_telemetry) |
+
+**Sim arms (n=160, vs `sim_out/f1.jsonl` = live 0ed0a6d):** `s1` = `e2aef5a` (shop/seal/Strength/paired), `s2` = `7d0ca6a`
+(s1 + discard candidates). Worktrees `../bes_wt_s1`, `../bes_wt_s2`. Results + verdict: see the R14 result line below
+(fill in). NOT deployed until they land. Owner rule: sim OUTCOMES decide; replicate OOS if kept on a mean.
+
+**Next, in priority:**
+1. **Planet frequency is FIRST-DRAW, not PLAYED.** `CV.hand_frequencies` = best play of ONE 8-card draw, no discards.
+   Measured (f1, antes 1-2, 1260 plays): the engine PLAYS Straight .181 / Flush .178 / Full House .171 / Pair .115 /
+   High Card .049, but first-draw says Straight .093 / Flush .061 / FH .065 / Pair .318 / High Card .062. So Pair/High
+   Card planets are over-priced ~2-3x and Straight/Flush/FH under-priced ~2-3x -- every planet, Celestial pick,
+   Black Hole and the commitment read it. (Pluto flipped buy/skip on 2 of 8 seeds from the 1/8 quantisation alone.)
+   Fix = a dig-aware frequency (measure the engine's played distribution per deck), NOT a hand-type fudge table.
+2. **The no-flat-scores audit (owner rule 2026-09-26, memory `no-flat-scores`).** Remaining flats: `CV.TAROT_BASE`
+   (and card_value still falls back to it when a measured tarot is <= 0), `CV.SPECTRAL_BASE` fallbacks, Gold card /
+   Gold seal / Lucky $ in `CV.card_econ_value` (one round's worth, not x rounds left like the seals now), planet 0.3
+   fallback, `T.THIN_CREDIT`, `T.CARD_PERM_CREDIT`, Packs `QUALITY_FRAC`/`CARD_W`, `PERKEO_HOLD`.
+3. The rest of START HERE's list (Business Card $ in the retrigger projection, Burnt aim in digs, last 3 tier priors).
+
 ## ⭐⭐⭐ START HERE (2026-09-25 end of session) — STATE, WIN-RATE HISTORY, AND THE NEXT FEW SESSIONS
 
 **Live install = `0ed0a6d`** (restart Balatro after any deploy -- no hot reload). Tests: `lua tests/runner.lua` (1264 pass).
