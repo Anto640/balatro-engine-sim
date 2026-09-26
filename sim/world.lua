@@ -217,8 +217,7 @@ local function apply_deck_tarot(run, key, hand, draw_pile)
     if removed == 0 then return nil end
     return { shape = "thin", n = removed }
   end
-  local nh = Tarot.apply_to_hand(hand, key, run and { jokers = run.jokers, deck = run.deck,
-    run = { hand_levels = run.hand_levels, hand_size = run.hand_size } } or nil)   -- enh / suit / rank -> changed slots are copies
+  local nh = Tarot.apply_to_hand(hand, key, run and { jokers = run.jokers, deck = run.deck } or nil)   -- enh / suit / rank -> changed slots are copies
   if not nh then return nil end
   local n = 0
   for i, c in ipairs(hand) do

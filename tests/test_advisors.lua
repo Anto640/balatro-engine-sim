@@ -916,8 +916,7 @@ return function(t)
     local gs = GS.new{ deck = deck, remaining = deck, run = { hand_levels = {}, hand_size = 8 } }
 
     -- no drawn hand -> generic strategy, NOT a specific (undrawn) deck card
-    -- Gold pays only while HELD (and is permanent): the target is a spare you will not play (2026-09-26)
-    t.eq(Tarot.target_note(gs, "c_devil"), "apply to a spare card you will HOLD, not play", "Devil: strategy when no hand drawn")
+    t.eq(Tarot.target_note(gs, "c_devil"), "apply to your 1 highest-value card", "Devil: strategy when no hand drawn")
     t.eq(Tarot.target_note(gs, "c_empress"), "apply to your 2 highest-value cards", "Empress: strategy (2 cards)")
     t.ok(Tarot.target_note(gs, "c_tower"):find("weakest"), "Tower (Stone): strategy targets the weakest")
     t.ok(Tarot.target_note(gs, "c_sun"):find("non%-Hearts"), "Sun: strategy converts non-Hearts to Hearts")
@@ -926,16 +925,16 @@ return function(t)
     -- DRAWN hand present -> names the specific hand cards (explicit pool OR gs.hand)
     local hand = { card{ id = 1, rank = "Ace", suit = "Spades" }, card{ id = 2, rank = "King", suit = "Clubs" },
                    card{ id = 3, rank = "3", suit = "Clubs" } }
-    t.eq(Tarot.target_note(gs, "c_devil", hand), "apply to 3C", "Devil (explicit hand) names the weakest card you will hold")
+    t.eq(Tarot.target_note(gs, "c_devil", hand), "apply to AS", "Devil (explicit hand) names the highest card")
     t.ok(Tarot.target_note(gs, "c_empress", hand):find("^apply to AS,"), "Empress (explicit hand) names the Ace first")
     -- gs.hand is used automatically when present (the in-pack/in-blind case)
     local gsh = GS.new{ deck = deck, hand = hand, run = { hand_levels = {}, hand_size = 8 } }
-    t.eq(Tarot.target_note(gsh, "c_devil"), "apply to 3C", "names a card from the DRAWN hand, never an undrawn deck card")
+    t.eq(Tarot.target_note(gsh, "c_devil"), "apply to AS", "names a card from the DRAWN hand, never an undrawn deck card")
 
     -- pack-open with a drawn hand names a HAND card (regression: it named an undrawn card)
     local gs2 = GS.new{ deck = deck, hand = hand, remaining = deck, run = { hand_levels = {}, hand_size = 8 },
       pack = { picks_left = 1, items = { { set = "Tarot", key = "c_devil", name = "The Devil" } } } }
-    t.ok(PackOpen.recommend(gs2).reason:find("apply to 3C"), "pack-open names a drawn hand card")
+    t.ok(PackOpen.recommend(gs2).reason:find("apply to AS"), "pack-open names a drawn hand card")
   end
 
   -- ---- the tarot TARGET is lifted into the BIG move line, not just the reason ----
