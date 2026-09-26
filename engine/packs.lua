@@ -263,11 +263,12 @@ end
 -- (Cartomancer, 8 Ball, Seance, ...). Same measured per-card values the pack pools use; a card worth
 -- less than nothing floors at 0 (you would sell or skip it).
 function P.mean_random(gs, kind, opts)
-  local items = (kind == "Spectral") and spectral_pool(gs, opts) or tarot_pool(gs, opts)
+  local items = (kind == "Spectral") and spectral_pool(gs, opts)
+    or (kind == "Planet") and planet_pool(gs, opts) or tarot_pool(gs, opts)
   if #items == 0 then return 0 end
-  local s = 0
-  for _, it in ipairs(items) do s = s + it.v end
-  return s / #items
+  local s, w = 0, 0
+  for _, it in ipairs(items) do s = s + it.v * (it.w or 1); w = w + (it.w or 1) end
+  return (w > 0) and (s / w) or 0
 end
 
 local function mkcard(rank_id, suit, enh, edition, seal)
