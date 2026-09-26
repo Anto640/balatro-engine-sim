@@ -596,10 +596,16 @@ return function(t)
       run.rng = lcg(seed * 7 + 1)
       Content._take_pack(run, { key = "p_buffoon_mega", name = "Buffoon Pack" }, run.rng)
       if #run.jokers > 5 then overflowA = true end
-      for _, j in ipairs(run.jokers) do if j.key ~= "j_joker" then protected_ok = false end end
+      -- (2026-09-25 R13: a pack pick MAY replace the weakest joker when it clears the shop's swap bar -- owner: the
+      -- engine "didn't change its jokers once". On five identical +4 Mult Jokers the swaps are Duo / Swashbuckler /
+      -- Blue Joker / Banner / Scholar... -- upgrades. The protected property is now: never a like-for-like churn,
+      -- and at most ONE swap per pick.)
+      local n_plain = 0
+      for _, j in ipairs(run.jokers) do if j.key == "j_joker" then n_plain = n_plain + 1 end end
+      if n_plain < 4 then protected_ok = false end
     end
     t.ok(not overflowA, "no overflow on a full protected board")
-    t.ok(protected_ok, "CORE-PROTECTED: an all-scorer full board never sells a scorer for a pack pick")
+    t.ok(protected_ok, "CORE-PROTECTED: a full scorer board swaps at most one joker per pack pick, for a different joker")
     -- (B) a DISPOSABLE-filler board (keep_bias 0) CAN swap a filler for a pack joker
     local swaps, overflowB = 0, false
     for seed = 1, 30 do
