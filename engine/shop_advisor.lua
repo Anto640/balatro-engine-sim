@@ -1404,6 +1404,50 @@ function SA.recommend(gs, opts)
         reason = string.format("Sell %s (+$%d) — %s.", j.name or j.key or "joker", cash, why),
       }
     end
+    -- BEST-TRADE SWAP (2026-09-27, owner, live 2YD6L372: "it rerolled past a Trio which would have probably won it").
+    -- The upgrade above only ever considers selling the ONE joker ranked weakest -- there Sock and Buskin, a protected
+    -- retrigger core -- so Trio could never clear the bar, while two flat-mult jokers the owner saw doing little were
+    -- never weighed against it. On a full board, weigh every offered joker against selling EACH owned joker, with the
+    -- same protections as the upgrade (the sold joker's measured contribution x SWAP_KEEP_SLOPE, its keep_bias as the
+    -- margin, the survival check), and offer the best trade as a SELL_JOKER that makes room for it.
+    if slots_free <= 0 and shop and #(shop.jokers or {}) > 0 then
+      local best_t
+      for i = 1, #gs.jokers do
+        local jk = gs.jokers[i]
+        local ab = jk.ability
+        local ex = (type(ab) == "table" and type(ab.extra) == "table") and ab.extra or nil
+        local eternal = type(ab) == "table" and (ab.eternal or (ex and ex.eternal))
+        if not eternal and i ~= worst_i then
+          local ci = joker_contribution(gs, i, mopts)
+          local kb = BuildPlan.keep_bias(jk.key, gs, Eval.joker_fires(gs, i, mopts))
+          local keep = ci * (1 + SA.SWAP_KEEP_SLOPE * ci) + math.max(SA.UPGRADE_MARGIN, kb)
+          local cash_i = jk.sell_value or 1
+          for _, sj in ipairs(shop.jokers) do
+            if (dollars(gs) + cash_i - (sj.cost or 0)) >= reserve then
+              local cur = JokerValue.score_delta(gs, sj, mopts)
+              local sv = surv()
+              local ok_s = not (sv and sv.unsafe(i, math.max(0, cur or 0) / sv.need))
+              if ok_s and (cur == nil or cur > 0) then
+                local g = buy_fv_delta(gs, sj, mopts) + (BuildPlan.fit(gs, sj, build, invest))
+                local up = g - keep
+                if up > 0 and (not best_t or up > best_t.up) then
+                  best_t = { up = up, i = i, sj = sj, cash = cash_i }
+                end
+              end
+            end
+          end
+        end
+      end
+      if best_t then
+        local tj = gs.jokers[best_t.i]
+        actions[#actions + 1] = {
+          type = "SELL_JOKER", target = tj, cost = 0, value = SA.W_FV * best_t.up,
+          swap_for = best_t.sj, swap_cash = best_t.cash,
+          reason = string.format("Sell %s (+$%d) — frees a slot for %s, a clear upgrade.",
+            tj.name or tj.key or "joker", best_t.cash, best_t.sj.name or best_t.sj.key or "a better joker"),
+        }
+      end
+    end
     -- SPAWNER FARM: a full board with a per-blind joker spawner (Riff-Raff). Sell the weakest joker that is
     -- NOT a spawner; the freed slot lands one spawned joker next blind (value measured on this board) and
     -- the sale's cash is real. Same protected selection (keep_bias, survival penalty) as the sale above.
@@ -1744,16 +1788,20 @@ function SA.recommend(gs, opts)
       local rc = top.cost or 0
       local pick, pick_idx
       for i, a in ipairs(actions) do
-        if (a.type == "BUY_JOKER" or a.type == "BUY_CONSUMABLE") and (a.value or 0) > 0
+        local swap_ok = a.type == "SELL_JOKER" and a.swap_for and (a.value or 0) > 0
+        and (dollars(gs) + (a.swap_cash or 0) - (a.swap_for.cost or 0) - rc) >= (reserve - credit)
+      if swap_ok or ((a.type == "BUY_JOKER" or a.type == "BUY_CONSUMABLE") and (a.value or 0) > 0
            and (a.type ~= "BUY_JOKER" or (slots_free or 0) >= 2)
-           and (dollars(gs) - (a.cost or 0) - rc) >= (reserve - credit) then
+           and (dollars(gs) - (a.cost or 0) - rc) >= (reserve - credit)) then
           if not pick or a.value > pick.value then pick, pick_idx = a, i end
         end
       end
       if pick and pick_idx > 1 then
         table.remove(actions, pick_idx)
         table.insert(actions, 1, pick)
-        pick.reason = (pick.reason or "") .. "  [Buy this BEFORE rerolling — a reroll replaces it, and you can afford both.]"
+        pick.reason = (pick.reason or "") .. (pick.swap_for
+          and "  [Do this BEFORE rerolling — a reroll would replace the joker it makes room for.]"
+          or "  [Buy this BEFORE rerolling — a reroll replaces it, and you can afford both.]")
       end
     end
   end

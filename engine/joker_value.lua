@@ -66,6 +66,83 @@ local function clone_with_jokers(gs, list)
   return p
 end
 
+-- DIG-AWARE JOKER MEASUREMENT (2026-09-27, owner: "it rerolled past a Trio which would have probably won it"). Every
+-- joker used to be measured on the best play of ONE 8-card deal with no discards -- a hand nobody plays. Live 2YD6L372
+-- (a Pair build with Duo): swapping Lusty Joker for Trio measured -25% on single deals, but +40% when each board digs
+-- with the play engine's cheap draw heuristic (Heuristics.best_discard, which scores draws WITH that board's jokers)
+-- and +44% with the full Monte-Carlo dig. A conditional multiplier is worth what you can dig toward, and you dig
+-- toward what the board rewards. With BES_DIG_HANDS=1 every sample is a DEAL shared by both boards (common random
+-- numbers: one seed per sample, so with/without stay paired) which EACH board then digs for the expected discards used
+-- (budget x the live-measured 0.63). Dug hands are cached per (board, deck, seed), so the shared current board is dug
+-- once per decision.
+JV.DIG_HANDS = os.getenv("BES_DIG_HANDS") == "1"
+JV.DISCARD_BUDGET_USED = 0.63     -- live-measured share of the discard budget used (see CV.DISCARD_BUDGET_USED)
+local DIG_CACHE, DIG_N = {}, 0
+local function card_key(c)
+  return (c.rank_id or c.rank or "") .. (c.suit or "") .. (c.enhancement or "") .. (c.edition or "") .. (c.seal or "")
+end
+local function deck_key(deck)
+  local parts = {}
+  for i = 1, #deck do parts[i] = card_key(deck[i]) end
+  return table.concat(parts, ",")
+end
+local function board_sig(list)
+  local parts = {}
+  for i, j in ipairs(list or {}) do parts[i] = (j.key or "?") .. ":" .. (j.edition or "") end
+  return table.concat(parts, ",")
+end
+-- deal from `deck` with `seed`, then dig D times with board_gs's jokers; returns the hand the board would play
+local function deal_dig(board_gs, deck, dkey, hs, seed)
+  local b = board_gs.blind or {}
+  local budget = b.base_discards or ((b.discards_left or 3) + (b.discards_used or 0))
+  local D = math.floor(budget * JV.DISCARD_BUDGET_USED + 0.5)
+  local key = board_sig(board_gs.jokers) .. "|" .. dkey .. "|" .. hs .. "|" .. D .. "|" .. seed
+  local hit = DIG_CACHE[key]
+  if hit then return hit end
+  local st = seed
+  local function rng() st = (st * 16807) % 2147483647; return (st - 1) / 2147483646 end
+  local sh = {}
+  for i = 1, #deck do sh[i] = deck[i] end
+  for i = #sh, 2, -1 do local r = math.floor(rng() * i) + 1; sh[i], sh[r] = sh[r], sh[i] end
+  local hand, p = {}, hs + 1
+  for i = 1, hs do hand[i] = sh[i] end
+  if D > 0 then
+    local H = require("engine.heuristics")
+    local g = {}
+    for k, v in pairs(board_gs) do g[k] = v end
+    for _ = 1, D do
+      g.hand = hand
+      local pile = {}
+      for i = p, #sh do pile[#pile + 1] = sh[i] end
+      g.remaining = pile
+      local d = H.best_discard(g)
+      if not d or not d.cards or #d.cards == 0 or #d.cards >= #hand then break end
+      local drop = {}
+      for _, c in ipairs(d.cards) do drop[c] = true end
+      local nh = {}
+      for _, c in ipairs(hand) do if not drop[c] then nh[#nh + 1] = c end end
+      while #nh < hs and p <= #sh do nh[#nh + 1] = sh[p]; p = p + 1 end
+      hand = nh
+    end
+  end
+  if DIG_N >= 4096 then DIG_CACHE, DIG_N = {}, 0 end
+  DIG_CACHE[key] = hand; DIG_N = DIG_N + 1
+  return hand
+end
+-- deal k of a deck is the SAME for every measurement of a decision (seeded from the deck's content), so the current
+-- board is dug once per decision and every candidate is compared on identical deals (common random numbers)
+local SEED_MEMO = setmetatable({}, { __mode = "k" })
+local function deal_seed(deck, dkey, k)
+  local base = SEED_MEMO[deck]
+  if not base or base.key ~= dkey then
+    local h = 5381
+    for i = 1, #dkey, 3 do h = (h * 33 + dkey:byte(i)) % 2147483647 end
+    base = { key = dkey, h = h }
+    SEED_MEMO[deck] = base
+  end
+  return (base.h + k * 104729) % 2147483646 + 1
+end
+
 local function shuffled(list, rng)
   local a = {}
   for i = 1, #list do a[i] = list[i] end
@@ -76,6 +153,15 @@ local function shuffled(list, rng)
   end
   return a
 end
+
+-- one sample hand: a fresh deal (the DIG_HANDS path draws per-board dug hands instead, see deal_dig)
+local function sample_hand(gs, deck, hs, rng)
+  local s = shuffled(deck, rng)
+  local hand = {}
+  for i = 1, hs do hand[i] = s[i] end
+  return hand
+end
+JV._sample_hand = sample_hand
 
 -- Can we measure on this state at all? (need a deck and a modelled joker)
 function JV.can_measure(gs, joker)
@@ -111,11 +197,12 @@ function JV.score_delta(gs, joker, opts)
   -- candidate insertion positions (for a copier) costs N x best_play, not N x (draw+rescore).
   -- Determinism is unchanged for the common append path: the same `samples` shuffles are
   -- consumed, in the same order, whether or not the candidate is a copier.
-  local hands, a_scores = {}, {}
+  local hands, a_scores, seeds = {}, {}, {}
+  local dkey = JV.DIG_HANDS and deck_key(deck)
   for k = 1, samples do
-    local s = shuffled(deck, rng)
-    local hand = {}
-    for i = 1, hs do hand[i] = s[i] end
+    local hand
+    if JV.DIG_HANDS then seeds[k] = deal_seed(deck, dkey, k); hand = deal_dig(without, deck, dkey, hs, seeds[k])
+    else hand = sample_hand(gs, deck, hs, rng) end
     hands[k] = hand
     local a = HandEval.best_play(without, hand)
     a_scores[k] = a and a.score or 0
@@ -124,7 +211,8 @@ function JV.score_delta(gs, joker, opts)
     local withg = clone_with_jokers(gs, with_list)
     local total = 0
     for k = 1, samples do
-      local b = HandEval.best_play(withg, hands[k])
+      local hand = JV.DIG_HANDS and deal_dig(withg, deck, dkey, hs, seeds[k]) or hands[k]
+      local b = HandEval.best_play(withg, hand)
       total = total + ((b and b.score or 0) - a_scores[k])
     end
     return total / samples
@@ -180,12 +268,15 @@ function JV.remove_delta(gs, idx, opts)
   local withoutg = clone_with_jokers(gs, rest)
 
   local total = 0
-  for _ = 1, samples do
-    local s = shuffled(deck, rng)
-    local hand = {}
-    for i = 1, hs do hand[i] = s[i] end
-    local a = HandEval.best_play(withg, hand)
-    local b = HandEval.best_play(withoutg, hand)
+  local dkey = JV.DIG_HANDS and deck_key(deck)
+  for k = 1, samples do
+    local ha, hb
+    if JV.DIG_HANDS then
+      local sd = deal_seed(deck, dkey, k)
+      ha, hb = deal_dig(withg, deck, dkey, hs, sd), deal_dig(withoutg, deck, dkey, hs, sd)
+    else ha = sample_hand(gs, deck, hs, rng); hb = ha end
+    local a = HandEval.best_play(withg, ha)
+    local b = HandEval.best_play(withoutg, hb)
     total = total + ((a and a.score or 0) - (b and b.score or 0))
   end
   return total / samples
@@ -212,10 +303,9 @@ function JV.avg_score(gs, opts)
 
   local g = clone_with_jokers(gs, gs.jokers or {})
   local total = 0
-  for _ = 1, samples do
-    local s = shuffled(deck, rng)
-    local hand = {}
-    for i = 1, hs do hand[i] = s[i] end
+  local dkey = JV.DIG_HANDS and deck_key(deck)
+  for k = 1, samples do
+    local hand = JV.DIG_HANDS and deal_dig(g, deck, dkey, hs, deal_seed(deck, dkey, k)) or sample_hand(gs, deck, hs, rng)
     local ev = HandEval.best_play(g, hand)
     total = total + (ev and ev.score or 0)
   end
