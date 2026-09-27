@@ -100,7 +100,7 @@ thing **headless-testable**. See the Layout section in `README.md` for the per-f
 - **Tool index:** `tools/README.md` — 31 analysis tools grouped by the QUESTION each answers.
   Read it before writing a new one; most read existing telemetry and cost nothing to run.
 - **Tests (do this after every change):** `lua tests/runner.lua` (run via the Bash
-  tool). Lua 5.1+/LuaJIT, no `love`/`G`/Steamodded needed. Currently **1267 pass** (+ 605 sim, all green 2026-09-26).
+  tool). Lua 5.1+/LuaJIT, no `love`/`G`/Steamodded needed. Currently **1278 pass** (+ 605 sim, all green 2026-09-27).
   Failures print `FAIL  <case>  (got X, want Y)`; exit code is non-zero on failure.
   ⚠ **Two known, pre-existing conditions — don't mistake either for a regression you caused:**
   (1) the sim suite's standing failures are gone (2026-09-26: the CORE-PROTECTED pack-swap test was restated for
@@ -729,7 +729,8 @@ expect sd ~1.9 (MDE ~0.42 at n=160) for anything touching the shop loop.
 
 ## Git
 
-Active work is on branch `joker-coverage-and-engine-fixes`. **Commit and push whenever you (the AI
+Active work is on branch `winrate-v4-bundle`; `main` is synced to the validated/live state (fast-forward/merge it when a
+batch of changes is confirmed -- last synced 2026-09-27 at `2aa00f9` + README). **Commit and push whenever you (the AI
 assistant) judge it appropriate — you do NOT need to wait to be asked** (owner directive, 2026-08-28).
 Use judgement: commit at coherent checkpoints with a clear message, keep the tree green, and don't
 bundle unrelated changes. Run the test suite before committing.
