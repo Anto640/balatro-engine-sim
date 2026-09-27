@@ -1224,19 +1224,6 @@ function SA.recommend(gs, opts)
         slots_free = ShopState.slots_free(gs) }
     end
     actions[#actions + 1] = rentry
-    -- OVERSTOCK (+1 card in every shop view for the rest of the run): the reroll just measured what new cards are
-    -- worth to this board -- its GROSS gain per card, before the reroll's price and before the appetite damping
-    -- (an Overstock card costs nothing). Over the views left (blinds remaining x views per blind at this bankroll),
-    -- halved for runway like the generator jokers (a card seen later has less run left to pay back).
-    local per_card = SA.REROLL_DISCOUNT * w_score * 5 * improvement * realizable / Vouchers.SHOP_CARD_SLOTS
-    local horizon = 0.5 * Eval.blinds_remaining(gs) * Vouchers.views_per_blind(gs)
-    for _, e in ipairs(priced) do
-      if e.type == "BUY_VOUCHER" and e.target and Vouchers.OVERSTOCK[e.target.key] then
-        e.value = e.value + per_card * horizon
-        e.reason = string.format("Buy %s ($%d) — +1 card in every shop view (~%.0f views left this run).",
-          e.name or "Overstock", e.cost or 10, horizon * 2)
-      end
-    end
   end
   end)
 
@@ -1659,7 +1646,6 @@ function SA.recommend(gs, opts)
   -- Holding has value only with Observatory (a held planet gives x1.5 to its hand) or Perkeo (copies a held card
   -- at shop end), so those keep the old behaviour.
   try(function()
-    if os.getenv("BES_NO_SHOP_PLANET_USE") == "1" then return end   -- A/B switch (arm r16c)
     local vo = (gs.run and gs.run.vouchers_owned) or {}
     local held_value = vo.v_observatory and true or false          -- live: a set { key = true }
     for _, k in ipairs(vo) do if k == "v_observatory" then held_value = true end end   -- sim: a list

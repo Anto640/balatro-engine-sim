@@ -82,17 +82,6 @@ end
 -- antes played; 457 rerolls over ~2022 shops; 2022 shops over 846 antes (3 blinds each).
 V.CELESTIAL_PACKS_PER_ANTE = 0.70
 V.REROLLS_PER_SHOP = 0.23
--- Rerolls per shop visit BY BANKROLL (the engine rerolls when rich -- above the interest cap a reroll is nearly
--- free money), measured 2026-09-26 on sim_out/hf.jsonl (2290 visits): <$15 0.02, $15-24 0.06, $25-39 0.23,
--- $40+ 0.88 (the flat 0.23 average priced Reroll Surplus at ~$0.4/round for a live run rerolling 3-5x a shop).
-V.REROLLS_BY_BANK = { { 15, 0.02 }, { 25, 0.06 }, { 40, 0.23 }, { math.huge, 0.88 } }
-V.REROLL_BASE_COST = 5         -- game rule
-V.SHOP_CARD_SLOTS = 2          -- game rule (joker/consumable cards per shop view, before Overstock)
-function V.rerolls_per_visit(gs)
-  local d = math.max(0, (gs and gs.economy and gs.economy.dollars) or 0)
-  for _, b in ipairs(V.REROLLS_BY_BANK) do if d < b[1] then return b[2] end end
-  return V.REROLLS_BY_BANK[#V.REROLLS_BY_BANK][2]
-end
 V.SHOPS_PER_ROUND = 2022 / 846 / 3
 V.AVG_BLIND_REWARD = 4          -- game rule: Small $3 / Big $4 / Boss $5
 V.ANTIMATTER_COST = 10
@@ -234,11 +223,8 @@ local DATA = {
   -- never holds them, so the effect never fires for it.
   v_observatory    = entry("Observatory", 0, 0, "x1.5 per HELD planet (the engine uses planets immediately)"),
   -- ---- not usable / not modelled -> 0 (never bought) ----
-  -- OVERSTOCK: one more card in EVERY shop view (each shop and each reroll) for the rest of the run -- valued in
-  -- shop_advisor from the reroll's measured per-card value (see V.OVERSTOCK). (Was 0 -- "not modelled, never
-  -- bought" -- while live BQ63E388 rerolled ~20 times at $40-65 with Overstock on offer.)
-  v_overstock_norm = entry("Overstock", 0, 0, "+1 card in every shop view"),
-  v_overstock_plus = entry("Overstock Plus", 0, 0, "+1 card in every shop view"),
+  v_overstock_norm = entry("Overstock", 0, 0, "+1 shop card slot (" .. UNUSED .. ")"),
+  v_overstock_plus = entry("Overstock Plus", 0, 0, "+1 shop card slot (" .. UNUSED .. ")"),
   v_crystal_ball   = entry("Crystal Ball", 0, 0, "+1 consumable slot (" .. UNUSED .. ")"),
   v_omen_globe     = entry("Omen Globe", 0, 0, "spectral in arcana packs (" .. UNUSED .. ")"),
   v_tarot_merchant = entry("Tarot Merchant", 0, 0, "tarots appear more (" .. UNUSED .. ")"),
@@ -266,15 +252,9 @@ local ECON = {
   v_clearance_sale = function(gs) return 0.25 * income_per_round(gs) end,
   v_liquidation    = function(gs) return 0.25 * income_per_round(gs) end,   -- 25% -> 50%: another 25%
   -- $2 off every reroll, at the rate the engine actually rerolls
-  v_reroll_surplus = function(gs) return 2 * V.rerolls_per_visit(gs) * V.SHOPS_PER_ROUND end,
-  v_reroll_glut    = function(gs) return 2 * V.rerolls_per_visit(gs) * V.SHOPS_PER_ROUND end,
+  v_reroll_surplus = function() return 2 * V.REROLLS_PER_SHOP * V.SHOPS_PER_ROUND end,
+  v_reroll_glut    = function() return 2 * V.REROLLS_PER_SHOP * V.SHOPS_PER_ROUND end,
 }
--- Overstock is priced in shop_advisor (SA.overstock_value) from the shop's OWN measured card value -- the gross
--- value a reroll's new cards are expected to add -- because it IS free card views: the only measurement of what a
--- card view is worth to this engine lives in the reroll valuation.
-V.OVERSTOCK = { v_overstock_norm = true, v_overstock_plus = true }
--- shop views per blind (each visit, plus its rerolls at this bankroll)
-function V.views_per_blind(gs) return V.SHOPS_PER_ROUND * (1 + V.rerolls_per_visit(gs)) end
 
 function V.get(key) return key and DATA[key] or nil end
 
