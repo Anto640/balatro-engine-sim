@@ -1224,6 +1224,23 @@ function SA.recommend(gs, opts)
         slots_free = ShopState.slots_free(gs) }
     end
     actions[#actions + 1] = rentry
+    -- OVERSTOCK v2 (+1 card in every shop view for the rest of the run). Priced from the reroll's measured GROSS
+    -- per-card value over the views left (blinds remaining x views per blind at this bankroll, halved for runway) --
+    -- but ONLY out of SURPLUS: v1 (no gate) was bought at antes 1-2 where $10 is the run's economy, and measured
+    -- negative (arm r16c). The engine rerolls, i.e. buys card views, only when above the interest cap, so an extra
+    -- card is only "free" to the extent the $10 comes out of money above the cap.
+    local per_card = SA.REROLL_DISCOUNT * w_score * 5 * improvement * realizable / Vouchers.SHOP_CARD_SLOTS
+    local horizon = 0.5 * Eval.blinds_remaining(gs) * Vouchers.views_per_blind(gs)
+    local cap_dollars = interest_cap(gs) * 5
+    for _, e in ipairs(priced) do
+      if e.type == "BUY_VOUCHER" and e.target and Vouchers.OVERSTOCK[e.target.key] then
+        local surplus = dollars(gs) - (e.cost or 10) - cap_dollars
+        local gate = clamp(surplus / (e.cost or 10), 0, 1)
+        e.value = e.value + gate * per_card * horizon
+        e.reason = string.format("Buy %s ($%d) — +1 card in every shop view (~%.0f views left this run).",
+          e.name or "Overstock", e.cost or 10, horizon * 2)
+      end
+    end
   end
   end)
 
