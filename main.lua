@@ -360,7 +360,17 @@ function BES.apply_pack(gs, po, provisional)
   end
   BES.last = { gs = gs, ranked = { best = action }, pack = true,
     provisional = (provisional or BES.pack_awaits_hand(gs)) or nil }
-  if Overlay then Overlay.set({ best = action }) end
+  -- show a pack choice only once it is DECIDED (owner 2026-09-27: the panel said "sell Swashbuckler for Green Joker",
+  -- then the measured pass skipped the pack -- the first line was only the instant provisional estimate)
+  if Overlay then
+    if BES.last.provisional then
+      Overlay.set({ best = { type = "Evaluating pack…" },
+        reason = "Measuring each pick against your deck — the choice appears when it is decided." })
+      Overlay.state.reason = "Measuring each pick against your deck — the choice appears when it is decided."
+    else
+      Overlay.set({ best = action })
+    end
+  end
   Log.info("PACK: " .. (po.reason or ""))
 end
 
