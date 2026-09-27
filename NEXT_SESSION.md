@@ -17,7 +17,15 @@
 | `r16c` | vouchers + BH only | -0.163 (p 0.063) | 12/24, 124 tied | 37->32 | 51->44 | voucher part REVERTED (`718c7ba`): Overstock at 8-21 FV bought at antes 1-2 |
 | r16b vs r16c | planet-use alone | -0.010 (p 0.95) | 47/63 | 32->37 | 44->46 | kept |
 | `r16d` 718c7ba | planet-use + BH credit | -0.050 (p 0.75) | 49/62 | 37->36 | 51->50 | SHIPPED (correctness; neutral) |
-**LIVE INSTALL = `95e0b9f`** (2026-09-27). New baseline: `sim_out/r16d.jsonl`. Overnight: `at2` (audit batch retry with the
+**OVERNIGHT 2026-09-27 (vs r16d; OOS = BES_SEED_OFF=7):**
+| arm | what | in-sample | OOS | verdict |
+|---|---|---|---|---|
+| `at2m` (40 runs) | measure Emperor/HP output use | Emperor outputs used 17/22 = 0.77, HP 24/24 = 1.00 | -- | -> CV.GEN_USE_RATE |
+| `at2` | no-flat audit batch 1 retried (+ use rates) | +0.009, wins 36->**47**, reach-8 +6 (McNemar 33/22, p 0.18) | -0.058, wins 49->**43**, reach-8 -5 | did NOT replicate; pooled ~null (+5 wins/320). SHIPPED as correctness (owner no-flat rule), not as a gain |
+| `ov2` | Overstock gated to money above the interest cap | -0.038, 142 tied, wins 36->35 | -- | neutral (fires only when rich); SHIPPED (was a hard 0) |
++ `d399bbc` Gold seal / Lucky money counts retriggers (Chad etc.) -- rare, on mechanism.
+**LIVE INSTALL = `d399bbc`** (2026-09-27, verified 0 diffs). Baselines on disk: `sim_out/{r16d,r16d7,at2,at2_7,ov2}.jsonl`
+(the live engine ~= at2+ov2+retriggers: use at2/at2_7 as its reference until a fresh arm is run). Overnight: `at2` (audit batch retry with the
 MEASURED use rate of Emperor/HP outputs -- sim now logs gen_made/gen_used) and `ov2` (Overstock gated to money above the
 interest cap), both vs r16d. Runner: `%TMP%/bes/arm.sh` (resumable; restart after memory reaps).
 
