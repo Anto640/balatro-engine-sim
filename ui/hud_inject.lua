@@ -95,8 +95,13 @@ local function draw_panel()
   -- scale the one pixel font to each target height
   local function sc(px) return px / base end
   -- lines: {text, target_px, colour}
+  -- live self-play / auto-restart status (owner 2026-09-27), read from the auto-player each frame
+  local ap = HUD.autoplay
+  local status = ap and string.format("Self-play: %s   Auto-restart: %s  (F11 / F6)",
+    ap.enabled and "ON" or "OFF", ap.auto_restart and "ON" or "OFF") or nil
   local spec = {
     { st.title,   PANEL.title_px, COL.title },
+    { status,     PANEL.body_px,  (ap and ap.enabled) and COL.ev or COL.reason },
     { st.move,    PANEL.move_px,  COL.move },
     { st.conf,    PANEL.body_px,  COL.conf },
     { st.ev,      PANEL.body_px,  COL.ev },

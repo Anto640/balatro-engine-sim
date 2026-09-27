@@ -822,7 +822,7 @@ end
 
 -- ---- in-game wiring ---------------------------------------------------------
 if _G.G and _G.SMODS then
-  if HUDInject then HUDInject.install() end
+  if HUDInject then HUDInject.autoplay = Autoplay; HUDInject.install() end   -- status row: self-play / auto-restart
 
   -- debug + toggle keys (chain to any previously-registered handler)
   if love then
@@ -837,6 +837,10 @@ if _G.G and _G.SMODS then
           and "ON  (fast: logs decisions, NO evaluation -> no lag)"
           or  "OFF (full evaluation + live recommendations)"))
       end
+      if key == "f6" and Autoplay then
+        local on = Autoplay.toggle_restart()
+        Log.info("BES AUTO-RESTART " .. (on and "ON  (a new run starts by itself when a run ends)" or "OFF"))
+      end
       if key == "f11" and Autoplay then
         local on = Autoplay.toggle()
         -- auto-play needs live recommendations, so force full evaluation ON
@@ -845,7 +849,7 @@ if _G.G and _G.SMODS then
           Log.info("BES capture-only OFF (auto-play needs live evaluation)")
         end
         Log.info("BES AUTO-PLAY " .. (on
-          and "ON  (blind PLAY/DISCARD only — the engine now plays hands itself)"
+          and "ON  (the engine plays by itself; F6 toggles auto-restart of finished runs)"
           or  "OFF (you control the game)"))
       end
       if prev then return prev(key, ...) end

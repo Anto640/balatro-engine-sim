@@ -118,7 +118,9 @@ thing **headless-testable**. See the Layout section in `README.md` for the per-f
   and to `bes_joker_dump.txt` in the LÖVE save folder, each tagged
   `scored`/`value-only`/`UNCOVERED`); `F8` force a re-evaluation; `F9` toggle the overlay;
   `F10` capture-only toggle (log decisions, no eval); **`F11` AUTO-PLAY toggle** (the self-player,
-  `ui/autoplay.lua`, default OFF — plays whole runs; logs to `bes_autoplay.log`).
+  `ui/autoplay.lua`, default OFF — plays whole runs; logs to `bes_autoplay.log`); **`F6` AUTO-RESTART toggle** (default OFF — with
+  auto-play on, a finished run (game over / win) is restarted via the game's hold-R path after 4 s, so runs chain
+  unattended). The panel shows a live `Self-play: ON/OFF   Auto-restart: ON/OFF` row.
 
 ## Self-play simulator & data-driven tuning (THE current workflow — read this)
 

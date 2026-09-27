@@ -230,4 +230,37 @@ return function(t)
     _G.love, _G.G = saved_love, saved_G
     Autoplay.enabled = false
   end
+
+  -- AUTO-RESTART (F6, 2026-09-27): on the game-over screen, after RESTART_DELAY, start a new run through the game's
+  -- own hold-R path (G.FUNCS.start_setup_run with the stake forced); never when the option is off.
+  do
+    local clock = 500
+    local saved_love, saved_G = _G.love, _G.G
+    _G.love = { timer = { getTime = function() return clock end } }
+    local started, stake_at_start = 0, nil
+    local G = {
+      STATES = { GAME_OVER = 7, SELECTING_HAND = 1 }, STATE = 7, STAGES = { RUN = 2 }, STAGE = 2,
+      SETTINGS = {}, GAME = { stake = 3, seeded = false, pseudorandom = { seed = "X" } },
+      jokers = { cards = {} }, consumeables = { cards = {} }, hand = { cards = {} }, STAGE_OBJECTS = {},
+      FUNCS = {},
+    }
+    G.FUNCS.start_setup_run = function() started = started + 1; stake_at_start = G.forced_stake end
+    _G.G = G
+    Autoplay.enabled = true
+    Autoplay.locked_until, Autoplay.last_sig, Autoplay._ended_since = 0, nil, nil
+    Autoplay.auto_restart = false
+    for _ = 1, 10 do Autoplay.tick({}, nil); clock = clock + 1 end
+    t.eq(started, 0, "auto-restart: OFF -> never restarts a finished run")
+    Autoplay.auto_restart = true
+    Autoplay.tick({}, nil)
+    t.eq(started, 0, "auto-restart: waits RESTART_DELAY so the death is recorded first")
+    clock = clock + Autoplay.RESTART_DELAY + 0.1
+    Autoplay.tick({}, nil)
+    t.eq(started, 1, "auto-restart: ON -> a new run is started via the hold-R path")
+    t.eq(stake_at_start, 3, "auto-restart: keeps the run's stake")
+    t.eq(G.SETTINGS.current_setup, "New Run", "auto-restart: sets up a New Run (same deck, fresh seed)")
+    Autoplay.auto_restart = false
+    _G.love, _G.G = saved_love, saved_G
+    Autoplay.enabled = false
+  end
 end

@@ -89,6 +89,61 @@ function Autoplay.dump_ui(G)
   flog("--- END UI DUMP ---")
 end
 
+-- AUTO-RESTART (F6, owner 2026-09-27): when a run ENDS (game over, or the win screen), start a new run by itself so
+-- the self-player can play many runs unattended. It uses the game's OWN hold-R restart path (Controller key-hold
+-- 'r': same deck and stake, a fresh seed unless the run was seeded), after RESTART_DELAY so the run's death/win is
+-- recorded first. Off by default; every step is pcall'd and logged, so a failure can only stop the restart, never
+-- crash the game.
+Autoplay.auto_restart = false
+Autoplay.RESTART_DELAY = 4.0
+Autoplay.restarts = 0
+function Autoplay.toggle_restart()
+  Autoplay.auto_restart = not Autoplay.auto_restart
+  flog("==== AUTO-RESTART " .. (Autoplay.auto_restart and "ON" or "OFF") .. " ====")
+  return Autoplay.auto_restart
+end
+local function run_ended(G)
+  if G.STATES and G.STATE == G.STATES.GAME_OVER then return "game over" end
+  if G.GAME and G.GAME.won and G.OVERLAY_MENU then return "win" end
+  return nil
+end
+local function restart_run(G)
+  return pcall(function()
+    if G.save_settings then G:save_settings() end
+    G.SETTINGS.current_setup = "New Run"
+    G.GAME.viewed_back = nil
+    G.run_setup_seed = G.GAME.seeded
+    G.challenge_tab = G.GAME and G.GAME.challenge and G.GAME.challenge_tab or nil
+    G.forced_seed, G.setup_seed = nil, nil
+    if G.GAME.seeded then G.forced_seed = G.GAME.pseudorandom.seed end
+    G.forced_stake = G.GAME.stake
+    if G.STAGE == G.STAGES.RUN then G.FUNCS.start_setup_run() end
+    G.forced_stake = nil
+    G.challenge_tab = nil
+    G.forced_seed = nil
+  end)
+end
+-- returns true when it handled (or is waiting on) an ended run this tick
+local function maybe_restart(G)
+  local why = run_ended(G)
+  if not why then Autoplay._ended_since = nil; return false end
+  if not Autoplay.auto_restart then return true end
+  Autoplay._ended_since = Autoplay._ended_since or now()
+  if now() - Autoplay._ended_since < Autoplay.RESTART_DELAY then return true end
+  local ok, err = restart_run(G)
+  Autoplay._ended_since = nil
+  if ok then
+    Autoplay.restarts = Autoplay.restarts + 1
+    flog("auto-restart after " .. why .. " (#" .. Autoplay.restarts .. ")")
+    Autoplay.last_sig, Autoplay.pending_id, Autoplay.wait_sig = nil, nil, nil
+    Autoplay.locked_until = now() + 3.0
+  else
+    flog("auto-restart FAILED: " .. tostring(err) .. " -- turning auto-restart off")
+    Autoplay.auto_restart = false
+  end
+  return true
+end
+
 function Autoplay.toggle()
   Autoplay.enabled = not Autoplay.enabled
   Autoplay.locked_until = now() + 1.0
@@ -479,6 +534,7 @@ function Autoplay.tick(last, logger)
   if not Autoplay.enabled then return end
   local G = _G.G
   if not G then return end
+  if maybe_restart(G) then return end
   if now() < Autoplay.locked_until then return end
   if input_locked(G) then return end
   local ch = channel(G)
