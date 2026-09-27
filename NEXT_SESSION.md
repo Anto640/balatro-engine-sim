@@ -9,7 +9,17 @@
 | bought planets but held them (blocks the same planet from the shop) | REAL (game rule: a held card isn't re-offered; Showman lifts it) | `3cb4fe9` shop proposes USE for held planets (not with Observatory/Perkeo); `f359a04` sim now enforces the no-duplicate rule |
 | Emperor not bought (2nd time) | it is back on the flat 0.25 prior (audit batch reverted): -1.60 at $27 | pending the audit retry. The sim does NOT log Emperor-created tarots, so their realised value can't be measured yet -- add that logging first |
 | Neptune bought / Mercury-heavy with Ancient Joker; Investment skip at $27; Gros Michel / Bloodstone / Death skipped; purple-seal cards kept; board unchanged 5 antes | judgement calls / the build-assembly wall; Neptune/Mercury partly the old frequency model (live was on dig-aware freq) | none this round |
-Arms: `b16` = f359a04 (engine as live + sim no-duplicate rule), `r16` = 3cb4fe9 (the engine fixes). Verdict: see below (fill in).
+**R16 RESULTS (n=160 paired vs `b16` = f359a04):**
+| arm | what | progress | sign | wins | reach-8 | verdict |
+|---|---|---|---|---|---|---|
+| `r16` 3cb4fe9 | all four | -0.327 | 47/64 | 37->35 | 51->47 | INVALID: the sim could not execute a shop planet-use, and a refused action ENDS the shop visit (fixed `8cfbc52`) |
+| `r16b` 8cfbc52 | all four, sim fixed | -0.172 (p 0.30) | 48/67 | 37->37 | 51->46 | split |
+| `r16c` | vouchers + BH only | -0.163 (p 0.063) | 12/24, 124 tied | 37->32 | 51->44 | voucher part REVERTED (`718c7ba`): Overstock at 8-21 FV bought at antes 1-2 |
+| r16b vs r16c | planet-use alone | -0.010 (p 0.95) | 47/63 | 32->37 | 44->46 | kept |
+| `r16d` 718c7ba | planet-use + BH credit | -0.050 (p 0.75) | 49/62 | 37->36 | 51->50 | SHIPPED (correctness; neutral) |
+**LIVE INSTALL = `95e0b9f`** (2026-09-27). New baseline: `sim_out/r16d.jsonl`. Overnight: `at2` (audit batch retry with the
+MEASURED use rate of Emperor/HP outputs -- sim now logs gen_made/gen_used) and `ov2` (Overstock gated to money above the
+interest cap), both vs r16d. Runner: `%TMP%/bes/arm.sh` (resumable; restart after memory reaps).
 
 ## ⭐⭐⭐ 2026-09-26 (later) — R15 LIVE REVIEW (seed 978TLFTS, died ante 5) — LIVE INSTALL `3cc50c6`
 | owner observation | verdict | fix |
