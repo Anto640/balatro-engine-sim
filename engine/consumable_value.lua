@@ -772,6 +772,10 @@ end
 
 -- Consumables a generator tarot (High Priestess / Emperor) actually LANDS: both are created at once, one per free
 -- consumable slot after the generator itself is used (its own slot frees if it is held).
+-- Share of a generator tarot's outputs the engine actually USES (measured 2026-09-27, sim arm at2m, 40 runs with the
+-- sim's gen_made/gen_used telemetry): Emperor's random tarots 17/22 = 0.77, High Priestess's planets 24/24 = 1.00.
+-- An unused output is worth nothing, so the price is the pool mean x this rate.
+CV.GEN_USE_RATE = { c_emperor = 0.77, c_high_priestess = 1.00 }
 function CV.created_consumables_land(gs, key, n)
   local held, self_held = #(gs.consumables or {}), false
   for _, c in ipairs(gs.consumables or {}) do if c.key == key then self_held = true end end
@@ -891,7 +895,7 @@ function CV.card_value(gs, set, key, freq, need, rng, samples, hand_ctx)
       local landed = gs.pack and 2 or CV.created_consumables_land(gs, key, 2)
       if landed <= 0 then return 0, 0, "no free consumable slot for its output" end
       local mean = (key == "c_high_priestess") and CV.mean_random_planet(gs, rng) or CV.mean_random_tarot(gs, rng)
-      return landed * mean, 0, string.format("%d random %s", landed, key == "c_high_priestess" and "planets" or "tarots")
+      return landed * mean * (CV.GEN_USE_RATE[key] or 1), 0, string.format("%d random %s", landed, key == "c_high_priestess" and "planets" or "tarots")
     elseif key == "c_judgement" then
       local ok, Packs = pcall(require, "engine.packs")
       local v = ok and Packs.expected_shop_joker and Packs.expected_shop_joker(gs, 1, { rng = rng, samples = 4 }) or 0
