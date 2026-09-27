@@ -1,5 +1,25 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## ⭐⭐⭐ 2026-09-27 (later) — R17b: MORE UNATTENDED RUNS + "THE BOARD NEVER CHANGES" ROOT CAUSES
+Runs: KGJ9UMQH a5 Boss, 7Y3LRJJG **a1 Small (297/300)**, HMNFE4W2 a5 Boss, 2YD6L372 a8 Big (.79). 0 wins.
+- The overlay flip ("sell Swashbuckler for Green Joker" -> skip; pack picks changing at the last second) was the
+  provisional pass being DISPLAYED (the self-player correctly waited) -> `2aa00f9` shows "Evaluating pack..." until decided.
+- ⭐ TWO ROOT CAUSES of "never changes jokers / keeps redundant flat mults / rerolled past Trio" (owner: keep in mind):
+  1. **Joker value is measured on ONE 8-card deal with no discards.** Live 2YD6L372 (Pair build + Duo): swapping
+     Lusty for Trio = -25% on single deals, **+40% (heuristic dig) / +44% (MC dig)** when each board digs with its own
+     jokers; Swashbuckler->Trio +49% / +85%. Conditional multipliers are worth what you dig toward.
+     `c8503f4` BES_DIG_HANDS=1 (default OFF): content-seeded deals shared across a decision, each board digs with
+     its own jokers (Heuristics.best_discard), cached. Late shops 1.7s -> 3.1s.
+  2. **The full-board swap only weighed selling the ONE weakest joker** (there a protected Sock and Buskin). `c8503f4`
+     best-trade swap: every offer vs selling EACH owned joker (same protections); runs before a reroll that would
+     replace its target. Replay: "Sell Swashbuckler (+$2) -- frees a slot for The Trio".
+  Also: Sock and Buskin measured LOWEST raw (2208 pts vs flats 2648-5512) -- mult is additive and Duo doubles it, while
+  S&B only helps scored faces; on DUG hands S&B/Trio gain (Pair builds dig for face pairs).
+- Arms running (8 workers): `base17` 2aa00f9, `sw17` c8503f4 (swap), `dig17` c8503f4 + BES_DIG_HANDS=1. Ship on
+  wins/reach-8 + OOS replication; if dig17 wins, make it default and optimise its cost.
+- 7Y3LRJJG ante-1 death: each step defensible (dug 4 discards for a one-hand clear, then 297/300); but the sim dies at
+  ante 1 in ~4% of runs -- investigate (competent play never loses ante 1).
+
 ## ⭐⭐⭐ 2026-09-27 — R17: FIRST UNATTENDED RUNS (auto-restart F6) — LIVE INSTALL `b76d453`
 5 complete unattended runs (13:58-15:30) + 1 partial: K1MG6F66 a6 Big (.77), JDBPAMG6 a4 Boss (.87), RE4MB8K5 **a8 Big (.94)**,
 TDD21SIX a5 Big (.92), S79XPZDS a7 Boss (.72). **0 wins; mean run length 17.3 min.** Auto-restart fired 5/5 times.
