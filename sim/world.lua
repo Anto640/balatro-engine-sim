@@ -267,9 +267,17 @@ end
 local function grant_joker_world(run, rng, rarity_w)   -- Judgement/Soul; content checks the slot
   require("sim.content").grant_joker(run, rng, rarity_w)
 end
-local function grant_consumable_world(run, rng, set)   -- High Priestess (Planet) / Emperor (Tarot)
+local function grant_consumable_world(run, rng, set, made_by)   -- High Priestess (Planet) / Emperor (Tarot)
   if #(run.consumables or {}) >= run.consumable_slots then return false end
-  run.consumables[#run.consumables + 1] = require("sim.content").gen_consumable(set, rng)
+  local c = require("sim.content").gen_consumable(set, rng)
+  -- telemetry: count what a generator makes, and (in use_consumable) how much of it is USED -- the realised
+  -- value of an Emperor/High Priestess is its outputs' value x how often the engine actually uses them
+  if made_by then
+    c.made_by = made_by
+    run._gen_made = run._gen_made or {}
+    run._gen_made[made_by] = (run._gen_made[made_by] or 0) + 1
+  end
+  run.consumables[#run.consumables + 1] = c
   return true
 end
 World.grant_consumable_world = grant_consumable_world  -- reused by sim.content (Hallucination on pack-open)
@@ -384,9 +392,9 @@ local function use_consumable(run, action, uses, targets, hand, draw_pile)
         elseif key == "c_soul" then                              -- spectral generator: a Legendary joker
           grant_joker_world(run, rng, { Legendary = 1 })
         elseif key == "c_high_priestess" then                    -- generator: up to 2 Planets
-          grant_consumable_world(run, rng, "Planet"); grant_consumable_world(run, rng, "Planet")
+          grant_consumable_world(run, rng, "Planet", key); grant_consumable_world(run, rng, "Planet", key)
         elseif key == "c_emperor" then                           -- generator: up to 2 Tarots
-          grant_consumable_world(run, rng, "Tarot"); grant_consumable_world(run, rng, "Tarot")
+          grant_consumable_world(run, rng, "Tarot", key); grant_consumable_world(run, rng, "Tarot", key)
         elseif key == "c_fool" then                              -- generator: recreate the last tarot/planet used
           local last = run._last_consumable
           if last and #(run.consumables or {}) < run.consumable_slots then
@@ -490,6 +498,10 @@ local function use_consumable(run, action, uses, targets, hand, draw_pile)
           run._planets_used = run._planets_used or {}
           run._planets_used[key] = true        -- Satellite: $1/round per UNIQUE planet used this run
         elseif cset == "Tarot" then JokerTick.on_tarot_used(run, 1) end
+        if c.made_by then
+          run._gen_used = run._gen_used or {}
+          run._gen_used[c.made_by] = (run._gen_used[c.made_by] or 0) + 1
+        end
         -- track the last tarot/planet used for The Fool (never Fool itself)
         if key ~= "c_fool" and (hand_name or cset == "Tarot") then
           run._last_consumable = { set = cset, key = key, name = cname }

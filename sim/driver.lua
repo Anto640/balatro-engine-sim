@@ -314,7 +314,7 @@ function Driver.run(seed, opts)
       end
       if not result.cleared then
         local b = board(run)
-        emit({ kind = "death", ante = ante, blind_type = blind.type, boss = (blind.type == "Boss"),
+        emit({ kind = "death", gen_made = run._gen_made, gen_used = run._gen_used, ante = ante, blind_type = blind.type, boss = (blind.type == "Boss"),
                boss_key = blind.boss_key, target = result.target, scored = result.scored,
                ratio = (result.target > 0) and (result.scored / result.target) or nil,
                dollars = b.dollars, njokers = b.njokers, jokers = b.jokers,
@@ -352,7 +352,7 @@ function Driver.run(seed, opts)
     else
       if ante >= 8 then
         run.won = true
-        emit({ kind = "win", ante = ante, dollars = run.economy.dollars,
+        emit({ kind = "win", gen_made = run._gen_made, gen_used = run._gen_used, ante = ante, dollars = run.economy.dollars,
                njokers = #(run.jokers or {}), jokers = Json.array(joker_keys(run)) })
         return { records = recs, won = true, death_ante = nil, seed = seed }
       end
