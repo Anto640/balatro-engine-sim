@@ -436,7 +436,8 @@ local function type_ok(ch, t)
   if ch == "shop" then return t == "SAVE" or t == "REROLL" or t == "USE_CONSUMABLE" or (t and (t:find("^BUY") or t:find("^SELL"))) end
   -- SELL_JOKER is allowed in a pack: a joker pick into a FULL board needs room made first, and you
   -- CAN sell jokers while a booster is open (the make-room sell the engine now recommends as its own step).
-  if ch == "pack" then return t == "PICK" or t == "SKIP" or t == "SKIP_PACK" or (t and t:find("^SELL")) end
+  -- USE_CONSUMABLE in a pack: use a held planet to free a consumable slot for a card-making tarot pick
+  if ch == "pack" then return t == "PICK" or t == "SKIP" or t == "SKIP_PACK" or t == "USE_CONSUMABLE" or (t and t:find("^SELL")) end
   if ch == "blind_select" then return t == "CONTINUE" or t == "SKIP" or t == "PLAY" end
   return true
 end

@@ -120,6 +120,9 @@ T.SPECTRAL_TARGET = {
   c_trance   = { kind = "seal",    n = 1 },  -- Blue Seal (makes a Planet)
   c_medium   = { kind = "seal",    n = 1 },  -- Purple Seal (makes a Tarot)
   c_aura     = { kind = "edition", n = 1 },  -- Foil / Holographic / Polychrome
+  -- Cryptid copies ONE SELECTED card twice: the use button needs that selection (live K1MG6F66: no target was named,
+  -- the button never appeared and the pick was lost). Its best card to copy is the highest-value one.
+  c_cryptid  = { kind = "copy",    n = 1 },
 }
 
 -- F6 timing. Hermit's payout grows with bankroll up to +$20, so preserve that

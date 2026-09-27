@@ -319,7 +319,17 @@ end
 function BES.apply_pack(gs, po, provisional)
   local pick = po.best
   local action
-  if po.sell and po.sell.key and not po.skip then
+  if po.use_first and po.use_first.key and not po.skip then
+    -- MAKE ROOM IN THE TRAY: a card-making tarot from the pack needs a free consumable slot to be usable, so use
+    -- the held planet first (its own step, like the make-room sell), then the pick.
+    action = {
+      type = "USE_CONSUMABLE",
+      target = { name = po.use_first.name, key = po.use_first.key }, use_keys = { po.use_first.key },
+      reason = string.format("Use %s first to free a consumable slot for %s, then take it.",
+        po.use_first.name, po.use_first.for_name or "the pick"),
+      confidence = 0.7,
+    }
+  elseif po.sell and po.sell.key and not po.skip then
     -- MAKE ROOM IS ITS OWN STEP (owner request 2026-08-30). A joker pick into a FULL board can't be
     -- taken until a joker is sold, so the PRIMARY recommendation is the SELL ("Sell X to make room for
     -- Y") -- its own header line, not a grey note under "Take Y". After the sell the re-evaluation frees

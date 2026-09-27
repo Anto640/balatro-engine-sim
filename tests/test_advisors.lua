@@ -546,11 +546,14 @@ return function(t)
                                         { set = "Tarot", key = "c_devil", name = "The Devil" } } })
     t.ok(v_full < v_free, "Emperor is worth less when consumable slots are full (its created Tarots overflow)")
 
-    -- and the advice says to USE a held consumable to make room
-    local r_full = PackOpen.recommend(arc(emp, { held = {
-      { set = "Tarot", key = "c_magician", name = "The Magician" },
+    -- 2026-09-27 (live KGJ9UMQH): with the tray full a card-making tarot from a pack has NO use button. Room is made by
+    -- USING a held planet first (always usable) -- its own step; with no held planet the pick is unusable (0).
+    t.eq(v_full, 0, "Emperor with a full tray and no held planet to use first is unusable")
+    local r_planet = PackOpen.recommend(arc(emp, { held = {
+      { set = "Planet", key = "c_jupiter", name = "Jupiter" },
       { set = "Tarot", key = "c_devil", name = "The Devil" } } }), { cheap = true })
-    t.ok(r_full.reason:find("use") and r_full.reason:find("held"), "names using a held consumable to make room")
+    t.ok(r_planet.use_first and r_planet.use_first.key == "c_jupiter",
+      "names using the held planet first to make room for the pick")
 
     -- with a free slot, no make-room warning
     t.ok(not PackOpen.recommend(arc(emp, { held = {} }), { cheap = true }).reason:find("free consumable slot"),

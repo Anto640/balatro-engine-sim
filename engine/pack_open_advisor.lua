@@ -273,6 +273,21 @@ function PO.recommend(gs, opts)
       for _, e in ipairs(valued) do if e.key == "c_fool" then e.v = 0 end end
     end
   end
+  -- CARD-MAKING TAROTS NEED A FREE CONSUMABLE SLOT TO BE USED AT ALL (the game's can_use: Emperor / High Priestess /
+  -- Fool opened from a pack, with the tray full, have no use button -- live KGJ9UMQH lost a Fool pick this way). Room
+  -- can be made by USING a held planet first (always usable), which the self-player can do; otherwise the pick is
+  -- unusable and worth nothing.
+  local use_first
+  if free_cslots <= 0 then
+    for _, c in ipairs(held_cons) do
+      if (c.set == "Planet" or c.key == "c_black_hole") and not use_first then use_first = c end
+    end
+    if not use_first then
+      for _, e in ipairs(valued) do
+        if GEN[e.key] and GEN[e.key].out == "consumable" then e.v = 0 end
+      end
+    end
+  end
   table.sort(valued, function(a, b2) return a.v > b2.v end)
 
   -- choose up to picks_left items. The v>0 gate exists to skip deck-BLOATING cards (a Standard
@@ -517,7 +532,11 @@ function PO.recommend(gs, opts)
     local tg = Tarot.best_targets(gs, ordered[1].key, gs.hand)
     if tg and #tg > 0 then best_target_cards = {}; for _, t in ipairs(tg) do best_target_cards[#best_target_cards + 1] = { id = t.id } end end
   end
-  return { ranked = valued, picks = ordered, best = ordered[1].it, reason = reason, sell = sell,
+  -- make room first: the chosen pick needs a consumable slot and a held planet can free one
+  local first = ordered[1] and ordered[1].it
+  local use_first_item = (use_first and first and GEN[first.key] and GEN[first.key].out == "consumable")
+    and { key = use_first.key, name = use_first.name or use_first.key, for_name = ordered[1].name } or nil
+  return { ranked = valued, picks = ordered, best = ordered[1].it, reason = reason, sell = sell, use_first = use_first_item,
            skip = skip_full or nil,   -- full board + no worthwhile joker swap -> skip, don't recommend "take"
            target_note = best_target_note, target_cards = best_target_cards }
 end

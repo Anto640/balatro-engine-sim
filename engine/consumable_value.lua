@@ -784,7 +784,9 @@ end
 function CV.fool_target(gs)
   if not gs then return nil end
   local lt = gs.last_tarot_planet
-  if lt and lt.key then return lt.key end
+  -- the game's Fool cannot copy a Fool (can_use needs last_tarot_planet ~= 'c_fool'; live S79XPZDS picked a Fool
+  -- whose use button never appeared)
+  if lt and lt.key and lt.key ~= "c_fool" then return lt.key end
   for _, h in ipairs(gs.consumables or {}) do
     if h.set == "Tarot" or h.set == "Planet" then return h.key end
   end

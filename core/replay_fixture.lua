@@ -113,6 +113,7 @@ function RF.fixture_of(gs, choice, idx, kind)
       economy = { dollars = (gs.economy or {}).dollars or 0,
                   interest_cap = (gs.economy or {}).interest_cap },
       shop = shop_pod(gs.shop), pack = pack_pod(gs.pack),
+      last_tarot_planet = gs.last_tarot_planet and { key = gs.last_tarot_planet.key } or nil,   -- what the Fool copies
       blind = { name = b.name, blind_type = b.blind_type, boss = b.boss or nil,
                 boss_effect_key = b.boss_effect_key, target_chips = b.target_chips,
                 chips_scored = b.chips_scored, hands_left = b.hands_left,
@@ -137,7 +138,7 @@ function RF.rehydrate(fix)
     deck = g.deck or {}, remaining = g.remaining or {}, hand = g.hand or {},
     jokers = g.jokers or {}, consumables = g.consumables or {},
     economy = g.economy or { dollars = 0, interest_cap = 5 },
-    shop = g.shop, pack = g.pack, blind = g.blind or {}, run = g.run or {},
+    shop = g.shop, pack = g.pack, blind = g.blind or {}, run = g.run or {}, last_tarot_planet = g.last_tarot_planet,
   }
   for _, j in ipairs(gs.jokers) do j.ability = j.ability or { extra = {} } end
   -- a pack joker: live state carries its read joker (item.joker); fixtures written before 2026-09-24
