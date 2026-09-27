@@ -1,5 +1,21 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## ⭐⭐⭐ 2026-09-27 — R17: FIRST UNATTENDED RUNS (auto-restart F6) — LIVE INSTALL `b76d453`
+5 complete unattended runs (13:58-15:30) + 1 partial: K1MG6F66 a6 Big (.77), JDBPAMG6 a4 Boss (.87), RE4MB8K5 **a8 Big (.94)**,
+TDD21SIX a5 Big (.92), S79XPZDS a7 Boss (.72). **0 wins; mean run length 17.3 min.** Auto-restart fired 5/5 times.
+Found + FIXED (`b76d453`, live-only -- 3 pack picks LOST in 5 runs): Cryptid had no selected card (T.SPECTRAL_TARGET gains
+c_cryptid); a Fool with a full tray and a Fool whose last-used card was a Fool (game can_use) -> card-making tarots need a
+free slot: "Use <held planet> first" step (USE_CONSUMABLE allowed in the pack channel) else valued 0; fixtures now record
+last_tarot_planet (it was dropped, so every replay saw "nothing to copy").
+**Live vs sim (9 recent live runs vs 320 sim runs of the ~same engine, at2+at2_7):**
+- scoring is FAITHFUL: 224 live hands re-scored from the recorded state -> actual/predicted = 1.05 (misses are Lucky/
+  Bloodstone randomness + boss debuffs the quick re-score omits).
+- death ante: live mean 5.8 vs sim 6.1; reach ante 6+: live 5/9 vs sim 58% -- similar. 0 wins in 9 at 28% = p 0.06.
+- ⭐ **DEATHS ON THE BIG BLIND: live 6/9 vs sim 20% (ante 4+ deaths, n=182) -- p 0.003. REAL, UNEXPLAINED.** Every live
+  Big-blind death came after a barely-cleared Small (ratio 1.06-1.25). Next: (1) compare Big-blind SKIP rates (sim skips
+  22% of ante-4+ Big blinds; live blind_select records mix shop advice -- log the skip decision cleanly first), (2) compare
+  board power entering each ante live vs sim, (3) the 20 FORCED shop actions (a shop decision took >3 s).
+
 ## ⭐⭐⭐ 2026-09-26 (evening) — R16 LIVE REVIEW (seed BQ63E388, died ante 6 by ~200 chips, $40-65 most of the run)
 | owner observation | verdict | fix |
 |---|---|---|
