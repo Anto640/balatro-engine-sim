@@ -733,6 +733,12 @@ return function(t)
     t.ok(p3 > 0, "Purple seal: spawns a tarot")
     t.ok(p5 > p3, "Purple seal: more discards -> more tarots -> worth more")
     t.ok(math.abs(p3 - 0.10) > 1e-6, "Purple seal is modelled, not the old flat 0.10")
+    -- a Gold seal pays per TRIGGER: Hanging Chad retriggers the first scored card (owner 2026-09-26)
+    local gold = card{ rank_id = 7, suit = "Clubs", seal = "Gold" }
+    local plain_board = GS.new{ deck = deck, blind = { base_discards = 4 } }
+    local chad_board = GS.new{ deck = deck, blind = { base_discards = 4 }, jokers = { { key = "j_hanging_chad", ability = {} } } }
+    t.ok(CV.card_econ_value(chad_board, gold) > CV.card_econ_value(plain_board, gold),
+      "Gold seal is worth more with Hanging Chad (retriggers pay again)")
   end
 
   -- ---- cost matters: cheaper item of equal effect is preferred ----

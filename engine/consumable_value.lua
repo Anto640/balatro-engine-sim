@@ -419,14 +419,35 @@ function CV.card_round_rates(gs)
   }
 end
 
+-- Expected EXTRA triggers of a card when it scores, from the board's retrigger jokers and its own Red seal (game
+-- rules): Hanging Chad +2 on the FIRST scored card (1 of ~CARDS_PER_PLAY scored), Sock and Buskin +1 on faces, Hack +1 on
+-- 2-5, Seltzer +1 (while it lasts), Dusk +1 on the final hand (1 of ~PLAYS_PER_BLIND), Red seal +1. Money paid WHEN
+-- SCORED (Gold seal $3, Lucky $20) pays on every trigger -- owner 2026-09-26: a Gold seal is worth more with Chad.
+function CV.expected_retriggers(gs, card)
+  local r = 0
+  for _, j in ipairs(gs.jokers or {}) do
+    local k = j.key
+    if k == "j_hanging_chad" then r = r + 2 / CV.CARDS_PER_PLAY
+    elseif k == "j_sock_and_buskin" and Cards.is_face(card) then r = r + 1
+    elseif k == "j_hack" then
+      local rk = Cards.rank_id(card) or 0
+      if rk >= 2 and rk <= 5 then r = r + 1 end
+    elseif k == "j_selzer" then r = r + 1
+    elseif k == "j_dusk" then r = r + 1 / CV.PLAYS_PER_BLIND end
+  end
+  if card.seal == "Red" then r = r + 1 end
+  return r
+end
+
 function CV.card_econ_value(gs, card, rng)
   local v, enh, seal = 0, card.enhancement, card.seal
   -- $ per round at the measured rates (2026-09-26: were guesses -- Gold held 60% of rounds, Gold seal played 35%,
   -- Lucky scored EVERY round; measured ~25% / ~13% / ~13% on a 52-card red-deck game)
   local rr = CV.card_round_rates(gs)
   if enh == "m_gold" then v = v + VU.dollars_to_frac(gs, 3 * rr.held_end) end     -- $3 if held at round end
-  if enh == "m_lucky" then v = v + VU.dollars_to_frac(gs, 20 / 15 * rr.scored) end -- 1 in 15 -> $20, when scored
-  if seal == "Gold" then v = v + VU.dollars_to_frac(gs, 3 * rr.scored) end        -- $3 when scored
+  local trig = 1 + CV.expected_retriggers(gs, card)                               -- each retrigger pays again
+  if enh == "m_lucky" then v = v + VU.dollars_to_frac(gs, 20 / 15 * rr.scored * trig) end -- 1 in 15 -> $20, when scored
+  if seal == "Gold" then v = v + VU.dollars_to_frac(gs, 3 * rr.scored * trig) end        -- $3 when scored
   if seal == "Blue" or seal == "Purple" then v = v + CV.seal_generator_value(gs, seal, rng) end
   return v
 end
