@@ -594,7 +594,12 @@ function Autoplay.tick(last, logger)
   -- SAVE blocked forever, and the deadlock-breaker below was unreachable behind the freshness `return`.
   local nontargeted = best.type == "SAVE" or best.type == "REROLL" or best.type == "CONTINUE"
     or best.type == "SKIP" or best.type == "SKIP_PACK"
-  if nontargeted then isfresh = true end
+  -- EXCEPT leaving/rerolling a SHOP: that decision is only right for the stock it was made on, and the first
+  -- evaluation of a shop sees it EMPTY (the game stocks it a moment later) -- executing that "Bank $X" left shops
+  -- the engine would have bought from (live LBUI8IK1). The deadlock above came from the same root: a stock that
+  -- arrived without changing the overlay's signature never re-evaluated (core/signature now covers every offer).
+  -- The MAX_WAIT breaker still rescues a genuine freshness false-negative.
+  if nontargeted and not (ch == "shop" and (best.type == "SAVE" or best.type == "REROLL")) then isfresh = true end
   -- DEADLOCK-BREAKER, promoted ABOVE the freshness gate so it can rescue ANY freshness false-negative
   -- (targeted included): after MAX_WAIT stuck on the SAME state, proceed even if not fresh (a targeted
   -- action still resolves by stable id/key at execution, or logs "not found" -- never a wrong-card).

@@ -622,6 +622,19 @@ return function(t)
       "a different offered skip tag changes the signature")
     t.eq(Sig.of(bsel("Big", "tag_x")), Sig.of(bsel("Big", "tag_x")),
       "an unchanged blind-select state keeps the same signature (no churn)")
+    -- a shop with NO jokers on offer: its packs / tarots / voucher arriving must still re-evaluate (live LBUI8IK1)
+    local function shop(extra)
+      local sh = { jokers = {}, consumables = {}, boosters = {}, vouchers = {}, reroll_cost = 5 }
+      for k, v in pairs(extra or {}) do sh[k] = v end
+      return GS.new{ meta = { state = "SHOP" }, economy = { dollars = 16 }, shop = sh }
+    end
+    t.ok(Sig.of(shop()) ~= Sig.of(shop{ boosters = { { key = "p_arcana_normal_3" } } }),
+      "packs appearing in a joker-less shop change the signature")
+    t.ok(Sig.of(shop()) ~= Sig.of(shop{ consumables = { { key = "c_hermit" } } }),
+      "a tarot/planet offer changes the signature")
+    local held = GS.new{ meta = { state = "SHOP" }, consumables = { { key = "c_jupiter" } } }
+    t.ok(Sig.of(held) ~= Sig.of(GS.new{ meta = { state = "SHOP" } }),
+      "using a held consumable changes the signature (no stale 'Use Jupiter')")
   end
 
   -- ---- scaling fuel: feed a conditional scaler when it's SAFE to ----

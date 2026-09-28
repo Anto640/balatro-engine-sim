@@ -58,10 +58,30 @@ function Sig.of(gs)
     }, ",")
   end
 
-  -- shop contents (only when present)
+  -- held consumables + hand levels: using a held planet/tarot in the shop changes neither the dollars nor the
+  -- board, so without these the panel kept advising "Use Jupiter" after Jupiter was gone.
+  local c = {}
+  for _, it in ipairs(gs.consumables or {}) do c[#c + 1] = it.key or "?" end
+  parts[#parts + 1] = "C=" .. table.concat(c, ",")
+  local lv = {}
+  for name, h in pairs((gs.run and gs.run.hand_levels) or {}) do lv[#lv + 1] = name .. (h.level or 1) end
+  table.sort(lv)
+  parts[#parts + 1] = "L=" .. table.concat(lv, ",")
+
+  -- shop contents (only when present). EVERY offer, not just the jokers: the game stocks the shop in one event
+  -- after the screen opens, so the first evaluation sees an EMPTY shop. With only the jokers here, a shop that
+  -- offered no jokers (all tarot/planet slots) never re-evaluated once its packs appeared -- the empty shop's
+  -- "Bank $16" stayed on the panel and the self-player left a shop it would have opened a pack in (live
+  -- LBUI8IK1, 2026-09-28: at ~56% death risk; 6 shops in 9 runs, 5 of them a different decision).
   if gs.shop then
     local s = {}
     for _, it in ipairs(gs.shop.jokers or {}) do s[#s + 1] = it.key or "?" end
+    s[#s + 1] = "|"
+    for _, it in ipairs(gs.shop.consumables or {}) do s[#s + 1] = it.key or "?" end
+    s[#s + 1] = "|"
+    for _, it in ipairs(gs.shop.boosters or {}) do s[#s + 1] = it.key or it.name or "?" end
+    s[#s + 1] = "|"
+    for _, it in ipairs(gs.shop.vouchers or {}) do s[#s + 1] = it.key or "?" end
     parts[#parts + 1] = "SHOP=" .. table.concat(s, ",") .. "@" .. tostring(gs.shop.reroll_cost)
   end
 

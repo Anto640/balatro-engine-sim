@@ -15,6 +15,27 @@ The owner is running unattended F11 + F6 runs on this build. **Next session, in 
 Ops: `%TMP%/bes/arm.sh <name> <worktree> <workers> [n] [seed_off] [ENV=VAL]` (resumable; memory reaps come from
 Chrome/Steam/Discord, not the ~14 MB workers); owner authorises self-restart after reaps.
 
+## ⭐⭐⭐⭐ 2026-09-28 (later) — R18: UNATTENDED RUNS ON 42a867f + TWO LIVE-ONLY DEFECTS FIXED
+Runs (session starting bes_runs line 11138): VKMZCD5H a5 Boss, PY43WSDU a6 Small, G5QGWQKG a4 Big, UTNJ8T4Q a5 Boss,
+TVHSKP3G a4 Boss, NPB9HYPN a8 Small, VPF6778S a4 Small, JU4XNUI5 **a1 Boss**, LBUI8IK1 **a2 Small** -- 0/9, ~12 min/run.
+Non-boss deaths 5/9 (Small 4, Big 1): live boards still weaker than the sim's. Two causes found, both LIVE-ONLY
+(the sim never runs these paths, which is why sim win rate and live results diverge):
+1. **Stale shop advice** (`core/signature.lua`): the change signature held only the shop's JOKERS. The game stocks the
+   shop one event after the screen opens, so the first evaluation sees an EMPTY shop; in a shop offering no jokers the
+   packs/tarots arriving changed nothing, the empty shop's "Bank $X" stayed, and the self-player left (SAVE was exempt
+   from its freshness check). 6 shops in 9 runs; 5 would have decided differently (LBUI8IK1 a2: banked $16 at ~56%
+   death risk instead of an Arcana pack, died next blind; UTNJ8T4Q: missed Hermit +$12; VPF6778S a1 / NPB9HYPN a6:
+   missed Buffoon packs). Fix: signature covers every offer + held consumables + hand levels (also ends the stale
+   "Use Jupiter" after using it); autoplay requires freshness for shop SAVE/REROLL (MAX_WAIT breaker still applies).
+2. **Judgement on a full board** (`engine/pack_open_advisor.lua`): joker-making cards (Judgement/Wraith/Soul) were
+   priced with a flat `room_credit` on a full board and never got the make-room sell; the game has no use button
+   until a slot is free, so the pick failed 3x and the self-player skipped the whole Mega Arcana (NPB9HYPN a7).
+   Fix: the measured pass gates them by the joker swap bar + survival check (like a joker pick); a pass carries the
+   SELL as its own first step, a fail is worth 0. Replay: Judgement was chosen on 2/6 deals, now 0/6 (Tower+Hierophant).
+Also shipped this session: `70266aa` the overlay holds "…" while an action animates (discard redraw, pack pick/close).
+Not fixed: the Certificate shop (LBUI8IK1 a1 boss) is NOISE -- the Celestial pack reads +4.7 or -4.9 by rng seed
+(8 samples); worth a look at pack-value variance. JU4XNUI5 a1 = the known ante-1 class (spent to $1 on Supernova).
+
 
 ## ⭐⭐⭐ 2026-09-27 (later) — R17b: MORE UNATTENDED RUNS + "THE BOARD NEVER CHANGES" ROOT CAUSES
 Runs: KGJ9UMQH a5 Boss, 7Y3LRJJG **a1 Small (297/300)**, HMNFE4W2 a5 Boss, 2YD6L372 a8 Big (.79). 0 wins.

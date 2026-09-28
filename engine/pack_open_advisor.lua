@@ -249,9 +249,10 @@ function PO.recommend(gs, opts)
     local f = (not cheap and it.set == "Planet") and get_freq() or nil
     local b = (not cheap and it.card) and get_base() or nil
     local v, meas = value_item(gs, it, need, f, b, rng, cheap, hctx)
+    local raw = v
     -- a generator whose creation can't fit your slots is worth less (it overflows)
     v = v * gen_factor(it.key)
-    valued[#valued + 1] = { it = it, key = it.key, name = it.name or it.key or "item", v = v, meas = meas }
+    valued[#valued + 1] = { it = it, key = it.key, name = it.name or it.key or "item", v = v, raw = raw, meas = meas }
   end
   -- THE FOOL is chosen on its value like anything else, but the copy-target search below only
   -- ORDERS picks that are already selected -- so before this fix a Fool with nothing to copy
@@ -285,6 +286,36 @@ function PO.recommend(gs, opts)
     if not use_first then
       for _, e in ipairs(valued) do
         if GEN[e.key] and GEN[e.key].out == "consumable" then e.v = 0 end
+      end
+    end
+  end
+  -- JOKER-MAKING CARDS ON A FULL BOARD (Judgement / Wraith / The Soul): the game gives them NO use button until a
+  -- joker slot is free (live NPB9HYPN ante 7: Judgement picked on a 5/5 board, the pick failed three times and the
+  -- self-player skipped the whole Mega Arcana). Room means SELLING a joker, so the measured pass judges them like a
+  -- joker pick on a full board: the created joker's measured value must clear the same swap bar (weakest owned joker
+  -- + the shop's hysteresis) and the survival check. Then it is worth its full value, with the sell as its own first
+  -- step (below); otherwise it can't be used and is worth nothing. (The cheap pass keeps the room_credit prior --
+  -- it is provisional and never executed.)
+  local gen_swap
+  if not cheap and free_jslots <= 0 then
+    local wi, wname, wfv, sv
+    for _, e in ipairs(valued) do
+      local meta = GEN[e.key]
+      if meta and meta.out == "joker" then
+        if wi == nil and wfv == nil then
+          wi, wname, wfv = weakest_owned_joker(gs, mopts)
+          wfv = wfv or math.huge
+          local ok, SA = pcall(require, "engine.shop_advisor")
+          sv = ok and SA.sell_survival and SA.sell_survival(gs) or nil
+        end
+        local fv = VU.frac_to_fv(math.max(0, e.raw or 0))
+        local safe = not (sv and wi and sv.unsafe(wi, math.max(0, e.raw or 0)))
+        if wi and fv > wfv and safe then
+          e.v = e.raw
+          if not gen_swap or e.v > gen_swap.v then gen_swap = { v = e.v, e = e, wi = wi, wname = wname } end
+        else
+          e.v = 0
+        end
       end
     end
   end
@@ -499,6 +530,14 @@ function PO.recommend(gs, opts)
           (jpick and jpick.name) or "the pack joker", wtxt)
       end
     end
+  end
+
+  -- (d) the top pick MAKES a joker (Judgement / Wraith / Soul) and cleared the swap bar above: sell the weakest
+  -- joker first, as its own step, exactly like a joker pick.
+  if not sell and not skip_full and gen_swap and ordered[1] == gen_swap.e then
+    local wj = gs.jokers[gen_swap.wi]
+    sell = { name = gen_swap.wname, index = gen_swap.wi, key = wj and wj.key, id = wj and wj.id,
+             for_name = ordered[1].name, for_key = ordered[1].key }
   end
 
   -- SKIP-FED joker feed: Red Card gains +3 Mult PERMANENTLY every time a Booster Pack is SKIPPED. The

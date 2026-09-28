@@ -153,6 +153,12 @@ return function(t)
     for _ = 1, 3 do Autoplay.tick(last, nil); clock = clock + 1 end
     t.eq(left, 0, "autoplay: never leaves a shop that is still sliding in / unstocked")
     G.shop.T.y = 5; G.shop_jokers.cards = { {}, {} }              -- slid in + stocked
+    -- the SAVE above was decided on the EMPTY shop: it must not be executed on the stocked one (live LBUI8IK1)
+    clock = clock + 0.1
+    for _ = 1, 4 do Autoplay.tick(last, nil); clock = clock + 0.5 end
+    t.eq(left, 0, "autoplay: a SAVE decided on the empty shop is not executed once the shop is stocked")
+    last = { ranked = { best = { type = "SAVE" } },
+             gs = { shop = { jokers = { {}, {} } }, economy = { dollars = 10 } } }   -- re-evaluated on the stock
     for _ = 1, 6 do Autoplay.tick(last, nil); clock = clock + 1 end
     t.eq(left, 1, "autoplay: once loaded (plus settle), SAVE leaves the shop exactly once")
     _G.love, _G.G = saved_love, saved_G

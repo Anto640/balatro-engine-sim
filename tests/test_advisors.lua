@@ -563,8 +563,23 @@ return function(t)
     local rj = PackOpen.recommend(arc({ { set = "Tarot", key = "c_judgement", name = "Judgement" } },
       { jslots = 2, jokers = { joker{ key = "j_lusty_joker", name = "Lusty Joker" },
                                joker{ key = "j_mail", name = "Mail-In Rebate" } } }))
-    t.ok(rj.reason:find("Joker slots are full") and rj.reason:find("sell"),
-      "Judgement with a full board says to sell a joker first")
+    -- live NPB9HYPN (2026-09-28): the game has no use button for Judgement on a full board, so the measured pass must
+    -- never leave a bare "Take Judgement": either it clears the swap bar and the SELL is its own first step, or skip.
+    if rj.skip then
+      t.ok(true, "Judgement on a full board that doesn't beat the weakest joker -> skip")
+    else
+      t.eq(rj.best and rj.best.key, "c_judgement", "Judgement is the pick only as a swap")
+      t.ok(rj.sell and rj.sell.key ~= nil, "Judgement on a full board comes with a make-room SELL step")
+      t.ok(rj.reason:find("Joker slots are full") and rj.reason:find("sell"),
+        "Judgement with a full board says to sell a joker first")
+    end
+    -- beside a usable tarot, a Judgement that can't clear the swap bar must not be the pick
+    local rj2 = PackOpen.recommend(arc({ { set = "Tarot", key = "c_judgement", name = "Judgement" },
+                                         { set = "Tarot", key = "c_empress", name = "The Empress" } },
+      { jslots = 2, jokers = { joker{ key = "j_lusty_joker", name = "Lusty Joker" },
+                               joker{ key = "j_greedy_joker", name = "Greedy Joker" } } }))
+    t.ok(rj2.skip or (rj2.best and (rj2.best.key ~= "c_judgement" or rj2.sell)),
+      "a full-board Judgement is never a bare pick (no use button until a joker is sold)")
 
     -- a slot-blocked generator loses to a usable targeting tarot in the same pack
     local r_alt = PackOpen.recommend(arc({
