@@ -43,7 +43,10 @@ self-player can sell in a blind). Amber Acorn needs nothing (jokers read face-do
 one-shot `bes_autostart` file (save folder; turns F11+F6 on and continues the saved run) -> **4125ZXCZ WON** (first
 self-play live win). ⚠ The SIM still treats Leaf/Heart/Bell/Acorn as plain x2 bosses (easier than real ante 8) --
 a fidelity item for the sim.
-Pace-noise A/B running: `pace20` (BES_PACE_SAMPLES=20) vs `r18` (Judgement fix: 155/160 tied, 54->51 wins n.s., kept).
+Pace-noise A/B DONE -- **NOT shipped**: `pace20` (BES_PACE_SAMPLES=20) vs `r18` wins 51 -> 39, reach-8 57 -> 49,
+sign 62/79 (p 0.18), progress -0.271 (p 0.20). The risk logistic + urgent/0.25/0.5 thresholds were fitted on the NOISY
+5-sample margin; a precise margin reads "comfortable" more on borderline boards -> banks more. Retry only jointly with
+a refit of Pacing.RISK_* on 20-sample margins. (`r18` = Judgement fix: 155/160 tied, 54 -> 51 wins n.s., kept.)
 Not fixed: the Certificate shop (LBUI8IK1 a1 boss) is NOISE -- the Celestial pack reads +4.7 or -4.9 by rng seed
 (8 samples); worth a look at pack-value variance. JU4XNUI5 a1 = the known ante-1 class (spent to $1 on Supernova).
 
