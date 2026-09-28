@@ -8,7 +8,5 @@
 data/*.jsonl -text
 data/*.txt   -text
 
- ('$'"
-": command not found).
 # Shell scripts run under bash: always LF (a CR at line end makes bash fail with "command not found").
 *.sh text eol=lf
