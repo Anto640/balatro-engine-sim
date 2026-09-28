@@ -314,6 +314,30 @@ function JV.avg_score(gs, opts)
   return result
 end
 
+-- Mean of the TOP `top` fraction of `samples` single-deal best plays (default: best 25% of 20). A blind is played
+-- over several hands with discards, so what a board achieves sits near the top of its single-deal distribution;
+-- tools/estimator_probe.lua (615 sim blinds, 2026-09-28) ranked this the best predictor of clearing a blind
+-- (AUC 0.870 vs 0.817 for the mean of 5 deals the pacing model used).
+function JV.top_score(gs, opts)
+  opts = opts or {}
+  local rng = opts.rng or math.random
+  local samples = opts.samples or 20
+  local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
+  if not deck or #deck < JV.MIN_DECK then return nil end
+  local hs = math.min((gs.run and gs.run.hand_size) or 8, #deck)
+  local g = clone_with_jokers(gs, gs.jokers or {})
+  local s = {}
+  for k = 1, samples do
+    local ev = HandEval.best_play(g, sample_hand(gs, deck, hs, rng))
+    s[k] = (ev and ev.score) or 0
+  end
+  table.sort(s, function(a, b) return a > b end)
+  local n = math.max(1, math.floor(samples * (opts.top or 0.25) + 0.5))
+  local tot = 0
+  for i = 1, n do tot = tot + s[i] end
+  return tot / n
+end
+
 -- Measured score delta per unit of a UNIFORM per-card chip buff (a DECK-BUFF spu), used to value
 -- Hiker (+chips per scored card, permanent) and any other deck-chip buffer. Adds `ref` perma_chips to
 -- each card of the sampled hand and scores the CURRENT board on both the base and buffed hand, paired

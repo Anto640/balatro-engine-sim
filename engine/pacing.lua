@@ -100,11 +100,26 @@ end
 -- 3+ 33%/38%. Ante 7+ uses the ante-6 intercept (at ante 7 "within 2 antes" is simply "doesn't win").
 P.RISK_INTERCEPT = { -2.776, -0.529, 0.792, 1.281, 1.634, 1.073 }
 P.RISK_SLOPE = -1.164
-function P.risk(ante, margin)
+-- The same logistic re-fitted on the TOP-QUARTER capacity (BES_PACE_CAP=q25; filled by the refit, plan step 2).
+-- A different capacity read gives different margins, so it needs its own fit (pace20's lesson: a better read on
+-- the old fit reads "comfortable" too often and banks).
+-- Fitted 2026-09-28 on 926 first-shop-per-ante samples from 160 fresh seeds (s*1000+5, tools/pace_fit_probe.lua,
+-- engine = fin18): q25 AUC 0.787, mean AUC 0.786 for "dies within 2 antes". The mean refit is the SAME read as the
+-- default re-fitted on today's engine -- it says the 09-23 fit overstates risk (ante-4 intercept 1.28 -> -0.64).
+P.RISK_Q25 = { intercept = { -1.683, -1.243, -0.799, 0.033, -0.015, 0.884 }, slope = -0.927 }
+P.RISK_MEAN_REFIT = { intercept = { -2.382, -2.075, -1.496, -0.643, -0.686, 0.107 }, slope = -0.816 }
+P.RISK_MODE = (os.getenv and os.getenv("BES_PACE_RISK")) or "default"   -- "refit" -> RISK_MEAN_REFIT (A/B only)
+function P.risk(ante, margin, mode)
   local a = math.max(1, math.min(6, math.floor(ante or 1)))
-  local z = P.RISK_INTERCEPT[a] + P.RISK_SLOPE * math.log(math.max(margin or 0, 1e-3))
+  local ic, sl = P.RISK_INTERCEPT, P.RISK_SLOPE
+  if mode == "q25" and P.RISK_Q25 then ic, sl = P.RISK_Q25.intercept, P.RISK_Q25.slope
+  elseif P.RISK_MODE == "refit" then ic, sl = P.RISK_MEAN_REFIT.intercept, P.RISK_MEAN_REFIT.slope end
+  local z = ic[a] + sl * math.log(math.max(margin or 0, 1e-3))
   return 1 / (1 + math.exp(-z))
 end
+
+-- Capacity read: "mean" = mean of P.SAMPLES single deals (default); "q25" = mean of the best 25% of 20 deals.
+P.CAP_MODE = (os.getenv and os.getenv("BES_PACE_CAP")) or "mean"
 
 -- Samples for the capacity read. At 5, the "can't clear the next boss" flag (urgent) flips by rng seed on a
 -- marginal board -- live LBUI8IK1 a1: margin 0.46-1.79 across seeds, urgent 15/20, and the shop swung between
@@ -118,7 +133,13 @@ function P.pace(gs, opts)
   local ante = math.floor((gs.meta and gs.meta.ante) or 1)
   local hands = (gs.blind and gs.blind.base_hands) or 4
   if hands <= 0 then hands = 4 end
-  local avg = JokerValue.avg_score(gs, { samples = opts.samples or P.SAMPLES, rng = opts.rng })
+  local mode = opts.cap_mode or P.CAP_MODE
+  local avg
+  if mode == "q25" then
+    avg = JokerValue.top_score(gs, { samples = 20, top = 0.25, rng = opts.rng })
+  else
+    avg = JokerValue.avg_score(gs, { samples = opts.samples or P.SAMPLES, rng = opts.rng })
+  end
   if not avg then return nil end
 
   local cap = avg * hands                    -- current per-blind scoring capacity
@@ -135,7 +156,7 @@ function P.pace(gs, opts)
   local proj8 = cap * (g ^ math.max(0, P.TARGET_ANTE - ante))
   local on_pace = (fail == nil)
   local margin = proj8 / math.max(1, req8)
-  local risk = P.risk(ante, margin)
+  local risk = P.risk(ante, margin, mode)
 
   return {
     ante = ante, growth = g, capacity = cap,
