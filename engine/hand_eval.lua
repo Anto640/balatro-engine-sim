@@ -232,13 +232,17 @@ function HandEval.effective_jokers(gs)
   local out = {}
   for idx, j in ipairs(jokers) do
     local impl = Jokers.get(j.key)
-    if impl and impl.copy then
+    if j.debuffed then
+      -- DISABLED this hand (Crimson Heart, or any live debuff): the game skips a debuffed joker entirely -- no
+      -- effect, no edition -- and a Blueprint/Brainstorm aimed at it copies nothing (calculate_joker returns nil).
+      out[#out + 1] = { impl = nil, edition = nil, position = idx, hookj = j }
+    elseif impl and impl.copy then
       -- follow the copy chain to the first concrete (non-copy) joker, cycle-safe
       local ti = (impl.copy == "right") and (idx + 1) or 1
       local steps, tj, timpl = 0, nil, nil
       while ti and ti >= 1 and ti <= #jokers and steps <= #jokers do
         tj = jokers[ti]
-        timpl = tj and Jokers.get(tj.key)
+        timpl = tj and not tj.debuffed and Jokers.get(tj.key) or nil
         if timpl and timpl.copy then
           ti = (timpl.copy == "right") and (ti + 1) or 1
           tj, timpl = nil, nil

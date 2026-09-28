@@ -31,6 +31,7 @@ local function read_card(c)
     edition     = ed,
     seal        = c.seal,                              -- string or nil
     debuffed    = c.debuff or false,
+    forced      = (c.ability and c.ability.forced_selection) and true or nil,  -- Cerulean Bell
   }
 end
 
@@ -58,6 +59,7 @@ local function read_joker(c, idx)
     sell_value = c.sell_cost,                           -- VERIFY
     cost       = c.cost,                                -- shop price  -- VERIFY
     rarity     = c.config and c.config.center and c.config.center.rarity,
+    debuffed   = c.debuff and true or nil,                -- Crimson Heart disables one joker per hand
   }
 end
 

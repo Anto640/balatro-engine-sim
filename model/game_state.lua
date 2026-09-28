@@ -22,6 +22,7 @@ function GameState.card(t)
     edition     = t.edition,
     seal        = t.seal,
     debuffed    = t.debuffed or false,
+    forced      = t.forced or nil,  -- Cerulean Bell: the game keeps this card selected; every play/discard includes it
   }
 end
 
@@ -37,6 +38,7 @@ function GameState.joker(t)
     sell_value = t.sell_value or 0,
     cost       = t.cost,         -- shop buy price (nil when owned)
     rarity     = t.rarity,
+    debuffed   = t.debuffed or nil,  -- disabled this hand (Crimson Heart): contributes nothing
   }
 end
 

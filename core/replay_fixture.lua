@@ -33,7 +33,7 @@ RF.deep = deep
 local function card_pod(c)
   return { id = c.id, rank_id = c.rank_id, rank = c.rank, suit = c.suit,
            enhancement = c.enhancement, edition = c.edition, seal = c.seal,
-           debuffed = c.debuffed or nil }
+           debuffed = c.debuffed or nil, forced = c.forced or nil }
 end
 local function cards_pod(list)
   local out = Json.array({})
@@ -42,7 +42,7 @@ local function cards_pod(list)
 end
 local function joker_pod(j)
   return { id = j.id, key = j.key, name = j.name, position = j.position, edition = j.edition,
-           rarity = j.rarity, sell_value = j.sell_value, cost = j.cost,
+           rarity = j.rarity, sell_value = j.sell_value, cost = j.cost, debuffed = j.debuffed or nil,
            ability = deep(j.ability or { extra = {} }) }
 end
 local function jokers_pod(list)

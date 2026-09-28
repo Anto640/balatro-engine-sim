@@ -52,16 +52,54 @@ end
 -- recommend -- or arbitrate on -- an ILLEGAL play. Builds the same filter simulation.lua
 -- uses in its rollout, from the plumbed cross-hand state (gs.blind.played_hand_types,
 -- K1/K2). Returns nil when the boss has no play restriction (the common case -> unchanged).
+-- CERULEAN BELL (ante-8 finisher): the game keeps one hand card FORCED-selected; it can't be unselected, so every
+-- play and discard includes it. Live 4125ZXCZ (2026-09-28) reached the ante-8 Bell and stalled for hours: the engine
+-- chose a Pair without the forced card, the self-player's selection never matched (forced card + the pair), retry.
+local function forced_card(gs)
+  for _, c in ipairs(gs.hand or {}) do if c.forced then return c end end
+  return nil
+end
+DE.forced_card = forced_card
+local function includes_card(cards, fc)
+  for _, c in ipairs(cards or {}) do
+    if c == fc or (c.id ~= nil and c.id == fc.id) then return true end
+  end
+  return false
+end
+
 local function boss_filter(gs)
   local b = gs.blind or {}
   local eff = (b.boss and b.boss_effect_key) and BossEffect.of(b.boss_effect_key) or nil
-  if not BossEffect.has_play_restriction(eff) then return nil end
-  local types = b.played_hand_types or {}
-  local first = nil
-  for ht in pairs(types) do first = ht; break end   -- Mouth: only one type is ever present
-  local state = { types = types, first = first }
-  return function(sel, ht) return BossEffect.legal_play(eff, sel, ht, state) end
+  local restricted = BossEffect.has_play_restriction(eff)
+  local fc = forced_card(gs)
+  if not restricted and not fc then return nil end
+  local state
+  if restricted then
+    local types = b.played_hand_types or {}
+    local first = nil
+    for ht in pairs(types) do first = ht; break end   -- Mouth: only one type is ever present
+    state = { types = types, first = first }
+  end
+  return function(sel, ht)
+    if fc and not includes_card(sel, fc) then return false end
+    if restricted then return BossEffect.legal_play(eff, sel, ht, state) end
+    return true
+  end
 end
+
+-- A recommended DISCARD must include the forced card too (discards are built in several places; enforce it once
+-- on the result): add it, or -- at the 5-card limit -- swap it in for the last card.
+local function force_into_discard(gs, a)
+  local fc = forced_card(gs)
+  if not (fc and a and a.type == "DISCARD" and a.cards) or includes_card(a.cards, fc) then return a end
+  local cards = {}
+  for i, c in ipairs(a.cards) do cards[i] = c end
+  if #cards >= 5 then cards[#cards] = fc else cards[#cards + 1] = fc end
+  a.cards = cards
+  a.reason = (a.reason or "") .. "  [Cerulean Bell: the forced card goes too.]"
+  return a
+end
+DE._force_into_discard = force_into_discard
 
 local function labels(cards)
   local out = {}
@@ -1173,6 +1211,79 @@ function DE.decide(gs, opts)
     best = best, alternatives = alternatives, reason = best.reason,
     sim = opts and opts.sim or nil,
   }
+end
+
+-- CERULEAN BELL guard on EVERY exit of decide (several branches build their own card sets): a discard -- or a
+-- play from a path that bypasses the legal-play filter (the dig-play uses the discard chooser's set) -- must
+-- include the forced card, since the game plays/discards it regardless.
+-- VERDANT LEAF (ante-8 finisher): every card is debuffed until ONE joker is sold (then the blind is disabled). The
+-- engine saw the debuffed cards but never considered the sale, so it played card-less hands into the final boss.
+-- Compare the best play now against the best play after selling each joker (cards live again); recommend the sale
+-- that leaves the strongest hand when it beats playing on. Only this blind matters -- it is the last one of the run.
+function DE.leaf_sell(gs)
+  local b = gs.blind or {}
+  if not (b.boss and b.boss_effect_key == "bl_final_leaf") then return nil end
+  local jokers, hand = gs.jokers or {}, gs.hand or {}
+  if #jokers == 0 or #hand == 0 then return nil end
+  local debuffed = false
+  for _, c in ipairs(hand) do if c.debuffed then debuffed = true; break end end
+  if not debuffed then return nil end   -- already disabled (a joker was sold)
+  local now = HandEval.best_play(gs, hand)
+  local now_score = (now and now.score) or 0
+  local live = {}
+  for i, c in ipairs(hand) do
+    local cc = {}; for k, v in pairs(c) do cc[k] = v end
+    cc.debuffed = false; live[i] = cc
+  end
+  local best_i, best_score
+  for i, j in ipairs(jokers) do
+    local ab = j.ability
+    local eternal = type(ab) == "table" and (ab.eternal or (type(ab.extra) == "table" and ab.extra.eternal))
+    if not eternal then
+      local g2 = {}; for k, v in pairs(gs) do g2[k] = v end
+      local js = {}
+      for k, jj in ipairs(jokers) do if k ~= i then js[#js + 1] = jj end end
+      g2.jokers = js; g2.hand = live
+      local ev = HandEval.best_play(g2, live)
+      local s = (ev and ev.score) or 0
+      if not best_score or s > best_score then best_i, best_score = i, s end
+    end
+  end
+  if not best_i or best_score <= now_score then return nil end
+  local j = jokers[best_i]
+  return {
+    type = "SELL_JOKER", target = { name = j.name or j.key, key = j.key, id = j.id }, leaf_sell = true,
+    value = best_score, confidence = 0.8, confidence_basis = "heuristic_margin",
+    reason = string.format("Verdant Leaf: sell %s — your cards are debuffed until a joker is sold (best hand %d -> %d).",
+      j.name or j.key, math.floor(now_score), math.floor(best_score)),
+  }
+end
+
+local decide_core = DE.decide
+function DE.decide(gs, opts)
+  local r = decide_core(gs, opts)
+  local leaf = r and DE.leaf_sell(gs)
+  if leaf then
+    table.insert(r.alternatives, 1, r.best)
+    r.best, r.reason = leaf, leaf.reason
+  end
+  local fc = r and forced_card(gs)
+  if not fc then return r end
+  local function fix(a)
+    if not (a and a.cards) then return end
+    if a.type == "DISCARD" then force_into_discard(gs, a)
+    elseif a.type == "PLAY" and not includes_card(a.cards, fc) then
+      local cards = {}
+      for i, c in ipairs(a.cards) do cards[i] = c end
+      if #cards >= 5 then cards[#cards] = fc else cards[#cards + 1] = fc end
+      a.cards = cards
+      local ev = HandEval.score(gs, cards)
+      if ev then a.hand_type, a.score = ev.hand_type, ev.score end
+    end
+  end
+  fix(r.best)
+  for _, a in ipairs(r.alternatives or {}) do fix(a) end
+  return r
 end
 
 -- Blend real survival odds into the chosen action's confidence + attach probs.

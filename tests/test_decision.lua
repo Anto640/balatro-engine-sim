@@ -28,6 +28,53 @@ return function(t)
     t.eq(#decide("bl_psychic").cards, 5, "Psychic (min 5) -> engine recommends a legal 5-card play")
   end
 
+  -- ANTE-8 FINISHERS (live 4125ZXCZ 2026-09-28 stalled ~4 h at Cerulean Bell).
+  do
+    local function has_id(cards, id) for _, c in ipairs(cards or {}) do if c.id == id then return true end end return false end
+    -- Cerulean Bell: card 4 is forced-selected -> every recommended play includes it
+    local h = {
+      card{ id = 1, rank = "Ace", suit = "Spades" }, card{ id = 2, rank = "Ace", suit = "Hearts" },
+      card{ id = 3, rank = "7", suit = "Clubs" }, card{ id = 4, rank = "4", suit = "Diamonds", forced = true },
+      card{ id = 5, rank = "9", suit = "Spades" },
+    }
+    local gs = GS.new{ hand = h, run = { hand_levels = {}, hand_size = 5 },
+      blind = { target_chips = 200, chips_scored = 0, hands_left = 1, discards_left = 0,
+        boss = true, boss_effect_key = "bl_final_bell", played_hand_types = {} } }
+    local best = DE.decide(gs).best
+    t.ok(best.type == "PLAY" and has_id(best.cards, 4), "Cerulean Bell: the play includes the forced card")
+    t.ok(has_id(best.cards, 1) and has_id(best.cards, 2), "Cerulean Bell: ...and still plays the Ace pair")
+    local d = DE._force_into_discard(gs, { type = "DISCARD", cards = { h[3], h[5] } })
+    t.ok(has_id(d.cards, 4) and #d.cards == 3, "Cerulean Bell: a discard gets the forced card added")
+    local d5 = DE._force_into_discard(gs, { type = "DISCARD", cards = { h[1], h[2], h[3], h[5], h[3] } })
+    t.ok(has_id(d5.cards, 4) and #d5.cards == 5, "Cerulean Bell: a full 5-card discard swaps the forced card in")
+
+    -- Crimson Heart: a disabled (debuffed) joker contributes nothing, and a Blueprint copying it copies nothing
+    local HandEval = require("engine.hand_eval")
+    local pair = { card{ id = 1, rank = "Ace", suit = "Spades" }, card{ id = 2, rank = "Ace", suit = "Hearts" } }
+    local function score(jks) return HandEval.score(GS.new{ jokers = jks, run = { hand_levels = {} } }, pair).score end
+    local bare = score({})
+    t.ok(score({ joker{ key = "j_joker", name = "Joker" } }) > bare, "control: an active Joker adds mult")
+    t.eq(score({ joker{ key = "j_joker", name = "Joker", debuffed = true } }), bare,
+      "Crimson Heart: the disabled joker adds nothing")
+    t.eq(score({ joker{ key = "j_blueprint", name = "Blueprint" }, joker{ key = "j_joker", name = "Joker", debuffed = true } }), bare,
+      "Crimson Heart: a Blueprint aimed at the disabled joker copies nothing")
+
+    -- Verdant Leaf: every card debuffed until a joker is sold -> recommend selling the joker that leaves the best hand
+    local lh = {}
+    for i, c in ipairs({ { "King", "Spades" }, { "King", "Hearts" }, { "King", "Clubs" }, { "5", "Spades" }, { "9", "Hearts" } }) do
+      lh[i] = card{ id = i, rank = c[1], suit = c[2], debuffed = true }
+    end
+    local lgs = GS.new{ hand = lh, run = { hand_levels = {}, hand_size = 5 },
+      jokers = { joker{ id = 101, key = "j_joker", name = "Joker" }, joker{ id = 102, key = "j_egg", name = "Egg" } },
+      blind = { target_chips = 100000, chips_scored = 0, hands_left = 4, discards_left = 3,
+        boss = true, boss_effect_key = "bl_final_leaf", played_hand_types = {} } }
+    local lb = DE.decide(lgs).best
+    t.eq(lb.type, "SELL_JOKER", "Verdant Leaf: sell a joker to lift the card debuff")
+    t.eq(lb.target and lb.target.key, "j_egg", "Verdant Leaf: sells the joker whose loss costs least (Egg, not Joker)")
+    for _, c in ipairs(lh) do c.debuffed = false end
+    t.ok(DE.decide(lgs).best.type ~= "SELL_JOKER", "Verdant Leaf: once disabled (cards live), no more selling")
+  end
+
   -- The Mouth (single hand type all round) -- the CROSS-HAND lock that was silently inert in the
   -- live game because state_extraction never populated blind.played_hand_types (2026-08-31 loss:
   -- played Straight, then Two Pair / Pair / Pair, all scoring 0, and died). Once the field is

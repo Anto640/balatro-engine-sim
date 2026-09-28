@@ -905,6 +905,9 @@ if _G.G and _G.SMODS then
     -- re-scheduling loop that could accumulate events and leak over time).
     local prev_update = love.update
     local acc = 0
+    -- one-shot remote autostart (ui/autoplay.lua check_autostart): a `bes_autostart` file in the save folder turns
+    -- self-play + auto-restart on at launch and continues the saved run
+    if Autoplay and Autoplay.check_autostart then pcall(Autoplay.check_autostart) end
     love.update = function(dt, ...)
       if prev_update then prev_update(dt, ...) end
       -- advance any in-flight background job a few ms EVERY frame (cheap when idle)

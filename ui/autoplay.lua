@@ -144,6 +144,48 @@ local function maybe_restart(G)
   return true
 end
 
+-- ONE-SHOT AUTOSTART (for restarting the game remotely, e.g. to load a fix while the owner is away): if the file
+-- `bes_autostart` exists in the save folder at launch, it is deleted, self-play + auto-restart turn ON, and from the
+-- main menu the saved run is CONTINUED (or a new run starts if there is none). Without the file nothing changes.
+Autoplay.AUTOSTART_FILE = "bes_autostart"
+Autoplay.AUTOSTART_DELAY = 5.0
+function Autoplay.check_autostart()
+  local ok, info = pcall(function() return love.filesystem.getInfo(Autoplay.AUTOSTART_FILE) end)
+  if not (ok and info) then return false end
+  pcall(love.filesystem.remove, Autoplay.AUTOSTART_FILE)
+  Autoplay.enabled, Autoplay.auto_restart, Autoplay._autostart = true, true, true
+  flog("==== AUTOSTART: self-play + auto-restart ON; will continue the saved run from the menu ====")
+  return true
+end
+-- returns true while it is handling the menu -> run step
+local function maybe_autostart(G)
+  if not Autoplay._autostart then return false end
+  if not (G.STATES and G.STATE == G.STATES.MENU and G.MAIN_MENU_UI) then
+    if G.STAGE == (G.STAGES and G.STAGES.RUN) then Autoplay._autostart = nil end   -- already in a run
+    return false
+  end
+  Autoplay._menu_since = Autoplay._menu_since or now()
+  if now() - Autoplay._menu_since < Autoplay.AUTOSTART_DELAY then return true end
+  Autoplay._autostart, Autoplay._menu_since = nil, nil
+  local ok, err = pcall(function()
+    if not G.SAVED_GAME then
+      local raw = get_compressed(G.SETTINGS.profile .. "/" .. "save.jkr")
+      if raw ~= nil then G.SAVED_GAME = STR_UNPACK(raw) end
+    end
+    if G.SAVED_GAME ~= nil and not (G.SAVED_GAME.GAME and G.SAVED_GAME.GAME.won) then
+      flog("autostart: continuing the saved run")
+      G.FUNCS.start_run(nil, { savetext = G.SAVED_GAME })
+    else
+      flog("autostart: no saved run -- starting a new run")
+      G.SETTINGS.current_setup = "New Run"
+      G.FUNCS.start_run(nil, { stake = G.PROFILES[G.SETTINGS.profile].MEMORY.stake or 1 })
+    end
+  end)
+  if not ok then flog("autostart FAILED: " .. tostring(err)) end
+  Autoplay.locked_until = now() + 4.0
+  return true
+end
+
 function Autoplay.toggle()
   Autoplay.enabled = not Autoplay.enabled
   Autoplay.locked_until = now() + 1.0
@@ -325,6 +367,14 @@ local function highlighted_matches(G, cards_pod)
   for k in pairs(have) do if not want[k] then return false end end
   return next(want) ~= nil   -- must be non-empty and exactly equal
 end
+-- Are all the wanted cards highlighted (extras allowed)?
+local function highlighted_contains(G, cards_pod)
+  local want = wanted_ids(cards_pod)
+  local have = {}
+  if G.hand and G.hand.highlighted then for _, c in ipairs(G.hand.highlighted) do have[cid(c)] = true end end
+  for k in pairs(want) do if not have[k] then return false end end
+  return next(want) ~= nil
+end
 -- Reorder the live joker row to the engine's recommended order (best.reorder.joker_order). Jokers score
 -- left->right, so order can be a big swing (a +mult LEFT of an xmult vs wasted RIGHT of it). There is no
 -- reorder BUTTON in Balatro (it's drag-only), so we reorder G.jokers.cards directly (by id) and re-align.
@@ -457,7 +507,8 @@ local function channel(G)
   return nil
 end
 local function type_ok(ch, t)
-  if ch == "hand" then return t == "PLAY" or t == "DISCARD" or t == "USE_CONSUMABLE" end
+  -- SELL_JOKER in a hand: Verdant Leaf (ante 8) debuffs every card until a joker is sold
+  if ch == "hand" then return t == "PLAY" or t == "DISCARD" or t == "USE_CONSUMABLE" or t == "SELL_JOKER" end
   if ch == "shop" then return t == "SAVE" or t == "REROLL" or t == "USE_CONSUMABLE" or (t and (t:find("^BUY") or t:find("^SELL"))) end
   -- SELL_JOKER is allowed in a pack: a joker pick into a FULL board needs room made first, and you
   -- CAN sell jokers while a booster is open (the make-room sell the engine now recommends as its own step).
@@ -506,6 +557,12 @@ end
 -- NOTE: cards are already highlighted by the tick's phase-1 (a frame earlier), so Balatro's
 -- can_play/can_discard have registered the selection — these just click the button.
 local function do_hand(G, best, logger)
+  if best.type == "SELL_JOKER" then   -- Verdant Leaf: sell a joker to lift the card debuff
+    local card = find_card({ G.jokers }, best.target)
+    if not card then log(logger, "SELL(hand): joker not found"); return false end
+    log(logger, "sell " .. tostring(ckey(card)) .. " (in blind)")
+    return click(G, "sell_card", logger, best.target)
+  end
   if best.type == "USE_CONSUMABLE" then
     log(logger, "USE " .. tostring(best.target and (best.target.key or best.target.name)))
     return click(G, "use_card", logger, best.target)
@@ -562,6 +619,7 @@ function Autoplay.tick(last, logger)
   if not G then return end
   if maybe_restart(G) then return end
   if now() < Autoplay.locked_until then return end
+  if maybe_autostart(G) then return end
   if Autoplay.in_transition(G) then return end   -- controller locks, a deal/play resolving, a pack closing
   local ch = channel(G)
   if not ch then return end
@@ -671,7 +729,12 @@ function Autoplay.tick(last, logger)
   local target_cards
   if ch == "hand" and (best.type == "PLAY" or best.type == "DISCARD") then target_cards = best.cards
   elseif (best.type == "USE_CONSUMABLE" or best.type == "PICK") and best.cards and #best.cards > 0 then target_cards = best.cards end
-  if target_cards and not highlighted_matches(G, target_cards) then
+  -- A card the GAME holds selected (Cerulean Bell's forced card) can't be unhighlighted, so an exact match may be
+  -- impossible; the engine now includes it, but if a selection still never matches, don't re-select forever
+  -- (live 4125ZXCZ looped ~4 hours at the ante-8 Bell): after MAX_WAIT accept a selection that CONTAINS every wanted card.
+  local sel_ok = target_cards and (highlighted_matches(G, target_cards)
+    or (forced and highlighted_contains(G, target_cards)))
+  if target_cards and not sel_ok then
     local n = highlight(G, target_cards)
     log(logger, "select " .. n .. " card" .. (n == 1 and "" or "s") .. " (" .. tostring(best.hand_type or best.type) .. ")")
     Autoplay.locked_until = now() + 0.4    -- let the selection register before we click next pass
