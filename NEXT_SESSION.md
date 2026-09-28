@@ -1,6 +1,20 @@
 # NEXT_SESSION.md — fresh-session handoff
 
-**⭐ LIVE INSTALL = `42a867f` (2026-09-28): best-trade swap SHIPPED; `main` synced to it. BES_DIG_HANDS stays OFF.**
+## ⭐⭐⭐⭐ START HERE (2026-09-28)
+**LIVE INSTALL = `42a867f`**: best-trade swap SHIPPED (pooled 320 seeds 86 -> 100 wins, 26.9% -> 31.3%); `main` synced to
+the branch tip; `BES_DIG_HANDS` stays OFF. Tests 1278 unit + 605 sim. Sim baselines: `sim_out/{sw17,sw17_7}.jsonl` (= live).
+The owner is running unattended F11 + F6 runs on this build. **Next session, in order:**
+1. **Review those runs** (the R17 method): outcomes + average length; `bes_autoplay.log` for live-only failures
+   ("pick unusable", "button not found" other than cash_out, FORCED, stalls); live vs sim (win rate, death ante,
+   death BLIND -- is the Big-blind gap still there?); does it now SWAP jokers live (look for "frees a slot for ... a
+   clear upgrade")? Replay any misplay from `bes_fixtures.jsonl` before theorising.
+2. **Big-blind / weaker live boards** (R17b): live Small clears x1.22 vs sim x1.43 -- find where live boards lose
+   strength (purchases, skips, money into each ante), with more runs.
+3. **Ante-1 jokerless deaths** (R17b): price the jokerless board's survival risk in the first shop (not a flat bump).
+4. Dig-aware joker valuation per-joker / MC dig (R17b); the remaining no-flat items; shop speed.
+Ops: `%TMP%/bes/arm.sh <name> <worktree> <workers> [n] [seed_off] [ENV=VAL]` (resumable; memory reaps come from
+Chrome/Steam/Discord, not the ~14 MB workers); owner authorises self-restart after reaps.
+
 
 ## ⭐⭐⭐ 2026-09-27 (later) — R17b: MORE UNATTENDED RUNS + "THE BOARD NEVER CHANGES" ROOT CAUSES
 Runs: KGJ9UMQH a5 Boss, 7Y3LRJJG **a1 Small (297/300)**, HMNFE4W2 a5 Boss, 2YD6L372 a8 Big (.79). 0 wins.
