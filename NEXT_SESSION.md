@@ -19,9 +19,10 @@ predicts the NEXT blind best (AUC 0.870 vs 0.817 mean-of-5). Refit (`tools/pace_
 (p 0.04) -- NOT shipped.** Same signature as pace20: a more accurate / more optimistic risk read makes the engine
 bank instead of buying power. Working hypothesis: the engine wins MORE when it errs toward buying power; the next
 lever is the spending policy under "comfortable", not the precision of the read. `prefit` (BES_PACE_RISK=refit,
-calibration only) CONFIRMED it: **wins 50 -> 32, progress -0.32 (p 0.006), sign 32/67 (p 0.0006)**. Next: `rs07`
-(BES_PACE_RISK_SHIFT=0.7, MORE pessimistic than today) running; a gain there is magnitude tuning -> needs OOS
-(BES_SEED_OFF=7) before shipping.
+calibration only) CONFIRMED it: **wins 50 -> 32, progress -0.32 (p 0.006), sign 32/67 (p 0.0006)**. And `rs07`
+(BES_PACE_RISK_SHIFT=0.7, MORE pessimistic) ALSO lost: **wins 50 -> 38, p 0.026, reach-8 57 -> 45**. Conclusion: the
+shipped risk fit is a local optimum for the shop's 0.25/0.5/urgent thresholds -- shifting it either way loses. Pacing
+is closed for tuning unless the thresholds are refit jointly; see the audit plan (4.4 now low priority).
 Still open from R17b: ante-1 jokerless deaths (price survival risk in the first shop); per-joker dig-aware valuation;
 the remaining no-flat items; shop speed (late-ante shops take >3 s).
 Ops: `bash tools/arm.sh <name> <worktree> <workers> [n] [seed_off] [ENV=VAL]` (resumable; memory reaps come from

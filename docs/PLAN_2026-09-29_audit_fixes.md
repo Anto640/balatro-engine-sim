@@ -11,7 +11,7 @@ every A/B after that should be judged in a world that behaves like the real game
 ## Phase 0 — finish what is running (tonight)
 | # | Item | Action | Batch |
 |---|---|---|---|
-| 0.1 | `rs07` (risk read +0.7 more pessimistic) | Compare vs `fin18`. If wins improve: out-of-sample arm `rs07_7` (BES_SEED_OFF=7) vs a `fin18_7` baseline. Not shipped until Phase 4 re-checks it on the corrected sim | 1–2 arms (~50 min each) |
+| 0.1 | `rs07` (risk read +0.7 more pessimistic) | **DONE: lost (wins 50 → 38, p 0.026).** With refit/pq25 also losing, the shipped risk fit is a local optimum; no OOS arm | — |
 
 ## Phase 1 — engine scoring correctness (live + sim; ship on mechanism)
 These are provably wrong scores; per the burden-of-proof rule they ship unless a paired batch is significantly negative.
@@ -78,7 +78,7 @@ out-of-sample), and expect the sim win rate to fall. Split into two bundles so t
 | 4.1 | Reroll value swings ±57% by seed; 35% of all flips (seed-flip) | `Packs.expected_shop_joker`: draw 32 jokers instead of 8 (+6% shop time), or value the whole pool once per shop | Paired A/B + OOS (precision changes have shifted the operating point before: pace20) |
 | 4.2 | `Packs.expected_pick` uses a 40-trial best-of-N simulation (seed-flip) | Exact calculation: no noise, cheaper | Paired A/B |
 | 4.3 | Chance-dependent plays fail 52% live (live-gap step 1) | Play chooser prefers a guaranteed clear (minimum score ≥ need) over a higher-average play when one exists | Needs 3.8 first; paired A/B |
-| 4.4 | Pacing: `urgent` flag flips on noise (12 of 13 pace flips) + tonight's result (less pessimism always lost) | Re-run `rs07` on the corrected sim; add hysteresis to `urgent` jointly with the risk shift; refit only jointly with a decision threshold | A/B + OOS |
+| 4.4 | Pacing: `urgent` flag flips on noise (12 of 13 pace flips) | Low priority: the risk fit is a local optimum (refit, pq25 and rs07 all lost). Only worth trying `urgent` hysteresis, which keeps the same decisions on average and removes the coin flips | A/B + OOS |
 | 4.5 | Joker value noise (16% of flips; ×4 samples = 2.7× slower shops) | Deferred: too expensive now; revisit with a cheaper estimator | — |
 
 ## Checked and no change needed
