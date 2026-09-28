@@ -88,6 +88,8 @@ function Sig.tracker()
       return false
     end,
     current = function() return last end,
+    -- forget the stored signature so the next changed() re-evaluates even an unchanged state
+    reset = function() last = nil end,
   }
 end
 

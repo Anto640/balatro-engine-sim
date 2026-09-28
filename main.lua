@@ -299,6 +299,7 @@ end
 -- finishes, then patches calibrated win/draw probabilities onto the panel.
 
 BES_SIM_BUDGET = 0.003   -- max seconds of background work per frame
+BES_TRANSITION_MAX = 6   -- seconds a mid-animation hold may last before the state is treated as settled
 BES.job = nil            -- in-flight background job: { thread, gs, sig, finish }
 
 -- Build + push the overlay action for a pack recommendation (shared by the cheap
@@ -721,6 +722,31 @@ function BES.tick()
   -- CAPTURE-ONLY (data collection): telemetry + fixtures are logged in observe above; skip the
   -- Monte-Carlo evaluation entirely (the lag). The engine is replayed OFFLINE over the fixtures.
   if BES.capture_only then return end
+  -- MID-ANIMATION: the last action is still resolving (a discard/play redrawing the hand, a pack pick / pack
+  -- closing, a sell/reroll). Its frames are not decisions -- advising on them showed a plan for a half-drawn hand
+  -- and "take this / skip" on a pack that was already closing (owner 2026-09-28). Hold the panel on a wait line,
+  -- drop any in-flight job, and forget the signature so the SETTLED state is always evaluated afresh.
+  -- Safety valve: a transition longer than BES_TRANSITION_MAX is treated as settled (a stuck flag must not
+  -- blank the panel for good).
+  local now = (love and love.timer and love.timer.getTime()) or 0
+  local busy = Autoplay and Autoplay.in_transition and Autoplay.in_transition(_G.G)
+  if busy then
+    BES._trans_since = BES._trans_since or now
+    busy = (now - BES._trans_since) < BES_TRANSITION_MAX
+  else
+    BES._trans_since = nil
+  end
+  if busy then
+    if not BES._waiting then
+      BES._waiting = true
+      BES.job = nil
+      BES.tracker.reset()
+      if Overlay then Overlay.set({ best = nil, reason = "…" }) end
+      if HUDInject then HUDInject.refresh() end
+    end
+    return
+  end
+  BES._waiting = false
   if not BES.tracker.changed(gs) then return end
   -- cheap, measurement-free pass for EVERY state -> panel updates immediately (C4:
   -- the only snapshot this cycle; evaluate reuses it rather than snapshotting again)

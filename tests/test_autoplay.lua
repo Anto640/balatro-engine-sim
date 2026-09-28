@@ -263,4 +263,31 @@ return function(t)
     _G.love, _G.G = saved_love, saved_G
     Autoplay.enabled = false
   end
+
+  -- MID-ANIMATION gate (owner 2026-09-28): no advice / no action on the frames while a discard redraws the hand
+  -- or a pack closes after its last pick.
+  do
+    local S = { SELECTING_HAND = 1, DRAW_TO_HAND = 2, HAND_PLAYED = 3, NEW_ROUND = 4, PLAY_TAROT = 5,
+                TAROT_PACK = 6, SHOP = 7 }
+    local function g(state, extra)
+      local G = { STATES = S, STATE = state, CONTROLLER = { locks = {} } }
+      for k, v in pairs(extra or {}) do G[k] = v end
+      return G
+    end
+    local open_pack = { cards = { {}, {} } }
+    t.eq(Autoplay.in_transition(g(S.SELECTING_HAND)), false, "transition: a settled hand is a decision")
+    t.eq(Autoplay.in_transition(g(S.DRAW_TO_HAND)), true, "transition: a discard redrawing the hand is not")
+    t.eq(Autoplay.in_transition(g(S.HAND_PLAYED)), true, "transition: a hand being scored is not")
+    local locked = g(S.SHOP); locked.CONTROLLER.locks.selling_card = true
+    t.eq(Autoplay.in_transition(locked), true, "transition: a controller lock (sell animating) holds")
+    t.eq(Autoplay.in_transition(g(S.TAROT_PACK, { pack_cards = open_pack,
+      booster_pack = { alignment = { offset = { y = 0 } } } })), false, "transition: an open pack is a decision")
+    t.eq(Autoplay.in_transition(g(S.TAROT_PACK, { pack_cards = open_pack,
+      booster_pack = { alignment = { offset = { y = 29, py = 0 } } } })), true,
+      "transition: a pick resolving (pack panel slid away) is not")
+    t.eq(Autoplay.in_transition(g(S.TAROT_PACK, { pack_cards = open_pack })), true,
+      "transition: a closing pack (panel removed, leftover cards still shown) is not")
+    t.eq(Autoplay.in_transition(g(S.SHOP, { pack_cards = open_pack })), false,
+      "transition: leftover pack cards outside a pack screen do not hold the shop")
+  end
 end

@@ -422,6 +422,31 @@ local function input_locked(G)
   end)
   return locked
 end
+-- Is the game MID-ANIMATION -- the previous action still resolving, so the live state is a half-way frame, not a
+-- decision? (owner 2026-09-28: after a discard the panel advised on the half-redrawn hand; after the last pack pick
+-- it said "take this tarot" / "skip" for the ~0.5 s the pack took to close.) Read from the game source (Lovely dump):
+--   * DRAW_TO_HAND / HAND_PLAYED / NEW_ROUND / PLAY_TAROT: a discard/play/deal/tarot is resolving
+--     (SELECTING_HAND is only set once the draw events have finished);
+--   * any CONTROLLER lock: use / selling_card / shop_reroll / skip_blind / toggle_shop ... are held while
+--     their action animates;
+--   * a pack screen whose panel is closing: G.FUNCS.use_card slides G.booster_pack off-screen (alignment.offset.py
+--     set) while a pick resolves, and end_consumeable removes it before the leftover pack cards are cleared.
+function Autoplay.in_transition(G)
+  if not (G and G.STATES) then return false end
+  local S, st = G.STATES, G.STATE
+  if st ~= nil and (st == S.DRAW_TO_HAND or st == S.HAND_PLAYED or st == S.NEW_ROUND or st == S.PLAY_TAROT) then
+    return true
+  end
+  if input_locked(G) then return true end
+  local pack_state = st ~= nil and (st == S.TAROT_PACK or st == S.PLANET_PACK or st == S.SPECTRAL_PACK
+    or st == S.STANDARD_PACK or st == S.BUFFOON_PACK or st == S.SMODS_BOOSTER_OPENED)
+  if pack_state and G.pack_cards and G.pack_cards.cards and #G.pack_cards.cards > 0 then
+    local bp = G.booster_pack
+    local off = bp and bp.alignment and bp.alignment.offset
+    if not bp or (off and off.py ~= nil) then return true end
+  end
+  return false
+end
 local function channel(G)
   if G.pack_cards and G.pack_cards.cards and #G.pack_cards.cards > 0 then return "pack" end
   if not (G.STATE and G.STATES) then return nil end
@@ -537,7 +562,7 @@ function Autoplay.tick(last, logger)
   if not G then return end
   if maybe_restart(G) then return end
   if now() < Autoplay.locked_until then return end
-  if input_locked(G) then return end
+  if Autoplay.in_transition(G) then return end   -- controller locks, a deal/play resolving, a pack closing
   local ch = channel(G)
   if not ch then return end
   if ch == "shop" and not shop_ready(G) then return end   -- wait for the shop to finish loading
