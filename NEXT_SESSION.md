@@ -10,6 +10,14 @@ Restarting the game is the owner's call: never launch Balatro unasked. **Sim bas
 2. Review new live runs on the current install (the R17 method: outcomes, `bes_autoplay.log` live-only failures,
    live vs sim, replay misplays from `bes_fixtures.jsonl`).
 3. Make the sim's Ceremonial Dagger use `engine/dagger.lua`'s feed-or-park rule (it never destroys in the sim).
+**Plan step 1-2 results (2026-09-28 evening):** step 1 (`tools/estimator_probe.lua`, 615 blinds): best-25%-of-20
+predicts the NEXT blind best (AUC 0.870 vs 0.817 mean-of-5). Refit (`tools/pace_fit_probe.lua`, 926 samples): for
+"dies within 2 antes" q25 = mean (0.787 vs 0.786), and the 09-23 risk fit OVERSTATES today's risk (ante-4 intercept
+1.28 vs refit -0.64). **`pq25` (BES_PACE_CAP=q25 + its fit) vs fin18: wins 50 -> 38, reach-8 57 -> 47, sign 61/87
+(p 0.04) -- NOT shipped.** Same signature as pace20: a more accurate / more optimistic risk read makes the engine
+bank instead of buying power. Working hypothesis: the engine wins MORE when it errs toward buying power; the next
+lever is the spending policy under "comfortable", not the precision of the read. `prefit` (BES_PACE_RISK=refit,
+calibration only) is running to confirm.
 Still open from R17b: ante-1 jokerless deaths (price survival risk in the first shop); per-joker dig-aware valuation;
 the remaining no-flat items; shop speed (late-ante shops take >3 s).
 Ops: `%TMP%/bes/arm.sh <name> <worktree> <workers> [n] [seed_off] [ENV=VAL]` (resumable; memory reaps come from
