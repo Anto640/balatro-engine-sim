@@ -33,6 +33,17 @@ Non-boss deaths 5/9 (Small 4, Big 1): live boards still weaker than the sim's. T
    Fix: the measured pass gates them by the joker swap bar + survival check (like a joker pick); a pass carries the
    SELL as its own first step, a fail is worth 0. Replay: Judgement was chosen on 2/6 deals, now 0/6 (Tower+Hierophant).
 Also shipped this session: `70266aa` the overlay holds "…" while an action animates (discard redraw, pack pick/close).
+**R18b (same day): ANTE-8 FINISHERS + a 4-hour stall.** 4125ZXCZ reached the ante-8 **Cerulean Bell** and the
+self-player looped ~4 h (engine chose plays without the forced card; then the self-player re-added the forced card,
+which the game lists twice, so the 5-card limit rejected a pick). Of the five finishers only Violet Vessel (x6) was
+modelled. Fixed (`0f78461`, `01810fc`): Bell (forced card read + legal-play filter + discard/play guard + no double
+add + superset-after-MAX_WAIT), **Crimson Heart** (joker debuff read; a debuffed joker and copies of it score 0),
+**Verdant Leaf** (recommend selling the joker whose loss leaves the best hand while cards are debuffed; the
+self-player can sell in a blind). Amber Acorn needs nothing (jokers read face-down). Restarted remotely via the new
+one-shot `bes_autostart` file (save folder; turns F11+F6 on and continues the saved run) -> **4125ZXCZ WON** (first
+self-play live win). ⚠ The SIM still treats Leaf/Heart/Bell/Acorn as plain x2 bosses (easier than real ante 8) --
+a fidelity item for the sim.
+Pace-noise A/B running: `pace20` (BES_PACE_SAMPLES=20) vs `r18` (Judgement fix: 155/160 tied, 54->51 wins n.s., kept).
 Not fixed: the Certificate shop (LBUI8IK1 a1 boss) is NOISE -- the Celestial pack reads +4.7 or -4.9 by rng seed
 (8 samples); worth a look at pack-value variance. JU4XNUI5 a1 = the known ante-1 class (spent to $1 on Supernova).
 
