@@ -108,8 +108,12 @@ lua  tools/analyze_runs.lua sim_out/<name>.jsonl trace [seed]   # one run's blow
   fix); merged parallel output is byte-identical to sequential. `sim_batch.lua` gained `[shard nshards]`
   args for it. (The old idea of a per-call deck-signature MC cache is now moot — parallelism is the win.)
 - **Worker count (owner rule):** 11 when the owner is away, 4–6 while they use the PC. When memory runs low the
-  shell gets killed but the workers survive; merge or resume their output with the resumable runner rather than
-  relaunching, and relaunch a killed batch only with the owner's go-ahead.
+  shell gets killed but the workers usually survive: merge or resume their output with the resumable runner. If a
+  batch was actually killed, rerun it (resuming from the finished seeds) without asking the owner first.
+- **Say how long a batch will take.** When starting a batch or probe, tell the owner the estimated duration and
+  the clock time it should finish, and update it when checking progress. Observed rates (160-seed arm, 2026-09-28,
+  with Balatro running): ~1 h at 9 workers, ~50 min at 11, ~1.5–2 h at 4–6. Estimate from the live rate
+  (finished seeds / elapsed) once a run is under way; late seeds are slower, as runs that reach ante 8 last longest.
 - **What to read in `analyze_runs`:** the **death-ante histogram** (push the mode later);
   **per-ante trajectory** ($ / jokers / **hand-lv** / pace_margin / run_str); **ENGINE ACTION
   SUMMARY** (what it bought / SOLD / **SKIPPED** = offered-but-not-taken, packs, rerolls,

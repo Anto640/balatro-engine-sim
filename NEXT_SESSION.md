@@ -13,7 +13,8 @@ Restarting the game is the owner's call: never launch Balatro unasked. **Sim bas
 Still open from R17b: ante-1 jokerless deaths (price survival risk in the first shop); per-joker dig-aware valuation;
 the remaining no-flat items; shop speed (late-ante shops take >3 s).
 Ops: `%TMP%/bes/arm.sh <name> <worktree> <workers> [n] [seed_off] [ENV=VAL]` (resumable; memory reaps come from
-Chrome/Steam/Discord, not the ~14 MB workers); relaunching a killed batch needs the owner's go-ahead.
+Chrome/Steam/Discord, not the ~14 MB workers); rerun a killed batch without asking. When starting any batch, tell the
+owner its estimated duration and finish time (~1 h per 160-seed arm at 9 workers).
 
 ## ⭐⭐⭐⭐ 2026-09-28 (later) — R18: UNATTENDED RUNS ON 42a867f + TWO LIVE-ONLY DEFECTS FIXED
 Runs (session starting bes_runs line 11138): VKMZCD5H a5 Boss, PY43WSDU a6 Small, G5QGWQKG a4 Big, UTNJ8T4Q a5 Boss,
