@@ -4,7 +4,9 @@
 **Live install = the branch tip**, apart from the default-off `BES_PACE_CAP` pacing code, which isn't deployed.
 Restarting the game is the owner's call: never launch Balatro unasked. **Sim baseline:** `sim_out/fin18.jsonl`
 (real ante-8 bosses, 50/160 wins). `main` last synced at `42a867f`; sync it once the new live runs look healthy.
-**Next, in order:**
+**Next, in order:** ⭐ after `rs07` (+ its OOS arm if positive), work through
+`docs/PLAN_2026-09-29_audit_fixes.md` (the three 2026-09-28 audits: engine scoring bugs, telemetry, sim rules, then engine
+tuning on the corrected sim). The items below are superseded where that plan covers them.
 1. Plan step 2 (see PLAN in the R18 block below): fit `Pacing.RISK_Q25` from `sim_out/pacefit_*.jsonl`, A/B
    `BES_PACE_CAP=q25` against fin18, replicate on fresh seeds if positive.
 2. Review new live runs on the current install (the R17 method: outcomes, `bes_autoplay.log` live-only failures,
