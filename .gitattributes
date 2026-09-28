@@ -7,3 +7,6 @@
 # trailing \r inside the last JSON value for any line-based reader.
 data/*.jsonl -text
 data/*.txt   -text
+
+# Shell scripts run under bash: always LF, or bash fails on the  ('$'"": command not found).
+*.sh text eol=lf
