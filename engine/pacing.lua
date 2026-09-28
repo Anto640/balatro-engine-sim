@@ -109,12 +109,16 @@ P.RISK_SLOPE = -1.164
 P.RISK_Q25 = { intercept = { -1.683, -1.243, -0.799, 0.033, -0.015, 0.884 }, slope = -0.927 }
 P.RISK_MEAN_REFIT = { intercept = { -2.382, -2.075, -1.496, -0.643, -0.686, 0.107 }, slope = -0.816 }
 P.RISK_MODE = (os.getenv and os.getenv("BES_PACE_RISK")) or "default"   -- "refit" -> RISK_MEAN_REFIT (A/B only)
+-- A/B result 2026-09-28 vs fin18: making the risk read LESS pessimistic always lost -- pace20 51->39 wins, pq25 50->38,
+-- refit 50->32 (p 0.006, sign 32/67). The engine wins more when it believes it is at risk (it buys power instead of
+-- banking). RISK_SHIFT (logit units, env BES_PACE_RISK_SHIFT, default 0) tests the other direction.
+P.RISK_SHIFT = tonumber(os.getenv and os.getenv("BES_PACE_RISK_SHIFT") or "") or 0
 function P.risk(ante, margin, mode)
   local a = math.max(1, math.min(6, math.floor(ante or 1)))
   local ic, sl = P.RISK_INTERCEPT, P.RISK_SLOPE
   if mode == "q25" and P.RISK_Q25 then ic, sl = P.RISK_Q25.intercept, P.RISK_Q25.slope
   elseif P.RISK_MODE == "refit" then ic, sl = P.RISK_MEAN_REFIT.intercept, P.RISK_MEAN_REFIT.slope end
-  local z = ic[a] + sl * math.log(math.max(margin or 0, 1e-3))
+  local z = ic[a] + sl * math.log(math.max(margin or 0, 1e-3)) + P.RISK_SHIFT
   return 1 / (1 + math.exp(-z))
 end
 
