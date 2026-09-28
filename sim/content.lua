@@ -666,6 +666,22 @@ local function sell_effects(run, j, rng)
 end
 Content._sell_effects = sell_effects   -- exposed for the fidelity tests
 
+-- Sell an owned joker (the object in run.jokers): sell-triggered effects, refund, slot bookkeeping, Campfire, trace.
+-- Shared by the shop's SELL_JOKER and the in-blind sale (Verdant Leaf, sim/world.lua).
+function Content.sell_joker(run, j, rng)
+  for i, x in ipairs(run.jokers) do
+    if x == j then
+      sell_effects(run, j, rng)    -- Luchador/Diet Cola/Invisible: sell-triggered effects
+      run.economy.dollars = run.economy.dollars + (j.sell_value or 1); table.remove(run.jokers, i)
+      note_negative_loss(run, j)   -- E-11: a sold negative joker takes its +1 slot with it
+      JokerTick.on_joker_sold(run) -- Campfire +0.25x per joker sold
+      trace(run, { kind = "joker_loss", key = j.key, via = "sell" })
+      return true
+    end
+  end
+  return false
+end
+
 local function apply_action(run, shop, a, rng)
   local tp = a.type
   if tp == "BUY_JOKER" and a.target then
@@ -702,14 +718,8 @@ local function apply_action(run, shop, a, rng)
     for i, b in ipairs(shop.boosters) do if b == a.target then table.remove(shop.boosters, i); break end end
     return true
   elseif tp == "SELL_JOKER" and a.target then
-    for i, j in ipairs(run.jokers) do
-      if j == a.target then
-        sell_effects(run, j, rng)    -- Luchador/Diet Cola/Invisible: sell-triggered effects
-        run.economy.dollars = run.economy.dollars + (j.sell_value or 1); table.remove(run.jokers, i)
-        note_negative_loss(run, j)   -- E-11: a sold negative joker takes its +1 slot with it
-        JokerTick.on_joker_sold(run) -- Campfire +0.25x per joker sold
-        trace(run, { kind = "joker_loss", key = j.key, via = "sell" }); break
-      end
+    for _, j in ipairs(run.jokers) do
+      if j == a.target then Content.sell_joker(run, j, rng); break end
     end
     return true
   elseif tp == "SELL_TO_BUY" and a.target then

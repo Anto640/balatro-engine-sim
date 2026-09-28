@@ -385,6 +385,39 @@ return function(t)
     t.ok(true, "ran a second seed without error (" .. tostring(c.scored) .. ")")
   end
 
+  -- ---- ANTE-8 FINISHERS (2026-09-28): the sim used to play these as plain x2 bosses ----
+  do
+    local GS = require("model.game_state")
+    local function run_with(jokers)
+      local run = World.new_run(21)
+      for _, k in ipairs(jokers) do run.jokers[#run.jokers + 1] = GS.joker{ key = k, name = k, sell_value = 2 } end
+      return run
+    end
+    -- Verdant Leaf: cards debuffed until a joker is sold -> the engine sells one, the blind is then playable
+    local run = run_with({ "j_egg", "j_joker" })
+    local njk = #run.jokers
+    local r = World.play_blind(run, { type = "Boss", target = 300, boss_key = "bl_final_leaf" })
+    t.eq(#run.jokers, njk - 1, "Verdant Leaf: the engine sells a joker to lift the debuff")
+    t.ok(r.cleared, "Verdant Leaf: after the sale the blind is cleared")
+    local stuck = false
+    for _, c in ipairs(run.deck) do if c.debuffed then stuck = true end end
+    t.ok(not stuck, "Verdant Leaf: no card stays debuffed after the blind")
+
+    -- Crimson Heart / Cerulean Bell: the blind resolves and no joker debuff / forced card outlives it
+    local run2 = run_with({ "j_joker", "j_egg" })
+    local r2 = World.play_blind(run2, { type = "Boss", target = 300, boss_key = "bl_final_heart" })
+    t.ok(r2.cleared, "Crimson Heart: a clearable blind still clears")
+    local dj = false
+    for _, j in ipairs(run2.jokers) do if j.debuffed then dj = true end end
+    t.ok(not dj, "Crimson Heart: no joker stays disabled after the blind")
+    local run3 = run_with({ "j_joker" })
+    local r3 = World.play_blind(run3, { type = "Boss", target = 300, boss_key = "bl_final_bell" })
+    t.ok(r3.cleared, "Cerulean Bell: a clearable blind still clears")
+    local fc = false
+    for _, c in ipairs(run3.deck) do if c.forced then fc = true end end
+    t.ok(not fc, "Cerulean Bell: no card stays forced after the blind")
+  end
+
   -- ---- boss resources: The Needle gives exactly ONE hand ----
   do
     local run = World.new_run(5)

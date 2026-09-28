@@ -837,6 +837,54 @@ function World.play_blind(run, blind)
   local restricted = BossEffect.has_play_restriction(eff)
   local plays = 0
 
+  -- ANTE-8 FINISHERS (game source: blind.lua set_blind / drawn_to_hand / debuff_card, card.lua sell). Until
+  -- 2026-09-28 the sim played these as plain x2 bosses (easier than the real ante 8). Amber Acorn (flip + shuffle the
+  -- jokers) is NOT modelled: the live self-player reads face-down jokers and re-sorts them, so it is a no-op there.
+  local fkey = eff and blind.boss_key or nil
+  local leaf = (fkey == "bl_final_leaf")    -- every playing card debuffed until ONE joker is sold
+  local heart = (fkey == "bl_final_heart")  -- after the deal and after each hand PLAYED: one random joker disabled
+  local bell = (fkey == "bl_final_bell")    -- after every deal: a random hand card is forced-selected
+  local heart_prev, heart_prepped = nil, true
+  local function set_leaf(on) for _, c in ipairs(run.deck) do c.debuffed = on or nil end end
+  if leaf then set_leaf(true) end
+  local function after_draw()
+    if heart and heart_prepped and #run.jokers > 0 then
+      local pool, fallback = {}, {}
+      for _, j in ipairs(run.jokers) do
+        j.debuffed = nil
+        fallback[#fallback + 1] = j
+        if j ~= heart_prev then pool[#pool + 1] = j end
+      end
+      if #pool == 0 then pool = fallback end
+      local k = math.floor(rng() * #pool) + 1
+      heart_prev = pool[math.min(#pool, math.max(1, k))]
+      heart_prev.debuffed = true
+      heart_prepped = false
+    end
+    if bell and #hand > 0 then
+      local any = false
+      for _, c in ipairs(hand) do if c.forced then any = true; break end end
+      if not any then
+        local k = math.floor(rng() * #hand) + 1
+        hand[math.min(#hand, math.max(1, k))].forced = true
+      end
+    end
+  end
+  -- the game plays/discards the forced card with whatever else is selected (it can't be unselected)
+  local function with_forced(sel)
+    if not (bell and sel) then return sel end
+    local fc
+    for _, c in ipairs(hand) do if c.forced then fc = c; break end end
+    if not fc then return sel end
+    for _, c in ipairs(sel) do if c == fc then return sel end end
+    local out = {}
+    for i, c in ipairs(sel) do out[i] = c end
+    if #out >= 5 then out[#out] = fc else out[#out + 1] = fc end
+    return out
+  end
+  local function clear_forced(cards) for _, c in ipairs(cards or {}) do c.forced = nil end end
+  after_draw()
+
   JokerTick.on_blind_start(run, rng) -- per-round joker state: Ancient/Idol/Castle suit, Hit-the-Road reset, Ceremonial feed
   blind_start_generators(run, rng)   -- Cartomancer: create a Tarot at blind select (before any play)
 
@@ -869,8 +917,21 @@ function World.play_blind(run, blind)
     local action = ranked and ranked.best
     if not action then break end
 
-    if action.type == "DISCARD" and b.discards_left > 0 then
+    if action.type == "SELL_JOKER" and action.target then
+      -- in-blind sale (Verdant Leaf: selling ANY joker disables the boss). Match the engine's target by id, else key.
+      local tj
+      for _, j in ipairs(run.jokers) do
+        if (action.target.id ~= nil and j.id == action.target.id) or (action.target.id == nil and j.key == action.target.key) then tj = j; break end
+      end
+      if not tj then break end
+      require("sim.content").sell_joker(run, tj, rng)
+      if leaf then leaf = false; set_leaf(false) end
+      if tj == heart_prev then heart_prev = nil end
+
+    elseif action.type == "DISCARD" and b.discards_left > 0 then
+      action.cards = with_forced(action.cards)
       local discarded = action.cards
+      clear_forced(discarded)
       local avail = #hand
       local is_first_discard = not b._first_discard_done
       b._first_discard_done = true
@@ -881,6 +942,7 @@ function World.play_blind(run, blind)
       discard_effects(run, discarded, is_first_discard, rng)  -- Burnt (level) / Sixth Sense (spectral)
       log_action("discard", discarded, nil, nil, avail, #draw_pile)
       refill(hand, draw_pile, hand_size)
+      after_draw()
 
     elseif action.type == "USE_CONSUMABLE" then
       -- apply the consumable, then take its recommended follow-up play (if any)
@@ -892,7 +954,9 @@ function World.play_blind(run, blind)
         if restricted and not BossEffect.legal_play(eff, sel, action.hand_type, pstate) then
           sel = nil
         end
+        sel = with_forced(sel)
         if sel then
+          clear_forced(sel); heart_prepped = true
           local ev = HandEval.score(build_gs(run, b, hand, draw_pile, eff), sel)
           b.scored = b.scored + (ev.score or 0); plays = plays + 1
           JokerTick.on_play(run, ev, sel)   -- A1: accumulate scalers on the played hand
@@ -916,6 +980,7 @@ function World.play_blind(run, blind)
             end
           end
           refill(hand, draw_pile, hand_size)
+          after_draw()
         end
       end
       -- if the consumable had no follow-up play, loop re-evaluates the new state
@@ -933,7 +998,9 @@ function World.play_blind(run, blind)
         if ev2 and sel2 then sel, htype = sel2, ev2.hand_type else sel = nil end
       end
       if not sel then break end  -- no legal play available (e.g. can't make 5 under Psychic)
+      sel = with_forced(sel)
       local ev = HandEval.score(build_gs(run, b, hand, draw_pile, eff), sel)
+      clear_forced(sel); heart_prepped = true
       b.scored = b.scored + (ev.score or 0); plays = plays + 1
       local is_first_play = not b._first_play_done; b._first_play_done = true
       JokerTick.on_play(run, ev, sel)   -- A1: accumulate scalers on the played hand
@@ -956,8 +1023,13 @@ function World.play_blind(run, blind)
         end
       end
       refill(hand, draw_pile, hand_size)
+      after_draw()
     end
   end
+  -- finisher state never outlives the blind
+  if leaf then set_leaf(false) end
+  if heart then for _, j in ipairs(run.jokers) do j.debuffed = nil end end
+  if bell then clear_forced(run.deck) end
 
   local cleared = b.scored >= b.target
   -- Mr. Bones (JOKER_FIDELITY P0, survival): prevents death when you scored at least 25% of the
