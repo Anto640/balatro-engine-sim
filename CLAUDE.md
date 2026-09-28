@@ -28,7 +28,7 @@ plus a large correctness/coverage/strategy pass.
 > "only Mult" measurement was invalid because the sampled hand contained no Diamonds at all. **Replay the
 > recorded state; do not rebuild it from the description.**
 >
-> ### ⭐⭐⭐⭐⭐ LATEST (2026-09-27): R17 — install `b76d453` (unattended runs via F6; live pack-pick fixes; ⭐ live dies on BIG blinds 6/9 vs sim 20%, p 0.003 — see NEXT_SESSION R17). R16 — `d399bbc` (R15 + pre-deal pack gate + shop planet-use + Black Hole credit + no-flat audit batch 1 with measured use rates + Overstock v2 + retrigger-aware Gold seal). R14 live review — engine `f22edfc`, CONFIRMED vs old live in the corrected sim: 32->38/160 in-sample, 28->49/160 OOS (p 0.022); read the R14 block atop `NEXT_SESSION.md`.
+> ### ⭐⭐⭐⭐⭐ LATEST (2026-09-28): install `42a867f` — best-trade swap shipped (pooled 320 seeds: wins 86->100, 26.9%->31.3%; OOS +4); `main` synced. R17 — `b76d453` (unattended runs via F6; live pack-pick fixes; ⭐ live dies on BIG blinds 6/9 vs sim 20%, p 0.003 — see NEXT_SESSION R17). R16 — `d399bbc` (R15 + pre-deal pack gate + shop planet-use + Black Hole credit + no-flat audit batch 1 with measured use rates + Overstock v2 + retrigger-aware Gold seal). R14 live review — engine `f22edfc`, CONFIRMED vs old live in the corrected sim: 32->38/160 in-sample, 28->49/160 OOS (p 0.022); read the R14 block atop `NEXT_SESSION.md`.
 > ### (previous) 2026-09-25: read the "START HERE" block of `NEXT_SESSION.md` — live install `0ed0a6d`,
 > ### sim win rate 22.5% (36/160, was 6.2% on 09-23), the win-rate checkpoint table, and the prioritised next sessions.
 > ### Every joker is now MEASURED except Mr Bones / Diet Cola / Credit Card; forward valuation ON; the tier floor STAYS.
@@ -730,7 +730,7 @@ expect sd ~1.9 (MDE ~0.42 at n=160) for anything touching the shop loop.
 ## Git
 
 Active work is on branch `winrate-v4-bundle`; `main` is synced to the validated/live state (fast-forward/merge it when a
-batch of changes is confirmed -- last synced 2026-09-27 at `2aa00f9` + README). **Commit and push whenever you (the AI
+batch of changes is confirmed -- last synced 2026-09-28 at `42a867f`). **Commit and push whenever you (the AI
 assistant) judge it appropriate — you do NOT need to wait to be asked** (owner directive, 2026-08-28).
 Use judgement: commit at coherent checkpoints with a clear message, keep the tree green, and don't
 bundle unrelated changes. Run the test suite before committing.

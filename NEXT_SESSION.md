@@ -1,5 +1,7 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+**⭐ LIVE INSTALL = `42a867f` (2026-09-28): best-trade swap SHIPPED; `main` synced to it. BES_DIG_HANDS stays OFF.**
+
 ## ⭐⭐⭐ 2026-09-27 (later) — R17b: MORE UNATTENDED RUNS + "THE BOARD NEVER CHANGES" ROOT CAUSES
 Runs: KGJ9UMQH a5 Boss, 7Y3LRJJG **a1 Small (297/300)**, HMNFE4W2 a5 Boss, 2YD6L372 a8 Big (.79). 0 wins.
 - The overlay flip ("sell Swashbuckler for Green Joker" -> skip; pack picks changing at the last second) was the
@@ -18,7 +20,8 @@ Runs: KGJ9UMQH a5 Boss, 7Y3LRJJG **a1 Small (297/300)**, HMNFE4W2 a5 Boss, 2YD6L
 - **RESULTS (n=160 paired, 2026-09-28):**
   | arm | vs | progress | sign | wins | reach-8 | verdict |
   |---|---|---|---|---|---|---|
-  | `sw17` c8503f4 (best-trade swap) | base17 | **+0.140 (p 0.076)** | 31/20, **109 tied** | 44 -> **54** | 54 -> 58 | promising -> OOS (`base17_7`/`sw17_7`) |
+  | `sw17` c8503f4 (best-trade swap) | base17 | **+0.140 (p 0.076)** | 31/20, **109 tied** | 44 -> **54** | 54 -> 58 | promising -> OOS |
+  | `sw17_7` (OOS, BES_SEED_OFF=7) | base17_7 | +0.045 (p 0.51) | 25/26, 109 tied | 42 -> **46** | 59 -> 57 | **SHIPPED** -- pooled 320: wins 86 -> 100 (26.9% -> 31.3%), positive on both pools |
   | `dig17` (+ BES_DIG_HANDS=1) | sw17 | -0.310 (p 0.18) | 66/73 | 54 -> 48 | 58 -> 58 | NOT shipped (flag stays OFF). The single-deal measure is still wrong in principle (Trio -25% vs +40% dug), but pricing every joker on heuristic-dug hands did not convert -- likely over-credits conditional jokers the play engine then fails to dig for; revisit with the MC dig or per-joker, not wholesale |
 - Pack picks already use the best-trade bar (`weakest_owned_joker` = min over owned of c*(1+slope*c)+max(margin,kb)),
   so the shop was the only path with the fixed-weakest flaw.
