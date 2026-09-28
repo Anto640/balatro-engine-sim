@@ -106,13 +106,19 @@ function P.risk(ante, margin)
   return 1 / (1 + math.exp(-z))
 end
 
+-- Samples for the capacity read. At 5, the "can't clear the next boss" flag (urgent) flips by rng seed on a
+-- marginal board -- live LBUI8IK1 a1: margin 0.46-1.79 across seeds, urgent 15/20, and the shop swung between
+-- "buy power" (Celestial +4.7) and "bank $6" (-4.9) on the same state. At 20: margin 0.80-1.40, urgent 18/20.
+-- Env override BES_PACE_SAMPLES for the sim A/B.
+P.SAMPLES = tonumber(os.getenv and os.getenv("BES_PACE_SAMPLES") or "") or 5
+
 -- pace(gs, opts) -> assessment, or nil if capacity can't be measured (no deck).
 function P.pace(gs, opts)
   opts = opts or {}
   local ante = math.floor((gs.meta and gs.meta.ante) or 1)
   local hands = (gs.blind and gs.blind.base_hands) or 4
   if hands <= 0 then hands = 4 end
-  local avg = JokerValue.avg_score(gs, { samples = opts.samples or 5, rng = opts.rng })
+  local avg = JokerValue.avg_score(gs, { samples = opts.samples or P.SAMPLES, rng = opts.rng })
   if not avg then return nil end
 
   local cap = avg * hands                    -- current per-blind scoring capacity
