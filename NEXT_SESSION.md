@@ -47,6 +47,15 @@ Pace-noise A/B DONE -- **NOT shipped**: `pace20` (BES_PACE_SAMPLES=20) vs `r18` 
 sign 62/79 (p 0.18), progress -0.271 (p 0.20). The risk logistic + urgent/0.25/0.5 thresholds were fitted on the NOISY
 5-sample margin; a precise margin reads "comfortable" more on borderline boards -> banks more. Retry only jointly with
 a refit of Pacing.RISK_* on 20-sample margins. (`r18` = Judgement fix: 155/160 tied, 54 -> 51 wins n.s., kept.)
+**PLAN (owner-approved direction, 2026-09-28): realistic hand estimates for shop decisions.** Pacing risk and joker
+value both run on the MEAN of 5 single no-discard deals (undersells dug play; the risk fit is tuned to its noise).
+0. Baseline `fin18` (sim with real ante-8 bosses) -- all A/Bs paired vs it, OOS before shipping.
+1. MEASURE first: on recorded sim states compute mean-5 / mean-20 / top-25%-of-20 (owner's "top few hands") / dig
+   rollout; pick the estimator that best predicts the next blind's outcome (cleared, ratio).
+2. PACING: swap it in + REFIT Pacing.RISK_* on its margins (fresh 160 batch); A/B.
+3. JOKER VALUE: same estimator; per-joker predicted-vs-realised check, cap conditional credit the play engine
+   doesn't dig for (the dig17/Trio lesson); A/B.
+4. Ship: wins/reach-8 non-negative in-sample AND OOS, sign test not against; shop time <= ~2x; then live F11.
 Not fixed: the Certificate shop (LBUI8IK1 a1 boss) is NOISE -- the Celestial pack reads +4.7 or -4.9 by rng seed
 (8 samples); worth a look at pack-value variance. JU4XNUI5 a1 = the known ante-1 class (spent to $1 on Supernova).
 
