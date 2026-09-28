@@ -487,6 +487,11 @@ function HandEval.score_with(gs, played, effective, mods)
   end
 
   -- 4. main jokers, left -> right (copies already resolved into `effective`)
+  -- Baseball Card (and copies of it): x1.5 applied right after each Uncommon joker scores (see joker_effects).
+  local other_x = 1
+  for _, e in ipairs(effective) do
+    if e.impl and e.impl.other_uncommon_xmult then other_x = other_x * e.impl.other_uncommon_xmult end
+  end
   for _, e in ipairs(effective) do
     -- K5: foil/holo (additive) apply BEFORE the joker's own effect (so an xmult joker
     -- multiplies the +chips/+mult too); polychrome (x1.5) applies AFTER.
@@ -495,6 +500,12 @@ function HandEval.score_with(gs, played, effective, mods)
       chips, mult = apply(chips, mult, e.impl.on_hand(ctx, e.hookj), "joker:" .. e.hookj.key)
     end
     chips, mult = apply(chips, mult, joker_edition_post(e.edition), "joker-edition:" .. tostring(e.edition))
+    if other_x > 1 then
+      local src = (gs.jokers or {})[e.position]   -- the joker IN this slot (a copier is not itself Uncommon)
+      if src and not src.debuffed and Jokers.is_uncommon(src) then
+        chips, mult = apply(chips, mult, { xmult = other_x }, "joker:j_baseball")
+      end
+    end
   end
 
   local score = math.floor(chips * mult + 1e-9)

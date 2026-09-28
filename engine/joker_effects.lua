@@ -209,14 +209,14 @@ J.j_steel_joker = { on_hand = function(ctx)
   local steel = count_deck(ctx.gs, function(c) return c.enhancement == "m_steel" end)
   return { xmult = 1 + 0.2 * steel }
 end }
-J.j_baseball = { on_hand = function(ctx)
-  -- x1.5 per Uncommon joker owned
-  local n = 0
-  for _, jk in ipairs(ctx.gs.jokers or {}) do
-    if (jk.rarity == "Uncommon") or (jk.rarity == 2) or JokerData.resolve(jk.key).rarity == "Uncommon" then n = n + 1 end
-  end
-  if n > 0 then return { xmult = 1.5 ^ n } end
-end }
+-- Baseball Card: x1.5 each time an UNCOMMON joker scores, applied at THAT joker's position in the row (the game's
+-- `context.other_joker` pass), not x1.5^n once at Baseball's own slot -- an Uncommon on the left is multiplied before
+-- the +Mult to its right is added (live N3WZCB7D scored 0.57-0.72x of the old prediction). hand_eval applies it via the
+-- `other_uncommon_xmult` marker; a Blueprint/Brainstorm copying Baseball counts as another Baseball.
+J.j_baseball = { other_uncommon_xmult = 1.5 }
+local function is_uncommon(jk)
+  return jk and ((jk.rarity == "Uncommon") or (jk.rarity == 2) or JokerData.resolve(jk.key).rarity == "Uncommon") or false
+end
 J.j_drivers_license = { on_hand = function(ctx)
   local enh = count_deck(ctx.gs, function(c) return c.enhancement ~= nil end)
   if enh >= 16 then return { xmult = 3 } end
@@ -257,7 +257,15 @@ J.j_campfire      = { on_hand = function(_, j) return { xmult = scaled(j, XMULT,
 J.j_madness       = { on_hand = function(_, j) return { xmult = scaled(j, XMULT, 1) } end }
 J.j_throwback     = { on_hand = function(_, j) return { xmult = scaled(j, XMULT, 1) } end }
 J.j_hit_the_road  = { on_hand = function(_, j) return { xmult = scaled(j, XMULT, 1) } end }
-J.j_ramen         = { on_hand = function(_, j) return { xmult = scaled(j, XMULT, 2) } end } -- starts x2, decays
+-- Ramen starts x2 and DECAYS (-0.01 per discarded card). The live card keeps the current value in `ability.x_mult`
+-- next to a fixed copy of the starting `Xmult = 2`; scaled() takes the max, so Ramen always read x2 (live audit
+-- 2026-09-28: 5 of 12 under-scoring boards held Ramen, all at ~0.75x of prediction). It is the only decaying xmult,
+-- so read the live value directly.
+J.j_ramen         = { on_hand = function(_, j)
+  local ab = type(j and j.ability) == "table" and j.ability or nil
+  if ab and type(ab.x_mult) == "number" then return { xmult = ab.x_mult } end
+  return { xmult = scaled(j, XMULT, 2) }
+end }
 J.j_caino         = { on_hand = function(_, j) return { xmult = scaled(j, XMULT, 1) } end }
 J.j_yorick        = { on_hand = function(_, j) return { xmult = scaled(j, XMULT, 1) } end }
 -- K2: Loyalty Card / Card Sharp are CONDITIONAL, not accumulators. The old scaled() matched the
@@ -308,9 +316,21 @@ local function scoring_suits(ctx)
   end
   return s
 end
+-- Flower Pot (game: card.lua Flower Pot): non-Wild cards mark their own suit, then EACH Wild fills ONE still-missing
+-- suit (checked Hearts, Diamonds, Spades, Clubs). The old read let one Wild count as all four suits (live audit: four
+-- Clubs + a Wild predicted x3, the game gave nothing). Seeing Double is left as is: its SMODS check lets a Wild fill
+-- every empty suit, which is what scoring_suits already models.
 J.j_flower_pot = { on_hand = function(ctx)
-  local s = scoring_suits(ctx)
-  if s.Hearts and s.Diamonds and s.Clubs and s.Spades then return { xmult = 3 } end
+  local got, wilds = {}, 0
+  for _, c in ipairs(ctx.scoring) do
+    if not Cards.is_stone(c) then
+      if Cards.is_wild(c) then wilds = wilds + 1 elseif c.suit then got[c.suit] = true end
+    end
+  end
+  for _, s in ipairs({ "Hearts", "Diamonds", "Spades", "Clubs" }) do
+    if not got[s] and wilds > 0 then got[s] = true; wilds = wilds - 1 end
+  end
+  if got.Hearts and got.Diamonds and got.Clubs and got.Spades then return { xmult = 3 } end
 end }
 J.j_seeing_double = { on_hand = function(ctx)
   local s = scoring_suits(ctx)
@@ -379,6 +399,7 @@ function M.get(key) return J[key] end
 function M.registry() return J end
 function M.is_registered(key) return J[key] ~= nil end
 M.VALUE_ONLY = VALUE_ONLY
+M.is_uncommon = is_uncommon   -- used by hand_eval for Baseball Card's per-position x1.5
 function M.is_value_only(key) return VALUE_ONLY[key] == true end
 -- A joker is "covered" if it has a scoring hook OR is explicitly value-only.
 function M.is_covered(key) return J[key] ~= nil or VALUE_ONLY[key] == true end

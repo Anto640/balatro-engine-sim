@@ -283,4 +283,31 @@ return function(t)
     t.eq(ev.hand_type, "Flush", "Smeared: all-red is a flush")
     t.eq(ev.score, 256, "flush: (35 + 2+5+9+10+3) * 4 = 256")
   end
+
+  -- LIVE SCORING BUGS (live-vs-sim audit 2026-09-28)
+  do
+    local pair = play{ { "Ace", "Spades" }, { "Ace", "Hearts" } }
+    -- Ramen: reads its live decaying x_mult, not the fixed starting Xmult = 2
+    local r = HandEval.score(state{ joker{ key = "j_ramen", ability = { x_mult = 1.8, Xmult = 2, extra = 0.01 } } }, pair)
+    local r2 = HandEval.score(state{ joker{ key = "j_ramen", ability = { x_mult = 2, Xmult = 2, extra = 0.01 } } }, pair)
+    t.ok(r.score < r2.score, "Ramen at x1.8 scores less than Ramen at x2 (was always read as x2)")
+    t.eq(r.score, math.floor(r2.score * 0.9 + 1e-9), "Ramen x1.8 = 0.9 of x2")
+
+    -- Flower Pot: one Wild fills ONE missing suit
+    local fp = { joker{ key = "j_flower_pot" } }
+    local clubs_wild = play{ { "2", "Clubs" }, { "5", "Clubs" }, { "7", "Clubs" }, { "9", "Clubs" }, { "King", "Hearts", "m_wild" } }
+    local base = HandEval.score(state{}, clubs_wild).score
+    t.eq(HandEval.score(state(fp), clubs_wild).score, base, "Flower Pot: four Clubs + one Wild gives nothing (was x3)")
+    local three_wild = play{ { "Ace", "Clubs" }, { "Ace", "Hearts" }, { "Ace", "Diamonds" }, { "Ace", "Spades", "m_wild" } }
+    local b3 = HandEval.score(state{}, three_wild).score
+    t.eq(HandEval.score(state(fp), three_wild).score, b3 * 3, "Flower Pot: three suits + a Wild filling the fourth gives x3")
+
+    -- Baseball Card: x1.5 lands at the Uncommon joker's position, so +Mult to its right is not multiplied
+    local bb, steel, jk = joker{ key = "j_baseball" }, joker{ key = "j_steel_joker" }, joker{ key = "j_joker" }
+    local left = HandEval.score(state{ bb, steel, jk }, pair)    -- (m * 1.5) + 4
+    local right = HandEval.score(state{ bb, jk, steel }, pair)   -- (m + 4) * 1.5
+    t.ok(right.score > left.score, "Baseball: an Uncommon right of +Mult multiplies it; on the left it does not")
+    local none = HandEval.score(state{ bb, jk }, pair)
+    t.eq(none.score, HandEval.score(state{ jk }, pair).score, "Baseball with no Uncommon joker does nothing")
+  end
 end
