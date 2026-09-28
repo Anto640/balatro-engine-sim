@@ -378,7 +378,7 @@ end
 --                  (WINRATE_V3_PLAN 5t). Feeding it MORE commitments would amplify a
 --                  refuted path, so it does not get to see this one.
 -- Keeping the blast radius to a single mechanism is also what makes the result readable:
--- a broad re-weight lands inside the noise floor (CLAUDE.md, THE #1 TUNING RULE).
+-- a broad re-weight lands inside the noise floor (CLAUDE.md, "Tuning rule").
 function BP.anchored_commitment(gs)
   local c = BP.commitment(gs)
   if c and c.via == "played" then return nil end

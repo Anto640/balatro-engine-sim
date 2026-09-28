@@ -1,19 +1,19 @@
 # NEXT_SESSION.md — fresh-session handoff
 
-## ⭐⭐⭐⭐ START HERE (2026-09-28)
-**LIVE INSTALL = `42a867f`**: best-trade swap SHIPPED (pooled 320 seeds 86 -> 100 wins, 26.9% -> 31.3%); `main` synced to
-the branch tip; `BES_DIG_HANDS` stays OFF. Tests 1278 unit + 605 sim. Sim baselines: `sim_out/{sw17,sw17_7}.jsonl` (= live).
-The owner is running unattended F11 + F6 runs on this build. **Next session, in order:**
-1. **Review those runs** (the R17 method): outcomes + average length; `bes_autoplay.log` for live-only failures
-   ("pick unusable", "button not found" other than cash_out, FORCED, stalls); live vs sim (win rate, death ante,
-   death BLIND -- is the Big-blind gap still there?); does it now SWAP jokers live (look for "frees a slot for ... a
-   clear upgrade")? Replay any misplay from `bes_fixtures.jsonl` before theorising.
-2. **Big-blind / weaker live boards** (R17b): live Small clears x1.22 vs sim x1.43 -- find where live boards lose
-   strength (purchases, skips, money into each ante), with more runs.
-3. **Ante-1 jokerless deaths** (R17b): price the jokerless board's survival risk in the first shop (not a flat bump).
-4. Dig-aware joker valuation per-joker / MC dig (R17b); the remaining no-flat items; shop speed.
+## START HERE (2026-09-28, evening)
+**Live install = the branch tip**, apart from the default-off `BES_PACE_CAP` pacing code, which isn't deployed.
+Restarting the game is the owner's call: never launch Balatro unasked. **Sim baseline:** `sim_out/fin18.jsonl`
+(real ante-8 bosses, 50/160 wins). `main` last synced at `42a867f`; sync it once the new live runs look healthy.
+**Next, in order:**
+1. Plan step 2 (see PLAN in the R18 block below): fit `Pacing.RISK_Q25` from `sim_out/pacefit_*.jsonl`, A/B
+   `BES_PACE_CAP=q25` against fin18, replicate on fresh seeds if positive.
+2. Review new live runs on the current install (the R17 method: outcomes, `bes_autoplay.log` live-only failures,
+   live vs sim, replay misplays from `bes_fixtures.jsonl`).
+3. Make the sim's Ceremonial Dagger use `engine/dagger.lua`'s feed-or-park rule (it never destroys in the sim).
+Still open from R17b: ante-1 jokerless deaths (price survival risk in the first shop); per-joker dig-aware valuation;
+the remaining no-flat items; shop speed (late-ante shops take >3 s).
 Ops: `%TMP%/bes/arm.sh <name> <worktree> <workers> [n] [seed_off] [ENV=VAL]` (resumable; memory reaps come from
-Chrome/Steam/Discord, not the ~14 MB workers); owner authorises self-restart after reaps.
+Chrome/Steam/Discord, not the ~14 MB workers); relaunching a killed batch needs the owner's go-ahead.
 
 ## ⭐⭐⭐⭐ 2026-09-28 (later) — R18: UNATTENDED RUNS ON 42a867f + TWO LIVE-ONLY DEFECTS FIXED
 Runs (session starting bes_runs line 11138): VKMZCD5H a5 Boss, PY43WSDU a6 Small, G5QGWQKG a4 Big, UTNJ8T4Q a5 Boss,

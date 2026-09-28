@@ -33,7 +33,7 @@ if cap then _G.BES_MC_CAP = cap end
 local probe_name = os.getenv("BES_PROBE")
 local probe_opts = Probe.opts(probe_name)
 
--- HELD-OUT SEEDS (CLAUDE.md "THE #1 TUNING RULE", revised 2026-08-11). Every verdict in this
+-- HELD-OUT SEEDS (CLAUDE.md "Tuning rule"). Every verdict in this
 -- project's history was measured on the SAME seed pool (s*1000+3) that changes were selected on,
 -- so retained gains are partly fit to that sample. `BES_SEED_OFF` shifts the pool to a disjoint
 -- one (e.g. BES_SEED_OFF=7 -> s*1000+7) so a retained change can be CONFIRMED out of sample.
