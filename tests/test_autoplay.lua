@@ -90,6 +90,24 @@ return function(t)
     env.restore()
   end
 
+  -- CERULEAN BELL (live 4125ZXCZ looped for hours): the game keeps card 3 selected through unhighlight_all and caps
+  -- the selection at 5 (adding an already-selected card lists it twice). A 5-card play that includes the forced
+  -- card must still get selected exactly and played.
+  do
+    local env = setup(8)
+    local G = env.G
+    local forced = G.hand.cards[3]
+    G.hand.highlighted = { forced }
+    function G.hand:unhighlight_all() self.highlighted = { forced } end
+    function G.hand:add_to_highlighted(c)
+      if #self.highlighted < 5 then self.highlighted[#self.highlighted + 1] = c end   -- the game's hand-area rule
+    end
+    local best = { type = "PLAY", hand_type = "Flush", cards = { pod(1), pod(2), pod(3), pod(4), pod(5) } }
+    local played = env.run(best)
+    t.ok(played ~= nil and #played == 5, "autoplay: a 5-card play including the Bell's forced card is played")
+    env.restore()
+  end
+
   -- no reorder recommended -> the hand is left exactly as dealt
   do
     local env = setup(6)

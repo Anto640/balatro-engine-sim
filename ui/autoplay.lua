@@ -350,8 +350,15 @@ local function highlight(G, cards_pod)
   pcall(function() if G.hand.unhighlight_all then G.hand:unhighlight_all() end end)
   local want, n = {}, 0
   for _, pod in ipairs(cards_pod or {}) do if pod.id ~= nil then want[pod.id] = true end end
+  -- a card the game keeps selected (Cerulean Bell's forced card) survives unhighlight_all; adding it AGAIN puts it
+  -- in `highlighted` twice, so the 5-card limit rejects a real pick and the selection never matches (live 4125ZXCZ)
+  local already = {}
+  for _, c in ipairs(G.hand.highlighted or {}) do already[c] = true end
   for _, card in ipairs(G.hand.cards or {}) do
-    if want[cid(card)] then pcall(function() G.hand:add_to_highlighted(card) end); n = n + 1 end
+    if want[cid(card)] then
+      if not already[card] then pcall(function() G.hand:add_to_highlighted(card) end) end
+      n = n + 1
+    end
   end
   return n
 end
