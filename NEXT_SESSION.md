@@ -15,8 +15,21 @@ Runs: KGJ9UMQH a5 Boss, 7Y3LRJJG **a1 Small (297/300)**, HMNFE4W2 a5 Boss, 2YD6L
      replace its target. Replay: "Sell Swashbuckler (+$2) -- frees a slot for The Trio".
   Also: Sock and Buskin measured LOWEST raw (2208 pts vs flats 2648-5512) -- mult is additive and Duo doubles it, while
   S&B only helps scored faces; on DUG hands S&B/Trio gain (Pair builds dig for face pairs).
-- Arms running (8 workers): `base17` 2aa00f9, `sw17` c8503f4 (swap), `dig17` c8503f4 + BES_DIG_HANDS=1. Ship on
-  wins/reach-8 + OOS replication; if dig17 wins, make it default and optimise its cost.
+- **RESULTS (n=160 paired, 2026-09-28):**
+  | arm | vs | progress | sign | wins | reach-8 | verdict |
+  |---|---|---|---|---|---|---|
+  | `sw17` c8503f4 (best-trade swap) | base17 | **+0.140 (p 0.076)** | 31/20, **109 tied** | 44 -> **54** | 54 -> 58 | promising -> OOS (`base17_7`/`sw17_7`) |
+  | `dig17` (+ BES_DIG_HANDS=1) | sw17 | -0.310 (p 0.18) | 66/73 | 54 -> 48 | 58 -> 58 | NOT shipped (flag stays OFF). The single-deal measure is still wrong in principle (Trio -25% vs +40% dug), but pricing every joker on heuristic-dug hands did not convert -- likely over-credits conditional jokers the play engine then fails to dig for; revisit with the MC dig or per-joker, not wholesale |
+- Pack picks already use the best-trade bar (`weakest_owned_joker` = min over owned of c*(1+slope*c)+max(margin,kb)),
+  so the shop was the only path with the fixed-weakest flaw.
+- **Big-blind deaths (live vs sim, antes 4+):** live plays MORE blinds (Small 91% vs 79%, Big 82% vs 76%) and its
+  boards clear the Small by LESS (median x1.22 vs x1.43; 58% vs 39% of Small clears under x1.3) -- live boards run
+  ~15% weaker entering an ante, and the 1.5x Big is where that shows. Per-hand scoring is faithful (1.05), so the
+  gap is upstream (purchases/skips). Sample: 34 live ante-states / 12 runs -- collect more before acting.
+- **Ante-1 deaths (sim ~3%):** the engine enters the ante-1 Big with NO jokers in 58% of runs (90/155); 3% of those
+  die (0/65 with a joker). Cause: the first shop at ~$10 opens a Celestial/Spectral pack (valued 7-11) over an
+  affordable joker (e.g. Crafty 3.05). Worth ~0.5 wins/160; the right fix prices the jokerless board's survival
+  risk (pace risk read ~1% where the real death rate is 3%) -- not a flat first-scorer bump.
 - 7Y3LRJJG ante-1 death: each step defensible (dug 4 discards for a one-hand clear, then 297/300); but the sim dies at
   ante 1 in ~4% of runs -- investigate (competent play never loses ante 1).
 
