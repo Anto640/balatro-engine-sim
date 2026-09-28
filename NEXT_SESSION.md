@@ -20,7 +20,7 @@ lever is the spending policy under "comfortable", not the precision of the read.
 calibration only) is running to confirm.
 Still open from R17b: ante-1 jokerless deaths (price survival risk in the first shop); per-joker dig-aware valuation;
 the remaining no-flat items; shop speed (late-ante shops take >3 s).
-Ops: `%TMP%/bes/arm.sh <name> <worktree> <workers> [n] [seed_off] [ENV=VAL]` (resumable; memory reaps come from
+Ops: `bash tools/arm.sh <name> <worktree> <workers> [n] [seed_off] [ENV=VAL]` (resumable; memory reaps come from
 Chrome/Steam/Discord, not the ~14 MB workers); rerun a killed batch without asking. When starting any batch, tell the
 owner its estimated duration and finish time (~1 h per 160-seed arm at 9 workers).
 

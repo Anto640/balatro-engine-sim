@@ -22,6 +22,9 @@ plus a large correctness/coverage/strategy pass.
 >    watch it reproduce the misplay on the real state;
 > 4. fix, and re-replay the same fixture to prove the advice changed.
 >
+> Minimal replay: `local gs = require("core.replay_fixture").rehydrate(Json.decode(line))` for the fixture line, then
+> `require("engine.shop_advisor").recommend(gs, {})` (shop) or `require("engine.pack_open_advisor").recommend(gs, {})` (pack).
+>
 > R8 used exactly this to convert *"it sold Greedy for a To Do List"* into two located defects and a verified
 > fix in one session. **It beats reasoning from a synthetic board, which is how the same session's first
 > attempt at that diagnosis went wrong** — a hand-built reconstruction picked a different funder and its
@@ -64,6 +67,8 @@ thing **headless-testable**. See the Layout section in `README.md` for the per-f
   the install LF, so a byte compare reports false differences). Keep backups outside `Mods/`: Steamodded loads any
   copy inside it as a second, conflicting instance of the mod. The game loads code only at startup, and only the
   owner starts or restarts Balatro.
+- **Live logs** (save folder `%APPDATA%/Balatro/`): `bes_runs.jsonl` (run telemetry), `bes_fixtures.jsonl` (full `gs` per
+  decision), `bes_autoplay.log` (self-player actions and failures). Crashes: the Lovely log in `Mods/lovely/log/`.
 - **In-game debug keys:** `F7` dump owned jokers' live `ability` tables (to the console
   and to `bes_joker_dump.txt` in the LÖVE save folder, each tagged
   `scored`/`value-only`/`UNCOVERED`); `F8` force a re-evaluation; `F9` toggle the overlay;
@@ -98,15 +103,17 @@ luajit tools/sim_batch.lua <n_seeds> <name>        # single-core -> sim_out/<nam
 lua  tools/analyze_runs.lua sim_out/<name>.jsonl   # death-ante histogram, per-ante trajectory,
                                                    #   ENGINE ACTION SUMMARY + COUNTERFACTUAL
 lua  tools/analyze_runs.lua sim_out/<name>.jsonl trace [seed]   # one run's blow-by-blow timeline
+
+# A/B arm (how verdicts are run): a worktree of the commit under test, then the resumable runner from the main checkout
+git worktree add "$TMP/bes_wt_<name>" HEAD
+bash tools/arm.sh <name> "$TMP/bes_wt_<name>" <workers> [n=160] [seed_off=3] [ENV=VAL ...]   # merges to sim_out/<name>.jsonl
+lua  tools/analyze_runs.lua sim_out/<baseline>.jsonl compare sim_out/<name>.jsonl         # paired verdict
 ```
 - **Run FULL FIDELITY** (no `mc_cap` arg). The `_G.BES_MC_CAP` cheap-path **distorts** decisions
   (cap=3 degrades in-blind play → too harsh); only for rough scans.
-- **SPEED — SOLVED by PARALLELISM (2026-07-01).** ~95s/run single-core → ~60 min for n=40. `tools/sim_par.sh`
-  shards the seeds across all cores (one LuaJIT process each, interleaved) and merges the JSONL, so n=40
-  drops to **~6–8 min on 12 cores** (~10×). This is EXACT (no distortion) and only became safe once the
-  sim was made cross-process deterministic (sorted-key sampling + stable tie-breaks — see the determinism
-  fix); merged parallel output is byte-identical to sequential. `sim_batch.lua` gained `[shard nshards]`
-  args for it. (The old idea of a per-call deck-signature MC cache is now moot — parallelism is the win.)
+- **Speed:** ~95 s/run single-core; batches run in parallel (one LuaJIT process per worker, interleaved seeds).
+  Merged parallel output is byte-identical to sequential because the sim is cross-process deterministic
+  (sorted-key sampling + stable tie-breaks).
 - **Worker count (owner rule):** 11 when the owner is away, 4–6 while they use the PC. When memory runs low the
   shell gets killed but the workers usually survive: merge or resume their output with the resumable runner. If a
   batch was actually killed, rerun it (resuming from the finished seeds) without asking the owner first.
@@ -258,6 +265,11 @@ NOTE: `xmult_scaling` jokers ARE xmult — use `JokerData.is_xmult()`.
 - **In-game loader gotcha:** Steamodded does NOT add the mod folder to `package.path`;
   `main.lua` registers a custom `package.searcher` for our namespaces. Headless tests set
   `package.path` instead, so they bypass it.
+- **Toolchain on this machine:** `lua`/`luajit` need
+  `export PATH="$PATH:/c/Users/Anto/AppData/Local/Programs/LuaJIT/bin:/c/Users/Anto/AppData/Local/Programs/Lua/bin"` in
+  every Bash call. From PowerShell, `bash` resolves to WSL; launch a detached batch with
+  `Start-Process "C:\Program Files\Git\bin\bash.exe" -ArgumentList "-l","<script>" -WindowStyle Hidden` so a memory reap of
+  the session shell can't stop it.
 
 ## Git
 
