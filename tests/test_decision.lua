@@ -28,6 +28,34 @@ return function(t)
     t.eq(#decide("bl_psychic").cards, 5, "Psychic (min 5) -> engine recommends a legal 5-card play")
   end
 
+  -- CEREMONIAL DAGGER placement (live VZ3YKT5F: it ate ~7 purchases). Feed it only a joker worth less than the Mult
+  -- it would gain (+2x sell); otherwise park it rightmost. (Owner: an un-fed Dagger keeps its Mult but stops growing.)
+  do
+    local Dagger = require("engine.dagger")
+    local deck, id = {}, 0
+    for _, s in ipairs({ "Spades", "Hearts", "Clubs", "Diamonds" }) do
+      for _, r in ipairs({ "2", "3", "4", "5", "6", "7", "8", "9", "10", "Jack", "Queen", "King", "Ace" }) do
+        id = id + 1; deck[#deck + 1] = card{ id = id, rank = r, suit = s }
+      end
+    end
+    local function gs_with(jks)
+      return GS.new{ deck = deck, jokers = jks, meta = { ante = 3 }, run = { hand_levels = {}, hand_size = 8, joker_slots = 5 } }
+    end
+    local dag = joker{ id = 1, key = "j_ceremonial", name = "Ceremonial Dagger", ability = { mult = 0, extra = {} }, sell_value = 3 }
+    -- a Gift Card selling for $12 scores nothing: eating it (+24 Mult) is worth far more than keeping it
+    local gift = joker{ id = 2, key = "j_gift", name = "Gift Card", sell_value = 12 }
+    local p = Dagger.plan(gs_with({ dag, gift }))
+    t.ok(p and p.feed and p.feed.key == "j_gift", "Dagger: feeds a high-sell non-scorer (+24 Mult)")
+    t.eq(p and p.order[#p.order].key, "j_gift", "Dagger: the food is placed right of the Dagger")
+    -- a real scorer worth more than +2x its sell value must NOT be eaten: park the Dagger rightmost
+    local dag2 = joker{ id = 1, key = "j_ceremonial", name = "Ceremonial Dagger", ability = { mult = 0, extra = {} }, sell_value = 3 }
+    local duo = joker{ id = 3, key = "j_duo", name = "The Duo", sell_value = 4 }
+    local p2 = Dagger.plan(gs_with({ dag2, duo }))
+    t.ok(p2 and not p2.feed, "Dagger: a strong xmult joker is protected, not eaten")
+    t.eq(p2 and p2.order[#p2.order].key, "j_ceremonial", "Dagger: parked on the far right")
+    t.eq(Dagger.plan(gs_with({ duo, dag2 })), nil, "Dagger: already rightmost with nothing worth feeding -> no change")
+  end
+
   -- ANTE-8 FINISHERS (live 4125ZXCZ 2026-09-28 stalled ~4 h at Cerulean Bell).
   do
     local function has_id(cards, id) for _, c in ipairs(cards or {}) do if c.id == id then return true end end return false end

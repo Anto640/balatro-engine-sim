@@ -108,6 +108,18 @@ return function(t)
     env.restore()
   end
 
+  -- CEREMONIAL DAGGER GUARD (live VZ3YKT5F lost ~7 bought jokers to it): moved to the far right before blind select
+  do
+    local function jk(key) return { config = { center = { key = key } } } end
+    local saved_G = _G.G
+    local G = { jokers = { cards = { jk("j_joker"), jk("j_ceremonial"), jk("j_photograph") } } }
+    t.ok(Autoplay._protect_from_dagger(G, nil), "Dagger guard: moves a Dagger that has a joker to its right")
+    t.eq(G.jokers.cards[3].config.center.key, "j_ceremonial", "Dagger guard: the Dagger ends up rightmost")
+    t.eq(#G.jokers.cards, 3, "Dagger guard: no joker lost")
+    t.ok(not Autoplay._protect_from_dagger(G, nil), "Dagger guard: already rightmost -> no change")
+    _G.G = saved_G
+  end
+
   -- no reorder recommended -> the hand is left exactly as dealt
   do
     local env = setup(6)

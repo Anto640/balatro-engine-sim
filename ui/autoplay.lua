@@ -614,8 +614,36 @@ local function do_pack(G, best, logger)
   if not card then log(logger, "pack pick not found (" .. tostring(target.key or target.name) .. ")"); return false end
   log(logger, "pack pick " .. tostring(ckey(card) or target.key)); return click(G, "use_card", logger, target)
 end
+-- CEREMONIAL DAGGER GUARD: at blind start the Dagger DESTROYS the joker to its right. New jokers land on the right,
+-- so an unmoved Dagger ate every later purchase (live VZ3YKT5F: Credit Card, Arrowhead, Photograph, Scholar,
+-- Superposition, DNA, Even Steven -- ~$40 -- and died at ante 6 on 3 jokers). Move it to the far right before the
+-- blind is selected (nothing to eat); the per-play scoring reorder may bring it back in, which is harmless since it
+-- only fires at blind start. Same as the sim, whose Dagger never destroys (sim/joker_tick.lua).
+local function protect_from_dagger(G, logger)
+  local live = G.jokers and G.jokers.cards
+  if not live or #live < 2 then return false end
+  local di
+  for i, c in ipairs(live) do if ckey(c) == "j_ceremonial" then di = i end end
+  if not di or di == #live then return false end
+  local d = table.remove(live, di)
+  live[#live + 1] = d
+  pcall(function() if G.jokers.set_ranks then G.jokers:set_ranks() end end)
+  pcall(function() if G.jokers.align_cards then G.jokers:align_cards() end end)
+  log(logger, "moved Ceremonial Dagger to the far right (it destroys the joker to its right at blind start)")
+  return true
+end
+Autoplay._protect_from_dagger = protect_from_dagger   -- exposed for tests
+
 local function do_blind_select(G, best, logger)
   if best and best.type == "SKIP" then log(logger, "skip blind"); return click(G, "skip_blind", logger) end
+  -- Ceremonial Dagger: apply the engine's arrangement (feed a joker it judged worth eating, or park the Dagger
+  -- rightmost); if the engine couldn't decide, park it (never let it eat a purchase by accident). The array move is
+  -- immediate and the Dagger fires only once the blind is set.
+  if best and best.arrange then
+    if reorder_jokers(G, best.arrange) then log(logger, "arranged jokers for Ceremonial Dagger") end
+  elseif not (best and best.dagger_checked) then
+    protect_from_dagger(G, logger)
+  end
   log(logger, "select/play blind"); return click(G, "select_blind", logger)
 end
 

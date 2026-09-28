@@ -56,6 +56,7 @@ local PackOpenAdvisor = try_require("engine.pack_open_advisor")
 local BuildPlan = try_require("engine.build_plan")  -- live persistence of the archetype commitment
 local Overlay  = try_require("ui.overlay")
 local HUDInject = try_require("ui.hud_inject")
+local Dagger   = try_require("engine.dagger")    -- Ceremonial Dagger placement before blind select
 local Autoplay = try_require("ui.autoplay")   -- F11: translate the engine's decision into real inputs
 -- Phase 0 self-play instrumentation (SELFPLAY_PLAN.md): record real runs to JSONL
 -- so we can confirm the "behind on pace by ante 2-3" hypothesis with numbers.
@@ -208,6 +209,17 @@ function BES.evaluate(with_sim, gs)
             and "Play the blind — the boss can't be skipped."
             or "Play the blind — no skip tag worth taking here.",
         }
+      end
+      -- Ceremonial Dagger: decide what (if anything) sits to its right before the blind starts (engine/dagger.lua)
+      if Dagger and action.type ~= "SKIP" then
+        local okd, dp = pcall(Dagger.plan, gs)
+        if okd then
+          action.dagger_checked = true
+          if dp then
+            action.arrange = dp.order
+            action.reason = (action.reason or "") .. "  [" .. dp.reason .. "]"
+          end
+        end
       end
       BES.last = { gs = gs, ranked = { best = action }, skip = true }
       if Overlay then Overlay.set({ best = action }) end
