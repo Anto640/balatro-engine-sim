@@ -10,7 +10,7 @@ every A/B after that should be judged in a world that behaves like the real game
 
 ## Status (overnight 2026-09-29)
 - Phase 1 DONE (`f86c375`): Baseball, Flower Pot, Ramen. Live replay: predictable plays <0.8x 5.1% -> 1.7%,
-  guaranteed-clear failures 12 -> 5. Regression arm `sc19` vs fin18.
+  guaranteed-clear failures 12 -> 5. Regression arm `sc19` vs fin18: neutral (155/160 tied, wins 50 -> 51) -- kept.
 - Phase 2 DONE (`f80b871`): telemetry capacity on the whole deck, discards logged as discards, tools merged.
 - Phase 3A DONE (`8d2739f`): 3.1-3.8 all implemented.
 - Phase 3B DONE for the frequent items: 3.9 Arm (engine scores it too), 3.10 Hook, 3.11 first-shop Buffoon, 3.12
