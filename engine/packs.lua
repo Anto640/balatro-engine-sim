@@ -196,10 +196,14 @@ end
 P.POOL_DRAWS = tonumber(os.getenv and os.getenv("BES_POOL_DRAWS") or "") or 8
 -- BES_POOL_DRAWS=all: measure EVERY joker once, weighted by its rarity, instead of sampling -- no draw noise at all
 -- (owner 2026-09-29, after pool32 was neutral out-of-sample). Costs ~150 measurements per pool.
-P.POOL_ALL = (os.getenv and os.getenv("BES_POOL_DRAWS")) == "all"
+-- SHIPPED 2026-09-29 (all jokers, 2 deals each): wins up on all four pools (fin20 21->29, fin20_7 31->33; on the current
+-- engine stone 24->28, xpick_7 33->41; pooled current 57->69, reach-8 86->88), progress n.s. both ways -- an accuracy
+-- change (same pack value, less draw noise), shipped as not significantly negative. BES_POOL_DRAWS=<n> restores sampling.
+local _pd = os.getenv and os.getenv("BES_POOL_DRAWS")
+P.POOL_ALL = (_pd == nil or _pd == "" or _pd == "all")
 -- Deals per joker in ALL mode (BES_POOL_SAMPLES; unset = the caller's samples, as the sampled pool). 1 makes the full
 -- pool ~150 single-deal measurements, about a third of its shop overhead, for the live overlay.
-P.POOL_ALL_SAMPLES = tonumber(os.getenv and os.getenv("BES_POOL_SAMPLES") or "")
+P.POOL_ALL_SAMPLES = tonumber(os.getenv and os.getenv("BES_POOL_SAMPLES") or "") or 2
 
 -- MEASURED pool: sample M jokers (rarity-weighted) and measure each against YOUR
 -- deck via JokerValue. This makes "what a Buffoon pack might give" a calculation

@@ -1095,9 +1095,11 @@ return function(t)
     local rr = SA.recommend(shop_with{ dollars = 8,
       consumables = { { set = "Planet", key = "c_jupiter", name = "Jupiter", sell_cost = 1 } },
       boosters = { { key = "p_buffoon_normal", name = "Buffoon Pack", cost = 4 } } })
-    t.eq(rr.best.type, "USE_CONSUMABLE", "affordable -> the held planet is used, never sold to fund the pack")
+    -- (either order is right: the full measured joker pool can price the pack above the planet's use)
+    t.ok(rr.best.type == "USE_CONSUMABLE" or rr.best.type == "BUY_PACK",
+      "affordable -> the held planet is used or the pack bought, never sold to fund the pack")
     local sells, buys = false, false
-    for _, a in ipairs(rr.alternatives) do
+    for _, a in ipairs({ rr.best, table.unpack and table.unpack(rr.alternatives) or unpack(rr.alternatives) }) do
       if a.type == "SELL_TO_BUY" and (a.value or 0) > 0 then sells = true end
       if a.type == "BUY_PACK" and (a.value or 0) > 0 then buys = true end
     end
