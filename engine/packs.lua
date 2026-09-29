@@ -197,6 +197,9 @@ P.POOL_DRAWS = tonumber(os.getenv and os.getenv("BES_POOL_DRAWS") or "") or 8
 -- BES_POOL_DRAWS=all: measure EVERY joker once, weighted by its rarity, instead of sampling -- no draw noise at all
 -- (owner 2026-09-29, after pool32 was neutral out-of-sample). Costs ~150 measurements per pool.
 P.POOL_ALL = (os.getenv and os.getenv("BES_POOL_DRAWS")) == "all"
+-- Deals per joker in ALL mode (BES_POOL_SAMPLES; unset = the caller's samples, as the sampled pool). 1 makes the full
+-- pool ~150 single-deal measurements, about a third of its shop overhead, for the live overlay.
+P.POOL_ALL_SAMPLES = tonumber(os.getenv and os.getenv("BES_POOL_SAMPLES") or "")
 
 -- MEASURED pool: sample M jokers (rarity-weighted) and measure each against YOUR
 -- deck via JokerValue. This makes "what a Buffoon pack might give" a calculation
@@ -229,7 +232,7 @@ local function joker_pool(gs, opts)
   for i = 1, M do
     local it = all and keys[i] or draw()
     local m = JokerValue.score_delta(gs, { key = it.k, ability = { extra = {} } },
-                                     { samples = opts.samples or 3, rng = rng })
+                                     { samples = (all and P.POOL_ALL_SAMPLES) or opts.samples or 3, rng = rng })
     local v = m and (m / need) or ((it.e.tier or 3) * 0.3)
     -- B5: these M items are ALREADY a rarity-weighted SAMPLE (draw() above), so expected_pick
     -- must draw among them with EQUAL weight. Storing the rarity weight here re-applied it,
