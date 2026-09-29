@@ -23,6 +23,8 @@ every A/B after that should be judged in a world that behaves like the real game
   ante 6. `fin20_7` (fresh seeds): 31/160, reach-8 46. Phase 4 arms compare against fin20.
 - 4.1 `pool32` (BES_POOL_DRAWS=32) vs fin20: **wins 21 -> 28, reach-8 27 -> 38, sign 78/52 (p 0.028), progress +0.276
   (p 0.059)** -- promising; `pool32_7` vs fin20_7 queued for out-of-sample replication before shipping.
+- 4.2 `xpick` (BES_EXACT_PICK=1) vs fin20: **wins 21 -> 32, reach-8 27 -> 43 (McNemar p 0.021)**, progress +0.096 (n.s.),
+  sign 75/60 (n.s.) -- tail-carried; `xpick_7` + `combo`/`combo_7` (both switches) queued.
 
 ## Phase 0 — finish what is running (tonight)
 | # | Item | Action | Batch |
