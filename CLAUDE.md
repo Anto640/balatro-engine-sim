@@ -191,7 +191,9 @@ empirically; the table above is why.
 - Judge changes at baseline income: the engine must generate its own money. `BES_PROBE=rich10` is a diagnostic
   for a mechanism that needs spare money to show up, never the verdict on its own.
 - The 7-win human corpus is the owner's playstyle, not ground truth. Sim outcomes (wins, reach-8) decide, and a gain
-  carried by the mean is replicated on fresh seeds (`BES_SEED_OFF`) before shipping.
+  carried by the mean is replicated on fresh seeds (`BES_SEED_OFF`) before shipping. Run that fresh-seed arm ONLY when
+  the first arm is promising (paired progress up, wins not down) -- a neutral or negative first arm needs no
+  confirmation, and correctness fixes need just one regression arm (owner 2026-09-29: don't double-run by default).
 - Run each A/B arm from a git worktree. Modules load when a worker starts, so editing the tree mid-arm contaminates it.
 - Compare against the current baseline arm named in `NEXT_SESSION.md` START HERE, paired on the same seeds.
 
