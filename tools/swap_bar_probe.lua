@@ -14,6 +14,8 @@ for line in io.lines(os.getenv("APPDATA") .. "/Balatro/bes_fixtures.jsonl") do
     local slots = gs and ((gs.run and gs.run.joker_slots) or 5)
     if gs and gs.shop and #(gs.shop.jokers or {}) > 0 and #(gs.jokers or {}) >= slots then
       shops = shops + 1
+      if shops % 100 == 0 then io.stderr:write(string.format("[probe] %d shops replayed (fixture line %d)
+", shops, n)) end
       _G.BES_SWAP_TRACE = {}
       local rok, rec = pcall(SA.recommend, gs, {})
       local best = rok and rec and rec.best
