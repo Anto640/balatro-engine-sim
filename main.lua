@@ -504,7 +504,14 @@ function BES.telemetry_instance()
     enrich = function(gs)
       local m = {}
       if Pacing then
-        local ok, p = pcall(Pacing.pace, gs, { samples = 6 })
+        -- measure on the WHOLE deck, as the sim does: gs.deck is only the undrawn pile at a boundary (audit 2026-09-28)
+        local pg = gs
+        local okf, full = pcall(Extract.full_deck)
+        if okf and full and #full > 0 then
+          pg = {}; for k, v in pairs(gs) do pg[k] = v end
+          pg.deck = full
+        end
+        local ok, p = pcall(Pacing.pace, pg, { samples = 6 })
         if ok and p then
           m.pace_margin = p.margin; m.on_pace = p.on_pace
           m.capacity = p.capacity; m.growth = p.growth; m.fail_ante = p.fail_ante
@@ -624,7 +631,11 @@ function BES.track_play(gs)
     local action
     if hl ~= nil and prev.hl ~= nil and hl < prev.hl then action = "PLAY"
     elseif dl ~= nil and prev.dl ~= nil and dl < prev.dl then action = "DISCARD"
-    elseif prev.selecting and m.state ~= "SELECTING_HAND" then action = "PLAY" end  -- last play ended the blind
+    elseif prev.selecting and m.state ~= "SELECTING_HAND" then
+      -- the state moves before the counter animates down: a discard goes straight to DRAW_TO_HAND, a play to
+      -- HAND_PLAYED. Reading every state change as a PLAY logged each discard as a play (audit 2026-09-28).
+      action = (m.state == "DRAW_TO_HAND") and "DISCARD" or "PLAY"
+    end
     if action then
       pcall(love.filesystem.append, BES_FIXLOG, Json.encode({
         kind = "play", seed = tonumber(seed) or seed, ante = m.ante, action = action,

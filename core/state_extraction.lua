@@ -285,6 +285,15 @@ function Extract.snapshot()
   }
 end
 
+-- The WHOLE deck (G.playing_cards), wherever each card currently is. gs.deck is G.deck, the undrawn pile, which at
+-- a blind or ante boundary is missing the cards in hand / played / discarded -- telemetry measured capacity on that
+-- partial pile and read live boards as weaker than they are (live-vs-sim audit 2026-09-28). nil when unavailable.
+function Extract.full_deck()
+  local G = _G.G
+  if not (G and G.playing_cards) then return nil end
+  return read_area({ cards = G.playing_cards })
+end
+
 -- Map G.STATE numeric ids to readable names where possible.
 function Extract.state_name(state_id)
   local G = _G.G

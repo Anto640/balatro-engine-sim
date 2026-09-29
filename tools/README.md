@@ -61,6 +61,10 @@ Almost everything here reads **existing** telemetry and costs nothing to run. On
 | **`replay_fixtures.lua`** | replay the CURRENT engine over the human's captured decision states (`bes_fixtures.jsonl` from the live mod's capture-only mode) -> `picks.jsonl`. The "run the eval while you sleep" half of the agreement objective |
 | **`agreement.py`** | join those engine picks to what the human ACTUALLY did (blind plays, pack picks, shop buys/rerolls/vouchers) and report per-decision agreement per channel. Auto-discovers the winning-run pool. Found: engine plays DIFFERENT cards 83% of shared plays, over-buys 26% + over-rerolls 15% vs winners |
 | **`blind_outcome.lua`** | for each blind decision where engine & human played DIFFERENT cards, forward-simulate BOTH with `Sim.survive_after` (CRN) + take each play's immediate score. Answers "who is right." Found: 88% BOTH clear (survival-neutral); the engine clears in ONE big hand (88%) & banks unused hands while the winner plays WEAKER hands (0.32x vs 1.70x target) to MILK the blind for value/scaling -- in-blind economy generation the engine misses |
+| **`seed_flip_probe.lua`** / **`seed_flip_report.lua`** | which recorded shop / pack decisions change their TOP PICK when only the Monte-Carlo seed changes, which estimator causes it (pace / pack EV / reroll-pool EV / joker value / consumable value), and what sample count stops it. Replays `bes_fixtures.jsonl` as the live mod calls the advisors (no engine change). **Found (2026-09-28): 35% of live decisions flip; reroll-pool EV is the top source** |
+| **`live_gap.lua`** | live vs sim death RATE per blind played (Small/Big/Boss, by ante band), with skips inferred. `lua tools/live_gap.lua <bes_runs.jsonl> <from_line> <sim.jsonl>` |
+| **`live_audit/play_realisation.lua`** | every live Small/Big play re-scored by the current engine vs the game's actual score: share under 0.8x, deterministic vs chance plays, guaranteed-clear failures. `luajit tools/live_audit/play_realisation.lua tools/live_audit/seeds_2026-09-28.txt` |
+| **`arm.sh`** | the resumable A/B arm runner (see CLAUDE.md "Running batches") |
 
 ## Search / ceiling
 
