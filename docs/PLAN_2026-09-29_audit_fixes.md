@@ -45,6 +45,13 @@ every A/B after that should be judged in a world that behaves like the real game
   projected decks; e.g. Shoot the Moon 15.98 -> 15.81 in an ante-1 shop) and the cascade reshuffles 86 seeds. Not
   significant -> KEPT (correctness, and it is the live-scoring fix); `stone` is the new baseline. Watch wins on the
   next arms; if they stay low, recheck the Tower/Marble valuations.
+- **SWAP BAR (owner 2026-09-29: "it rarely takes a comparable or clearly better joker").** `tools/swap_bar_probe.lua`
+  over 1610 live full-board shops (fixtures from line 9035): 974 offers weighed, **409 beat the joker they'd replace,
+  284 of those (69%) refused by the bar, 177 even at >= 1.5x** (WJ9XMWUQ: Blue Joker 2.11 vs Seeing Double 5.51, bar
+  5.53). Causes: the flat UPGRADE_MARGIN 1.2 exceeds most offers' whole gain (0.4-3), and scaler keep_bias (~2.5)
+  shields weak scalers (Green Joker 0.01 at a7, Runner 0.27). Arm `sb1` (BES_UPGRADE_MARGIN=0.6, BES_SWAP_SLOPE=0.25)
+  vs `stone` runs after pa2_7 (`%TMP%/bes/chain_next.sh`, worktree `%TMP%/bes_wt_sb` at 978ce1b), then rr32. July's
+  lesson: margin cuts alone churned -- watch SOLD counts. Next if needed: keep_bias for low-C scalers.
 - **4.1 was never tested:** the reroll path passes `measure_count = 6`, so pool32/poolall only changed Buffoon-pack and
   created-joker values. `BES_REROLL_DRAWS` (`492dff7`, default 6) -> arm `rr32` vs `stone` queued after pa2_7
   (`%TMP%/bes/chain_rr.sh`, worktree `%TMP%/bes_wt_rr`), `rr32_7` vs `xpick_7` only if promising. ETA ~21:45 / ~22:40.
