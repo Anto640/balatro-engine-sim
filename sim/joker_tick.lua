@@ -265,7 +265,10 @@ function JokerTick.on_round_end(run, rng)
       if j.key == "j_cavendish" then return rng() < (1 / 1000) end      -- 1-in-1000 extinction / round -- VERIFY
       return false
     end)
-    for _, j in ipairs(extra) do destroyed[#destroyed + 1] = j end
+    for _, j in ipairs(extra) do
+      destroyed[#destroyed + 1] = j
+      if j.key == "j_gros_michel" then run.gros_michel_extinct = true end   -- opens the pool to Cavendish
+    end
   end
   return destroyed
 end

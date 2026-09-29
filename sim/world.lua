@@ -650,6 +650,28 @@ local function play_effects(run, sel, is_first)
 end
 World._play_effects = play_effects   -- exposed for the fidelity tests
 
+-- GLASS CARDS SHATTER (sim-rules audit #5: they never did, a permanent x2 card): each scoring Glass card has a
+-- 1-in-4 chance (Oops! All 6s doubles it) to be destroyed after the hand; Glass Joker gains x0.75 per Glass card
+-- destroyed. Consumes rng only when a Glass card scores, so runs without Glass stay byte-identical.
+local function glass_shatter(run, ev, rng)
+  local broken = 0
+  for _, c in ipairs((ev and ev.scoring_cards) or {}) do
+    if c.enhancement == "m_glass" and not c.debuffed and rng() < oops_p(run, 0.25) then
+      if remove_obj(run.deck, c) then broken = broken + 1 end
+    end
+  end
+  if broken > 0 then
+    for _, j in ipairs(run.jokers or {}) do
+      if j.key == "j_glass" and not j.debuffed then
+        j.ability = j.ability or {}
+        j.ability.x_mult = (j.ability.x_mult or 1) + 0.75 * broken
+      end
+    end
+  end
+  return broken
+end
+World._glass_shatter = glass_shatter
+
 -- Space Joker (JOKER_FIDELITY P0, leveling): a 1/4 chance to level up the PLAYED hand, on every play.
 -- The world used to ignore it entirely, so a run leaning on Space accrued none of the levels it earns.
 -- Only consumes RNG when Space is actually owned, so non-Space runs stay byte-identical. -- VERIFY 1/4.
@@ -800,6 +822,17 @@ local function play_generators(run, ev)
 end
 World._play_generators = play_generators   -- exposed for the generator regression tests
 
+-- The REFEREE score of the play actually made: chance effects (Lucky, Misprint, Bloodstone, Lucky/Business $) are
+-- ROLLED, as the game rolls them. The engine's own decisions keep scoring them at their average (audit plan 3.8).
+local function referee_score(gs, sel, rng)
+  HandEval.roll_rng = rng
+  local ok, ev = pcall(HandEval.score, gs, sel)
+  HandEval.roll_rng = nil
+  if not ok then error(ev) end
+  return ev
+end
+World._referee_score = referee_score
+
 -- ---- play one blind ---------------------------------------------------------
 -- Plays `blind` to completion with the REAL decision engine and faithful mechanics.
 -- blind = { type = "Small"|"Big"|"Boss", target = chips, boss_key = key|nil, name? }
@@ -847,6 +880,17 @@ function World.play_blind(run, blind)
   local heart_prev, heart_prepped = nil, true
   local function set_leaf(on) for _, c in ipairs(run.deck) do c.debuffed = on or nil end end
   if leaf then set_leaf(true) end
+
+  -- THE PILLAR (sim-rules audit 2026-09-28: it did nothing; 43 boss fights in 160 runs): cards already played this
+  -- ante are debuffed in the boss blind. The world remembers which card objects were played this ante.
+  if not run._ante_played or run._ante_played.ante ~= run.ante then run._ante_played = { ante = run.ante, set = {} } end
+  local pillar_marked = {}
+  if eff and blind.boss_key == "bl_pillar" then
+    for _, c in ipairs(run.deck) do
+      if run._ante_played.set[c] and not c.debuffed then c.debuffed = true; pillar_marked[#pillar_marked + 1] = c end
+    end
+  end
+  local function mark_played(sel) for _, c in ipairs(sel or {}) do run._ante_played.set[c] = true end end
   local function after_draw()
     if heart and heart_prepped and #run.jokers > 0 then
       local pool, fallback = {}, {}
@@ -956,13 +1000,14 @@ function World.play_blind(run, blind)
         end
         sel = with_forced(sel)
         if sel then
-          clear_forced(sel); heart_prepped = true
-          local ev = HandEval.score(build_gs(run, b, hand, draw_pile, eff), sel)
+          clear_forced(sel); heart_prepped = true; mark_played(sel)
+          local ev = referee_score(build_gs(run, b, hand, draw_pile, eff), sel, rng)
           b.scored = b.scored + (ev.score or 0); plays = plays + 1
           JokerTick.on_play(run, ev, sel)   -- A1: accumulate scalers on the played hand
           local is_first_play = not b._first_play_done; b._first_play_done = true
           space_joker_level(run, ev)        -- Space Joker: 1/4 chance to level the played hand
           post_play_econ(run, ev, sel, eff) -- A7/A8: play-money + The Tooth/Arm penalties
+          glass_shatter(run, ev, rng)       -- Glass cards: 1 in 4 to shatter after scoring
           play_effects(run, sel, is_first_play)      -- DNA: copy the first single played card
           play_generators(run, ev)          -- Superposition/Vagabond/8 Ball/Seance -> consumables
           track_play(run, b, ev.hand_type)  -- K1/K2: run/blind hand-type history
@@ -999,13 +1044,14 @@ function World.play_blind(run, blind)
       end
       if not sel then break end  -- no legal play available (e.g. can't make 5 under Psychic)
       sel = with_forced(sel)
-      local ev = HandEval.score(build_gs(run, b, hand, draw_pile, eff), sel)
-      clear_forced(sel); heart_prepped = true
+      local ev = referee_score(build_gs(run, b, hand, draw_pile, eff), sel, rng)
+      clear_forced(sel); heart_prepped = true; mark_played(sel)
       b.scored = b.scored + (ev.score or 0); plays = plays + 1
       local is_first_play = not b._first_play_done; b._first_play_done = true
       JokerTick.on_play(run, ev, sel)   -- A1: accumulate scalers on the played hand
       space_joker_level(run, ev)        -- Space Joker: 1/4 chance to level the played hand
       post_play_econ(run, ev, sel, eff) -- A7/A8: play-money + The Tooth/Arm penalties
+      glass_shatter(run, ev, rng)       -- Glass cards: 1 in 4 to shatter after scoring
       play_effects(run, sel, is_first_play)      -- DNA: copy the first single played card
       play_generators(run, ev)          -- Superposition/Vagabond/8 Ball/Seance -> consumables
       track_play(run, b, ev.hand_type or htype)  -- K1/K2: run/blind hand-type history
@@ -1030,6 +1076,7 @@ function World.play_blind(run, blind)
   if leaf then set_leaf(false) end
   if heart then for _, j in ipairs(run.jokers) do j.debuffed = nil end end
   if bell then clear_forced(run.deck) end
+  for _, c in ipairs(pillar_marked) do c.debuffed = nil end
 
   local cleared = b.scored >= b.target
   -- Mr. Bones (JOKER_FIDELITY P0, survival): prevents death when you scored at least 25% of the

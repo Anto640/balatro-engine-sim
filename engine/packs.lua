@@ -244,6 +244,8 @@ end
 -- positive SPECTRAL_BASE prior, so Hex/Ankh looked GOOD in the pool even on a built board they
 -- would gut -- over-valuing Spectral packs for a run that has jokers to lose. Black Hole (+1 to
 -- every hand level) is still MEASURED deck-aware.
+-- relative weight of The Soul / Black Hole among the 16 regular spectrals: a 0.3% roll per card vs 1/16 per regular
+P.HIDDEN_SPECTRAL_W = 0.003 * 16
 local function spectral_pool(gs, opts)
   opts = opts or {}
   local n = per_hand_need(gs)
@@ -259,7 +261,10 @@ local function spectral_pool(gs, opts)
       local vfrac, gain = ConsumableValue.card_value(gs, "Spectral", key, nil, n, rng, sm)
       v = (vfrac or 0) + VU.income_frac(gs, gain or 0)
     end
-    items[#items + 1] = { v = math.max(0, v), w = 1 }  -- best-of-N picks the good ones; a trap spectral floors to 0 (you'd skip it)
+    -- The Soul and Black Hole are HIDDEN cards: not in the Spectral pool, only a 0.3% roll per created card. Weighting
+    -- them like the 16 regular spectrals priced every Spectral pack with a ~1-in-9 shot at a Legendary (2026-09-28 audit).
+    local hidden = (key == "c_soul" or key == "c_black_hole")
+    items[#items + 1] = { v = math.max(0, v), w = hidden and P.HIDDEN_SPECTRAL_W or 1 }  -- a trap spectral floors to 0 (you'd skip it)
   end
   return items
 end

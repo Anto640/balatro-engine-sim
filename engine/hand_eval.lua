@@ -366,7 +366,22 @@ local function scored_enhancement_effect(enh, oops)
   if enh == "m_bonus" then return { chips = 30 }
   elseif enh == "m_mult" then return { mult = 4 }
   elseif enh == "m_glass" then return { xmult = 2 }
-  elseif enh == "m_lucky" then return { mult = oops and 8 or 4, approx = true } -- expected: (1 or 2)/5 * 20
+  elseif enh == "m_lucky" then return { mult = oops and 8 or 4, approx = true, roll = oops and "lucky_oops" or "lucky" } -- expected: (1 or 2)/5 * 20
+  end
+  return nil
+end
+
+-- ROLLED SCORING (the sim's referee only). The engine scores chance effects at their average (Lucky +4 Mult,
+-- Misprint +11, Bloodstone x1.25, Lucky $20/15, Business Card $1); a player can't see the roll. But when the SIM uses
+-- this scorer as the referee for the play actually made, averaging means a play that clears only on average always
+-- clears -- live, 56% of those failed (live-vs-sim audit 2026-09-28). The world sets HandEval.roll_rng around its
+-- referee call; every effect tagged `roll` is then sampled. nil (the default) = expected values, unchanged.
+HandEval.roll_rng = nil
+local function roll_effect(kind, r)
+  if kind == "lucky" then return (r() < 1 / 5) and { mult = 20 } or nil
+  elseif kind == "lucky_oops" then return (r() < 2 / 5) and { mult = 20 } or nil
+  elseif kind == "misprint" then return { mult = math.floor(r() * 24) }            -- uniform 0..23
+  elseif kind == "bloodstone" then return (r() < 1 / 2) and { xmult = 1.5 } or nil
   end
   return nil
 end
@@ -425,7 +440,9 @@ function HandEval.score_with(gs, played, effective, mods)
 
   -- apply a hook effect to the running totals (mutates chips/mult and the
   -- guaranteed-floor cmin/mmin; approx effects are excluded from the floor).
+  local R = HandEval.roll_rng
   local function apply(c, m, eff, src)
+    if R and eff and eff.roll then eff = roll_effect(eff.roll, R) end   -- referee: sample the chance effect
     if eff and eff.approx then approx = true
     else cmin, mmin = apply_effect(cmin, mmin, eff, nil, nil) end
     return apply_effect(c, m, eff, log, src)
@@ -456,9 +473,16 @@ function HandEval.score_with(gs, played, effective, mods)
         -- expected $ ($20 at 1/15) each trigger. This is why a first-card
         -- retrigger (Hanging Chad) on a money card is worth ordering for.
         if card.seal == "Gold" then money = money + 3 end
-        if card.enhancement == "m_lucky" then money = money + (mods.oops and 40 or 20) / 15 end  -- Oops doubles Lucky's 1/15 $ odds
+        if card.enhancement == "m_lucky" then
+          if R then money = money + ((R() < (mods.oops and 2 or 1) / 15) and 20 or 0)
+          else money = money + (mods.oops and 40 or 20) / 15 end  -- Oops doubles Lucky's 1/15 $ odds
+        end
         if business > 0 and (mods.all_faces or Cards.is_face(card)) then
-          money = money + business * (mods.oops and 2 or 1)   -- $2 at 1/2 (Oops -> 1/1) per Business Card, per trigger
+          if R then
+            for _ = 1, business do if mods.oops or R() < 0.5 then money = money + 2 end end
+          else
+            money = money + business * (mods.oops and 2 or 1)   -- $2 at 1/2 (Oops -> 1/1) per Business Card, per trigger
+          end
         end
       end
     end

@@ -74,7 +74,7 @@ J.j_abstract  = { on_hand = function(ctx) return { mult = 3 * ctx.njokers } end 
 J.j_half      = { on_hand = function(ctx) if #ctx.played <= 3 then return { mult = 20 } end end }
 J.j_gros_michel = { on_hand = function() return { mult = 15 } end }
 J.j_cavendish = { on_hand = function() return { xmult = 3 } end }
-J.j_misprint  = { on_hand = function() return { mult = 11, approx = true } end } -- expected of 0..23
+J.j_misprint  = { on_hand = function() return { mult = 11, approx = true, roll = "misprint" } end } -- expected of 0..23
 J.j_popcorn   = { on_hand = function(_, j) return { mult = scaled(j, MULT, 20) } end } -- decays -4/round
 J.j_ice_cream = { on_hand = function(_, j) return { chips = scaled(j, CHIPS, 100) } end } -- decays -5/hand
 J.j_stuntman  = { on_hand = function() return { chips = 250 } end }                     -- (-2 hand size: utility)
@@ -100,7 +100,7 @@ J.j_arrowhead   = suit_joker("Spades",   { chips = 50 })
 J.j_onyx_agate  = suit_joker("Clubs",    { mult = 7 })
 J.j_rough_gem   = suit_joker("Diamonds", { dollars = 1 })  -- money only (no score)
 J.j_bloodstone  = { on_card_scored = function(card)
-  if Cards.is_suit(card, "Hearts") then return { xmult = 1.25, approx = true } end -- 1/2 of x1.5
+  if Cards.is_suit(card, "Hearts") then return { xmult = 1.25, approx = true, roll = "bloodstone" } end -- 1/2 of x1.5
 end }
 -- ability.extra is a table for some jokers, a number for others -> only index
 -- it when it's actually a table.

@@ -96,11 +96,24 @@ function Content.planet_pool(run)
   end
   return pool or Content.PLANETS
 end
--- Spectrals (Soul/Black Hole appear only in Spectral packs at low weight). -- VERIFY pool
+-- Spectrals. The Soul and Black Hole are HIDDEN cards, not part of the Spectral pool: each card created in an
+-- Arcana/Spectral pack has a 0.3% chance to become The Soul, and each card in a Celestial/Spectral pack a 0.3% chance
+-- to become Black Hole (the game's create_card soul/black-hole roll). The sim used to draw them as ordinary 1-in-18
+-- spectrals, about 2x the real Legendary rate (sim-rules audit #6).
 Content.SPECTRALS = {}
+Content.HIDDEN_RATE = 0.003
 do
-  for k in pairs(ConsumableValue.SPECTRAL_BASE or {}) do Content.SPECTRALS[#Content.SPECTRALS + 1] = k end
+  for k in pairs(ConsumableValue.SPECTRAL_BASE or {}) do
+    if k ~= "c_soul" and k ~= "c_black_hole" then Content.SPECTRALS[#Content.SPECTRALS + 1] = k end
+  end
   table.sort(Content.SPECTRALS)  -- deterministic order for reproducible sampling
+end
+-- the hidden-card roll for one created pack card; returns the forced key or nil
+local function hidden_roll(rng, kind)
+  local key
+  if (kind == "tarot" or kind == "spectral") and rng() < Content.HIDDEN_RATE then key = "c_soul" end
+  if (kind == "planet" or kind == "spectral") and rng() < Content.HIDDEN_RATE then key = "c_black_hole" end
+  return key
 end
 -- Base (non-upgrade) vouchers -- the upgrades require their base owned first. -- VERIFY pairs
 -- W4: the pool offers ONLY vouchers the world MODELS. v_magic_trick (playing cards in shop)
@@ -155,6 +168,29 @@ local function pools()
   end
   for _, list in pairs(POOLS) do table.sort(list) end   -- deterministic sampling order
   return POOLS
+end
+
+-- POOL CONDITIONS (the game's `in_pool` rules). Without them the sim offered Cavendish from ante 1: owned in 53 of 160
+-- baseline runs, winning 64% vs 15% without it (sim-rules audit 2026-09-28, the largest fidelity gap).
+--   Gros Michel only until it goes extinct; Cavendish only after (pool flag `gros_michel_extinct`).
+--   Enhancement jokers only when the deck holds a matching card.
+Content.ENHANCEMENT_GATED = {
+  j_steel_joker = "m_steel", j_stone = "m_stone", j_ticket = "m_gold", j_lucky_cat = "m_lucky", j_glass = "m_glass",
+}
+function Content.in_pool(run, key)
+  if key == "j_cavendish" then return (run and run.gros_michel_extinct) == true end
+  if key == "j_gros_michel" then return not (run and run.gros_michel_extinct) end
+  local enh = Content.ENHANCEMENT_GATED[key]
+  if enh then
+    for _, c in ipairs((run and run.deck) or {}) do if c.enhancement == enh then return true end end
+    return false
+  end
+  return true
+end
+local function pool_filter(run, list)
+  local out = {}
+  for _, k in ipairs(list) do if Content.in_pool(run, k) then out[#out + 1] = k end end
+  return (#out > 0) and out or list
 end
 
 -- ---- weighted pick ----------------------------------------------------------
@@ -242,7 +278,7 @@ function Content.gen_joker(run, rng)
   local P = pools()
   local owned = owned_joker_keys(run)
   local rarity = pick_weighted(rng, Content.RARITY_W)
-  local list = P[rarity] or P.Common
+  local list = pool_filter(run, P[rarity] or P.Common)
   -- Phase A3 resource lesion: restrict the pool to top-tier jokers, so "the shop never
   -- offered the piece" is eliminated as an explanation. Inert unless a probe is active.
   if run and run.probe and run.probe.top_pool then
@@ -277,7 +313,7 @@ end
 function Content.gen_common_joker(run, rng)
   local P = pools()
   local owned = owned_joker_keys(run)
-  local list = P.Common or {}
+  local list = pool_filter(run, P.Common or {})
   local key
   for _ = 1, 6 do
     local cand = pick_uniform(rng, list)
@@ -446,6 +482,10 @@ function Content.open_pack(pack, run, rng)
       local key = pick_uniform(rng, Content.SPECTRALS); items[#items + 1] = { set = "Spectral", key = key, name = key }
     else -- standard (playing cards)
       items[#items + 1] = { set = "Standard", card = gen_card(rng, run) }
+    end
+    if kind == "tarot" or kind == "planet" or kind == "spectral" then
+      local hk = hidden_roll(rng, kind)
+      if hk and items[#items] then items[#items] = { set = "Spectral", key = hk, name = hk } end
     end
   end
   return { items = items, picks_left = k }
@@ -627,15 +667,11 @@ local function take_pack(run, pack, rng)
         trace(run, { kind = "joker_gain", key = it.joker.key, via = "pack" })
       end
     elseif it.set == "Tarot" or it.set == "Planet" or it.set == "Spectral" then
-      if #run.consumables < run.consumable_slots then
-        -- a slot is free: hold it (the engine times the use in-blind with LEVEL_USE_CREDIT etc.)
-        run.consumables[#run.consumables + 1] = { set = it.set, key = it.key, name = it.name }
-        trace(run, { kind = "consumable_gain", key = it.key, via = "pack" })
-      else
-        -- A6: slots full -> USE it immediately instead of silently dropping the paid-for pick
-        apply_pack_consumable_now(run, it, rng)
-        trace(run, { kind = "consumable_use", key = it.key, set = it.set, via = "pack" })
-      end
+      -- The game USES a pack's Tarot/Planet/Spectral the moment it is picked -- it never goes to the tray. The sim
+      -- used to hold it whenever a slot was free (~7 held picks per run), letting the engine time its use later
+      -- (e.g. Hermit saved for shop funding) -- a freedom the real game does not give (sim-rules audit #4).
+      apply_pack_consumable_now(run, it, rng)
+      trace(run, { kind = "consumable_use", key = it.key, set = it.set, via = "pack" })
     elseif it.set == "Standard" and it.card then
       run.deck[#run.deck + 1] = it.card
       JokerTick.on_cards_added(run, 1)   -- A1: Hologram +0.25x per playing card added
@@ -866,7 +902,14 @@ function Content.apply_tag(run, key, rng)
   elseif key == "tag_economy" then
     run.economy.dollars = run.economy.dollars + math.min(run.economy.dollars, 40)
   elseif key == "tag_orbital" then
-    level_hand(run, best_hand(run), 3)
+    -- the game names a RANDOM visible hand on the tag (the nine standard hands, plus a secret hand once played);
+    -- levelling the engine's best hand put engine opinion into the rules layer (sim-rules audit #3, 52 tags / 160 runs)
+    local visible = { "High Card", "Pair", "Two Pair", "Three of a Kind", "Straight", "Flush", "Full House",
+                      "Four of a Kind", "Straight Flush" }
+    for _, h in ipairs({ "Five of a Kind", "Flush House", "Flush Five" }) do
+      if ((run.hand_type_plays or {})[h] or 0) > 0 then visible[#visible + 1] = h end
+    end
+    level_hand(run, pick_uniform(rng, visible), 3)
   elseif key == "tag_negative" then
     run.joker_slots = run.joker_slots + 1                            -- the negative joker's extra slot
   elseif key == "tag_charm"   then open_free_pack(run, "p_arcana_mega", rng)

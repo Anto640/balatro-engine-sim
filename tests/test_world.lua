@@ -385,6 +385,45 @@ return function(t)
     t.ok(true, "ran a second seed without error (" .. tostring(c.scored) .. ")")
   end
 
+  -- ---- SIM RULE FIXES, bundle 3A (sim-rules + live-gap audits, 2026-09-28) ----
+  do
+    local Content = require("sim.content")
+    local HandEval = require("engine.hand_eval")
+    local GS = require("model.game_state")
+    local run = World.new_run(31)
+    -- pool conditions
+    t.ok(not Content.in_pool(run, "j_cavendish"), "Cavendish is not in the pool before Gros Michel goes extinct")
+    t.ok(Content.in_pool(run, "j_gros_michel"), "Gros Michel is in the pool at the start")
+    run.gros_michel_extinct = true
+    t.ok(Content.in_pool(run, "j_cavendish") and not Content.in_pool(run, "j_gros_michel"),
+      "after the extinction: Cavendish in, Gros Michel out")
+    t.ok(not Content.in_pool(run, "j_steel_joker"), "Steel Joker needs a Steel card in the deck")
+    run.deck[1].enhancement = "m_steel"
+    t.ok(Content.in_pool(run, "j_steel_joker"), "a Steel card in the deck opens Steel Joker")
+    -- hidden spectrals
+    local has_soul = false
+    for _, k in ipairs(Content.SPECTRALS) do if k == "c_soul" or k == "c_black_hole" then has_soul = true end end
+    t.ok(not has_soul, "The Soul / Black Hole are not in the regular Spectral pool (0.3% roll only)")
+    -- rolled referee scoring: a Lucky card scores +20 or +0, never the +4 average
+    local lucky = { GS.card{ id = 1, rank = "Ace", suit = "Spades", enhancement = "m_lucky" } }
+    local g = GS.new{ run = { hand_levels = {} } }
+    local avg = HandEval.score(g, lucky).score
+    local seen = {}
+    for s = 1, 40 do
+      local x = s * 7919
+      local ev = World._referee_score(g, lucky, function() x = (x * 16807) % 2147483647; return (x - 1) / 2147483646 end)
+      seen[ev.score] = true
+    end
+    local n = 0; for sc in pairs(seen) do n = n + 1; t.ok(sc ~= avg, "rolled Lucky score is never the average") end
+    t.eq(n, 2, "rolled Lucky gives exactly two outcomes (+20 Mult or none)")
+    t.eq(HandEval.roll_rng, nil, "the roll switch is off again after the referee call")
+    -- pack Tarots/Planets are used on pick, never held
+    local r2 = World.new_run(32)
+    local before = #r2.consumables
+    Content._take_pack(r2, { key = "p_celestial_normal_1", name = "Celestial Pack", cost = 4 }, r2.rng)
+    t.eq(#r2.consumables, before, "a Celestial pack pick is used immediately, not kept in the tray")
+  end
+
   -- ---- ANTE-8 FINISHERS (2026-09-28): the sim used to play these as plain x2 bosses ----
   do
     local GS = require("model.game_state")
