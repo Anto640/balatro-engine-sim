@@ -20,15 +20,16 @@ for f in glob.glob('arm_%s_*.jsonl'%name):
         if r.get('kind') in ('death','win'): fin.add(str(r['seed']))
 missing=[str(s*1000+off) for s in range(1,n+1) if str(s*1000+off) not in fin]
 print('arm',name,'finished',len(fin),'missing',len(missing))
-import os
-for k in range(nw):
-    part=missing[k::nw]
-    open('armseeds_%s_%d.txt'%(name,k),'w').write(' '.join(part))
+open('armseeds_%s.txt'%name,'w').write(' '.join(missing))
 EOF
-tag=$(date +%s)
+# Shared queue: each worker claims the next unclaimed seed (mkdir is atomic), so all N stay busy until the queue is
+# empty -- a fixed split left workers idle once their own share was done (2026-09-29: 10 of 11 busy mid-batch).
+tag=$(date +%s); claim="armclaim_${name}_${tag}"; mkdir -p "$claim"
 for k in $(seq 0 $((nw-1))); do
-  seeds=$(cat "armseeds_${name}_${k}.txt")
-  [ -n "$seeds" ] && luajit tools/run_seeds.lua "arm_${name}_${tag}_${k}.jsonl" $seeds > "arm_${name}_${k}.log" 2>&1 &
+  ( for s in $(cat "armseeds_${name}.txt"); do
+      mkdir "$claim/$s" 2>/dev/null || continue
+      luajit tools/run_seeds.lua "arm_${name}_${tag}_${k}.jsonl" "$s"
+    done ) > "arm_${name}_${k}.log" 2>&1 &
 done
 wait
 python - "$name" "$n" "$off" "$REPO" <<'EOF'
