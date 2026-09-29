@@ -16,10 +16,17 @@ Cards.RANK_ID = {
 
 Cards.SUITS = { "Spades", "Hearts", "Clubs", "Diamonds" }
 
--- Resolve a card's rank id from either .rank_id or a textual .rank.
-function Cards.rank_id(card)
+-- The card's printed rank, kept under a Stone enhancement (it returns if the card is re-enhanced).
+function Cards.base_rank_id(card)
   if card.rank_id then return card.rank_id end
   return Cards.RANK_ID[card.rank] or 0
+end
+
+-- Resolve a card's rank id from either .rank_id or a textual .rank. A Stone card has NO rank (the game's get_id()
+-- returns a random negative), so every rank check -- Hack, Scholar, Baron, Wee, 8 Ball, rank-targeting jokers -- skips it.
+function Cards.rank_id(card)
+  if card.enhancement == "m_stone" then return 0 end
+  return Cards.base_rank_id(card)
 end
 
 -- Base chip value contributed by a played card (before enhancements/jokers).

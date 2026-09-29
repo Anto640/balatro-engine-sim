@@ -139,6 +139,12 @@ return function(t)
     local hack = HandEval.score(state{ joker{ key = "j_hack" } }, twos)
     t.eq(base.score, 28, "pair of 2s baseline (10+2+2)*2 = 28")
     t.eq(hack.score, 36, "Hack retriggers each 2 (chips 10+8)*2 = 36")
+    -- A Stone card has no rank (live 4KMBNQY6: a Stone 2 was predicted retriggered, +50 chips it never scored).
+    local stoned = play{ {"2","Clubs"}, {"2","Diamonds"}, {"2","Spades"} }
+    stoned[3].enhancement = "m_stone"
+    local sb = HandEval.score(state{}, stoned)
+    local sh = HandEval.score(state{ joker{ key = "j_hack" } }, stoned)
+    t.eq(sh.score - sb.score, 8, "Hack retriggers the two real 2s only, not the Stone card")
   end
 
   -- ---- splash: every played card scores ----

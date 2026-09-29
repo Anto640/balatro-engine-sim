@@ -28,7 +28,11 @@ local function score_row(p, actual)
   local ok, ev = pcall(HandEval.score, p.g, sel)
   if not (ok and ev and (ev.score or 0) > 0) then return end
   rows[#rows + 1] = { r = actual / ev.score, approx = ev.approx, pred = ev.score, floor = ev.score_min or ev.score,
-    rem = p.rem, actual = actual, ante = p.ante, bt = p.bt, ht = ev.hand_type, keys = (function() local t = {} for _, j in ipairs(p.g.jokers) do t[#t+1] = j.key end return table.concat(t, " ") end)(), seed = p.seed, n = #sel }
+    rem = p.rem, actual = actual, g = p.g, sel = sel, cards = (function() local o = {} for _, c in ipairs(p.g.hand) do local on = false
+      for _, x in ipairs(sel) do if x == c then on = true end end
+      o[#o + 1] = (on and "*" or "") .. tostring(c.rank) .. tostring(c.suit):sub(1, 1) .. (c.enhancement and ("/" .. c.enhancement) or "")
+        .. (c.edition and ("/" .. tostring(c.edition)) or "") .. (c.seal and ("/" .. tostring(c.seal)) or "") .. (c.debuffed and "/DEB" or "") end
+      return table.concat(o, " ") end)(), ante = p.ante, bt = p.bt, ht = ev.hand_type, keys = (function() local t = {} for _, j in ipairs(p.g.jokers) do t[#t+1] = j.key end return table.concat(t, " ") end)(), seed = p.seed, n = #sel }
 end
 local prev = {}
 for line in io.lines(os.getenv("APPDATA") .. "/Balatro/bes_fixtures.jsonl") do
@@ -90,4 +94,16 @@ print(string.format("share of plays involving chance: %.1f%%", 100 * share / #ro
 print("\ndeterministic plays under 0.8x:")
 table.sort(rows, function(a, b) return a.r < b.r end)
 for _, r in ipairs(rows) do if not r.approx and r.r < 0.8 then
-  print(string.format("  %.2f %s a%s %-5s %-15s %dc pred %7.0f act %7.0f | %s", r.r, r.seed, tostring(r.ante), tostring(r.bt), tostring(r.ht), r.n, r.pred, r.actual, r.keys)) end end
+  print(string.format("  %.2f %s a%s %-5s %-15s %dc pred %7.0f act %7.0f | %s", r.r, r.seed, tostring(r.ante), tostring(r.bt), tostring(r.ht), r.n, r.pred, r.actual, r.keys))
+  if os.getenv("BES_PR_VERBOSE") then
+    print("       hand (*=played): " .. r.cards)
+    -- per-joker ablation: the predicted score without each joker, and the joker's live ability numbers
+    for i, j in ipairs(r.g.jokers) do
+      local g2 = {}; for k, v in pairs(r.g) do g2[k] = v end
+      g2.jokers = {}; for k, jj in ipairs(r.g.jokers) do if k ~= i then g2.jokers[#g2.jokers + 1] = jj end end
+      local ok, e2 = pcall(HandEval.score, g2, r.sel)
+      local a = j.ability or {}
+      print(string.format("       without %-22s %7.0f   mult=%s x_mult=%s extra=%s ed=%s%s", j.key, ok and e2.score or -1,
+        tostring(a.mult), tostring(a.x_mult), Json.encode(a.extra or ""), tostring(j.edition), j.debuffed and " DEBUFFED" or ""))
+    end
+  end end end

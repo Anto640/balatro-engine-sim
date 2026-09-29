@@ -260,7 +260,7 @@ function T.apply_to_hand(hand, key, gs)
     for _, c in ipairs(tg) do hit[c] = true end
     local new = {}
     for i, c in ipairs(hand) do
-      if hit[c] then new[i] = copy_card(c); new[i].rank_id = Cards.rank_id(c) + 1 else new[i] = c end
+      if hit[c] then new[i] = copy_card(c); new[i].rank_id = Cards.base_rank_id(c) + 1 else new[i] = c end
     end
     return new
   end
