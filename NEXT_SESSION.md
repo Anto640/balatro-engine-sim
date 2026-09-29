@@ -9,6 +9,9 @@ maths SHIPPED). **Sim baseline = `sim_out/fin20.jsonl` (21/160) / `fin20_7` (31/
 if promising) -- chain `%TMP%/bes/chain_pa2.sh`, log `%TMP%/bes/chain_f20.log`, worktree `%TMP%/bes_wt_pa`.
 Verdicts: pool32 NOT shipped (failed OOS); pacing risk tuning closed (refit / pq25 / rs07 all lost).
 Owner rules: run a fresh-seed arm only when the first is promising; never launch Balatro unless told; keep self-play short.
+**Live smoke test (owner-approved 2026-09-29):** Balatro self-play started 15:12 (bes_runs line 23554, fixtures line
+21469); a background job closes it at 16:35. Then analyse: outcomes, bes_autoplay.log failures, and predicted vs actual
+scores via `luajit tools/live_audit/play_realisation.lua <seeds>` (5 runs / 0 wins / no stalls as of 16:00).
 
 ## ⭐⭐⭐⭐ 2026-09-28 (later) — R18: UNATTENDED RUNS ON 42a867f + TWO LIVE-ONLY DEFECTS FIXED
 Runs (session starting bes_runs line 11138): VKMZCD5H a5 Boss, PY43WSDU a6 Small, G5QGWQKG a4 Big, UTNJ8T4Q a5 Boss,
