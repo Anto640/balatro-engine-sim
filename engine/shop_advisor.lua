@@ -153,7 +153,7 @@ end
 -- runs sold contributing scorers (Gros Michel, Scholar) at $42 for sideways jokers and
 -- died. Require the new joker to beat the sold one by this much FUTURE-VALUE before a
 -- swap is credited, so only a CLEAR upgrade disrupts a working board.
-SA.UPGRADE_MARGIN = 1.2
+SA.UPGRADE_MARGIN = tonumber(os.getenv and os.getenv("BES_UPGRADE_MARGIN") or "") or 1.2   -- env: swap-bar A/B
 -- A funder joker is "dead" (freely sellable to fund anything) only when it contributes at or
 -- below this FV -- the SAME threshold the SELL_JOKER path uses for its `dead` decision (worst_c
 -- <= 0.1). Anything above it is a FUNCTIONAL joker and may only be sold to fund a CLEARLY better
@@ -166,7 +166,7 @@ SA.DEAD_FUNDER_FV = 0.1
 -- jokers). A WEAK filler swaps ~freely for a keystone; a STRONG joker is protected super-linearly
 -- so a working board is never churned. Now that W3 makes acquired keystones COMPOUND, this
 -- acquisition lever is re-tested on the W3 world. Slope tuned to the mechanism (probe), not seeds.
-SA.SWAP_KEEP_SLOPE = 0.5
+SA.SWAP_KEEP_SLOPE = tonumber(os.getenv and os.getenv("BES_SWAP_SLOPE") or "") or 0.5   -- env: swap-bar A/B
 
 -- First-scorer priority (in the sgain*5 buy-value units). When the board has NO effective
 -- scorer, a flat immediate scorer is worth much more than its marginal -- it's the jump from
@@ -1363,6 +1363,8 @@ function SA.recommend(gs, opts)
               -- raw marginal only edges the weakest -- and a redundant flat is damped.
               local g = buy_fv_delta(gs, sj, mopts) + (BuildPlan.fit(gs, sj, build, invest))
               if g > upgrade then upgrade, up_name = g, (sj.name or sj.key) end
+              if _G.BES_SWAP_TRACE then _G.BES_SWAP_TRACE[#_G.BES_SWAP_TRACE + 1] =
+                { sold = j.key, ci = worst_c, buy = sj.key, g = g, cost = sj.cost, worst = true } end
             end
           end
         end
@@ -1380,6 +1382,8 @@ function SA.recommend(gs, opts)
         -- joker by C*(1 + SLOPE*C) -- weak filler swaps ~freely, a strong joker demands a much
         -- better replacement. Charged ONCE here (was the flat 2*C); pure sales charge it once below.
         local keep = worst_c * (1 + SA.SWAP_KEEP_SLOPE * worst_c)
+        if _G.BES_SWAP_TRACE then for _, t in ipairs(_G.BES_SWAP_TRACE) do
+          if t.worst and not t.keep then t.keep = keep + sell_margin end end end
         upgrade = math.max(0, upgrade - keep - sell_margin)
       end
       local nudge = SA.SELL_NUDGE[j.key] or 0      -- decay/downside proactive credit
@@ -1433,6 +1437,9 @@ function SA.recommend(gs, opts)
               if ok_s and (cur == nil or cur > 0) then
                 local g = buy_fv_delta(gs, sj, mopts) + (BuildPlan.fit(gs, sj, build, invest))
                 local up = g - keep
+                -- diagnostic only (tools/swap_bar_probe.lua): every full-board trade the bar weighed
+                if _G.BES_SWAP_TRACE then _G.BES_SWAP_TRACE[#_G.BES_SWAP_TRACE + 1] =
+                  { sold = jk.key, ci = ci, keep = keep, buy = sj.key, g = g, cost = sj.cost } end
                 if up > 0 and (not best_t or up > best_t.up) then
                   best_t = { up = up, i = i, sj = sj, cash = cash_i }
                 end

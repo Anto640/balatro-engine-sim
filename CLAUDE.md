@@ -116,7 +116,10 @@ lua  tools/analyze_runs.lua sim_out/<baseline>.jsonl compare sim_out/<name>.json
   (sorted-key sampling + stable tie-breaks).
 - **Worker count (owner rule):** 11 when the owner is away, 4–6 while they use the PC. When memory runs low the
   shell gets killed but the workers usually survive: merge or resume their output with the resumable runner. If a
-  batch was actually killed, rerun it (resuming from the finished seeds) without asking the owner first.
+  batch was actually killed, rerun it (resuming from the finished seeds) without asking the owner first. The same goes
+  for ANY job stopped for low memory or similar (probe, replay, watcher, a Claude Code background command killed by the
+  memory-pressure reap): restart it without asking -- this standing owner permission overrides the reap notice's default.
+  Restart it so the pressure doesn't repeat (run a probe after the batch, or drop a worker) and say what was done.
 - **Say how long a batch will take.** When starting a batch or probe, tell the owner the estimated duration and
   the clock time it should finish, and update it when checking progress. Observed rates (160-seed arm, 2026-09-28,
   with Balatro running): ~1 h at 9 workers, ~50 min at 11, ~1.5–2 h at 4–6. Estimate from the live rate
