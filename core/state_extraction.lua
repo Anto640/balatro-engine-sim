@@ -229,7 +229,11 @@ function Extract.snapshot()
       in_blind_select = (G.STATES and G.STATE == G.STATES.BLIND_SELECT) or false,
       seed_hash = GAME.pseudorandom and GAME.pseudorandom.seed or "",
     },
-    deck = read_area(G.deck),
+    -- deck = the WHOLE deck, remaining = the undrawn pile -- the same split the sim's build_gs uses. Reading G.deck for
+    -- both meant that mid-blind "the deck" was only the undrawn cards: Erosion counted every drawn/played card as missing
+    -- (+4 Mult each; live 58TL2YMH scored 0.13-0.25x of prediction) and deck counters (Steel/Stone Joker, Driver's
+    -- License, Cloud 9) missed the cards in hand. G.playing_cards is the whole deck wherever each card is.
+    deck = (G.playing_cards and read_area({ cards = G.playing_cards })) or read_area(G.deck),
     remaining = read_area(G.deck),       -- undrawn live in G.deck after a draw
     hand = read_area(G.hand),
     jokers = jokers,

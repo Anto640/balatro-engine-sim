@@ -307,6 +307,15 @@ return function(t)
     local left = HandEval.score(state{ bb, steel, jk }, pair)    -- (m * 1.5) + 4
     local right = HandEval.score(state{ bb, jk, steel }, pair)   -- (m + 4) * 1.5
     t.ok(right.score > left.score, "Baseball: an Uncommon right of +Mult multiplies it; on the left it does not")
+    -- Loyalty Card counts hands since it was OBTAINED (game: hands_played_at_create)
+    local function loyal(hp, at)
+      local g = GS.new{ jokers = { joker{ key = "j_loyalty_card", ability = { extra = { every = 5, Xmult = 4 },
+        hands_played_at_create = at } } }, run = { hand_levels = {}, hands_played = hp } }
+      return HandEval.score(g, pair).score
+    end
+    local plain = HandEval.score(state{}, pair).score
+    t.eq(loyal(8, 3), plain * 4, "Loyalty Card: the 6th hand since it was bought is x4")
+    t.eq(loyal(5, 3), plain, "Loyalty Card: 6th hand of the RUN but only the 3rd since bought -> no x4")
     local none = HandEval.score(state{ bb, jk }, pair)
     t.eq(none.score, HandEval.score(state{ jk }, pair).score, "Baseball with no Uncommon joker does nothing")
   end

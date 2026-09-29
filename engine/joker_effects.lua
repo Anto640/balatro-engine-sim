@@ -272,9 +272,15 @@ J.j_yorick        = { on_hand = function(_, j) return { xmult = scaled(j, XMULT,
 -- LIVE static config (extra.Xmult = 4/3) and applied x4/x3 EVERY hand -> the advisor claimed
 -- clears that won't happen. Model the real conditions from the plumbed play history; absent it
 -- they read conservative (x1), which already fixes the live over-fire.
-J.j_loyalty_card  = { on_hand = function(ctx)  -- x4 every 6th hand played
+-- Loyalty Card: x4 on every 6th hand played SINCE THE CARD WAS OBTAINED (game: loyalty_remaining =
+-- (every-1 - (hands_played - hands_played_at_create)) % (every+1), fires at == every). Counting from the start of the
+-- run instead mispredicted a mid-run Loyalty Card as x4 on the wrong hands (live U4V2NRBE scored 0.25x of prediction).
+J.j_loyalty_card  = { on_hand = function(ctx, j)
   local hp = (ctx.gs and ctx.gs.run and ctx.gs.run.hands_played) or 0
-  if (hp + 1) % 6 == 0 then return { xmult = 4 } end
+  local ab = type(j and j.ability) == "table" and j.ability or {}
+  local every = (type(ab.extra) == "table" and ab.extra.every) or 5
+  local since = (hp + 1) - (tonumber(ab.hands_played_at_create) or 0)   -- this hand included
+  if since > 0 and since % (every + 1) == 0 then return { xmult = (type(ab.extra) == "table" and ab.extra.Xmult) or 4 } end
 end }
 J.j_card_sharp    = { on_hand = function(ctx)  -- x3 only if this hand type was already played THIS round
   local played = ctx.gs and ctx.gs.blind and ctx.gs.blind.played_hand_types
