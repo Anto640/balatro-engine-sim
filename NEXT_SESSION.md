@@ -9,9 +9,14 @@ maths SHIPPED). **Sim baseline = `sim_out/fin20.jsonl` (21/160) / `fin20_7` (31/
 if promising) -- chain `%TMP%/bes/chain_pa2.sh`, log `%TMP%/bes/chain_f20.log`, worktree `%TMP%/bes_wt_pa`.
 Verdicts: pool32 NOT shipped (failed OOS); pacing risk tuning closed (refit / pq25 / rs07 all lost).
 Owner rules: run a fresh-seed arm only when the first is promising; never launch Balatro unless told; keep self-play short.
-**Live smoke test (owner-approved 2026-09-29):** Balatro self-play started 15:12 (bes_runs line 23554, fixtures line
-21469); a background job closes it at 16:35. Then analyse: outcomes, bes_autoplay.log failures, and predicted vs actual
-scores via `luajit tools/live_audit/play_realisation.lua <seeds>` (5 runs / 0 wins / no stalls as of 16:00).
+**Live smoke test DONE (15:12-16:35, bes_runs line 23554, fixtures 21469; seeds `tools/live_audit/seeds_2026-09-29.txt`):**
+6 finished runs, **1 win** (ZI1XU8GN), deaths a2 Small / a3 Boss 0.99 / a4 Boss 0.52 / a6 Boss 0.98 / a7 Big 0.98. No
+self-player stalls (cash_out retries <= 5). The replay found **Stone cards scored as if ranked**: Hack retriggered them
+(4KMBNQY6, every Pair with a Stone at 0.72-0.78x). Fixed `c95f142` (`Cards.rank_id` = 0 for Stone), DEPLOYED: smoke
+deterministic plays under 0.95x 7% -> 0%, guaranteed clears failing live 2 -> 0; overnight under 0.8x 1.7% -> 1.0%.
+Remaining overnight misses are CARD ORDER (Photograph / Glass / Even Steven): the self-player plays in hand order, the
+estimate assumes the best order -- the known live-only autoplay-reorder item. Regression arm `stone` (vs `xpick`,
+worktree `%TMP%/bes_wt_stone`) queued after chain_pa2 by `%TMP%/bes/chain_stone.sh` (same log).
 
 ## ⭐⭐⭐⭐ 2026-09-28 (later) — R18: UNATTENDED RUNS ON 42a867f + TWO LIVE-ONLY DEFECTS FIXED
 Runs (session starting bes_runs line 11138): VKMZCD5H a5 Boss, PY43WSDU a6 Small, G5QGWQKG a4 Big, UTNJ8T4Q a5 Boss,

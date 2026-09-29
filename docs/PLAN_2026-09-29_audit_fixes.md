@@ -28,6 +28,13 @@ every A/B after that should be judged in a world that behaves like the real game
   sign 75/60 (n.s.). **`xpick_7` vs fin20_7: wins 31 -> 33, progress +0.121, sign 80/61 -- same direction. Pooled 320:
   wins 52 -> 65, sign 155/121 (p ~0.04). SHIPPED as default (exact maths of the same quantity; correctness + cheaper).**
   Combo arms dropped (pool32 failed OOS); `poolall` / `pool64` queued instead (fresh-seed arm only if promising).
+- `poolall` (BES_POOL_DRAWS=all, exact pick OFF, worktree f6ebab3) vs fin20: **wins 21 -> 29, progress +0.287** --
+  promising, so `poolall_7` runs (ETA ~18:10), then `pool64`. NOTE: these arms are measured WITHOUT the shipped exact
+  pick; if poolall replicates, the shipped combination (poolall + exact pick) needs one arm vs `xpick` before deploying,
+  in its cheap live form (the full pool adds ~1.2 s per shop evaluation).
+- 1.4 live check (smoke test 2026-09-29, 6 runs, 1 win): **Stone cards scored as ranked** (Hack retriggered them) --
+  fixed `c95f142`, deployed; regression arm `stone` vs `xpick` queued after the pool chain. Remaining misses = card
+  order (self-player plays in hand order).
 
 ## Phase 0 — finish what is running (tonight)
 | # | Item | Action | Batch |
