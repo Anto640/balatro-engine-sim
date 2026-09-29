@@ -17,7 +17,10 @@ every A/B after that should be judged in a world that behaves like the real game
   Serpent, 3.13 Ox (sim side; the engine doesn't yet avoid the Ox hand), 3.14 Blue/Purple seals, 3.15 econ double-pay,
   3.17 Dagger, 3.18 Madness, 3.21 Mr. Bones reward, 3.22 edition weights.
   DEFERRED (each fires in <=5 of 160 runs, below the frequency ceiling): 3.16, 3.19, 3.20, 3.23-3.29.
-- Baselines: `fin19` = 3A, `fin20` = 3A+3B (+ `fin20_7` out-of-sample). Phase 4 arms compare against fin20.
+- Baselines: `fin20` = 3A+3B (+ `fin20_7` out-of-sample); `fin19` skipped for time. **fin20: 21/160 wins (13%)** vs 51
+  (32%) in the old world; reach-8 57 -> 27. Deaths moved to ante 5-6, led by **Big blinds (ante-5 Big deaths 3 -> 12)** --
+  the corrected sim now reproduces the live signature (live dies on Big blinds 2-3x the old sim). The Serpent kills 4 at
+  ante 6. Phase 4 arms compare against fin20.
 
 ## Phase 0 — finish what is running (tonight)
 | # | Item | Action | Batch |
