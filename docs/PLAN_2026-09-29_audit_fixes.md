@@ -42,6 +42,12 @@ every A/B after that should be judged in a world that behaves like the real game
 - **4.1 was never tested:** the reroll path passes `measure_count = 6`, so pool32/poolall only changed Buffoon-pack and
   created-joker values. `BES_REROLL_DRAWS` (`492dff7`, default 6) -> arm `rr32` vs `stone` queued after pa2_7
   (`%TMP%/bes/chain_rr.sh`, worktree `%TMP%/bes_wt_rr`), `rr32_7` vs `xpick_7` only if promising. ETA ~21:45 / ~22:40.
+- **4.3 DROPPED (no batch):** the chooser already ranks a guaranteed clear above an average-only one (tier 2 > 1). Live
+  average-only clears that failed were almost all on the blind's FIRST hand with 3-4 hands and discards left (e.g.
+  TCUKQQQH needed 20000, got 17937, 2063 left for 3 hands); the only last-hand one cleared. A miss costs ~$1, not runs.
+- Card order: the self-player DOES reorder (45 "reorder cards" live). Short plays left: 371LEAD2 cleared anyway (money
+  order once the clear is guaranteed, by design); JDBPAMG6 a4 Big missed by 60 (pred 10416, got 7440; Photograph +
+  Greedy order, old build) -- one case, watch for more before acting.
 - 1.4 live check (smoke test 2026-09-29, 6 runs, 1 win): **Stone cards scored as ranked** (Hack retriggered them) --
   fixed `c95f142`, deployed; regression arm `stone` vs `xpick` queued after the pool chain. Remaining misses = card
   order (self-player plays in hand order).
