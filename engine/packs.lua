@@ -69,7 +69,9 @@ end
 -- EXACT expected sum of the best k of n independent weighted draws (audit plan 4.2: the 40-trial simulation below is
 -- the biggest noise source in pack values, seed-flip probe 2026-09-28). The j-th largest of n draws is <= x exactly
 -- when at least n-j+1 draws are <= x, so P(Y_j <= x) = sum_{i=n-j+1..n} C(n,i) F(x)^i (1-F(x))^(n-i).
-P.EXACT_PICK = os.getenv and os.getenv("BES_EXACT_PICK") == "1"
+-- SHIPPED 2026-09-29: exact by default. A/B vs fin20 wins 21 -> 32, fresh seeds 31 -> 33; pooled 320 wins 52 -> 65,
+-- sign 155/121 (p ~0.04), positive on both pools. BES_EXACT_PICK=0 restores the 40-trial simulation.
+P.EXACT_PICK = not (os.getenv and os.getenv("BES_EXACT_PICK") == "0")
 local function binom(n, i)
   local c = 1
   for t = 1, i do c = c * (n - i + t) / t end

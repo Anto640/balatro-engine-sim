@@ -25,7 +25,9 @@ every A/B after that should be judged in a world that behaves like the real game
   (p 0.059)** -- but **`pool32_7` vs fin20_7 did NOT replicate: wins 31 -> 29, sign 67/75 (n.s.), reach-8 46 -> 43**.
   Pooled 320: wins 52 -> 57, nothing significant -> winner's curse; NOT shipped (switch stays default 8).
 - 4.2 `xpick` (BES_EXACT_PICK=1) vs fin20: **wins 21 -> 32, reach-8 27 -> 43 (McNemar p 0.021)**, progress +0.096 (n.s.),
-  sign 75/60 (n.s.) -- tail-carried; `xpick_7` + `combo`/`combo_7` (both switches) queued.
+  sign 75/60 (n.s.). **`xpick_7` vs fin20_7: wins 31 -> 33, progress +0.121, sign 80/61 -- same direction. Pooled 320:
+  wins 52 -> 65, sign 155/121 (p ~0.04). SHIPPED as default (exact maths of the same quantity; correctness + cheaper).**
+  Combo arms dropped (pool32 failed OOS); `poolall` / `pool64` queued instead (fresh-seed arm only if promising).
 
 ## Phase 0 — finish what is running (tonight)
 | # | Item | Action | Batch |
