@@ -195,6 +195,9 @@ SA.PACK_POVERTY_DAMP = 0.3   -- floor on a speculative pack's pool value when fa
 SA.REROLL_MIN_IMPROVEMENT = 0.2  -- boss-hand-fraction the expected joker must beat the
                                  -- current best by before a PAID reroll is worth it
 SA.REROLL_APPETITE_RICH = 0.7    -- above-cap appetite (was 1.0 -- maximal eagerness)
+-- Jokers measured to value a reroll (plan 4.1). 6 draws swing the value by seed (seed-flip probe 2026-09-28: 35% of
+-- seed-dependent picks); BES_REROLL_DRAWS for the A/B, default unchanged. BES_POOL_DRAWS never reached this path.
+SA.REROLL_DRAWS = tonumber(os.getenv and os.getenv("BES_REROLL_DRAWS") or "") or 6
 -- TRIED AND REVERTED (2026-08-11, WINRATE_V3_PLAN §5d): a full-board FEASIBILITY gate on the
 -- reroll. The reroll is priced off the JOKER a fresh shop would surface (`e_best`), but only
 -- money was checked for feasibility -- never whether a SLOT exists for it. Measured: 98% of
@@ -1180,7 +1183,7 @@ function SA.recommend(gs, opts)
   if rcost and ShopState.affordable(gs, rcost, credit) and (dollars(gs) - rcost) >= reserve - credit then
     local n_slots = math.max(2, #(shop.jokers or {}) + #(shop.consumables or {}))
     local bar = swap_bar()
-    local e_best = Packs.expected_shop_joker(gs, n_slots, { samples = 3, measure_count = 6, rng = rng, swap_bar = bar }) or 0
+    local e_best = Packs.expected_shop_joker(gs, n_slots, { samples = 3, measure_count = SA.REROLL_DRAWS, rng = rng, swap_bar = bar }) or 0
     -- realisable only to the extent you can still buy a joker after rerolling
     local buy_budget = dollars(gs) - rcost - reserve
     local realizable = clamp(buy_budget / SA.TYPICAL_JOKER_COST, 0, 1)
