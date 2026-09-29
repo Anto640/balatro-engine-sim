@@ -192,6 +192,9 @@ end
 -- seed-dependent pick flips (seed-flip probe 2026-09-28); 32 fixes the most flips for ~+6% shop time. Env
 -- BES_POOL_DRAWS for the A/B (audit plan 4.1); default unchanged until it is measured.
 P.POOL_DRAWS = tonumber(os.getenv and os.getenv("BES_POOL_DRAWS") or "") or 8
+-- BES_POOL_DRAWS=all: measure EVERY joker once, weighted by its rarity, instead of sampling -- no draw noise at all
+-- (owner 2026-09-29, after pool32 was neutral out-of-sample). Costs ~150 measurements per pool.
+P.POOL_ALL = (os.getenv and os.getenv("BES_POOL_DRAWS")) == "all"
 
 -- MEASURED pool: sample M jokers (rarity-weighted) and measure each against YOUR
 -- deck via JokerValue. This makes "what a Buffoon pack might give" a calculation
@@ -218,8 +221,11 @@ local function joker_pool(gs, opts)
   end
   local M = opts.measure_count or P.POOL_DRAWS
   local items = {}
-  for _ = 1, M do
-    local it = draw()
+  -- ALL mode: every joker once, carrying its rarity weight (the draw below would otherwise supply that weighting)
+  local all = P.POOL_ALL and not opts.measure_count
+  if all then M = #keys end
+  for i = 1, M do
+    local it = all and keys[i] or draw()
     local m = JokerValue.score_delta(gs, { key = it.k, ability = { extra = {} } },
                                      { samples = opts.samples or 3, rng = rng })
     local v = m and (m / need) or ((it.e.tier or 3) * 0.3)
@@ -231,7 +237,7 @@ local function joker_pool(gs, opts)
     -- replace by (shop_advisor.full_board_swap_bar) -- otherwise a reroll/Buffoon pack is priced as if a
     -- slot were free and the engine rerolls for jokers it will then refuse to swap in.
     if opts.swap_bar then v = v - opts.swap_bar end
-    items[#items + 1] = { v = math.max(0, v), w = 1 }
+    items[#items + 1] = { v = math.max(0, v), w = all and it.w or 1 }
   end
   return items
 end
