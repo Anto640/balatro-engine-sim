@@ -33,6 +33,7 @@ local EFFECT = {
   bl_eye    = { no_repeat_hand = true },      -- each hand type only once
   bl_mouth  = { single_hand_type = true },    -- only one hand type all round
   bl_hook   = { discard_after = 2 },          -- discards 2 random after each hand
+  bl_serpent = { draw_exact = 3 },           -- after a play or discard, draw exactly 3 (not up to hand size)
   -- economy (no scoring effect; flagged for the shop/eco reasoning)
   bl_tooth  = { money_per_card = 1 },
   bl_ox     = { money_zero_on_common = true },

@@ -397,6 +397,13 @@ function Content.gen_shop(run, rng)
   end
   local boosters = {}
   for _ = 1, Content.PACK_SLOTS do boosters[#boosters + 1] = Content.gen_pack(rng, run) end
+  -- The run's FIRST shop always has a (normal) Buffoon Pack in its first booster slot (the game's first_shop_buffoon);
+  -- the sim never guaranteed it (sim-rules audit #9, pessimistic: fewer early jokers).
+  if not run._first_shop_buffoon and boosters[1] then
+    run._first_shop_buffoon = true
+    local key = "p_buffoon_normal"
+    boosters[1] = { key = key, name = Packs.display_name(key, "buffoon"), cost = priced(run, Content.PACK_COST.normal or 4) }
+  end
   -- A4: ONE voucher per ANTE (not per shop). Generate at the ante's first shop and persist the
   -- SAME offer across that ante's shops (real Balatro restocks the voucher slot once per ante);
   -- cleared on purchase (apply_action). Fixes the ~3x over-exposure the audit flagged.

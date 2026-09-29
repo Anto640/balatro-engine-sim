@@ -96,8 +96,10 @@ return function(t)
       JD.resolve("j_golden").econ, "Golden Joker pays its avg $/round")
     t.eq(World._joker_econ_income({ jokers = { { key = "j_joker" } } }), 0, "a non-econ joker pays nothing")
     -- econ stacks across owned jokers
-    local two = World._joker_econ_income({ jokers = { { key = "j_golden" }, { key = "j_business" } } })
-    t.eq(two, JD.resolve("j_golden").econ + JD.resolve("j_business").econ, "econ income sums across owned jokers")
+    local two = World._joker_econ_income({ jokers = { { key = "j_golden" }, { key = "j_golden" } } })
+    t.eq(two, 2 * JD.resolve("j_golden").econ, "econ income sums across owned jokers")
+    -- Business Card is paid through scoring ($2 at 1/2 per face), so it gets no flat $/round on top (audit 2026-09-28)
+    t.eq(World._joker_econ_income({ jokers = { { key = "j_business" } } }), 0, "Business Card is not double-paid")
     -- Egg's "econ" is SELL-value growth, not spendable $ -> excluded
     t.eq(World._joker_econ_income({ jokers = { { key = "j_egg" } } }), 0, "Egg (sell-value) pays no round income")
     t.eq(World._joker_econ_income({ jokers = {} }), 0, "no jokers -> no econ income")

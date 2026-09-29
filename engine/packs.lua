@@ -66,6 +66,39 @@ end
 
 -- ---- expected best-K-of-N from a weighted pool ------------------------------
 -- items: array of { v = value, w = weight }
+-- EXACT expected sum of the best k of n independent weighted draws (audit plan 4.2: the 40-trial simulation below is
+-- the biggest noise source in pack values, seed-flip probe 2026-09-28). The j-th largest of n draws is <= x exactly
+-- when at least n-j+1 draws are <= x, so P(Y_j <= x) = sum_{i=n-j+1..n} C(n,i) F(x)^i (1-F(x))^(n-i).
+P.EXACT_PICK = os.getenv and os.getenv("BES_EXACT_PICK") == "1"
+local function binom(n, i)
+  local c = 1
+  for t = 1, i do c = c * (n - i + t) / t end
+  return c
+end
+local function expected_pick_exact(items, n, k, total)
+  local vals = {}
+  for _, it in ipairs(items) do vals[#vals + 1] = { v = it.v, p = (it.w or 1) / total } end
+  table.sort(vals, function(a, b) return a.v < b.v end)
+  local sum = 0
+  for j = 1, k do
+    local lo = n - j + 1
+    local function G(F)                                  -- P(j-th largest <= x) given F = P(draw <= x)
+      local g = 0
+      for i = lo, n do g = g + binom(n, i) * F ^ i * (1 - F) ^ (n - i) end
+      return g
+    end
+    local F, prevG = 0, 0
+    for _, e in ipairs(vals) do
+      F = math.min(1, F + e.p)
+      local g = G(F)
+      sum = sum + e.v * (g - prevG)
+      prevG = g
+    end
+  end
+  return sum
+end
+P._expected_pick_exact = expected_pick_exact
+
 function P.expected_pick(items, n, k, rng)
   if #items == 0 then return 0 end
   rng = rng or math.random
@@ -73,6 +106,7 @@ function P.expected_pick(items, n, k, rng)
   local total = 0
   for _, it in ipairs(items) do total = total + (it.w or 1) end
   if total <= 0 then return 0 end
+  if P.EXACT_PICK then return expected_pick_exact(items, n, k, total) end
   local function draw()
     local x = rng() * total
     local acc = 0
@@ -154,6 +188,11 @@ local function joker_pool_prior(gs)
   return items
 end
 
+-- How many jokers the measured pool draws. At 8 the reroll value swings +-57% between seeds and causes 35% of all
+-- seed-dependent pick flips (seed-flip probe 2026-09-28); 32 fixes the most flips for ~+6% shop time. Env
+-- BES_POOL_DRAWS for the A/B (audit plan 4.1); default unchanged until it is measured.
+P.POOL_DRAWS = tonumber(os.getenv and os.getenv("BES_POOL_DRAWS") or "") or 8
+
 -- MEASURED pool: sample M jokers (rarity-weighted) and measure each against YOUR
 -- deck via JokerValue. This makes "what a Buffoon pack might give" a calculation
 -- tied to your deck, not a static tier. Falls back to the prior when a joker has
@@ -177,7 +216,7 @@ local function joker_pool(gs, opts)
     for _, it in ipairs(keys) do acc = acc + it.w; if x <= acc then return it end end
     return keys[#keys]
   end
-  local M = opts.measure_count or 8
+  local M = opts.measure_count or P.POOL_DRAWS
   local items = {}
   for _ = 1, M do
     local it = draw()

@@ -291,6 +291,13 @@ local BH_HANDS = { "High Card", "Pair", "Two Pair", "Three of a Kind", "Straight
                    "Flush", "Full House", "Four of a Kind", "Straight Flush",
                    "Five of a Kind", "Flush House", "Flush Five" }
 local WOF_EDITIONS = { "foil", "holo", "polychrome" }
+-- Wheel of Fortune / Aura editions are weighted 50% Foil / 35% Holo / 15% Polychrome in the game, not uniform
+-- (sim-rules audit 2026-09-28)
+local function wof_edition(rng)
+  local r = rng()
+  if r < 0.50 then return "foil" elseif r < 0.85 then return "holo" end
+  return "polychrome"
+end
 
 -- ---- SPECTRALS (2026-08-11) -------------------------------------------------------------
 -- Fifteen of the eighteen spectrals the ENGINE prices were silently discarded by the world:
@@ -404,7 +411,7 @@ local function use_consumable(run, action, uses, targets, hand, draw_pile)
         elseif key == "c_wheel_of_fortune" then                  -- 1/4: add a random edition to a random joker
           if rng() < oops_p(run, 0.25) and #(run.jokers or {}) > 0 then
             local j = run.jokers[math.floor(rng() * #run.jokers) + 1]
-            if j and not j.edition then j.edition = WOF_EDITIONS[math.floor(rng() * 3) + 1] end
+            if j and not j.edition then j.edition = wof_edition(rng) end
           end
 
         -- ---- spectrals that RESHAPE THE DECK (the archetype enablers) ----
@@ -452,7 +459,7 @@ local function use_consumable(run, action, uses, targets, hand, draw_pile)
         elseif key == "c_aura" then           -- a random edition on one card in hand
           local tg = spectral_targets(run, hand)
           if #tg > 0 then
-            tg[math.floor(rng() * #tg) + 1].edition = WOF_EDITIONS[math.floor(rng() * 3) + 1]
+            tg[math.floor(rng() * #tg) + 1].edition = wof_edition(rng)
             shape = { shape = "edition", n = 1 }
           end
 
@@ -927,9 +934,59 @@ function World.play_blind(run, blind)
     return out
   end
   local function clear_forced(cards) for _, c in ipairs(cards or {}) do c.forced = nil end end
+  -- THE SERPENT draws exactly 3 after a play or discard (sim-rules audit #10: it did nothing)
+  local function refill_after()
+    if eff and eff.draw_exact then
+      for _ = 1, eff.draw_exact do if #draw_pile > 0 then hand[#hand + 1] = table.remove(draw_pile) end end
+    else
+      refill(hand, draw_pile, hand_size)
+    end
+  end
+  -- THE OX: playing the round's most-played poker hand sets money to $0 (sim-rules audit #11: the flag was never read).
+  -- The most-played hand is fixed when the blind is set.
+  local ox_hand
+  if eff and eff.money_zero_on_common then
+    local best = -1
+    local names = {}
+    for h in pairs(run.hand_type_plays or {}) do names[#names + 1] = h end
+    table.sort(names)
+    for _, h in ipairs(names) do
+      local n = run.hand_type_plays[h] or 0
+      if n > best then best, ox_hand = n, h end
+    end
+  end
+  local function ox_check(ht)
+    if ox_hand and ht == ox_hand and run.economy then run.economy.dollars = 0 end
+  end
+  -- THE HOOK discards 2 random HELD cards when the hand is played, BEFORE it scores (sim-rules audit #8: it used to
+  -- drop them after, so held-card jokers -- Steel, Baron, Blackboard, Raised Fist -- still saw them)
+  local function hook_discard(sel)
+    if not (eff and eff.discard_after) then return end
+    local inplay = {}; for _, c in ipairs(sel or {}) do inplay[c] = true end
+    for _ = 1, eff.discard_after do
+      local held = {}
+      for i, c in ipairs(hand) do if not inplay[c] then held[#held + 1] = i end end
+      if #held == 0 then break end
+      local k = math.floor(rng() * #held) + 1
+      if k > #held then k = #held end
+      table.remove(hand, held[k])
+    end
+  end
   after_draw()
 
-  JokerTick.on_blind_start(run, rng) -- per-round joker state: Ancient/Idol/Castle suit, Hit-the-Road reset, Ceremonial feed
+  -- the player's Ceremonial Dagger arrangement (feed a joker worth less than the Mult, else park it rightmost)
+  for _, j in ipairs(run.jokers or {}) do
+    if j.key == "j_ceremonial" then
+      local okd, plan = pcall(require("engine.dagger").plan, GS.new{ deck = run.deck, jokers = run.jokers,
+        meta = { ante = run.ante }, run = { hand_levels = run.hand_levels, hand_size = run.hand_size, joker_slots = run.joker_slots } },
+        { rng = rng })
+      if okd and plan and plan.order and #plan.order == #run.jokers then
+        for i, o in ipairs(plan.order) do run.jokers[i] = o end
+      end
+      break
+    end
+  end
+  JokerTick.on_blind_start(run, rng, blind.type) -- per-round joker state: Ancient/Idol/Castle suit, Hit-the-Road reset, Dagger / Madness
   blind_start_generators(run, rng)   -- Cartomancer: create a Tarot at blind select (before any play)
 
   -- per-hand play log (telemetry only; does not touch run state or the RNG). Records
@@ -984,8 +1041,11 @@ function World.play_blind(run, blind)
       JokerTick.on_discard(run, discarded)   -- A1: Green Joker -1, Ramen decay (may self-destruct)
       discard_econ(run, discarded)           -- effort economy: Faceless $5 per 3+ face discarded
       discard_effects(run, discarded, is_first_discard, rng)  -- Burnt (level) / Sixth Sense (spectral)
+      for _, c in ipairs(discarded or {}) do         -- PURPLE SEAL: a discarded Purple-seal card creates a Tarot (room permitting)
+        if c.seal == "Purple" and not c.debuffed then grant_consumable_world(run, rng, "Tarot") end
+      end
       log_action("discard", discarded, nil, nil, avail, #draw_pile)
-      refill(hand, draw_pile, hand_size)
+      refill_after()
       after_draw()
 
     elseif action.type == "USE_CONSUMABLE" then
@@ -1001,12 +1061,14 @@ function World.play_blind(run, blind)
         sel = with_forced(sel)
         if sel then
           clear_forced(sel); heart_prepped = true; mark_played(sel)
+          hook_discard(sel)
           local ev = referee_score(build_gs(run, b, hand, draw_pile, eff), sel, rng)
           b.scored = b.scored + (ev.score or 0); plays = plays + 1
           JokerTick.on_play(run, ev, sel)   -- A1: accumulate scalers on the played hand
           local is_first_play = not b._first_play_done; b._first_play_done = true
           space_joker_level(run, ev)        -- Space Joker: 1/4 chance to level the played hand
           post_play_econ(run, ev, sel, eff) -- A7/A8: play-money + The Tooth/Arm penalties
+          ox_check(ev.hand_type)
           glass_shatter(run, ev, rng)       -- Glass cards: 1 in 4 to shatter after scoring
           play_effects(run, sel, is_first_play)      -- DNA: copy the first single played card
           play_generators(run, ev)          -- Superposition/Vagabond/8 Ball/Seance -> consumables
@@ -1016,15 +1078,7 @@ function World.play_blind(run, blind)
           hand = remove_cards(hand, sel)
           b.hands_left = b.hands_left - 1
           log_action("play", sel, ev.hand_type, ev.score, avail, #draw_pile)
-          if eff and eff.discard_after then        -- The Hook: drop N random after a play
-            for _ = 1, eff.discard_after do
-              if #hand == 0 then break end
-              local i = math.floor(rng() * #hand) + 1
-              if i < 1 then i = 1 elseif i > #hand then i = #hand end
-              table.remove(hand, i)
-            end
-          end
-          refill(hand, draw_pile, hand_size)
+          refill_after()
           after_draw()
         end
       end
@@ -1044,6 +1098,7 @@ function World.play_blind(run, blind)
       end
       if not sel then break end  -- no legal play available (e.g. can't make 5 under Psychic)
       sel = with_forced(sel)
+      hook_discard(sel)
       local ev = referee_score(build_gs(run, b, hand, draw_pile, eff), sel, rng)
       clear_forced(sel); heart_prepped = true; mark_played(sel)
       b.scored = b.scored + (ev.score or 0); plays = plays + 1
@@ -1051,6 +1106,7 @@ function World.play_blind(run, blind)
       JokerTick.on_play(run, ev, sel)   -- A1: accumulate scalers on the played hand
       space_joker_level(run, ev)        -- Space Joker: 1/4 chance to level the played hand
       post_play_econ(run, ev, sel, eff) -- A7/A8: play-money + The Tooth/Arm penalties
+      ox_check(ev.hand_type or htype)
       glass_shatter(run, ev, rng)       -- Glass cards: 1 in 4 to shatter after scoring
       play_effects(run, sel, is_first_play)      -- DNA: copy the first single played card
       play_generators(run, ev)          -- Superposition/Vagabond/8 Ball/Seance -> consumables
@@ -1060,15 +1116,7 @@ function World.play_blind(run, blind)
       hand = remove_cards(hand, sel)
       b.hands_left = b.hands_left - 1
       log_action("play", sel, ev.hand_type or htype, ev.score, avail, #draw_pile)
-      if eff and eff.discard_after then
-        for _ = 1, eff.discard_after do
-          if #hand == 0 then break end
-          local i = math.floor(rng() * #hand) + 1
-          if i < 1 then i = 1 elseif i > #hand then i = #hand end
-          table.remove(hand, i)
-        end
-      end
-      refill(hand, draw_pile, hand_size)
+      refill_after()
       after_draw()
     end
   end
@@ -1078,6 +1126,21 @@ function World.play_blind(run, blind)
   if bell then clear_forced(run.deck) end
   for _, c in ipairs(pillar_marked) do c.debuffed = nil end
 
+  -- BLUE SEAL (sim-rules audit #13: never modelled): each Blue-seal card still HELD when the round ends creates the
+  -- Planet for the last hand played (if the tray has room).
+  if b.scored >= b.target and #b.plays > 0 then
+    local last_ht
+    for i = #b.plays, 1, -1 do if b.plays[i].kind == "play" then last_ht = b.plays[i].hand_type; break end end
+    local planet
+    for k, h in pairs(ConsumableValue.PLANET_KEY_HAND or {}) do if h == last_ht then planet = k end end
+    if planet then
+      for _, c in ipairs(hand) do
+        if c.seal == "Blue" and not c.debuffed and #(run.consumables or {}) < run.consumable_slots then
+          run.consumables[#run.consumables + 1] = { set = "Planet", key = planet, name = planet }
+        end
+      end
+    end
+  end
   local cleared = b.scored >= b.target
   -- Mr. Bones (JOKER_FIDELITY P0, survival): prevents death when you scored at least 25% of the
   -- target, then self-destructs. Without this the sim under-credits every run that holds it.
@@ -1201,6 +1264,10 @@ local ECON_INCOME_EXCLUDE = {
   j_ticket = true,        -- +$4 per scored Gold card                          (post_play_econ)
   j_mail = true,          -- +$5 per discarded card of the round's rank        (discard_econ)
   j_todo_list = true,     -- +$4 if the round's target hand is played          (conditional_econ)
+  -- paid through their real effect already, so the flat prior double-paid them (sim-rules audit 2026-09-28)
+  j_business = true,      -- $2 at 1/2 per scored face card                     (hand_eval money)
+  j_midas_mask = true,    -- scored faces become Gold -> $3 held each round      (post_play_econ + held gold)
+  j_certificate = true,   -- adds a sealed card each round                       (deck modification)
 }
 World.TO_THE_MOON_EXTRA = 1   -- extra $ of interest per $5 held -- VERIFY
 World.ROCKET_BASE       = 1   -- $/round -- VERIFY
@@ -1267,6 +1334,8 @@ function World.award_income(run, blind_result)
   local unused = math.max(0, blind_result.hands_left or 0)
   local income = Mechanics.round_income(blind_result.blind_type, unused,
     run.economy.dollars, run.economy.interest_cap)
+  -- a Mr. Bones save pays no blind reward (sim-rules audit: the sim paid it)
+  if blind_result.mr_bones_saved then income = income - (Mechanics.BLIND_REWARD[blind_result.blind_type] or 0) end
   income = income + joker_econ_income(run)   -- econ jokers finally pay their $/round
   income = income + conditional_econ(run, blind_result)  -- P1: Delayed Grat / Satellite (condition-gated)
   income = income + 3 * (blind_result.held_gold or 0)    -- Gold enhancement: $3 per card held in hand at round end

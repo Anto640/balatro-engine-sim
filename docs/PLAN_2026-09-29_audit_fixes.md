@@ -8,6 +8,17 @@ Every item from all three is listed below with a decision. Batch times assume 11
 every A/B after that should be judged in a world that behaves like the real game, and the current baseline is inflated
 (mostly by Cavendish). Engine tuning (reroll samples, pacing, guaranteed clears) comes last, measured on the corrected sim.
 
+## Status (overnight 2026-09-29)
+- Phase 1 DONE (`f86c375`): Baseball, Flower Pot, Ramen. Live replay: predictable plays <0.8x 5.1% -> 1.7%,
+  guaranteed-clear failures 12 -> 5. Regression arm `sc19` vs fin18.
+- Phase 2 DONE (`f80b871`): telemetry capacity on the whole deck, discards logged as discards, tools merged.
+- Phase 3A DONE (`8d2739f`): 3.1-3.8 all implemented.
+- Phase 3B DONE for the frequent items: 3.9 Arm (engine scores it too), 3.10 Hook, 3.11 first-shop Buffoon, 3.12
+  Serpent, 3.13 Ox (sim side; the engine doesn't yet avoid the Ox hand), 3.14 Blue/Purple seals, 3.15 econ double-pay,
+  3.17 Dagger, 3.18 Madness, 3.21 Mr. Bones reward, 3.22 edition weights.
+  DEFERRED (each fires in <=5 of 160 runs, below the frequency ceiling): 3.16, 3.19, 3.20, 3.23-3.29.
+- Baselines: `fin19` = 3A, `fin20` = 3A+3B (+ `fin20_7` out-of-sample). Phase 4 arms compare against fin20.
+
 ## Phase 0 — finish what is running (tonight)
 | # | Item | Action | Batch |
 |---|---|---|---|

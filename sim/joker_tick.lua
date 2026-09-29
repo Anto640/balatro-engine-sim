@@ -99,12 +99,16 @@ end
 -- suit (its chips accumulate all run; only the suit re-rolls), Hit the Road's per-round reset,
 -- and Ceremonial Dagger's one-time right-neighbour feed. OWNERSHIP-GATED + `rng` (the world
 -- stream) so a run without any of these consumes NO rng -> its stream stays byte-identical.
--- NOTE (Ceremonial): the real card DESTROYS the joker to its right and gains 2x its sell value
--- as Mult. The sim auto-reorders jokers (World.optimize_joker_order) rather than modelling the
--- player's placement, so faithfully destroying the "right neighbour" would eat cores it never
--- meant to sacrifice. We take the conservative subset -- the one-time +mult feed WITHOUT the
--- destroy (marked so it fires once) -- which is bounded and can't over-deliver. -- VERIFY
-function JokerTick.on_blind_start(run, rng)
+-- Ceremonial Dagger DESTROYS the (non-Eternal) joker to its right at every blind start and gains 2x its sell value
+-- as Mult. The world first applies the player's arrangement from engine/dagger.lua (feed a joker worth less than
+-- the Mult, else park the Dagger rightmost) -- the same decision the live self-player makes (audit plan 3.17).
+-- Madness (Small/Big blind selected): +x0.5 and destroys a random other non-Eternal joker (audit plan 3.18).
+local function eternal(j)
+  local a = j and j.ability
+  return type(a) == "table" and (a.eternal or (type(a.extra) == "table" and a.extra.eternal)) or false
+end
+function JokerTick.on_blind_start(run, rng, blind_type)
+  local doomed = {}
   for idx, j in ipairs(run.jokers or {}) do
     local k = j.key
     if k == "j_ancient" then
@@ -118,14 +122,22 @@ function JokerTick.on_blind_start(run, rng)
     elseif k == "j_hit_the_road" then
       ab(j).x_mult = 1                                           -- resets to x1 each round
     elseif k == "j_ceremonial" then
-      local a = ab(j)
-      if not a.cerem_fed then
-        local right = run.jokers[idx + 1]
-        if right then a.mult = (a.mult or 0) + 2 * (right.sell_value or 0) end
-        a.cerem_fed = true
+      local right = run.jokers[idx + 1]
+      if right and not eternal(right) and not doomed[right] and not doomed[j] then
+        local a = ab(j)
+        a.mult = (a.mult or 0) + 2 * (right.sell_value or 1)
+        doomed[right] = true
       end
+    elseif k == "j_madness" and (blind_type == "Small" or blind_type == "Big") and not doomed[j] then
+      local a = ab(j)
+      a.x_mult = (a.x_mult or 1) + 0.5
+      local others = {}
+      for _, o in ipairs(run.jokers) do if o ~= j and not eternal(o) and not doomed[o] then others[#others + 1] = o end end
+      if #others > 0 then doomed[others[math.floor(rng() * #others) + 1] or others[1]] = true end
     end
   end
+  if next(doomed) then return destroy_if(run, function(o) return doomed[o] == true end) end
+  return {}
 end
 
 -- ---- per-PLAY growth (called after a scoring hand is resolved) --------------
