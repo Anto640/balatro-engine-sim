@@ -451,6 +451,7 @@ function BP.is_keeper(key, gs)
   return BP.is_core(key)
 end
 
+BP.SCALER_KEEP_RUNWAY = tonumber(os.getenv and os.getenv("BES_SCALER_KEEP_RUNWAY") or "")   -- env: swap-bar A/B (sb2)
 function BP.keep_bias(key, gs, fires)
   local c = gs and BP.anchored_commitment(gs)
   if c and c.kind == "hand" then
@@ -470,7 +471,17 @@ function BP.keep_bias(key, gs, fires)
   -- Kings on an empty board). So `fires` (Eval.joker_fires: does it change the score at all on this deck?)
   -- decides -- a multiplier/retrigger/flat scorer that fires keeps its bias; one that does NOTHING gets
   -- none. fires == nil (not measured / measurement structurally blind: scalers, Dusk) keeps the old bias.
-  if JokerData.is_scaling(key) then return BP.CORE_KEEP end
+  if JokerData.is_scaling(key) then
+    -- A scaler's protection stands for growth it has yet to bank, so it shrinks as the run runs out
+    -- (BES_SCALER_KEEP_RUNWAY = blinds left for full protection; unset = always full, the shipped default). Swap-bar
+    -- probe 2026-09-29: an ante-7 Green Joker measuring 0.01 still blocked offers worth 1-3.
+    if BP.SCALER_KEEP_RUNWAY and gs then
+      local ante = math.floor((gs.meta and gs.meta.ante) or 1)
+      local left = math.max(0, 8 - ante) * 3 + 3   -- blinds left including this ante's (approx.)
+      return BP.CORE_KEEP * math.min(1, left / BP.SCALER_KEEP_RUNWAY)
+    end
+    return BP.CORE_KEEP
+  end
   if BP.is_core(key) then return (fires == false) and 0 or BP.CORE_KEEP end
   if is_flat_scorer(key) then return (fires == false) and 0 or BP.SCORER_KEEP end
   return 0
