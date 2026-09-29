@@ -20,7 +20,9 @@ every A/B after that should be judged in a world that behaves like the real game
 - Baselines: `fin20` = 3A+3B (+ `fin20_7` out-of-sample); `fin19` skipped for time. **fin20: 21/160 wins (13%)** vs 51
   (32%) in the old world; reach-8 57 -> 27. Deaths moved to ante 5-6, led by **Big blinds (ante-5 Big deaths 3 -> 12)** --
   the corrected sim now reproduces the live signature (live dies on Big blinds 2-3x the old sim). The Serpent kills 4 at
-  ante 6. Phase 4 arms compare against fin20.
+  ante 6. `fin20_7` (fresh seeds): 31/160, reach-8 46. Phase 4 arms compare against fin20.
+- 4.1 `pool32` (BES_POOL_DRAWS=32) vs fin20: **wins 21 -> 28, reach-8 27 -> 38, sign 78/52 (p 0.028), progress +0.276
+  (p 0.059)** -- promising; `pool32_7` vs fin20_7 queued for out-of-sample replication before shipping.
 
 ## Phase 0 — finish what is running (tonight)
 | # | Item | Action | Batch |
