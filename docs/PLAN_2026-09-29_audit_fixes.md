@@ -33,7 +33,12 @@ every A/B after that should be judged in a world that behaves like the real game
   (p 0.55), sign 66/70. NOT shipped** (switch stays default 8). Same pattern as pool32. The two first-pool gains are
   not independent: per-seed deltas of pool32 and poolall correlate 0.39 (they flip the same decisions and inherit the
   same cascades), so "twice on the original seeds" was one piece of evidence. Pooled 320: pool32 +0.20, poolall +0.10,
-  both n.s. `pool64` stopped by Claude (between two OOS failures, answers nothing new). Pack-pool draw noise is CLOSED.
+  both n.s. `pool64` stopped by Claude (between two OOS failures, answers nothing new).
+  **Revised (owner 2026-09-29):** poolall measures the SAME pack value with less noise -- an accuracy change, like
+  xpick -- so by the burden-of-proof rule it ships unless measured significantly negative (pooled 320: wins 52 -> 62,
+  reach-8 73 -> 83, n.s. but positive). Regression arms on the CURRENT engine in the cheap live form (all jokers,
+  2 deals each, +14% shop deals): `pa2` vs `stone`, `pa2_7` vs `xpick_7` (chain `%TMP%/bes/chain_pa2s.sh`, ETA ~20:50).
+  Ship if neither is significantly negative.
 - 1.4 live check (smoke test 2026-09-29, 6 runs, 1 win): **Stone cards scored as ranked** (Hack retriggered them) --
   fixed `c95f142`, deployed; regression arm `stone` vs `xpick` queued after the pool chain. Remaining misses = card
   order (self-player plays in hand order).

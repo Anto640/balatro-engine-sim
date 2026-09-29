@@ -7,7 +7,8 @@ maths SHIPPED). **Sim baseline = `sim_out/fin20.jsonl` (21/160) / `fin20_7` (31/
 3A+3B), which now reproduces the live Big-blind deaths. Old baselines (fin18 etc.) are the inflated world.
 **In flight:** `stone` (Stone-rank fix `c95f142`, default config) vs `xpick`, started 18:13, ETA ~19:05, log
 `%TMP%/bes/chain_f20.log`. `stone` becomes the new baseline (HEAD) if it is not significantly negative.
-Verdicts: pool32 AND poolall NOT shipped (both failed OOS; pack-pool noise closed); pacing risk tuning closed
+Then `pa2` / `pa2_7` (poolall at 2 deals on the current engine, regression check: ship unless significantly
+negative -- accuracy change, owner 2026-09-29), ETA ~20:50. Verdicts: pool32 not shipped; pacing risk tuning closed
 (refit / pq25 / rs07 all lost). `tools/arm.sh` now uses a shared seed queue (all workers busy to the end).
 Owner rules: run a fresh-seed arm only when the first is promising; never launch Balatro unless told; keep self-play short.
 **Live smoke test DONE (15:12-16:35, bes_runs line 23554, fixtures 21469; seeds `tools/live_audit/seeds_2026-09-29.txt`):**
