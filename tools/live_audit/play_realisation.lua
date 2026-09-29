@@ -28,7 +28,7 @@ local function score_row(p, actual)
   local ok, ev = pcall(HandEval.score, p.g, sel)
   if not (ok and ev and (ev.score or 0) > 0) then return end
   rows[#rows + 1] = { r = actual / ev.score, approx = ev.approx, pred = ev.score, floor = ev.score_min or ev.score,
-    rem = p.rem, actual = actual, g = p.g, sel = sel, cards = (function() local o = {} for _, c in ipairs(p.g.hand) do local on = false
+    rem = p.rem, actual = actual, g = p.g, hl = p.hl, dl = p.g.blind and p.g.blind.discards_left, sel = sel, cards = (function() local o = {} for _, c in ipairs(p.g.hand) do local on = false
       for _, x in ipairs(sel) do if x == c then on = true end end
       o[#o + 1] = (on and "*" or "") .. tostring(c.rank) .. tostring(c.suit):sub(1, 1) .. (c.enhancement and ("/" .. c.enhancement) or "")
         .. (c.edition and ("/" .. tostring(c.edition)) or "") .. (c.seal and ("/" .. tostring(c.seal)) or "") .. (c.debuffed and "/DEB" or "") end
@@ -91,10 +91,16 @@ print(string.format("  guaranteed floor >= remaining : %3d plays, failed live %3
 print(string.format("  EV-only (floor < remaining)   : %3d plays, failed live %3d (%.1f%%)", c.e[1], c.e[2], 100 * c.e[2] / math.max(1, c.e[1])))
 local share = 0; for _, r in ipairs(rows) do if r.approx then share = share + 1 end end
 print(string.format("share of plays involving chance: %.1f%%", 100 * share / #rows))
+if os.getenv("BES_PR_VERBOSE") then
+  print("\nEV-only predicted clears (floor < remaining) -- hands_left / discards_left at the play:")
+  for _, r in ipairs(rows) do if r.rem and r.rem > 0 and r.pred >= r.rem and r.floor < r.rem then
+    print(string.format("  %s %s a%s %-5s %-15s hands %s discards %s  pred %.0f floor %.0f need %.0f act %.0f", r.actual >= r.rem and "clear" or "FAIL ",
+      r.seed, tostring(r.ante), tostring(r.bt), tostring(r.ht), tostring(r.hl), tostring(r.dl), r.pred, r.floor, r.rem, r.actual)) end end
+end
 print("\ndeterministic plays under 0.8x:")
 table.sort(rows, function(a, b) return a.r < b.r end)
 for _, r in ipairs(rows) do if not r.approx and r.r < 0.8 then
-  print(string.format("  %.2f %s a%s %-5s %-15s %dc pred %7.0f act %7.0f | %s", r.r, r.seed, tostring(r.ante), tostring(r.bt), tostring(r.ht), r.n, r.pred, r.actual, r.keys))
+  print(string.format("  %.2f %s a%s %-5s %-15s %dc pred %7.0f act %7.0f need %7.0f | %s", r.r, r.seed, tostring(r.ante), tostring(r.bt), tostring(r.ht), r.n, r.pred, r.actual, r.rem or 0, r.keys))
   if os.getenv("BES_PR_VERBOSE") then
     print("       hand (*=played): " .. r.cards)
     -- per-joker ablation: the predicted score without each joker, and the joker's live ability numbers
