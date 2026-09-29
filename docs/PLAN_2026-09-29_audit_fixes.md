@@ -39,6 +39,12 @@ every A/B after that should be judged in a world that behaves like the real game
   reach-8 73 -> 83, n.s. but positive). Regression arms on the CURRENT engine in the cheap live form (all jokers,
   2 deals each, +14% shop deals): `pa2` vs `stone`, `pa2_7` vs `xpick_7` (chain `%TMP%/bes/chain_pa2s.sh`, ETA ~20:50).
   Ship if neither is significantly negative.
+- **`stone` vs `xpick` (Stone fix + Loyalty, correctness):** progress +0.041 (p 0.45), sign 23/19 (118 tied), death-ante
+  equal, reach-7 56 -> 62, reach-8 43 -> 42, **wins 32 -> 24 (11 lost / 3 gained, McNemar p 0.057)**. The lost wins had
+  no Stone card when they diverged: the fix shifts VALUATIONS that price hypothetical Stone cards (Tower, Marble,
+  projected decks; e.g. Shoot the Moon 15.98 -> 15.81 in an ante-1 shop) and the cascade reshuffles 86 seeds. Not
+  significant -> KEPT (correctness, and it is the live-scoring fix); `stone` is the new baseline. Watch wins on the
+  next arms; if they stay low, recheck the Tower/Marble valuations.
 - **4.1 was never tested:** the reroll path passes `measure_count = 6`, so pool32/poolall only changed Buffoon-pack and
   created-joker values. `BES_REROLL_DRAWS` (`492dff7`, default 6) -> arm `rr32` vs `stone` queued after pa2_7
   (`%TMP%/bes/chain_rr.sh`, worktree `%TMP%/bes_wt_rr`), `rr32_7` vs `xpick_7` only if promising. ETA ~21:45 / ~22:40.
