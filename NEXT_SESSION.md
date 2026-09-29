@@ -5,12 +5,15 @@
 (Phase 1 scoring fixes, whole-deck `gs.deck` + Loyalty fix, Arm/Serpent engine side, Spectral hidden weights, EXACT pack
 maths SHIPPED). **Sim baseline = `sim_out/fin20.jsonl` (21/160) / `fin20_7` (31/160)** -- the corrected sim (sim rules
 3A+3B), which now reproduces the live Big-blind deaths. Old baselines (fin18 etc.) are the inflated world.
-**In flight:** `stone` (Stone-rank fix `c95f142`, default config) vs `xpick`, started 18:13, ETA ~19:05, log
-`%TMP%/bes/chain_f20.log`. `stone` becomes the new baseline (HEAD) if it is not significantly negative.
-Then `pa2` / `pa2_7` (poolall at 2 deals on the current engine, regression check: ship unless significantly
-negative -- accuracy change, owner 2026-09-29), ETA ~20:50. Verdicts: pool32 not shipped; pacing risk tuning closed
-(refit / pq25 / rs07 all lost). `tools/arm.sh` now uses a shared seed queue (all workers busy to the end).
-Owner rules: run a fresh-seed arm only when the first is promising; never launch Balatro unless told; keep self-play short.
+**Baselines now: `pa2` (pool 3) / `pa2_7` (pool 7)** = the current default (Stone fix + full joker pool at 2 deals).
+**In flight** (chain `%TMP%/bes/chain_next.sh`, log `%TMP%/bes/chain_f20.log`): `sb1` swap bar (BES_UPGRADE_MARGIN=0.6
+BES_SWAP_SLOPE=0.25, worktree `%TMP%/bes_wt_sb`) vs `stone`, ETA ~00:40, `sb1_7` if promising; then `rr32` (reroll pool,
+`%TMP%/bes_wt_rr`), `rr32_7` if promising. Swap-bar probe: 69% of better offers refused on live full boards (plan).
+Verdicts today: poolall SHIPPED; Stone fix kept (wins 32 -> 24 n.s., cascade); pool32 not shipped; 4.3 dropped;
+pacing risk tuning closed. `tools/arm.sh` uses a shared seed queue (all workers busy to the end).
+Owner rules: fresh-seed arm only when the first is promising; accuracy changes ship unless significantly negative;
+never launch Balatro unless told; restart any job stopped for low memory without asking; report every result as a
+baseline-vs-arm table.
 **Live smoke test DONE (15:12-16:35, bes_runs line 23554, fixtures 21469; seeds `tools/live_audit/seeds_2026-09-29.txt`):**
 6 finished runs, **1 win** (ZI1XU8GN), deaths a2 Small / a3 Boss 0.99 / a4 Boss 0.52 / a6 Boss 0.98 / a7 Big 0.98. No
 self-player stalls (cash_out retries <= 5). The replay found **Stone cards scored as if ranked**: Hack retriggered them

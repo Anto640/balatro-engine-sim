@@ -39,6 +39,11 @@ every A/B after that should be judged in a world that behaves like the real game
   reach-8 73 -> 83, n.s. but positive). Regression arms on the CURRENT engine in the cheap live form (all jokers,
   2 deals each, +14% shop deals): `pa2` vs `stone`, `pa2_7` vs `xpick_7` (chain `%TMP%/bes/chain_pa2s.sh`, ETA ~20:50).
   Ship if neither is significantly negative.
+- **poolall SHIPPED (`585d25f`, deployed):** `pa2` vs `stone` wins 24 -> 28, reach-8 42 -> 36, progress +0.051 (p 0.75),
+  sign 77/59; `pa2_7` vs `xpick_7` wins 33 -> 41, reach-8 44 -> 52, progress -0.150 (p 0.38), sign 61/72. Wins up on
+  all four pools; nothing significant either way -> shipped as an accuracy change. **New baselines: `pa2` / `pa2_7`**
+  (= current default). `sb1` / `rr32` were queued on worktrees without it and compare vs `stone`; a winner there needs
+  one confirming arm on the current default.
 - **`stone` vs `xpick` (Stone fix + Loyalty, correctness):** progress +0.041 (p 0.45), sign 23/19 (118 tied), death-ante
   equal, reach-7 56 -> 62, reach-8 43 -> 42, **wins 32 -> 24 (11 lost / 3 gained, McNemar p 0.057)**. The lost wins had
   no Stone card when they diverged: the fix shifts VALUATIONS that price hypothetical Stone cards (Tower, Marble,
