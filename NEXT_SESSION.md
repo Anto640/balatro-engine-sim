@@ -1,33 +1,14 @@
 # NEXT_SESSION.md — fresh-session handoff
 
-## START HERE (2026-09-28, evening)
-**Live install = the branch tip**, apart from the default-off `BES_PACE_CAP` pacing code, which isn't deployed.
-Restarting the game is the owner's call: never launch Balatro unasked. **Sim baseline:** `sim_out/fin18.jsonl`
-(real ante-8 bosses, 50/160 wins) -- SUPERSEDED 2026-09-29 by **`sim_out/fin20.jsonl` (21/160, the corrected sim; see docs/PLAN_2026-09-29_audit_fixes.md)**. `main` last synced at `42a867f`; sync it once the new live runs look healthy.
-**Next, in order:** ⭐ after `rs07` (+ its OOS arm if positive), work through
-`docs/PLAN_2026-09-29_audit_fixes.md` (the three 2026-09-28 audits: engine scoring bugs, telemetry, sim rules, then engine
-tuning on the corrected sim). The items below are superseded where that plan covers them.
-1. Plan step 2 (see PLAN in the R18 block below): fit `Pacing.RISK_Q25` from `sim_out/pacefit_*.jsonl`, A/B
-   `BES_PACE_CAP=q25` against fin18, replicate on fresh seeds if positive.
-2. Review new live runs on the current install (the R17 method: outcomes, `bes_autoplay.log` live-only failures,
-   live vs sim, replay misplays from `bes_fixtures.jsonl`).
-3. Make the sim's Ceremonial Dagger use `engine/dagger.lua`'s feed-or-park rule (it never destroys in the sim).
-**Plan step 1-2 results (2026-09-28 evening):** step 1 (`tools/estimator_probe.lua`, 615 blinds): best-25%-of-20
-predicts the NEXT blind best (AUC 0.870 vs 0.817 mean-of-5). Refit (`tools/pace_fit_probe.lua`, 926 samples): for
-"dies within 2 antes" q25 = mean (0.787 vs 0.786), and the 09-23 risk fit OVERSTATES today's risk (ante-4 intercept
-1.28 vs refit -0.64). **`pq25` (BES_PACE_CAP=q25 + its fit) vs fin18: wins 50 -> 38, reach-8 57 -> 47, sign 61/87
-(p 0.04) -- NOT shipped.** Same signature as pace20: a more accurate / more optimistic risk read makes the engine
-bank instead of buying power. Working hypothesis: the engine wins MORE when it errs toward buying power; the next
-lever is the spending policy under "comfortable", not the precision of the read. `prefit` (BES_PACE_RISK=refit,
-calibration only) CONFIRMED it: **wins 50 -> 32, progress -0.32 (p 0.006), sign 32/67 (p 0.0006)**. And `rs07`
-(BES_PACE_RISK_SHIFT=0.7, MORE pessimistic) ALSO lost: **wins 50 -> 38, p 0.026, reach-8 57 -> 45**. Conclusion: the
-shipped risk fit is a local optimum for the shop's 0.25/0.5/urgent thresholds -- shifting it either way loses. Pacing
-is closed for tuning unless the thresholds are refit jointly; see the audit plan (4.4 now low priority).
-Still open from R17b: ante-1 jokerless deaths (price survival risk in the first shop); per-joker dig-aware valuation;
-the remaining no-flat items; shop speed (late-ante shops take >3 s).
-Ops: `bash tools/arm.sh <name> <worktree> <workers> [n] [seed_off] [ENV=VAL]` (resumable; memory reaps come from
-Chrome/Steam/Discord, not the ~14 MB workers); rerun a killed batch without asking. When starting any batch, tell the
-owner its estimated duration and finish time (~1 h per 160-seed arm at 9 workers).
+## START HERE (2026-09-29 afternoon)
+**Read `docs/PLAN_2026-09-29_audit_fixes.md` first** (status block at its top). Live install = branch tip `686bc7a`+
+(Phase 1 scoring fixes, whole-deck `gs.deck` + Loyalty fix, Arm/Serpent engine side, Spectral hidden weights, EXACT pack
+maths SHIPPED). **Sim baseline = `sim_out/fin20.jsonl` (21/160) / `fin20_7` (31/160)** -- the corrected sim (sim rules
+3A+3B), which now reproduces the live Big-blind deaths. Old baselines (fin18 etc.) are the inflated world.
+**In flight:** `poolall_7` (BES_POOL_DRAWS=all, fresh seeds; first pool 21 -> 29 wins) then `pool64` (+ `pool64_7` only
+if promising) -- chain `%TMP%/bes/chain_pa2.sh`, log `%TMP%/bes/chain_f20.log`, worktree `%TMP%/bes_wt_pa`.
+Verdicts: pool32 NOT shipped (failed OOS); pacing risk tuning closed (refit / pq25 / rs07 all lost).
+Owner rules: run a fresh-seed arm only when the first is promising; never launch Balatro unless told; keep self-play short.
 
 ## ⭐⭐⭐⭐ 2026-09-28 (later) — R18: UNATTENDED RUNS ON 42a867f + TWO LIVE-ONLY DEFECTS FIXED
 Runs (session starting bes_runs line 11138): VKMZCD5H a5 Boss, PY43WSDU a6 Small, G5QGWQKG a4 Big, UTNJ8T4Q a5 Boss,
