@@ -5,9 +5,10 @@
 (Phase 1 scoring fixes, whole-deck `gs.deck` + Loyalty fix, Arm/Serpent engine side, Spectral hidden weights, EXACT pack
 maths SHIPPED). **Sim baseline = `sim_out/fin20.jsonl` (21/160) / `fin20_7` (31/160)** -- the corrected sim (sim rules
 3A+3B), which now reproduces the live Big-blind deaths. Old baselines (fin18 etc.) are the inflated world.
-**In flight:** `poolall_7` (BES_POOL_DRAWS=all, fresh seeds; first pool 21 -> 29 wins) then `pool64` (+ `pool64_7` only
-if promising) -- chain `%TMP%/bes/chain_pa2.sh`, log `%TMP%/bes/chain_f20.log`, worktree `%TMP%/bes_wt_pa`.
-Verdicts: pool32 NOT shipped (failed OOS); pacing risk tuning closed (refit / pq25 / rs07 all lost).
+**In flight:** `stone` (Stone-rank fix `c95f142`, default config) vs `xpick`, started 18:13, ETA ~19:05, log
+`%TMP%/bes/chain_f20.log`. `stone` becomes the new baseline (HEAD) if it is not significantly negative.
+Verdicts: pool32 AND poolall NOT shipped (both failed OOS; pack-pool noise closed); pacing risk tuning closed
+(refit / pq25 / rs07 all lost). `tools/arm.sh` now uses a shared seed queue (all workers busy to the end).
 Owner rules: run a fresh-seed arm only when the first is promising; never launch Balatro unless told; keep self-play short.
 **Live smoke test DONE (15:12-16:35, bes_runs line 23554, fixtures 21469; seeds `tools/live_audit/seeds_2026-09-29.txt`):**
 6 finished runs, **1 win** (ZI1XU8GN), deaths a2 Small / a3 Boss 0.99 / a4 Boss 0.52 / a6 Boss 0.98 / a7 Big 0.98. No
