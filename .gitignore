@@ -18,3 +18,8 @@ scratch/
 # Self-play simulator batch outputs (regenerated; not source)
 sim_out/
 data/agreement_corpus/
+
+# A/B arm part-files (tools/arm.sh writes these into the worktree it runs in; merged output lands in sim_out/)
+/arm_*.jsonl
+/armseeds_*.txt
+/armclaim_*/
