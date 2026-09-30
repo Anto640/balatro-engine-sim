@@ -155,6 +155,7 @@ local function build_gs(run, blind, hand, draw_pile, eff)
       base_hands = blind.base_hands, base_discards = blind.base_discards,
       discards_used = blind._first_discard_done and 1 or 0,   -- Burnt Joker: is the next discard the first?
       played_hand_types = blind.played_types,   -- K2: hand types played THIS blind (Card Sharp)
+      first_hand_type = blind._pstate and blind._pstate.first,   -- the Mouth lock
     },
     run = {
       hand_levels = run.hand_levels, vouchers_owned = run.vouchers_owned, tags = run.tags,
@@ -874,6 +875,7 @@ function World.play_blind(run, blind)
 
   -- boss play-legality state (Psychic min-5 / Eye no-repeat / Mouth single-type)
   local pstate = { types = {}, first = nil }
+  b._pstate = pstate                   -- build_gs passes the Mouth lock (first type) to the engine, as main.lua does live
   local restricted = BossEffect.has_play_restriction(eff)
   local plays = 0
 
@@ -1087,37 +1089,48 @@ function World.play_blind(run, blind)
     else -- PLAY (default / fallback)
       local sel = action.cards
       local htype = action.hand_type
-      -- FIDELITY: the real game only allows LEGAL plays. If the engine's choice violates
-      -- the boss restriction, substitute the best LEGAL play (and the run still spends a
-      -- hand) -- so an engine that ignores Psychic's 5-card rule can't cheat the sim.
-      if restricted and (not sel or not BossEffect.legal_play(eff, sel, htype, pstate)) then
-        local filter = function(s, ht) return BossEffect.legal_play(eff, s, ht, pstate) end
-        local ev2, sel2 = HandEval.best_play_target(build_gs(run, b, hand, draw_pile, eff),
-          hand, b.target - b.scored, filter)
-        if ev2 and sel2 then sel, htype = sel2, ev2.hand_type else sel = nil end
+      if not sel or #sel == 0 then break end
+      if not htype then htype = select(1, HandEval.analyze(sel)) end
+      -- FIDELITY (2026-09-30): a play the boss forbids (Mouth off-type, Eye repeat, Psychic under 5 cards) is still
+      -- PLAYED in the game: it scores 0 ("Not allowed", blind.lua debuff_hand), spends the hand, and its cards leave
+      -- and are redrawn. The sim used to swap in the best legal play, or END the blind when there was none -- 15 of
+      -- the 17 Mouth deaths in bf/bf_7 were blinds ended with hands still unplayed.
+      if restricted and not BossEffect.legal_play(eff, sel, htype, pstate) then
+        sel = with_forced(sel)
+        hook_discard(sel)
+        clear_forced(sel); heart_prepped = true; mark_played(sel)
+        b._first_play_done = true
+        track_play(run, b, htype)         -- the game counts the hand as played (played_this_round)
+        local avail = #hand
+        hand = remove_cards(hand, sel)
+        b.hands_left = b.hands_left - 1
+        log_action("play", sel, htype, 0, avail, #draw_pile)
+        b.plays[#b.plays].not_allowed = true
+        refill_after()
+        after_draw()
+      else
+        sel = with_forced(sel)
+        hook_discard(sel)
+        local ev = referee_score(build_gs(run, b, hand, draw_pile, eff), sel, rng)
+        clear_forced(sel); heart_prepped = true; mark_played(sel)
+        b.scored = b.scored + (ev.score or 0); plays = plays + 1
+        local is_first_play = not b._first_play_done; b._first_play_done = true
+        JokerTick.on_play(run, ev, sel)   -- A1: accumulate scalers on the played hand
+        space_joker_level(run, ev)        -- Space Joker: 1/4 chance to level the played hand
+        post_play_econ(run, ev, sel, eff) -- A7/A8: play-money + The Tooth/Arm penalties
+        ox_check(ev.hand_type or htype)
+        glass_shatter(run, ev, rng)       -- Glass cards: 1 in 4 to shatter after scoring
+        play_effects(run, sel, is_first_play)      -- DNA: copy the first single played card
+        play_generators(run, ev)          -- Superposition/Vagabond/8 Ball/Seance -> consumables
+        track_play(run, b, ev.hand_type or htype)  -- K1/K2: run/blind hand-type history
+        pstate.types[ev.hand_type or htype] = true; pstate.first = pstate.first or (ev.hand_type or htype)
+        local avail = #hand
+        hand = remove_cards(hand, sel)
+        b.hands_left = b.hands_left - 1
+        log_action("play", sel, ev.hand_type or htype, ev.score, avail, #draw_pile)
+        refill_after()
+        after_draw()
       end
-      if not sel then break end  -- no legal play available (e.g. can't make 5 under Psychic)
-      sel = with_forced(sel)
-      hook_discard(sel)
-      local ev = referee_score(build_gs(run, b, hand, draw_pile, eff), sel, rng)
-      clear_forced(sel); heart_prepped = true; mark_played(sel)
-      b.scored = b.scored + (ev.score or 0); plays = plays + 1
-      local is_first_play = not b._first_play_done; b._first_play_done = true
-      JokerTick.on_play(run, ev, sel)   -- A1: accumulate scalers on the played hand
-      space_joker_level(run, ev)        -- Space Joker: 1/4 chance to level the played hand
-      post_play_econ(run, ev, sel, eff) -- A7/A8: play-money + The Tooth/Arm penalties
-      ox_check(ev.hand_type or htype)
-      glass_shatter(run, ev, rng)       -- Glass cards: 1 in 4 to shatter after scoring
-      play_effects(run, sel, is_first_play)      -- DNA: copy the first single played card
-      play_generators(run, ev)          -- Superposition/Vagabond/8 Ball/Seance -> consumables
-      track_play(run, b, ev.hand_type or htype)  -- K1/K2: run/blind hand-type history
-      pstate.types[ev.hand_type or htype] = true; pstate.first = pstate.first or (ev.hand_type or htype)
-      local avail = #hand
-      hand = remove_cards(hand, sel)
-      b.hands_left = b.hands_left - 1
-      log_action("play", sel, ev.hand_type or htype, ev.score, avail, #draw_pile)
-      refill_after()
-      after_draw()
     end
   end
   -- finisher state never outlives the blind
