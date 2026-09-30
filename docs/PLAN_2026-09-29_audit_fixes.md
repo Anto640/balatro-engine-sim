@@ -62,6 +62,14 @@ every A/B after that should be judged in a world that behaves like the real game
   sides ARE measured alike -- forward_measure on each -- so the probe's comparison is fair). Next: `ss24` = the lower
   bar + BES_SWAP_SAMPLES=24 (precise measurement of just the swap, +9% deals), then `sb2` -- both vs `pa2` on the
   shipped default (worktree `%TMP%/bes_wt_ss` at cba4e3f, chain `%TMP%/bes/chain_night.sh`, after rr32).
+- **SIM WAS BOSS-BLIND IN THE SHOP (fixed `b3ae087`):** `pboss` vs `pa2` tied 158/160 because `run._next_boss` (the
+  sim shop's gs.run.boss_key) was never set -- so the shop boss hints, Chicot's known-boss value and boss-aware pacing
+  never fired in the sim, while live they do. The sim now rolls the next boss when the current one is beaten (as the
+  game does). New baseline `bf` (current default, fixed sim) and `bfpb` (+ BES_PACE_BOSS=1) queued after `rrc`
+  (`%TMP%/bes/chain_bf.sh`); fresh-seed pair only if bfpb is promising.
+- **Self-player stall fixed (`ui/autoplay.lua`, deployed):** a hidden Play/Discard button (deck overview opened by the
+  mouse resting on the deck) outlasted MAX_WAIT, last_sig was burned and the run stalled for good; in a hand it now
+  keeps retrying every 3 s and moves the pointer off the deck.
 - **`sb2` vs `pa2`: NEUTRAL, barely fires** -- 150/160 tied, wins 28 -> 28, reach-8 36 -> 35, sold 459 -> 473.
   **Swap-bar line CLOSED:** sb1, ss24 and sb2 all failed to convert; the bar stays as shipped.
 - **`ss24` vs `pa2`: NOT promising** -- wins 28 -> 24, reach-8 36 -> 40, progress +0.039 (p 0.73), sign 45/48, sold
