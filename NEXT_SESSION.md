@@ -1,30 +1,31 @@
 # NEXT_SESSION.md — fresh-session handoff
 
-## START HERE (2026-09-29 afternoon)
-**Read `docs/PLAN_2026-09-29_audit_fixes.md` first** (status block at its top). Live install = branch tip `686bc7a`+
-(Phase 1 scoring fixes, whole-deck `gs.deck` + Loyalty fix, Arm/Serpent engine side, Spectral hidden weights, EXACT pack
-maths SHIPPED). **Sim baseline = `sim_out/fin20.jsonl` (21/160) / `fin20_7` (31/160)** -- the corrected sim (sim rules
-3A+3B), which now reproduces the live Big-blind deaths. Old baselines (fin18 etc.) are the inflated world.
-**Live/default now (`94b37f9`, main synced):** Stone fix + full joker pool (2 deals) + 32-joker reroll pool (SHIPPED
-2026-09-30 04:00, pooled wins 57 -> 66, reach-8 86 -> 99). Sim fixed 2026-09-30 (`b3ae087`): the sim shop
-now knows the next boss, as live always did (baseline jump +0.387, p 0.036). **Baseline now: `bf`** (pool 3; no pool-7
-counterpart yet -- run `bf_7` before the next fresh-seed check). Open: the live Mouth lock bug (plan).
-**In flight** (chain `%TMP%/bes/chain_next.sh`, log `%TMP%/bes/chain_f20.log`): `sb1` swap bar (BES_UPGRADE_MARGIN=0.6
-BES_SWAP_SLOPE=0.25, worktree `%TMP%/bes_wt_sb`) vs `stone`, ETA ~00:40, `sb1_7` if promising; then `rr32` (reroll pool,
-`%TMP%/bes_wt_rr`), `rr32_7` if promising. Swap-bar probe: 69% of better offers refused on live full boards (plan).
-Verdicts today: poolall SHIPPED; Stone fix kept (wins 32 -> 24 n.s., cascade); pool32 not shipped; 4.3 dropped;
-pacing risk tuning closed. `tools/arm.sh` uses a shared seed queue (all workers busy to the end).
-Owner rules: fresh-seed arm only when the first is promising; accuracy changes ship unless significantly negative;
-never launch Balatro unless told; restart any job stopped for low memory without asking; report every result as a
-baseline-vs-arm table.
-**Live smoke test DONE (15:12-16:35, bes_runs line 23554, fixtures 21469; seeds `tools/live_audit/seeds_2026-09-29.txt`):**
-6 finished runs, **1 win** (ZI1XU8GN), deaths a2 Small / a3 Boss 0.99 / a4 Boss 0.52 / a6 Boss 0.98 / a7 Big 0.98. No
-self-player stalls (cash_out retries <= 5). The replay found **Stone cards scored as if ranked**: Hack retriggered them
-(4KMBNQY6, every Pair with a Stone at 0.72-0.78x). Fixed `c95f142` (`Cards.rank_id` = 0 for Stone), DEPLOYED: smoke
-deterministic plays under 0.95x 7% -> 0%, guaranteed clears failing live 2 -> 0; overnight under 0.8x 1.7% -> 1.0%.
-Remaining overnight misses are CARD ORDER (Photograph / Glass / Even Steven): the self-player plays in hand order, the
-estimate assumes the best order -- the known live-only autoplay-reorder item. Regression arm `stone` (vs `xpick`,
-worktree `%TMP%/bes_wt_stone`) queued after chain_pa2 by `%TMP%/bes/chain_stone.sh` (same log).
+## START HERE (2026-09-30 checkpoint)
+**Read `docs/PLAN_2026-09-29_audit_fixes.md`** (status block at the top has every verdict with its numbers).
+
+**Live install = main = branch tip** (winrate-v4-bundle, synced 2026-09-30). Shipped since 09-29: Stone cards have no
+rank (`c95f142`); full joker pool for Buffoon packs, 2 deals each (`585d25f`); 32-joker reroll pool (`94b37f9`);
+self-player fixes -- hidden Play button no longer stalls a hand, in-blind (Verdant Leaf) sells select the joker first;
+**The Mouth lock** = first hand type played this blind, recorded in main.lua (`305c963`, NOT yet seen live).
+
+**Sim fixed 2026-09-30 (`b3ae087`):** the sim shop now knows the next boss (live always did): +0.387 progress
+(p 0.036), wins 27 -> 32. **Baselines: `sim_out/bf.jsonl` (pool 3, 32/160 wins) and `bf_7` (pool 7)** -- `bf_7` was
+started 16:05 on 2026-09-30 (worktree `%TMP%/bes_wt_bf`, log `%TMP%/bes/chain_f20.log`, ETA ~18:00). If the log has no
+"bf_7 done", check workers (`tasklist | grep -c luajit`); if they died, resume with
+`bash tools/arm.sh bf_7 "$TMP/bes_wt_bf" 11 160 7` (resumable, no need to ask).
+
+**Closed levers (don't retry without a new idea):** swap bar (sb1 / ss24 / sb2 -- lower bar trades more, not better,
+even with 24-deal measurement); boss-aware pacing (bfpb -0.12, shop hint already covers it); pacing risk refits;
+pool32/pool64; "died rich" (it is the interest reserve); prefer-guaranteed-clear (failures are harmless first hands).
+
+**Next candidates:** (1) confirm the Mouth fix in a short live self-play (owner launches or authorises); (2) why no
+in-blind fixtures were written for 16JEBAVN's Mouth blind; (3) new lever research -- the remaining live deaths are
+bosses (Mouth/Leaf) and weak boards; see the plan's open list.
+
+**Owner rules:** 11 workers when away, 4-6 while using the PC; never launch Balatro unless told; restart any job
+stopped for low memory without asking; give each batch's ETA and finish time; report each result as a
+baseline-vs-arm table; fresh-seed arm only if the first is promising; accuracy/correctness changes ship unless
+significantly negative; commit and push freely.
 
 ## ⭐⭐⭐⭐ 2026-09-28 (later) — R18: UNATTENDED RUNS ON 42a867f + TWO LIVE-ONLY DEFECTS FIXED
 Runs (session starting bes_runs line 11138): VKMZCD5H a5 Boss, PY43WSDU a6 Small, G5QGWQKG a4 Big, UTNJ8T4Q a5 Boss,
