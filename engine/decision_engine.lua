@@ -76,8 +76,16 @@ local function boss_filter(gs)
   local state
   if restricted then
     local types = b.played_hand_types or {}
-    local first = nil
-    for ht in pairs(types) do first = ht; break end   -- Mouth: only one type is ever present
+    -- Mouth: the lock is the FIRST type played this blind. Live, main.lua records it (first_hand_type) because
+    -- played_hand_types can hold more than one type (16JEBAVN 2026-09-30). Without it, a single entry is the lock;
+    -- several entries with no record are ambiguous -- take them in sorted order so the choice is at least stable.
+    local first = b.first_hand_type
+    if not first then
+      local keys = {}
+      for ht in pairs(types) do keys[#keys + 1] = ht end
+      table.sort(keys)
+      first = keys[1]
+    end
     state = { types = types, first = first }
   end
   return function(sel, ht)

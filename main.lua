@@ -173,6 +173,22 @@ function BES.evaluate(with_sim, gs)
     gs.run.build_plan = BES._build_plan   -- so BP.commitment/planet_credit see it (shop AND blind)
   end
 
+  -- THE MOUTH's lock = the FIRST hand type played this blind. played_hand_types (GAME.hands[*].played_this_round)
+  -- can hold more than one type, and the legality filter took an arbitrary one: live 16JEBAVN (2026-09-30) locked
+  -- Three of a Kind, then the engine recommended three Pairs predicting +558/+2016/+360 -- each scored 0 and the run
+  -- died. Record the first type ourselves: when exactly one hand has been played this round and the game has
+  -- registered it (last_hand_played is among this round's types), that is the lock. Keyed by run + round.
+  if gs.blind then
+    local fkey = tostring(gs.meta and gs.meta.seed_hash) .. ":" .. tostring(gs.meta and gs.meta.round)
+    if BES._first_hand_key ~= fkey then BES._first_hand_key, BES._first_hand = fkey, nil end
+    local b = gs.blind
+    if not BES._first_hand and b.hands_played_round == 1 and b.last_hand_played
+       and b.played_hand_types and b.played_hand_types[b.last_hand_played] then
+      BES._first_hand = b.last_hand_played
+    end
+    b.first_hand_type = BES._first_hand
+  end
+
   -- An open booster pack: recommend which revealed items to take, and in what
   -- order (chained effects), or to skip the pack (deck bloat). The cheap pass
   -- (with_sim=false, the live tick) ranks by priors instantly -- NO play

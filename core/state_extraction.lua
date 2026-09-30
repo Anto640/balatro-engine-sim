@@ -259,6 +259,8 @@ function Extract.snapshot()
       skip_tag_hand = skip_tag_hand,          -- the hand an Orbital tag would level (nil if unknown)
       boss_effect_key = blind.config and blind.config.blind and blind.config.blind.key,
       played_hand_types = played_hand_types,  -- hand types played THIS blind (Mouth/Eye legality)
+      hands_played_round = cur.hands_played,  -- hands played this round (first-hand lock, main.lua)  -- VERIFY field
+      last_hand_played = GAME.last_hand_played, -- the most recent played hand type  -- VERIFY field
       hands_left = cur.hands_left or 0,
       discards_left = cur.discards_left or 0,
       discards_used = cur.discards_used,     -- this round (Burnt Joker: the FIRST discard levels its hand; card.lua:3214)

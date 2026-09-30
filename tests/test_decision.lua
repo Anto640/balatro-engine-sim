@@ -125,6 +125,15 @@ return function(t)
     t.eq(decide(nil).hand_type, "Two Pair", "Mouth not yet locked -> greedy Two Pair is legal")
     -- locked to Pair by a prior hand -> Two Pair is now ILLEGAL (would score 0); play a Pair
     t.eq(decide("Pair").hand_type, "Pair", "Mouth locked to Pair -> engine plays a Pair, not the 0-scoring Two Pair")
+    -- live 16JEBAVN (2026-09-30): played_hand_types held TWO types and the filter took an arbitrary one. The recorded
+    -- first type (main.lua -> blind.first_hand_type) is the lock: here Two Pair, so the Two Pair is legal again.
+    local gs2 = GS.new{ hand = h, run = { hand_levels = {}, hand_size = 5 },
+      blind = { target_chips = 40, chips_scored = 0, hands_left = 1, discards_left = 0,
+        boss = true, boss_effect_key = "bl_mouth", played_hand_types = { Pair = 1, ["Two Pair"] = 1 },
+        first_hand_type = "Two Pair" } }
+    t.eq(DE.decide(gs2).best.hand_type, "Two Pair", "Mouth: the recorded first hand type is the lock, not an arbitrary entry")
+    gs2.blind.first_hand_type = "Pair"
+    t.eq(DE.decide(gs2).best.hand_type, "Pair", "Mouth: recorded lock Pair -> plays a Pair")
   end
 
   -- The Mouth, locked to a type the CURRENT hand CANNOT make (owner 2026-09-20 death: locked to Straight,
