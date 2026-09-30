@@ -9,10 +9,9 @@ self-player fixes -- hidden Play button no longer stalls a hand, in-blind (Verda
 **The Mouth lock** = first hand type played this blind, recorded in main.lua (`305c963`, NOT yet seen live).
 
 **Sim fixed 2026-09-30 (`b3ae087`):** the sim shop now knows the next boss (live always did): +0.387 progress
-(p 0.036), wins 27 -> 32. **Baselines: `sim_out/bf.jsonl` (pool 3, 32/160 wins) and `bf_7` (pool 7)** -- `bf_7` was
-started 16:05 on 2026-09-30 (worktree `%TMP%/bes_wt_bf`, log `%TMP%/bes/chain_f20.log`, ETA ~18:00). If the log has no
-"bf_7 done", check workers (`tasklist | grep -c luajit`); if they died, resume with
-`bash tools/arm.sh bf_7 "$TMP/bes_wt_bf" 11 160 7` (resumable, no need to ask).
+(p 0.036), wins 27 -> 32. **Baselines (current engine + fixed sim, worktree `%TMP%/bes_wt_bf`): `sim_out/bf.jsonl`
+(pool 3) 32/160 wins, reach-8 45; `sim_out/bf_7.jsonl` (pool 7) 32/160 wins, reach-8 45.** Compare every new arm
+against these, paired: `lua tools/analyze_runs.lua sim_out/bf.jsonl compare sim_out/<arm>.jsonl`. Nothing is running.
 
 **Closed levers (don't retry without a new idea):** swap bar (sb1 / ss24 / sb2 -- lower bar trades more, not better,
 even with 24-deal measurement); boss-aware pacing (bfpb -0.12, shop hint already covers it); pacing risk refits;
