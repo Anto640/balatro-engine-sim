@@ -337,6 +337,8 @@ function Driver.run(seed, opts)
       -- THEN the shop opens
       if blind.type == "Boss" then World.boss_clear_tick(run) end
       if blind.type == "Boss" and content.on_boss_cleared then content.on_boss_cleared(run) end
+      -- the next ante's boss is rolled now, as in the game, so the post-boss shop knows it
+      if blind.type == "Boss" and World.preroll_next_boss then World.preroll_next_boss(run) end
       -- SHOP: generate offerings + let the engine spend (injected; no-op stub by default).
       -- emit forwards the action trace (shop offers/advice, buys, sells, packs) into the
       -- run's records, so analyze_runs surfaces what it bought AND what it SKIPPED.

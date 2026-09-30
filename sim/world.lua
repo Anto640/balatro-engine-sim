@@ -1221,8 +1221,34 @@ function World.blind_target(ante, blind_type, boss_key)
 end
 
 -- Build the three blinds of an ante (Small, Big, Boss) with targets + the ante's boss.
+-- Is `key` a legal boss for `ante`? (a finisher only at ante 8/16..., a regular boss from its min ante)
+local function boss_legal(key, ante)
+  if ante % 8 == 0 then
+    for _, k in ipairs(World.FINISHER_BOSSES) do if k == key then return true end end
+    return false
+  end
+  local m = World.BOSS_MIN_ANTE[key]
+  return m ~= nil and ante >= m
+end
+
+-- The game rolls the NEXT ante's boss when the current boss is beaten (end of round), so the shop after a boss --
+-- and every shop of the ante -- already knows it (live gs.run.boss_key). The sim picked it only at the next ante's
+-- start and never exposed it to the shop (run._next_boss was read but never set), so every sim shop was boss-blind
+-- while the live engine was not (found 2026-09-30: the boss-aware pacing arm tied 158/160).
+function World.preroll_next_boss(run)
+  local save = run.ante
+  run.ante = save + 1
+  run._pending_boss = World.boss_for_ante(run)
+  run.ante = save
+  run._next_boss = run._pending_boss
+end
+
 function World.ante_blinds(run)
-  local boss_key = World.boss_for_ante(run)
+  local boss_key = run._pending_boss
+  run._pending_boss = nil
+  -- a pre-rolled boss that is illegal here (Hieroglyph replays the ante) is re-rolled
+  if not (boss_key and boss_legal(boss_key, run.ante)) then boss_key = World.boss_for_ante(run) end
+  run._next_boss = boss_key
   return {
     { type = "Small", target = World.blind_target(run.ante, "Small") },
     { type = "Big",   target = World.blind_target(run.ante, "Big") },
