@@ -9,6 +9,15 @@ every A/B after that should be judged in a world that behaves like the real game
 (mostly by Cavendish). Engine tuning (reroll samples, pacing, guaranteed clears) comes last, measured on the corrected sim.
 
 ## Status (overnight 2026-09-29)
+- **MOUTH (2026-09-30 evening).** Boss death rates (bf+bf_7, 320 runs): Mouth 19% vs 3-5% for the other x2 bosses, and
+  **15 of 17 Mouth losses ended with hands unplayed**: the sim replaced an off-type play with a legal one, or ENDED the
+  blind when none existed (audit 3.25, deferred as rare -- it was not). The game plays it for 0 and redraws.
+  `6f665b2` sim fix (boss-illegal play scores 0, spends the hand, cycles; Mouth lock passed as first_hand_type);
+  `04ae2b6` engine fix (0-scoring plays under every restriction; the forced 0 play throws the legal-type dig's cards,
+  not the best off-type hand; rollout seeded with the blind's lock, cycles instead of stopping). Chain
+  `%TMP%/bes/chain_mz.sh` (11 workers, from 19:05): `mz` (= current engine, fixed sim; NEW BASELINE pool 3) -> `mze`
+  (engine fix, vs mz) -> `mz_7` (baseline pool 7). Next if Mouth deaths stay high: the pre-lock dig spends every
+  discard before locking (seen in most Mouth death traces).
 - Phase 1 DONE (`f86c375`): Baseball, Flower Pot, Ramen. Live replay: predictable plays <0.8x 5.1% -> 1.7%,
   guaranteed-clear failures 12 -> 5. Regression arm `sc19` vs fin18: neutral (155/160 tied, wins 50 -> 51) -- kept.
 - Phase 2 DONE (`f80b871`): telemetry capacity on the whole deck, discards logged as discards, tools merged.
