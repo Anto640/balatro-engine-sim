@@ -67,6 +67,9 @@ every A/B after that should be judged in a world that behaves like the real game
 - **`bf` vs `rrc` (sim shop now knows the next boss):** wins 27 -> 32, reach-8 34 -> 45, reach-7 54 -> 65, **progress
   +0.387 (p 0.036), sign 86/60 (p 0.039)** -- the engine's existing boss-aware shop logic pays off; the old sim
   under-rated it. **`bf` is the baseline now** (engine = shipped default `94b37f9`+, sim `b3ae087`).
+- **`bf_7` (pool-7 baseline, current engine + fixed sim) DONE 18:21:** 32 wins, reach-8 45 (same totals as `bf`).
+  vs `pa2_7` (no rr32, old sim): wins 41 -> 32, reach-8 52 -> 45, progress +0.036 (p 0.85), sign 76/68 -- flat; the
+  pool-3 step went the other way (27 -> 32). **Baselines: `bf` / `bf_7`.**
 - **`bfpb` vs `bf` (boss-aware pacing): NOT promising** -- wins 32 -> 27, reach-8 45 -> 37, progress -0.120 (p 0.42),
   sign 50/66. Fresh pair skipped. With the shop hint already weighting the next boss, the extra urgency over-spends.
   Switch BES_PACE_BOSS stays off.
