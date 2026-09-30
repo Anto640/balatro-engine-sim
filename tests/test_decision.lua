@@ -188,6 +188,36 @@ return function(t)
     t.eq(kept, 0, "Mouth cycle play keeps both pairs (they can become Three of a Kind)")
   end
 
+  -- The Mouth LOCK CHOICE (2026-09-30): the first play locks the round, so the lock is priced over every hand
+  -- left, not this one. Three Jacks score 8400 now but a second Three of a Kind rarely comes; a Pair (6400) comes
+  -- back almost every hand and two of them clear 12000. The greedy Three of a Kind is not a "one-time" hand, so
+  -- the old step-down never fired on it.
+  do
+    local h = {
+      card{ id = 1, rank = "Jack", suit = "Hearts" }, card{ id = 2, rank = "Jack", suit = "Clubs" },
+      card{ id = 3, rank = "Jack", suit = "Spades" }, card{ id = 4, rank = "2", suit = "Spades" },
+      card{ id = 5, rank = "5", suit = "Diamonds" }, card{ id = 6, rank = "7", suit = "Clubs" },
+      card{ id = 7, rank = "9", suit = "Hearts" },   card{ id = 8, rank = "King", suit = "Diamonds" },
+    }
+    local inhand = { ["11Hearts"] = true, ["11Clubs"] = true, ["11Spades"] = true, ["2Spades"] = true,
+      ["5Diamonds"] = true, ["7Clubs"] = true, ["9Hearts"] = true, ["13Diamonds"] = true }
+    local pile = {}
+    for i = 1, 52 do
+      local r, su = ((i - 1) % 13) + 2, ({ "Spades", "Hearts", "Clubs", "Diamonds" })[((i - 1) % 4) + 1]
+      if not inhand[r .. su] then pile[#pile + 1] = card{ id = 4000 + i, rank_id = r, suit = su } end
+    end
+    local function rng() local s = 5; return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end end
+    local gs = GS.new{ deck = pile, hand = h, remaining = pile,
+      run = { hand_size = 8, joker_slots = 5, hand_levels = {
+        ["Three of a Kind"] = { chips = 270, mult = 28, level = 12 }, Pair = { chips = 300, mult = 20, level = 20 } } },
+      blind = { target_chips = 12000, chips_scored = 0, hands_left = 4, discards_left = 0,
+        boss = true, boss_effect_key = "bl_mouth", played_hand_types = {} } }
+    local best = DE.decide(gs, { rng = rng() }).best
+    t.eq(best.type, "PLAY", "Mouth lock choice: plays (no discards)")
+    t.eq(best.hand_type, "Pair", "Mouth lock choice: locks the Pair it can remake, not the bigger one-off Three of a Kind")
+    t.ok(best.reason and best.reason:find("The Mouth: lock Pair", 1, true) ~= nil, "Mouth lock choice: the reason names the lock")
+  end
+
   -- HOLD-CONDITIONAL PLAY TIMING: Mystic Summit (+15 mult at 0 discards) makes a scoring play land far
   -- bigger once the discards are spent, so with discards still in hand the engine must DIG them out first
   -- (owner 2026-08-31: "use all its discards before playing" -- it was playing the flush at 2 discards

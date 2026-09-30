@@ -94,6 +94,11 @@ end
 -- rest. This lets Sim.survive_after arbitrate the engine's play-vs-discard by
 -- expected survival instead of the mean-of-one-hand heuristic (F1/F2).
 local function money_credit(_, ev) return (ev and ev.money) or 0 end
+-- hands built from scarce specific cards (4+ of a rank, a 3+2): locking the Mouth on one dooms the later hands
+local ONE_OFF_HAND = {
+  ["Four of a Kind"] = true, ["Five of a Kind"] = true, ["Full House"] = true,
+  ["Straight Flush"] = true, ["Flush House"] = true, ["Flush Five"] = true,
+}
 
 -- `pol` (optional, OPT-IN): rollout-policy upgrades. pol.dig = when the hand can't clear and a discard
 -- remains, choose the discard by DiscardValue.best (MEASURED, joker-aware -- the same dig the full engine
@@ -217,6 +222,15 @@ local function rollout(gs, start_hand, pile, target, chips0, hands, discards, ha
     -- subset of the start hand once the pile ran dry would otherwise keep the stale start hand)
     local hgs = with_hand(bgs, current)
     local ev, sel = HandEval.best_play_target(hgs, current, rem, filter, true)
+    -- The Mouth, not yet locked, spare hands: the rollout's greedy first play would lock a one-off hand (Four of a
+    -- Kind, Full House ...) that never comes back. Step down to the best repeatable type unless the one-off clears.
+    if ev and eff and eff.single_hand_type and not pstate.first and hands_left >= 2
+       and ONE_OFF_HAND[ev.hand_type] and ev.score < rem then
+      local rev, rsel = HandEval.best_play_target(hgs, current, rem, function(s, ht)
+        return not ONE_OFF_HAND[ht] and (not filter or filter(s, ht))
+      end, true)
+      if rev then ev, sel = rev, rsel end
+    end
     if not ev then
       -- no legal play: the game still lets you play a hand for 0 (blind.lua debuff_hand), which cycles cards
       -- like a discard. With discards or spare hands left, cycle what the legal-type dig would throw.

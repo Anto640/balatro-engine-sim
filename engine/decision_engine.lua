@@ -190,15 +190,12 @@ DE.SURV_MARGIN  = 0.06
 -- human PLAYED. So the engine doesn't under-dig UNIFORMLY; it under-digs in the specific commit-to-a-line
 -- situations the human recognises (the build-commitment wall), which a blanket bias can't target.
 DE.DIG_BIAS = 0.0
--- Under The Mouth (one hand type all round) the FIRST play LOCKS the round to that type. A "one-time"
--- hand consumes scarce specific cards -- 4+ of a rank, or a 3+2 -- so you cannot RELOCK it each hand;
--- locking into it dooms every later hand to 0. The repeatable hands (High Card/Pair/Two Pair/Three of a
--- Kind/Straight/Flush) can be remade, so the Mouth first-play re-pick steps DOWN to the best of those
--- when the greedy pick is one-time and doesn't clear outright.
-DE.ONE_TIME_HAND = {
-  ["Four of a Kind"] = true, ["Five of a Kind"] = true, ["Full House"] = true,
-  ["Straight Flush"] = true, ["Flush House"] = true, ["Flush Five"] = true,
-}
+-- Under The Mouth (one hand type all round) the FIRST play LOCKS the round to that type. The lock is chosen by
+-- rollout (see LOCK CHOICE in DE.decide): another type's best play replaces the greedy lock only when its
+-- survive_after P(clear) beats the greedy's by this much (~1 SE at 60 samples; the same CRN seed prices every
+-- candidate, so the paired gap is tighter). E[frac] decides only between equal clear rates. It replaced a
+-- fixed step-down from "one-time" hands (Four of a Kind / Full House ...), which the rollout prices directly.
+DE.MOUTH_LOCK_MARGIN = 0.05
 -- When a held 0-discard joker (Mystic Summit) makes digging out the discards worth a big scoring
 -- uplift (defer_uplift), the survive_after rollout MIS-JUDGES it: its greedy continuation is Mystic-
 -- blind (it never digs to 0 for the +15), so it reports playing-now as just as safe and flips the dig
@@ -564,21 +561,54 @@ function DE.decide(gs, opts)
   -- repeatable type in the SAMPLED path, but the CHEAP overlay pass (no samples) does not, and the
   -- self-player acts on it. Re-pick among REPEATABLE types (make-frequency >= threshold) when the greedy
   -- first play is a one-time hand that doesn't clear. Only fires on the Mouth, first play, multi-hand.
+  -- LOCK CHOICE BY ROLLOUT (2026-09-30). The old guard only stepped down from one-time hands (Four of a Kind,
+  -- Full House ...). Sim Mouth deaths kept locking a type the deck rarely remakes (Three of a Kind 3332 vs 4000,
+  -- then nothing; 64003 cleared by locking High Card -- legal every hand -- and died locking Two Pair). Price
+  -- each makeable type's best play by survive_after: the rollout honours the lock it sets, digs and cycles
+  -- toward it, and sums every remaining hand -- so the choice weighs how often the type comes back, not just
+  -- this hand. The greedy play keeps the lock unless another type clears more often by DE.MOUTH_LOCK_MARGIN.
+  local mouth_lock_note, mouth_lock   -- mouth_lock = the chosen lock candidate { ev, cards, frac, clear }
   do
     local bb = gs.blind or {}
     local eff = bb.boss_effect_key and BossEffect.of(bb.boss_effect_key) or nil
-    local locked = bb.played_hand_types and next(bb.played_hand_types) ~= nil
-    -- one-time hands consume scarce specific cards (4+ of a rank, or a 3+2), so you can't RELOCK them
-    -- each hand; the repeatable hands (High Card/Pair/Two Pair/Trips/Straight/Flush) can be remade.
-    if eff and eff.single_hand_type and not locked and not clears and hands_left >= 2
-       and DE.ONE_TIME_HAND[play_ev.hand_type] then
-      local rev, rcards = HandEval.best_play_target(gs, hand, remaining, function(sel, ht)
-        return (not DE.ONE_TIME_HAND[ht]) and (not pfilter or pfilter(sel, ht))
-      end)
-      if rev and rcards then
-        play_ev, play_cards = rev, rcards
-        clears = play_ev.score >= remaining and remaining > 0
-        guaranteed = (play_ev.score_min or play_ev.score) >= remaining and remaining > 0
+    local locked = bb.first_hand_type ~= nil or (bb.played_hand_types and next(bb.played_hand_types) ~= nil)
+    if eff and eff.single_hand_type and not locked and not clears and hands_left >= 2 and remaining > 0 then
+      local cands = {}
+      for _, tp in ipairs(HandEval.top_plays(gs, hand, 12)) do
+        local T = tp.hand_type
+        local tev, tcards = HandEval.best_play_target(gs, hand, remaining, function(sel, ht)
+          return ht == T and (not pfilter or pfilter(sel, ht))
+        end)
+        if tev and tcards then cands[#cands + 1] = { ev = tev, cards = tcards } end
+      end
+      if #cands >= 1 then
+        local seed = disc_seed(gs)
+        local greedy
+        for _, c in ipairs(cands) do
+          local v = Simulation.survive_after(gs, { kind = "PLAY", sel = c.cards }, DE.SURV_SAMPLES, lcg(seed))
+          c.frac, c.clear = v.frac, v.clear
+          if c.ev.hand_type == play_ev.hand_type then greedy = c end
+        end
+        -- rank by P(clear), not E[frac]: partial credit prefers a big hand that never finishes (sim 35003: Four of
+        -- a Kind 3876/4000 = frac .97 but clears 0%; Three of a Kind clears 48%). frac only breaks ties (0% vs 0%).
+        table.sort(cands, function(a, z)
+          if a.clear ~= z.clear then return a.clear > z.clear end
+          if a.frac ~= z.frac then return a.frac > z.frac end
+          if a.ev.score ~= z.ev.score then return a.ev.score > z.ev.score end
+          return a.ev.hand_type < z.ev.hand_type
+        end)
+        local top = cands[1]
+        mouth_lock = greedy or top
+        if top ~= greedy and (not greedy or top.clear > greedy.clear + DE.MOUTH_LOCK_MARGIN
+                              or (top.clear == greedy.clear and top.frac > greedy.frac + DE.MOUTH_LOCK_MARGIN)) then
+          mouth_lock_note = string.format("The Mouth: lock %s (clears the blind ~%d%% of the time) rather than %s (~%d%%).",
+            top.ev.hand_type, math.floor(top.clear * 100 + 0.5), play_ev.hand_type,
+            math.floor(((greedy and greedy.clear) or 0) * 100 + 0.5))
+          play_ev, play_cards = top.ev, top.cards
+          mouth_lock = top
+          clears = play_ev.score >= remaining
+          guaranteed = (play_ev.score_min or play_ev.score) >= remaining
+        end
       end
     end
   end
@@ -642,6 +672,7 @@ function DE.decide(gs, opts)
     ordering = Ordering.optimize(gs, hand_ordered_play, {
       objective = (guaranteed and "money" or "score"), remaining = remaining }),
     fuel_note = play_fuel_note,   -- surfaced in DE._annotate
+    lock_note = mouth_lock_note,  -- surfaced in DE._annotate
   }
   -- credit the future growth this play triggers (0 unless it feeds a scaler)
   play_action.value = play_action.value + play_fuel_bonus
@@ -1177,6 +1208,21 @@ function DE.decide(gs, opts)
       end
     end
 
+    -- MOUTH: LOCK NOW OR DIG (2026-09-30). Before the lock every discard is also one fewer to remake the locked
+    -- type afterwards; sim 35003 locking Three of a Kind at 4 discards cleared 75%, but four digs later (a Trading
+    -- Card trade first, exempt from the rollout above) it locked at ~50%. The arbitration above ranks by E[frac]
+    -- with a margin; here, before the lock, dig only if the dig CLEARS more often than the chosen lock (the lock
+    -- choice's own P(clear), same CRN seed).
+    if mouth_lock and best.type == "DISCARD" and best.cards and #best.cards > 0
+       and play_action.cards and same_cards(play_action.cards, mouth_lock.cards) then
+      local vd = Simulation.survive_after(gs, { kind = "DISCARD", cards = best.cards }, DE.SURV_SAMPLES, lcg(disc_seed(gs)))
+      if mouth_lock.clear >= vd.clear and mouth_lock.clear > 0 then
+        best = play_action; best.plan = true
+        best.lock_note = string.format("The Mouth: lock %s now (clears ~%d%%) -- digging first clears ~%d%% and spends a discard the lock needs.",
+          play_action.hand_type, math.floor(mouth_lock.clear * 100 + 0.5), math.floor(vd.clear * 100 + 0.5))
+      end
+    end
+
     -- DIG-PLAY when OUT OF DISCARDS (owner 2026-08-31). With no discards, hands to spare, and no clear,
     -- the best-SCORING play spends your build cards on a hand that doesn't clear -- often worse than
     -- PLAYING YOUR CHAFF to cycle (a play removes+redraws its cards just like a discard) while KEEPING
@@ -1416,6 +1462,7 @@ function DE._annotate(best, c)
     end
     -- scaling-fuel note: this play was chosen (in part) to grow a conditional scaler
     if best.fuel_note then best.reason = best.reason .. "  [fuel: " .. best.fuel_note .. "]" end
+    if best.lock_note then best.reason = best.reason .. "  " .. best.lock_note end
   else -- DISCARD
     local play_score = c.play_action.score
     best.confidence = clamp(0.40 + (best.weight or 0.5) * 0.6, 0.40, 0.85)
