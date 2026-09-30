@@ -197,8 +197,10 @@ SA.REROLL_MIN_IMPROVEMENT = 0.2  -- boss-hand-fraction the expected joker must b
                                  -- current best by before a PAID reroll is worth it
 SA.REROLL_APPETITE_RICH = 0.7    -- above-cap appetite (was 1.0 -- maximal eagerness)
 -- Jokers measured to value a reroll (plan 4.1). 6 draws swing the value by seed (seed-flip probe 2026-09-28: 35% of
--- seed-dependent picks); BES_REROLL_DRAWS for the A/B, default unchanged. BES_POOL_DRAWS never reached this path.
-SA.REROLL_DRAWS = tonumber(os.getenv and os.getenv("BES_REROLL_DRAWS") or "") or 6
+-- seed-dependent picks). SHIPPED 32 (2026-09-30): rr32 vs stone wins 24 -> 32, reach-8 42 -> 48; rr32_7 vs xpick_7
+-- wins 33 -> 34, reach-8 44 -> 51; pooled wins 57 -> 66, reach-8 86 -> 99, progress n.s. -- the same reroll value
+-- with less draw noise, +9% shop deals. BES_REROLL_DRAWS=6 restores the old pool. (BES_POOL_DRAWS never reached here.)
+SA.REROLL_DRAWS = tonumber(os.getenv and os.getenv("BES_REROLL_DRAWS") or "") or 32
 -- TRIED AND REVERTED (2026-08-11, WINRATE_V3_PLAN §5d): a full-board FEASIBILITY gate on the
 -- reroll. The reroll is priced off the JOKER a fresh shop would surface (`e_best`), but only
 -- money was checked for feasibility -- never whether a SLOT exists for it. Measured: 98% of
