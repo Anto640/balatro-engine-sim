@@ -62,6 +62,9 @@ every A/B after that should be judged in a world that behaves like the real game
   sides ARE measured alike -- forward_measure on each -- so the probe's comparison is fair). Next: `ss24` = the lower
   bar + BES_SWAP_SAMPLES=24 (precise measurement of just the swap, +9% deals), then `sb2` -- both vs `pa2` on the
   shipped default (worktree `%TMP%/bes_wt_ss` at cba4e3f, chain `%TMP%/bes/chain_night.sh`, after rr32).
+- **`ss24` vs `pa2`: NOT promising** -- wins 28 -> 24, reach-8 36 -> 40, progress +0.039 (p 0.73), sign 45/48, sold
+  459 -> 528. With sb1: a lower swap bar trades more but not better, even with 24-deal measurement -- the refused
+  "better" swaps are worth little in the sim. The flat margin stays. `sb2` (scaler keep runway) running, ETA ~07:20.
 - **rr32 SHIPPED (`94b37f9`, deployed, main synced):** `rr32_7` vs `xpick_7` wins 33 -> 34, reach-8 44 -> 51, reach-7
   72 -> 79, progress +0.004. Pooled 320 wins 57 -> 66, reach-8 86 -> 99. Confirm arm `rrc` (new default vs `pa2`) queued
   last (`%TMP%/bes/chain_rrc.sh`); it becomes the next baseline.
