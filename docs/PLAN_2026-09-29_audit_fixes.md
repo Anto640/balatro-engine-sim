@@ -81,6 +81,8 @@ every A/B after that should be judged in a world that behaves like the real game
   a stale entry from the previous blind or two entries picks the wrong lock. Fix: main.lua records the first hand
   type actually played this blind (reset on blind change) and boss_filter prefers it. No fixture exists for that
   blind (in-blind fixtures stopped at the skip) -- also check why.
+  **FIXED `305c963` (deployed):** main.lua records blind.first_hand_type (first type played, keyed by run + round);
+  boss_filter prefers it. Needs a live Mouth to confirm. `bf_7` (pool-7 baseline) started 16:05, ETA ~18:00.
 - **SIM WAS BOSS-BLIND IN THE SHOP (fixed `b3ae087`):** `pboss` vs `pa2` tied 158/160 because `run._next_boss` (the
   sim shop's gs.run.boss_key) was never set -- so the shop boss hints, Chicot's known-boss value and boss-aware pacing
   never fired in the sim, while live they do. The sim now rolls the next boss when the current one is beaten (as the
