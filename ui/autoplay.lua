@@ -901,9 +901,23 @@ function Autoplay.tick(last, logger)
   -- blocked EVERY retry, stalling the run until an F11 reset (owner 2026-09-22: stuck skipping a
   -- standard pack). Now a transient miss is retried (every locked_until ~1.5s) until it renders, while
   -- the MAX_WAIT deadlock-breaker still stops a genuinely-missing button from retrying forever.
-  if issued or (now() - (Autoplay.wait_since or now())) > Autoplay.MAX_WAIT then
+  if issued then
     Autoplay.last_sig = s
     Autoplay.pending_id = nil
+  elseif (now() - (Autoplay.wait_since or now())) > Autoplay.MAX_WAIT then
+    if ch == "hand" then
+      -- A hidden Play/Discard button can outlast MAX_WAIT: live 2026-09-30 the deck overview (opened by the mouse
+      -- resting on the deck) hid both buttons, last_sig was burned, and since a hand state only changes by playing,
+      -- the run stalled for good. In a hand, keep retrying (slower) and move the pointer off the deck instead.
+      Autoplay.locked_until = now() + 3.0
+      pcall(function()
+        local w, h = love.graphics.getDimensions()
+        love.mouse.setPosition(math.floor(w * 0.6), math.floor(h * 0.12))
+      end)
+    else
+      Autoplay.last_sig = s
+      Autoplay.pending_id = nil
+    end
   end
 end
 
