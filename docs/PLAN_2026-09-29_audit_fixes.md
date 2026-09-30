@@ -62,6 +62,17 @@ every A/B after that should be judged in a world that behaves like the real game
   sides ARE measured alike -- forward_measure on each -- so the probe's comparison is fair). Next: `ss24` = the lower
   bar + BES_SWAP_SAMPLES=24 (precise measurement of just the swap, +9% deals), then `sb2` -- both vs `pa2` on the
   shipped default (worktree `%TMP%/bes_wt_ss` at cba4e3f, chain `%TMP%/bes/chain_night.sh`, after rr32).
+- **Live self-play 2026-09-30 09:28-11:15** (bes_runs from line 24837, fixtures 22717, autoplay log 72660; seeds
+  `tools/live_audit/seeds_2026-09-30.txt`): 3 runs ended, 0 wins -- 2E6KURK8 a8 Verdant Leaf (0.46), 16JEBAVN a3
+  **The Mouth** (0.37), A3SQKZG5 a5 **The Mouth** (0.74); HU6QHE83 reached a8 when closed. Scoring: 24/24
+  deterministic plays within 5%, 22/22 guaranteed clears cleared. Frame hitches per shop eval 9.4 (yesterday 9.8):
+  the new pool/reroll measurements are not noticeably slower. Two self-player stalls found and FIXED (hidden Play
+  button; in-blind sell never selected the joker). **OPEN -- live Mouth lock:** 16JEBAVN locked Three of a Kind,
+  then the engine recommended three Pairs predicting +558/+2016/+360 (all scored 0). A3SQKZG5's Mouth lock worked.
+  boss_filter takes the FIRST key of played_hand_types (from GAME.hands[*].played_this_round) assuming one entry;
+  a stale entry from the previous blind or two entries picks the wrong lock. Fix: main.lua records the first hand
+  type actually played this blind (reset on blind change) and boss_filter prefers it. No fixture exists for that
+  blind (in-blind fixtures stopped at the skip) -- also check why.
 - **SIM WAS BOSS-BLIND IN THE SHOP (fixed `b3ae087`):** `pboss` vs `pa2` tied 158/160 because `run._next_boss` (the
   sim shop's gs.run.boss_key) was never set -- so the shop boss hints, Chicot's known-boss value and boss-aware pacing
   never fired in the sim, while live they do. The sim now rolls the next boss when the current one is beaten (as the
