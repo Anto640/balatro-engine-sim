@@ -280,7 +280,7 @@ end
 -- directive 2026-08-30: "it spends money on it and has no clue how to utilise it"). This gates
 -- ACQUISITION only; an already-owned one is still valued normally for keep/sell. Extend this list
 -- rather than special-casing call sites. Currently only Matador (needs a boss-blind-ability trigger
--- event bus the sim lacks -- see JOKER_FIDELITY_AUDIT.md).
+-- event bus the sim lacks -- see docs/archive/JOKER_FIDELITY_AUDIT.md).
 JokerData.UNMODELLED = {
   j_matador = "pays only when your played hand triggers the boss blind's ability — the engine has no boss-trigger model, so it can't value it or play to use it",
 }

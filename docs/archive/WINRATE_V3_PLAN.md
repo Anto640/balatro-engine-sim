@@ -283,7 +283,7 @@ it, that's a measured indictment of the whole valuation. That readout alone is w
     **optimize them jointly**, which no single-lever experiment can do. Validate the result with one
     honest paired n=160 batch. *(Guard against surrogate overfit: hold out seeds, and require the
     final batch to confirm.)*
-- **C3 — revive MCTS as shop-only lookahead.** `MCTS_PLAN.md` was deferred for a good reason: no
+- **C3 — revive MCTS as shop-only lookahead.** `docs/archive/MCTS_PLAN.md` was deferred for a good reason: no
   value function to back up. B supplies one. Search 2–3 ply over `{buy, skip, reroll, save}` only.
   **Do not search in-blind** — measured play regret is 0.0076 (near-optimal); the entire loss is in
   the build. Budget-capped so the live overlay stays responsive.
@@ -4757,7 +4757,7 @@ exist. Read as a **bound**, like `rich` and `oracle_plan`, not as a shippable ch
   (where §20 already acts). That is a real closure.
 * **clearly positive** → the engine's ante-1/2 buying is destroying its own build by consuming the
   slots that the ante-3/4 pools would fill better, and the fix is a slot-RESERVATION policy — which is
-  `MCTS_PLAN.md`'s INC-1, the narrowest slice of the deferred search work and the one piece of it that
+  `docs/archive/MCTS_PLAN.md`'s INC-1, the narrowest slice of the deferred search work and the one piece of it that
   needs no search at all.
 
 ⚠ Honest caveat before anyone reads a verdict into the table above: the human n is **8 runs** (and 7
@@ -4908,11 +4908,11 @@ information, committed from ante 1 — worth zero at both operating points. Toge
 expressibility work measuring **exactly 0.000** and §5t's shape-credit revert, the "commit to a build
 and steer toward it" thread has now been tested four ways and has never produced anything.
 
-⚠ **NOT closed by this: search over the SHOP STREAM** (§5u item 1, `MCTS_PLAN.md`). That plans over
+⚠ **NOT closed by this: search over the SHOP STREAM** (§5u item 1, `docs/archive/MCTS_PLAN.md`). That plans over
 *acquisitions* — which reachable ante-8 board this run's offers support — not over hand type. The
 oracle has no shop lookahead at all. But the honest update is that its prior should fall: the one
 component of the planning family that was cheap to test has now returned zero twice, and the cheapest
-remaining slice of the search idea is `MCTS_PLAN.md` INC-1 (supply-aware slot/cash **reservation**),
+remaining slice of the search idea is `docs/archive/MCTS_PLAN.md` INC-1 (supply-aware slot/cash **reservation**),
 which §22 can bound for free with `ecap3rich` before any search is written.
 
 ⚠ **And the oracle is modest by construction** — its own comment says so: *"the hand this deck ACTUALLY
@@ -5284,7 +5284,7 @@ taken, at p < 0.0001.
 * **The human's 1.38 jokers at ante 2 is a CONSEQUENCE, not a cause.** They hold few jokers because of
   *what* they are willing to buy, not because empty slots are themselves valuable. §22's own
   survivorship caveat (n=8, 7 of which won) was the correct read of the observational data.
-* **`MCTS_PLAN.md` INC-1 — supply-aware slot/cash RESERVATION — is refuted before being built.** §22
+* **`docs/archive/MCTS_PLAN.md` INC-1 — supply-aware slot/cash RESERVATION — is refuted before being built.** §22
   named it as the positive branch's payoff. Forcing the engine to reserve early slots is catastrophic
   (wins 45 → 24), so the narrowest and most attractive slice of the deferred search work is dead. That
   is the second search-adjacent direction closed this session, after §24.

@@ -52,9 +52,9 @@ the standing rules distilled from them are in `CLAUDE.md` (tuning rule + standin
 > (run-length confound). The mod advises a **human who wins ~87.5%**;
 > autonomous winrate is *ceilinged* (compute/data-bound — see below). Advice quality is a **different,
 > non-compute-bound** objective, and the prior session's work is all there:
-> - **`ADVICE_REVIEW.md`** — the owner's live-run decision observations + the fixes shipped (anti-churn
+> - **`docs/ADVICE_REVIEW.md`** — the owner's live-run decision observations + the fixes shipped (anti-churn
 >   SELL_TO_BUY gate, active money-dig, Hermit-use, pack-first, planet-picks, debuff discard, UX).
-> - **`JOKER_FIDELITY_AUDIT.md`** — the sim was **flattering the engine** (paying jokers a flat `econ`
+> - **`docs/archive/JOKER_FIDELITY_AUDIT.md`** — the sim was **flattering the engine** (paying jokers a flat `econ`
 >   $/round they never earn). 25/26 jokers now faithfully modelled; **the faithful sim HALVED the winrate
 >   5.0% → 2.5%**, proving the old number inflated. The sim now measures what the overlay faces.
 > - **In-blind econ system** — `engine/discard_fuel.lua` (discard channel: Faceless/Mail/Trading + scaler
@@ -65,8 +65,8 @@ the standing rules distilled from them are in `CLAUDE.md` (tuning rule + standin
 >   open frontier. Read `NEXT_SESSION.md` first for the full handoff.
 
 **The AUTONOMOUS-WINRATE ceiling (historical, still true):** every per-decision / present-state / economy /
-product-board / learned-objective lever is closed or bounded; the MCTS/search investigation (`MCTS_PLAN.md`,
-`GRAND_AUDIT.md`) reached a **well-confirmed ceiling** — the gap is POLICY not supply (Phase 0a: 70–92% of
+product-board / learned-objective lever is closed or bounded; the MCTS/search investigation (`docs/archive/MCTS_PLAN.md`,
+`docs/GRAND_AUDIT.md`) reached a **well-confirmed ceiling** — the gap is POLICY not supply (Phase 0a: 70–92% of
 lost runs were offered the winning pieces and passed), but the value function is the wall and it is
 compute/data-bound beyond available local compute. Consolidated at the ceiling; the live objective is now
 advice quality (above).
@@ -272,14 +272,14 @@ class this apparatus produces. 63% of runs never committed before; now 71%. Feas
 ### richpack suggestive) — an economy investigation, NOT a per-decision/target build. Both the additive-
 ### family and the target-family are now exhausted; the frontier is operating-point economy.
 
-**➡ THE authoritative status is now `GRAND_AUDIT.md`** (2026-08-25) — a ground-up re-derivation +
+**➡ THE authoritative status is now `docs/GRAND_AUDIT.md`** (2026-08-25) — a ground-up re-derivation +
 section scorecard + ranked forward plans that re-establishes (and in places overturns) the conclusions
 below. **Read it FIRST.** It supersedes the *navigation* role of the docs below but preserves them as the
 audit trail: `docs/archive/WINRATE_V3_PLAN.md` §32 (then §31/§6/§30/§18) is the detailed checkpoint every
 `GRAND_AUDIT` citation resolves into; fresh-session handoff: `NEXT_SESSION.md`; historical audit + roadmap:
 `docs/archive/WINRATE_AUDIT.md`; superseded plans: `docs/archive/`. (The `WINRATE_*` docs were moved to
 `docs/archive/` on 2026-08-26; a bare `WINRATE_V3_PLAN.md §X` reference elsewhere in this file resolves there.)
-**The MCTS/search investigation is complete — see `MCTS_PLAN.md`: the winrate ceiling is POLICY not supply
+**The MCTS/search investigation is complete — see `docs/archive/MCTS_PLAN.md`: the winrate ceiling is POLICY not supply
 (Phase 0a), but is not closable with the current apparatus — the value function is the wall and it is
 compute/data-bound beyond a few nights of local compute (quadruply confirmed). Consolidated at the ceiling.**
 _Key `GRAND_AUDIT` corrections to the block below: (1) the level_gain "+0.421 rich10" is UNCONFIRMED
@@ -294,7 +294,7 @@ re-confirms valuation EARNS ITS KEEP (engine 2.5% vs expert 0.6%)._
 > **−0.165 (p 0.228)**, sign **47/52**, wins **42 → 40** (McNemar p 0.860) — **replicating** the 41/40
 > measured at baseline. It **executed** (commitment in 577/577 ante-states vs 622/828). So the gap is
 > not the engine failing to know what to build. **NOT closed: search over the SHOP STREAM** — a
-> different object; its cheapest slice (slot reservation, `MCTS_PLAN.md` INC-1) was bounded by
+> different object; its cheapest slice (slot reservation, `docs/archive/MCTS_PLAN.md` INC-1) was bounded by
 > `ecap3rich` (§28) and **REFUTED before being built** (below).
 > **⚠ §6 is a filter, not a wand:** 5 changes re-measured at `rich10` — 2 converted (B3, level_gain,
 > both *valuation*), 3 did not (readiness gate, oracle, **`ecap3` early board cap**, all *policy/
@@ -411,7 +411,7 @@ House+leveling / Hologram+copier / economy→Bull+xmult; common thread = an XMUL
 
 > ### ⭐ 2026-09-19 — WHAT THE PLAY INVESTIGATION ACTUALLY FOUND (read before trusting the play claims below).
 > Owner reported the F11 self-player's live play looked "nowhere near optimal." Investigated hard; the
-> nuanced, measured truth (full detail: `WINRATE_V4_PLAN.md` "IN-BLIND PLAY"):
+> nuanced, measured truth (full detail: `docs/archive/WINRATE_V4_PLAN.md` "IN-BLIND PLAY"):
 > **(1) PURE SCORING-PLAY IS near-optimal — but this is NARROW.** `HandEval` scores hands EXACTLY right
 > (7/7 canonical Balatro cases, `/tmp/hefid.lua`); the play-subset chooser picks the MAX-score play **94%**
 > of the time when it must maximize; the ante-1 dig is **at a clairvoyant ceiling** (78% one-hand vs 75% for a

@@ -1,9 +1,9 @@
-# MCTS_PLAN.md — scoping: line-finding search over the shop stream (re-scoped 2026-08-26)
+# docs/archive/MCTS_PLAN.md — scoping: line-finding search over the shop stream (re-scoped 2026-08-26)
 
 > **⚠ READ FIRST — the 2026-07-14 conclusion at the bottom of this file ("supply-constrained ceiling;
 > no decision policy can help; MCTS is dead") is OVERTURNED by evidence collected afterward.** It is
 > preserved below as the audit trail, not as the current verdict. The reconciliation is the whole point
-> of this re-scope (see §1). Current authoritative status: `GRAND_AUDIT.md`.
+> of this re-scope (see §1). Current authoritative status: `docs/GRAND_AUDIT.md`.
 
 ## 1. Why the old "supply ceiling" verdict is overturned — and why search is back on the table
 

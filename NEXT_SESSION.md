@@ -440,13 +440,13 @@ the assistant REPLAYS. Owner does not need to know the optimum or replay a speci
 which is tractable and the live overlay's actual job. `run tests/runner.lua` (1210 pass) + `runner_sim.lua`
 (604 pass, 1 pre-existing `test_world` failure) before committing.
 
-## ⭐⭐ 2026-09-19 — WINRATE_V4 investigation + the IN-BLIND PLAY / MONEY-FARMING finding (read `WINRATE_V4_PLAN.md`)
+## ⭐⭐ 2026-09-19 — WINRATE_V4 investigation + the IN-BLIND PLAY / MONEY-FARMING finding (read `docs/archive/WINRATE_V4_PLAN.md`)
 
 **Fresh baselines (current HEAD, `branch winrate-v4-bundle`):** autonomous **8.1%** baseline / **28.7%** rich10
 (the old docs' 2.5% is STALE — recent scaler/spectral/R7 work tripled it). `run_str` caps ~0.62 at ante 8 in
 BOTH → money buys levels, not board power.
 
-**What this session established (all in `WINRATE_V4_PLAN.md`):**
+**What this session established (all in `docs/archive/WINRATE_V4_PLAN.md`):**
 1. **Build/economy/supply levers are exhausted** — WS-3 product-value (reverted, killed winners), the whole
    economy family already tried (reroll-to-dig, banking, ecap3, pack-poverty), loss diagnosis = SUPPLY×SURVIVAL
    (engine takes offered multipliers fine; it just dies early → low exposure), and the learned-value path is a
@@ -532,7 +532,7 @@ ante-8 already-won states where measurement noise reshuffles equivalent win-line
 
 ## ⭐⭐ R6–R8 LIVE-RUN REVIEW (2026-09-04) — 3 fixes shipped, and the FIRST death traced end to end
 
-> **Read `ADVICE_REVIEW.md` R6/R7/R8 for the full detail.** The headline is methodological: R8 is the first
+> **Read `docs/ADVICE_REVIEW.md` R6/R7/R8 for the full detail.** The headline is methodological: R8 is the first
 > time this project has traced a live death from **board state → valuation → the specific line of code**,
 > by finding the run in `bes_runs.jsonl` and **replaying the exact shop state from `bes_fixtures.jsonl`**.
 > That loop — owner reports a misplay, find the seed, replay the fixture, watch the engine reproduce it —
@@ -862,7 +862,7 @@ Merry Andy 4, Matador 3. Shipped on correctness (fire rarely, no A/B).
   (Vagabond) churn protection (`d268ff6`).
 - **Mystic Summit play-timing** (`84dd375` defer_uplift — dig to 0 discards). **Ride the Bus face
   anti-synergy** (`46eb53f`). **level_need planet freq-gate** (`15e35af`).
-- Full owner-observation log: `ADVICE_REVIEW.md` R4. Method: reconstruct the misplay from telemetry
+- Full owner-observation log: `docs/ADVICE_REVIEW.md` R4. Method: reconstruct the misplay from telemetry
   (`bes_fixtures.jsonl` **state** records carry the full `gs`), fix, regression-test, corpus/sim A/B.
 
 ---
@@ -947,11 +947,11 @@ output-quality-aware (don't take a RANDOM joker into a full board); Riff-Raff sl
 disposable common to reopen a spawner slot — mechanism-justified, outcome-unproven); `best_targets` covers
 ALL card-targeting tarots + spectrals (Strength/Death/Hanged-Man/seals/Aura); the pack-poverty damp
 (bank toward the interest cap before gambling on a pack — SAFE + advice-positive). Reverted: the
-`interest_cap` unit fix (correct but regressed agreement — winners over-bank; see `conversion_baseline.txt`).
+`interest_cap` unit fix (correct but regressed agreement — winners over-bank; see `docs/archive/conversion_baseline.txt`).
 
 **Advice-quality A/B harness** (`tools/agreement_run.sh`): replay the frozen 7-win corpus under the current
-engine → per-decision agreement diff. **Conversion investigation** (`CONVERSION_PLAN.md` +
-`conversion_baseline.txt`): the gap is ECONOMY/SPEND discipline, not valuation (C' refuted: engine ranks the
+engine → per-decision agreement diff. **Conversion investigation** (`docs/archive/CONVERSION_PLAN.md` +
+`docs/archive/conversion_baseline.txt`): the gap is ECONOMY/SPEND discipline, not valuation (C' refuted: engine ranks the
 human's multiplier #1 91% of the time) — the frontier is assembly TIMING (core lands ante 4 not ante 2-3).
 
 ---
@@ -961,8 +961,8 @@ human's multiplier #1 91% of the time) — the frontier is assembly TIMING (core
 > **THE OBJECTIVE PIVOTED to ADVICE QUALITY this session** (the pivot the old §"if the objective ever
 > shifts" section below anticipated). The mod advises a *human who wins ~87.5%*; autonomous winrate is
 > ceilinged (below) but advice quality is a different, non-compute-bound objective. Read this top block
-> for the current state; `ADVICE_REVIEW.md` (the human's run observations + fixes) and
-> `JOKER_FIDELITY_AUDIT.md` (the sim-fidelity work) hold the detail. `GRAND_AUDIT.md` + `MCTS_PLAN.md`
+> for the current state; `docs/ADVICE_REVIEW.md` (the human's run observations + fixes) and
+> `docs/archive/JOKER_FIDELITY_AUDIT.md` (the sim-fidelity work) hold the detail. `docs/GRAND_AUDIT.md` + `docs/archive/MCTS_PLAN.md`
 > remain the authoritative record of the *winrate-ceiling* investigation (unchanged, still true).
 
 ## CURRENT STATE (2026-08-28) — the advice-quality + sim-fidelity session
@@ -970,13 +970,13 @@ human's multiplier #1 91% of the time) — the frontier is assembly TIMING (core
 Three big threads, all shipped/deployed (live install CURRENT, verified byte-identical; 1100 engine +
 604 sim tests pass, the 1 sim fail is a pre-existing unrelated overflow test):
 
-1. **Advice-review fixes** (`ADVICE_REVIEW.md`) — the owner played runs with the overlay live and
+1. **Advice-review fixes** (`docs/ADVICE_REVIEW.md`) — the owner played runs with the overlay live and
    catalogued every decision. Shipped: the **anti-churn SELL_TO_BUY live-funder gate** (was dumping
    Cloud 9 / Astronomer / polychrome Ice Cream for junk — the run-killer), the **active money-dig**,
    **held-consumable use** (Hermit), **pack-first sequencing**, **free-planet picks**, **debuff-first
    discard**, and UX (Play-blind at a boss, pack-pick target text, cost/size in the big line).
 
-2. **⭐ JOKER SIM-FIDELITY (`JOKER_FIDELITY_AUDIT.md`) — the sim was FLATTERING the engine.** The sim
+2. **⭐ JOKER SIM-FIDELITY (`docs/archive/JOKER_FIDELITY_AUDIT.md`) — the sim was FLATTERING the engine.** The sim
    paid many jokers a flat `econ` $/round they never actually earn (Faceless flat $3 vs its real
    $5-per-3-face-discard, etc.). Audited all 150 jokers; **25 of 26 gaps now faithfully modelled** (only
    Matador deferred — needs a boss-trigger event bus). **Result, measured: the faithful world HALVED the
@@ -998,7 +998,7 @@ converts money into builds) but the sim's greedy engine still doesn't convert �
 CONVERSION, not econ generation.** That is the unobstructed frontier: turn farmed money into a directed
 supermodular build (copiers × xmult × the hand being built toward).
 
-**➡ THE CONVERSION FRONTIER NOW HAS A PLAN: `CONVERSION_PLAN.md`.** The load-bearing reframe: every
+**➡ THE CONVERSION FRONTIER NOW HAS A PLAN: `docs/archive/CONVERSION_PLAN.md`.** The load-bearing reframe: every
 prior conversion verdict (oracle_plan §24, additive family §31, target/completion model §32c, product
 board-scorer P4) was rendered on the **ceilinged autonomous-winrate instrument** — NONE on the
 **advice-quality / agreement instrument** (`replay_fixtures.lua` + `agreement.py`). So the target/product
@@ -1013,7 +1013,7 @@ pack-pick conversion channel (41% agreement, the biggest gap). Start at Phase A.
 The engine is mature and correct; **autonomous** winrate (baseline ~2.5%) is a *policy/assembly* gap
 (not supply — Phase 0a) that is **not closable with the current apparatus**: the value function is the
 wall, and that wall is compute/data-bound beyond a few nights of local compute. Consolidated at the
-ceiling. Details below + in `GRAND_AUDIT.md` / `MCTS_PLAN.md`.
+ceiling. Details below + in `docs/GRAND_AUDIT.md` / `docs/archive/MCTS_PLAN.md`.
 
 ## The load-bearing findings (all in GRAND_AUDIT + MCTS_PLAN, with tools)
 
@@ -1060,7 +1060,7 @@ ceiling. Details below + in `GRAND_AUDIT.md` / `MCTS_PLAN.md`.
 The mod advises a *human* (who wins 87.5%). That is a **different, measurable objective** (the agreement
 objective vs the winners' picks) and is NOT compute-bound. Overlay-advice improvements that align with
 winners are shippable on that objective even when they are winrate-null autonomously (e.g. P2a). This is
-the natural pivot if winrate is treated as ceilinged. See `GRAND_AUDIT.md` §G1.
+the natural pivot if winrate is treated as ceilinged. See `docs/GRAND_AUDIT.md` §G1.
 
 ## Audit trail
 

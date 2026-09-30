@@ -1,7 +1,7 @@
-# CONVERSION_PLAN.md — money → a directed, supermodular build (2026-08-28)
+# docs/archive/CONVERSION_PLAN.md — money → a directed, supermodular build (2026-08-28)
 
 > **The frontier, in one line.** Econ *generation* is now correct and faithful (the 2026-08-28
-> fidelity + econ work — see `sim-fidelity-and-econ-2026-08-28`, `JOKER_FIDELITY_AUDIT.md`). What the
+> fidelity + econ work — see `sim-fidelity-and-econ-2026-08-28`, `docs/archive/JOKER_FIDELITY_AUDIT.md`). What the
 > engine still does not do is **CONVERT** the money it now truthfully earns into a *directed* build:
 > copiers × xmult × retriggers × the leveled hand you are building **toward**. The win condition is a
 > **product of assembled pieces**; the engine scores it as a **sum of present-board marginals**. That
@@ -25,7 +25,7 @@ null or was reverted on a winner's-curse null:
 **The load-bearing observation: not one of those verdicts was rendered on the ADVICE-QUALITY
 instrument.** They were all rendered on the sim's *autonomous greedy winrate* — which the project has
 independently, quadruply confirmed is **ceilinged** (the value function is the wall; compute/data-bound;
-`MCTS_PLAN.md`, `GRAND_AUDIT.md`). A ceilinged, chaotic instrument (sd ≈ 1.9, MDE ≈ 0.42 at n=160;
+`docs/archive/MCTS_PLAN.md`, `docs/GRAND_AUDIT.md`). A ceilinged, chaotic instrument (sd ≈ 1.9, MDE ≈ 0.42 at n=160;
 85% of seeds flip outcome under tiny perturbations, `tools/envelope.lua`) cannot register a conversion
 improvement even when one exists — the greedy autonomous policy can't *execute* a directed build
 regardless of how well the engine *advises* one.
@@ -131,7 +131,7 @@ The ruler must read the *current* engine before anything changes.
    `--- PACK disagreements ---` example lists. **These example lists ARE the spec** for Phases B–D:
    each is a decision where a winning human converted and the engine did not.
 
-**Deliverable:** a committed `conversion_baseline.txt` (the agreement report) that every later phase
+**Deliverable:** a committed `docs/archive/conversion_baseline.txt` (the agreement report) that every later phase
 diffs against. No code change. This is the cheapest, highest-value step and it gates the rest.
 
 ### Phase B — the completion/target model, re-judged on agreement
@@ -213,7 +213,7 @@ never opens the pack" (§5z) but Phase D is specifically about the pick *given* 
 ## 5. The first concrete step
 
 **Phase A, today, no code change:** locate/confirm the winning fixtures corpus, run the three commands
-above, and commit `conversion_baseline.txt`. That single report tells us — on the right instrument, for
+above, and commit `docs/archive/conversion_baseline.txt`. That single report tells us — on the right instrument, for
 the first time — *exactly which conversion decisions the engine gets wrong for a winning human*, and it
 turns Phases B–D from speculation into a punch-list of real disagreements. Everything after is
 build-then-measure against that ruler.

@@ -1,9 +1,9 @@
 ================================================================================
-CONVERSION_PLAN.md — PHASE A BASELINE (agreement instrument, 2026-08-28)
+docs/archive/CONVERSION_PLAN.md — PHASE A BASELINE (agreement instrument, 2026-08-28)
 ================================================================================
 The current engine, replayed over the winning-human decision corpus, joined to
 what the winners ACTUALLY did. This is the non-ceilinged advice-quality ruler the
-whole conversion frontier is measured against (CONVERSION_PLAN.md §3, Phase A).
+whole conversion frontier is measured against (docs/archive/CONVERSION_PLAN.md §3, Phase A).
 
 CORPUS
   fixtures : %APPDATA%/Balatro/bes_fixtures.jsonl   (3841 lines, captured 2026-08-27)
@@ -99,7 +99,7 @@ spend actions) while winners BANK (interest discipline) and spend selectively on
 pieces. This is exactly the `human-economy-policy` spec made measurable ("satisfice
 survival, invest surplus, econ gated by remaining need, interest discipline").
 
-RE-PRIORITIZED PLAN (supersedes the B/C/D order in CONVERSION_PLAN.md §3):
+RE-PRIORITIZED PLAN (supersedes the B/C/D order in docs/archive/CONVERSION_PLAN.md §3):
   B' (NEW #1) — PACK/REROLL SPEND-APPETITE vs BANKING. Why is BUY_PACK the engine's top
      buy (23%) and why does it never skip (95%)? FIRST check whether this is a REGRESSION
      from this session's econ/pack-first work (git bisect the pack-appetite over ADVICE
@@ -213,7 +213,7 @@ disagreements are fine-grained utility valuation. Data is thin (dominated by one
 CONVERSION INVESTIGATION — OVERALL CONCLUSION (2026-08-29)
 ================================================================================
 Measured on the AGREEMENT instrument (the non-ceilinged advice-quality ruler), the
-conversion gap is NOT what CONVERSION_PLAN.md hypothesized:
+conversion gap is NOT what docs/archive/CONVERSION_PLAN.md hypothesized:
   * NOT product-scoring / target-modeling (§32 target model already OOS-failed; not re-opened).
   * NOT joker VALUATION (C' REFUTED — engine ranks the human's multiplier #1 91% of the time).
   * NOT pack-PICK card choice (D' is within-category + tied to the hard commitment problem).

@@ -5,7 +5,7 @@
 # agreement with what the winners actually did (replay_fixtures.lua + agreement.py). Because the
 # corpus (states + human actions) is fixed and only the engine changes, running this before and after
 # an engine edit gives a clean before/after agreement diff -- the non-ceilinged conversion ruler
-# (CONVERSION_PLAN.md). This is the durable asset: measure any change's effect on how well the overlay
+# (docs/archive/CONVERSION_PLAN.md). This is the durable asset: measure any change's effect on how well the overlay
 # matches a winning human, with no sim-winrate chaos.
 #
 # USAGE

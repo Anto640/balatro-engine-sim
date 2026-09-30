@@ -29,7 +29,7 @@ local Driver = {}
 -- future (different shop draws / shuffles) -- exactly what chance-node determinization needs; we do
 -- NOT (and cannot) reproduce the original's hidden rng state. Functions are skipped in the copy
 -- (rng is the only one, and it's set explicitly). Deterministic per (seed, priv_seed) so a rollout
--- is reproducible. See MCTS_PLAN.md §4.
+-- is reproducible. See docs/archive/MCTS_PLAN.md §4.
 local function deep_copy(v)
   if type(v) ~= "table" then return v end
   local out = {}
@@ -369,7 +369,7 @@ end
 -- byte-faithful to a real run. value = 1 on a win, 0 on a death, else pace_margin at the reached
 -- horizon (the leaf V validated in Phase 1: weak early / strong late, so roll to ~ante 5+ before
 -- trusting it). `opts.content` MUST be the real content module (the greedy shop policy); with the
--- default stub the rollout dies early (no shop). See MCTS_PLAN.md §5.
+-- default stub the rollout dies early (no shop). See docs/archive/MCTS_PLAN.md §5.
 function Driver.rollout(fork, opts)
   opts = opts or {}
   local horizon = opts.horizon or opts.max_ante or 8

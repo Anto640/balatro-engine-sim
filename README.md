@@ -95,8 +95,8 @@ tests/    headless unit + simulator suites
 |---|---|
 | `NEXT_SESSION.md` | Current state, recent results and the prioritised next steps — start here |
 | `CLAUDE.md` | Working guide: architecture rules, workflow, measurement rules, gotchas |
-| `ADVICE_REVIEW.md` | Live-run misplays reported by the owner and how each was fixed |
-| `GRAND_AUDIT.md` | Deep audit of the win-rate investigation (historical, still referenced) |
+| `docs/ADVICE_REVIEW.md` | Live-run misplays reported by the owner and how each was fixed |
+| `docs/GRAND_AUDIT.md` | Deep audit of the win-rate investigation (historical, still referenced) |
 | `DESIGN.md` | Original design baseline (historical) |
 | `docs/archive/` | Superseded plans |
 

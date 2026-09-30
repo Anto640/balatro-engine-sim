@@ -1,11 +1,11 @@
-# WINRATE_V4_PLAN.md — the BUNDLE breakout (2026-09-18)
+# docs/archive/WINRATE_V4_PLAN.md — the BUNDLE breakout (2026-09-18)
 
 > **One-line thesis.** The engine is at **2.5%**; an expert human under the *same rules* wins **~87.5%**.
 > The whole gap is policy, and it is **supermodular** — the fixes multiply, so no single lever shows a
 > measurable winrate signal, which is exactly why two years of single-lever tuning bounced and reverted.
 > This plan **builds the fix as ONE bundle and measures it on the DENSE agreement corpus**, not on chaotic
 > baseline winrate. It supersedes the single-lever method for this objective; it does not touch the
-> autonomous-ceiling verdicts in `GRAND_AUDIT.md` (which concern the *learned value function*, a different,
+> autonomous-ceiling verdicts in `docs/GRAND_AUDIT.md` (which concern the *learned value function*, a different,
 > compute-bound path that stays declined).
 
 ---
@@ -163,7 +163,7 @@ build would repeat prior work. Evidence, current-code-verified:
 
 | lever | status | source |
 |---|---|---|
-| option-value banking (interest-cap fix + 4 variants) | **REVERTED** — regressed agreement (winners bank PAST the mechanical cap; old appetite was tuned around the bug) | conversion_baseline.txt B' |
+| option-value banking (interest-cap fix + 4 variants) | **REVERTED** — regressed agreement (winners bank PAST the mechanical cap; old appetite was tuned around the bug) | docs/archive/conversion_baseline.txt B' |
 | pack-poverty discipline (damp poor-board packs) | **SHIPPED** (`SA.PACK_POVERTY_DAMP`, `^1.6`), modest (eng_buy_human_save 264→258) | 20c146c |
 | reroll-to-dig for a core when core-poor | **REVERTED** −0.015, sign 7/17 ("exposure spending is high-variance, −EV") | WINRATE_AUDIT 2026-07-11 |
 | buy more packs (levelbuy) | **REVERTED** −0.229 | archive |

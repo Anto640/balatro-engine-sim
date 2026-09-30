@@ -1,4 +1,4 @@
-# ADVICE_REVIEW.md — human observations from live advice-review runs
+# docs/ADVICE_REVIEW.md — human observations from live advice-review runs
 
 > **What this is.** A catalogue of EVERY observation the mod owner (a very strong Balatro player, ~7/8
 > real winrate) made while following the engine's live overlay through two full runs (2026-08-26). It is a

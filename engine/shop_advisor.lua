@@ -136,7 +136,7 @@ SA.ECON_FLOOR_RATE = 0.5  -- FV charged per dollar pushed below the floor (tunab
 -- ($25/50/100) mid/late, so the engine preserves the interest-earning BUFFER. Surplus ABOVE the cap stays
 -- free to spend (the interest-cap value-buy fix), so good vouchers/jokers are unaffected; only sub-cap
 -- dip-to-poverty buys are damped. Capped at the real interest cap: holding PAST it is option-value banking
--- (a separate, unsolved lever -- conversion_baseline.txt), not attempted here.
+-- (a separate, unsolved lever -- docs/archive/conversion_baseline.txt), not attempted here.
 SA.ECON_FLOOR_STEP = 5    -- $ the floor rises per ante over the base
 function SA.econ_floor(gs)
   local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
@@ -921,7 +921,7 @@ function SA.recommend(gs, opts)
   -- directed value. The raw interest math 5x-over-charges live (cap read as $125), which made the engine
   -- hoard and pass up cheap good offers when already rich (owner report 2026-08-30: Chaos/Emperor left on
   -- the shelf at $30+). SCOPED to value-buys on purpose: correcting the cap for REROLLS/PACKS globally
-  -- regressed agreement (winners bank past the cap for option-value on GAMBLES; conversion_baseline.txt),
+  -- regressed agreement (winners bank past the cap for option-value on GAMBLES; docs/archive/conversion_baseline.txt),
   -- so those keep net_cost(). This gives the human/self-player the cheap-good-buy behavior asked for
   -- without re-opening the reroll/pack over-spend.
   local cap_int = cap_int_of(gs)
@@ -1139,7 +1139,7 @@ function SA.recommend(gs, opts)
     -- owned-synergy (sbonus) are never damped.
     local dollar_cap = (cap >= 25) and cap or (cap * 5)
     local pack_money = 1.0
-    -- CELESTIAL EXEMPTION (conversion_baseline.txt): leveling a COMMITTED hand is a DIRECTED build
+    -- CELESTIAL EXEMPTION (docs/archive/conversion_baseline.txt): leveling a COMMITTED hand is a DIRECTED build
     -- action, not a speculative gamble on a pool -- it is the ONE channel where engine and winner
     -- agree EXACTLY (0 discordant pairs, WINRATE_V3_PLAN 5s), and the conversion investigation named
     -- UNDER-LEVELING as the concrete gap (3 of 4 engine-followed losses died with an xmult core over

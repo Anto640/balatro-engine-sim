@@ -1,4 +1,4 @@
-# JOKER_FIDELITY_AUDIT.md — is every joker faithfully modelled in the SIM WORLD?
+# docs/archive/JOKER_FIDELITY_AUDIT.md — is every joker faithfully modelled in the SIM WORLD?
 
 > **Why this exists.** The engine's decision code is identical in sim and live, but the **sim world**
 > (`sim/*`) is a *model* of Balatro, not a replica. It reproduces SCORING perfectly (it calls the real

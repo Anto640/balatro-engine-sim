@@ -1,17 +1,17 @@
-# GRAND_AUDIT.md — the consolidated master audit (2026-08-25)
+# docs/GRAND_AUDIT.md — the consolidated master audit (2026-08-25)
 
 > **⭐⭐ SUPERSEDED FRAMING (2026-08-28) — read `NEXT_SESSION.md` first.** This doc is the authoritative
 > record of the *autonomous-winrate ceiling* investigation and remains true on that objective. But two
 > things happened after it: (1) the **objective pivoted to ADVICE QUALITY** (the mod advises a human who
 > wins ~87.5%; a non-compute-bound objective), and (2) the **sim was found to be FLATTERING the engine** —
 > it paid many jokers a flat `econ` $/round they never earn, so pre-2026-08-28 sim winrates are INFLATED.
-> Making the sim faithful (25/26 jokers, `JOKER_FIDELITY_AUDIT.md`) **halved the sim winrate (5.0% →
+> Making the sim faithful (25/26 jokers, `docs/archive/JOKER_FIDELITY_AUDIT.md`) **halved the sim winrate (5.0% →
 > 2.5%)**. So read the "2.5% ceiling" below as *the faithful figure the flattered sim was masking*, and
 > note the new frontier: **CONVERSION** (turn farmed money into a directed supermodular build), with the
 > in-blind econ generation now correct + faithful (`engine/discard_fuel.lua`, `engine/hold_fuel.lua`).
 
 > **⭐ SESSION TERMINUS (2026-08-26) — read this first.** The forward plans P0–P5 below are all resolved,
-> and the MCTS/search investigation they pointed to is COMPLETE (`MCTS_PLAN.md`). Net result: the 2.5%
+> and the MCTS/search investigation they pointed to is COMPLETE (`docs/archive/MCTS_PLAN.md`). Net result: the 2.5%
 > winrate ceiling is a **POLICY/assembly gap, not supply** (Phase 0a overturned the old supply-ceiling: 70%
 > baseline / 92% rich of lost runs were offered ≥2 affordable multiplier keystones and passed them up), but
 > it is **NOT closable with the current apparatus** — the **value function is the wall**: the greedy engine
@@ -32,7 +32,7 @@
 > §-number below points back into `WINRATE_V3_PLAN.md`. Read this first, then the plan sections it cites.
 > **📁 Archived 2026-08-26:** the `WINRATE_V3_PLAN.md` / `WINRATE_AUDIT.md` / `WINRATE_AUDIT_v2.md` audit-trail
 > docs moved to **`docs/archive/`** to declutter the top level — every `WINRATE_V3_PLAN.md §X` citation below
-> resolves to `docs/archive/WINRATE_V3_PLAN.md §X`. The current authoritative pair is this file + `MCTS_PLAN.md`.
+> resolves to `docs/archive/WINRATE_V3_PLAN.md §X`. The current authoritative pair is this file + `docs/archive/MCTS_PLAN.md`.
 >
 > **Method.** Baseline tests green (1046 pass). All numbers below were re-derived from on-disk data
 > (`sim_out/*.jsonl`, `data/*.jsonl`) or freshly run (paired, deterministic, from the pristine HEAD tree).
@@ -455,7 +455,7 @@ mean-progress objective and the strongest argument for the **agreement objective
   intentionally deferred) is a different, larger, un-bounded use.
 - **⇒ Tractable frontier exhausted; the one un-bounded direction is the deferred PLANNER/SEARCH (MCTS) with a
   learned rollout value** to price DYNAMIC target-directed play (the residual the agreement screen localized).
-  **NOW SCOPED: `MCTS_PLAN.md` (re-scoped 2026-08-26).** It OVERTURNS the 2026-07-14 "supply-ceiling / MCTS
+  **NOW SCOPED: `docs/archive/MCTS_PLAN.md` (re-scoped 2026-08-26).** It OVERTURNS the 2026-07-14 "supply-ceiling / MCTS
   dead" verdict (refuted by the human's 87.5% on identical inputs + rich10 24% + the line-finding frame), and
   gates the whole build on **Phase 0 — a retrospective shop-stream oracle** (do winning lines EXIST in lost
   runs' actual offer streams?): the cheapest, highest-information step, never run, which alone green-lights or
@@ -508,7 +508,7 @@ reframe available.
 
 ## H. DOC HOUSEKEEPING (performed this pass)
 
-- **`GRAND_AUDIT.md`** (this file) is the new entry point. `CLAUDE.md` and `NEXT_SESSION.md` pointers updated.
+- **`docs/GRAND_AUDIT.md`** (this file) is the new entry point. `CLAUDE.md` and `NEXT_SESSION.md` pointers updated.
 - `WINRATE_V3_PLAN.md` (§1→§32c), `WINRATE_AUDIT.md`, `WINRATE_AUDIT_v2.md` retained **unabridged** as the
   audit trail — every §-citation above resolves into them. Do not delete; they are the provenance.
 - New tooling this pass: `scratchpad/human_assembly.lua`, `reroll_past.lua`, `sim_amplifier.lua`,

@@ -11,7 +11,7 @@ Despite the historical filename, this guide applies equally to Codex and other c
 action, and overlays a ranked "best move" with a reason. Roadmap M1–M4 is complete
 plus a large correctness/coverage/strategy pass.
 
-> ### The main diagnostic: replay the recorded decision state (`ADVICE_REVIEW.md` R8)
+> ### The main diagnostic: replay the recorded decision state (`docs/ADVICE_REVIEW.md` R8)
 > **A live misplay can now be traced from board state → valuation → the exact line of code, because the mod
 > records both the run and the DECISION STATE.** The loop, in four steps:
 > 1. owner reports a misplay → find the run in **`bes_runs.jsonl`** (in the LÖVE save folder, `%APPDATA%/Balatro/`)
@@ -81,7 +81,7 @@ thing **headless-testable**. See the Layout section in `README.md` for the per-f
 
 The engine is tuned by running a **headless self-play simulator** that drives the REAL engine
 through whole runs, then analysing where/why it dies and fixing the cause. This is the primary
-way to improve the engine. History and past audits: `GRAND_AUDIT.md` and `docs/archive/`.
+way to improve the engine. History and past audits: `docs/GRAND_AUDIT.md` and `docs/archive/`.
 
 ### The simulator (`sim/`) — built, calibrated
 - `sim/world.lua` — the "referee": faithful in-blind play (seeded shuffle → deal → REAL
@@ -138,7 +138,7 @@ lua  tools/analyze_runs.lua sim_out/<baseline>.jsonl compare sim_out/<name>.json
 ## Research history
 
 The investigation log (winrate audits, operating-point results, refuted levers, the human-run dataset findings) is in
-`docs/archive/CLAUDE_HISTORY.md` and `GRAND_AUDIT.md`. Check it before re-trying a lever: most per-decision, economy
+`docs/archive/CLAUDE_HISTORY.md` and `docs/GRAND_AUDIT.md`. Check it before re-trying a lever: most per-decision, economy
 and planning levers have been measured, and the log records why each was kept or reverted.
 
 Verdict standard: **PAIRED n≥160**; compare with `analyze_runs.lua <A> compare <B>`.
@@ -246,7 +246,7 @@ NOTE: `xmult_scaling` jokers ARE xmult — use `JokerData.is_xmult()`.
   free slot. Value it by how much output actually lands (`pack_open_advisor` `gen_fit`),
   and advise making room — *use* a held consumable or *sell* a joker — rather than blindly
   recommending it. Same idea funds a buy you're short on (`SA` `SELL_TO_BUY`).
-  ⭐ **This applies to generator JOKERS too, and forgetting it cost a run** (`ADVICE_REVIEW.md` R8).
+  ⭐ **This applies to generator JOKERS too, and forgetting it cost a run** (`docs/ADVICE_REVIEW.md` R8).
   `Generators.output_fit` / `has_output_room` are the shared helpers — use them, don't re-derive the
   slot check. Three call sites now share them (blind-select, `SA.funder_is_live`, and BOTH tier-prior
   paths: `Eval.jp_from_measure` **and** the independent `shop_advisor.scoring_gain` prior — patching
