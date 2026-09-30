@@ -167,6 +167,7 @@ SA.DEAD_FUNDER_FV = 0.1
 -- so a working board is never churned. Now that W3 makes acquired keystones COMPOUND, this
 -- acquisition lever is re-tested on the W3 world. Slope tuned to the mechanism (probe), not seeds.
 SA.SWAP_KEEP_SLOPE = tonumber(os.getenv and os.getenv("BES_SWAP_SLOPE") or "") or 0.5   -- env: swap-bar A/B
+SA.SWAP_SAMPLES = tonumber(os.getenv and os.getenv("BES_SWAP_SAMPLES") or "")   -- env: deals per swap measurement (A/B)
 
 -- First-scorer priority (in the sgain*5 buy-value units). When the board has NO effective
 -- scorer, a flat immediate scorer is worth much more than its marginal -- it's the jump from
@@ -859,6 +860,9 @@ function SA.recommend(gs, opts)
   -- (sell ranking, buy-upgrade delta), so leave-one-out marginals are computed
   -- once and reused across the sell loop instead of re-sampling per joker.
   local mopts = { rng = rng, cache = JokerValue.new_cache(), samples = 6 }
+  -- full-board swaps compare two noisy 6-deal measurements; BES_SWAP_SAMPLES re-measures both sides of a swap with
+  -- more deals (A/B switch, default off). sb1 (a lower bar alone) swapped +20% more without better outcomes.
+  local swap_mopts = SA.SWAP_SAMPLES and { rng = rng, cache = mopts.cache, samples = SA.SWAP_SAMPLES } or mopts
   local swap_bar_memo
   local function swap_bar()   -- lazy + memoised: only the full-board reroll / Buffoon paths need it
     if swap_bar_memo == nil then swap_bar_memo = full_board_swap_bar(gs, mopts) or false end
@@ -1361,7 +1365,7 @@ function SA.recommend(gs, opts)
               -- PLAN the swap toward the core too: on a full board of additive commons, a
               -- core piece (xmult that multiplies the base) is a real upgrade even if its
               -- raw marginal only edges the weakest -- and a redundant flat is damped.
-              local g = buy_fv_delta(gs, sj, mopts) + (BuildPlan.fit(gs, sj, build, invest))
+              local g = buy_fv_delta(gs, sj, swap_mopts) + (BuildPlan.fit(gs, sj, build, invest))
               if g > upgrade then upgrade, up_name = g, (sj.name or sj.key) end
               if _G.BES_SWAP_TRACE then _G.BES_SWAP_TRACE[#_G.BES_SWAP_TRACE + 1] =
                 { sold = j.key, ci = worst_c, buy = sj.key, g = g, cost = sj.cost, worst = true } end
@@ -1381,7 +1385,8 @@ function SA.recommend(gs, opts)
         -- STRENGTH-PROPORTIONAL keep (see SA.SWAP_KEEP_SLOPE): the keystone must beat the sold
         -- joker by C*(1 + SLOPE*C) -- weak filler swaps ~freely, a strong joker demands a much
         -- better replacement. Charged ONCE here (was the flat 2*C); pure sales charge it once below.
-        local keep = worst_c * (1 + SA.SWAP_KEEP_SLOPE * worst_c)
+        local keep_c = (swap_mopts ~= mopts) and joker_contribution(gs, worst_i, swap_mopts) or worst_c
+        local keep = keep_c * (1 + SA.SWAP_KEEP_SLOPE * keep_c)
         if _G.BES_SWAP_TRACE then for _, t in ipairs(_G.BES_SWAP_TRACE) do
           if t.worst and not t.keep then t.keep = keep + sell_margin end end end
         upgrade = math.max(0, upgrade - keep - sell_margin)
@@ -1425,7 +1430,7 @@ function SA.recommend(gs, opts)
         local ex = (type(ab) == "table" and type(ab.extra) == "table") and ab.extra or nil
         local eternal = type(ab) == "table" and (ab.eternal or (ex and ex.eternal))
         if not eternal and i ~= worst_i then
-          local ci = joker_contribution(gs, i, mopts)
+          local ci = joker_contribution(gs, i, swap_mopts)
           local kb = BuildPlan.keep_bias(jk.key, gs, Eval.joker_fires(gs, i, mopts))
           local keep = ci * (1 + SA.SWAP_KEEP_SLOPE * ci) + math.max(SA.UPGRADE_MARGIN, kb)
           local cash_i = jk.sell_value or 1
@@ -1435,7 +1440,7 @@ function SA.recommend(gs, opts)
               local sv = surv()
               local ok_s = not (sv and sv.unsafe(i, math.max(0, cur or 0) / sv.need))
               if ok_s and (cur == nil or cur > 0) then
-                local g = buy_fv_delta(gs, sj, mopts) + (BuildPlan.fit(gs, sj, build, invest))
+                local g = buy_fv_delta(gs, sj, swap_mopts) + (BuildPlan.fit(gs, sj, build, invest))
                 local up = g - keep
                 -- diagnostic only (tools/swap_bar_probe.lua): every full-board trade the bar weighed
                 if _G.BES_SWAP_TRACE then _G.BES_SWAP_TRACE[#_G.BES_SWAP_TRACE + 1] =
