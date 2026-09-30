@@ -9,9 +9,15 @@ self-player fixes -- hidden Play button no longer stalls a hand, in-blind (Verda
 **The Mouth lock** = first hand type played this blind, recorded in main.lua (`305c963`, NOT yet seen live).
 
 **Sim fixed 2026-09-30 (`b3ae087`):** the sim shop now knows the next boss (live always did): +0.387 progress
-(p 0.036), wins 27 -> 32. **Baselines (current engine + fixed sim, worktree `%TMP%/bes_wt_bf`): `sim_out/bf.jsonl`
-(pool 3) 32/160 wins, reach-8 45; `sim_out/bf_7.jsonl` (pool 7) 32/160 wins, reach-8 45.** Compare every new arm
-against these, paired: `lua tools/analyze_runs.lua sim_out/bf.jsonl compare sim_out/<arm>.jsonl`. Nothing is running.
+(p 0.036), wins 27 -> 32.
+**Mouth fixes 2026-09-30 evening (plan status block has the numbers):** sim `6f665b2` (a boss-illegal play scores 0
+and cycles; it used to END the blind -- 15/17 Mouth losses) and engine `04ae2b6` (the forced 0 play throws the
+legal-type dig's cards; rollout honours the lock and cycles). Both neutral; engine SHIPPED + DEPLOYED (owner restarts
+the game). **Baselines (shipped engine + fixed sim, worktree `%TMP%/bes_wt_mze`): `sim_out/mze.jsonl` (pool 3) 32/160
+wins, reach-8 46; `sim_out/mze_7.jsonl` (pool 7) running from 23:46, ETA ~02:30 (`%TMP%/bes/chain_mze7.sh`, log
+`chain_mz.log`; resume with the same command if reaped).** Compare: `lua tools/analyze_runs.lua sim_out/mze.jsonl
+compare sim_out/<arm>.jsonl`. **Next lever: Mouth LOCK CHOICE** (value a type over all remaining hands incl. remake
+odds; don't spend every discard pre-lock) -- 64003 cleared by locking High Card and died locking Two Pair.
 
 **Closed levers (don't retry without a new idea):** swap bar (sb1 / ss24 / sb2 -- lower bar trades more, not better,
 even with 24-deal measurement); boss-aware pacing (bfpb -0.12, shop hint already covers it); pacing risk refits;

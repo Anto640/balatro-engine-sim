@@ -18,6 +18,16 @@ every A/B after that should be judged in a world that behaves like the real game
   `%TMP%/bes/chain_mz.sh` (11 workers, from 19:05): `mz` (= current engine, fixed sim; NEW BASELINE pool 3) -> `mze`
   (engine fix, vs mz) -> `mz_7` (baseline pool 7). Next if Mouth deaths stay high: the pre-lock dig spends every
   discard before locking (seen in most Mouth death traces).
+  **RESULTS:** `mz` vs `bf` (sim fix alone): wins 32 -> 33, reach-8 45 -> 47, progress +0.029 (p 0.13), 154 tied;
+  Mouth deaths 8 -> 7 -- the extra hands rarely save the blind (old engine threw its best cards on the 0 plays).
+  `mze` vs `mz` (engine fix): wins 33 -> 32, reach-8 47 -> 46, progress +0.011 (p 0.72), sign 11/4, 145 tied;
+  Mouth deaths 7 -> 9 (n.s.). SHIPPED (correctness), deployed. The two ante-3 losses (152003, 64003) are the
+  LOCK CHOICE: in mz, 64003 locked High Card (always remakeable) and cleared; in mze the rollout, now able to
+  cycle after a lock, looked more kindly on a Two Pair lock that never came back. The old rollout's "no legal
+  hand = blind over" was accidentally pricing repeatability. **Next lever: Mouth lock choice** -- value each
+  type by what it scores over ALL remaining hands (remake odds), and stop spending every discard pre-lock.
+  **Baselines: `mz` (pool 3) / `mz_7` (pool 7, running, ETA ~02:30)** -- engine = mze, but mze IS the shipped
+  engine, so compare new arms against `mze` (pool 3) and `mz_7` (pool 7, one engine behind; rerun as `mze_7` if needed).
 - Phase 1 DONE (`f86c375`): Baseball, Flower Pot, Ramen. Live replay: predictable plays <0.8x 5.1% -> 1.7%,
   guaranteed-clear failures 12 -> 5. Regression arm `sc19` vs fin18: neutral (155/160 tied, wins 50 -> 51) -- kept.
 - Phase 2 DONE (`f80b871`): telemetry capacity on the whole deck, discards logged as discards, tools merged.
