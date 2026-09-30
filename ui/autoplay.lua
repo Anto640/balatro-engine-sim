@@ -815,7 +815,9 @@ function Autoplay.tick(last, logger)
   -- channel for a MAKE-ROOM sell (board full, engine wants a joker from the pack): you can sell jokers
   -- while a booster is open. If the make-room sell can't actuate (a blind-select tag pack where the
   -- joker row isn't sellable), fall back to skipping the pack so the run never stalls.
-  if (ch == "shop" or ch == "pack") and best.type and best.type:find("^SELL") then
+  -- In a HAND too (Verdant Leaf: sell a joker to lift the debuff): the old one-click in-blind sell never selected
+  -- the joker, so its sell button never appeared and the run looped (live 2026-09-30 ante 8, 15 min on "sell Chaos").
+  if (ch == "shop" or ch == "pack" or (ch == "hand" and best.type == "SELL_JOKER")) and best.type and best.type:find("^SELL") then
     local card = find_card({ G.jokers, G.consumeables }, best.target)
     if not card then
       -- already sold (slot now free) or not found: in a pack, re-enter so the pick surfaces; in the
