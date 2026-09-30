@@ -62,6 +62,14 @@ every A/B after that should be judged in a world that behaves like the real game
   sides ARE measured alike -- forward_measure on each -- so the probe's comparison is fair). Next: `ss24` = the lower
   bar + BES_SWAP_SAMPLES=24 (precise measurement of just the swap, +9% deals), then `sb2` -- both vs `pa2` on the
   shipped default (worktree `%TMP%/bes_wt_ss` at cba4e3f, chain `%TMP%/bes/chain_night.sh`, after rr32).
+- **"Died rich" CLOSED (no defect):** `tools/died_rich.py sim_out/pa2.jsonl` -- 22 of 132 deaths held $25+ and scored
+  >= 90%; in their death-ante shops the engine bought packs 27/52 times and never left an affordable +value offer
+  untaken. The money is the interest reserve (~$25), which the owner rates as well handled.
+- **Boss-aware pacing (`pboss`, switch BES_PACE_BOSS=1, `06c2c6d`):** `urgent` used a generic 2x / 4-hand boss.
+  Boss death rates near ante 4 (pa2+pa2_7): Water 18%, Wall 17%, Mouth 15%, Needle 14% vs Wheel/Arm ~6%. The switch
+  also checks the known next boss at its real requirement / hands / scoring effect; newly urgent in 7.7% of live
+  shops (Club 17, Wall 16, Needle 12, Flint 10, Manacle 9 ...). Queued last (`%TMP%/bes/chain_pb.sh`, vs `pa2`).
+  Not covered: Water (capacity is already no-discard), Mouth/Eye/Serpent (play restrictions).
 - **Overnight order after sb1/rr32** (owner asked for the next clear thing if rr32 fails): (1) `sb2`
   (BES_SCALER_KEEP_RUNWAY=15, `0a92d6a`) regardless of sb1 -- the probe shows two separate causes; (2) a swap-bar
   winner gets one confirming arm on the current default vs `pa2`, ships, then rerun the reroll test (rerolls only pay
