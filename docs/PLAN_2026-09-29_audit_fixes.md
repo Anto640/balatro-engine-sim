@@ -57,6 +57,11 @@ every A/B after that should be judged in a world that behaves like the real game
   shields weak scalers (Green Joker 0.01 at a7, Runner 0.27). Arm `sb1` (BES_UPGRADE_MARGIN=0.6, BES_SWAP_SLOPE=0.25)
   vs `stone` runs after pa2_7 (`%TMP%/bes/chain_next.sh`, worktree `%TMP%/bes_wt_sb` at 978ce1b), then rr32. July's
   lesson: margin cuts alone churned -- watch SOLD counts. Next if needed: keep_bias for low-C scalers.
+- **`sb1` vs `stone`: NOT promising** -- wins 24 -> 27, progress -0.056 (p 0.60), sign 44/52, reach-8 42 -> 36, jokers
+  sold 433 -> 520. A lower bar alone swaps more without better outcomes: at 6 deals a close swap is a coin flip (both
+  sides ARE measured alike -- forward_measure on each -- so the probe's comparison is fair). Next: `ss24` = the lower
+  bar + BES_SWAP_SAMPLES=24 (precise measurement of just the swap, +9% deals), then `sb2` -- both vs `pa2` on the
+  shipped default (worktree `%TMP%/bes_wt_ss` at cba4e3f, chain `%TMP%/bes/chain_night.sh`, after rr32).
 - **Overnight order after sb1/rr32** (owner asked for the next clear thing if rr32 fails): (1) `sb2`
   (BES_SCALER_KEEP_RUNWAY=15, `0a92d6a`) regardless of sb1 -- the probe shows two separate causes; (2) a swap-bar
   winner gets one confirming arm on the current default vs `pa2`, ships, then rerun the reroll test (rerolls only pay
