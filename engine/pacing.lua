@@ -15,6 +15,7 @@
 local Mechanics = require("engine.mechanics")
 local JokerValue = require("engine.joker_value")
 local JokerData = require("engine.joker_data")
+local BossEffect = require("engine.boss_effect")
 
 local P = {}
 
@@ -132,6 +133,34 @@ P.CAP_MODE = (os.getenv and os.getenv("BES_PACE_CAP")) or "mean"
 -- Env override BES_PACE_SAMPLES for the sim A/B.
 P.SAMPLES = tonumber(os.getenv and os.getenv("BES_PACE_SAMPLES") or "") or 5
 
+-- BOSS-AWARE urgency (A/B switch BES_PACE_BOSS=1, default off). `urgent` ("can't clear the next boss -> buy power
+-- now") checks capacity against a GENERIC 2x boss with 4 hands, but the upcoming boss is known (gs.run.boss_key): The
+-- Wall needs 4x, The Needle allows ONE hand, Flint halves the base, suit/face bosses zero those cards. Sim pa2+pa2_7
+-- boss death rates near ante 4: Water 18%, Wall 17%, Mouth 15%, Needle 14% vs Wheel/Arm ~6%. With the switch on,
+-- the next boss is ALSO checked at its real requirement, hands and effect; failing it sets urgent.
+P.BOSS_AWARE = (os.getenv and os.getenv("BES_PACE_BOSS")) == "1"
+local function boss_short(gs, ante, hands, avg, opts)
+  local key = gs.run and gs.run.boss_key
+  if not key then return false end
+  local eff = BossEffect.of(key)
+  local hs = (gs.run and gs.run.hand_size) or 8
+  local bh, _, bhs = BossEffect.resources(eff, hands, 0, hs)
+  local bavg = avg
+  -- re-measure only when the boss changes what a hand scores (else a second noisy read would flip urgency by chance)
+  if eff.halve_base or eff.debuff_suit or eff.debuff_faces or eff.level_down or bhs ~= hs then
+    local bgs = {}
+    for k, v in pairs(gs) do bgs[k] = v end
+    bgs.boss_effect = eff
+    if bhs ~= hs then
+      bgs.run = {}
+      for k, v in pairs(gs.run) do bgs.run[k] = v end
+      bgs.run.hand_size = bhs
+    end
+    bavg = JokerValue.avg_score(bgs, { samples = opts.samples or P.SAMPLES, rng = opts.rng }) or avg
+  end
+  return bavg * bh < Mechanics.blind_requirement(ante, "Boss", eff.mult)
+end
+
 -- pace(gs, opts) -> assessment, or nil if capacity can't be measured (no deck).
 function P.pace(gs, opts)
   opts = opts or {}
@@ -166,7 +195,8 @@ function P.pace(gs, opts)
   return {
     ante = ante, growth = g, capacity = cap,
     on_pace = on_pace, fail_ante = fail,
-    urgent = (fail ~= nil) and (fail <= ante + 1), -- can't clear current/next boss
+    urgent = ((fail ~= nil) and (fail <= ante + 1))  -- can't clear current/next boss
+      or (P.BOSS_AWARE and boss_short(gs, ante, hands, avg, opts)) or false,
     projected_at_8 = proj8, required_at_8 = req8, margin = margin, risk = risk,
     reason = (risk >= 0.5)
       and string.format("At risk (~%d%% chance to die within 2 antes) — build power", math.floor(risk * 100 + 0.5))
