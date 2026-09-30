@@ -62,6 +62,9 @@ every A/B after that should be judged in a world that behaves like the real game
   sides ARE measured alike -- forward_measure on each -- so the probe's comparison is fair). Next: `ss24` = the lower
   bar + BES_SWAP_SAMPLES=24 (precise measurement of just the swap, +9% deals), then `sb2` -- both vs `pa2` on the
   shipped default (worktree `%TMP%/bes_wt_ss` at cba4e3f, chain `%TMP%/bes/chain_night.sh`, after rr32).
+- **rr32 SHIPPED (`94b37f9`, deployed, main synced):** `rr32_7` vs `xpick_7` wins 33 -> 34, reach-8 44 -> 51, reach-7
+  72 -> 79, progress +0.004. Pooled 320 wins 57 -> 66, reach-8 86 -> 99. Confirm arm `rrc` (new default vs `pa2`) queued
+  last (`%TMP%/bes/chain_rrc.sh`); it becomes the next baseline.
 - **`rr32` vs `stone`: PROMISING** -- wins 24 -> 32, reach-8 42 -> 48, reach-7 62 -> 66, progress +0.122 (p 0.33),
   sign 62/61, sold 433 -> 469. `rr32_7` (vs xpick_7) running, ETA ~03:50.
 - **"Died rich" CLOSED (no defect):** `tools/died_rich.py sim_out/pa2.jsonl` -- 22 of 132 deaths held $25+ and scored
