@@ -133,7 +133,20 @@ local function rollout(gs, start_hand, pile, target, chips0, hands, discards, ha
   -- money-only, so survival (frac) is untouched. Skipped when no hold lever is present.
   local hold_lever = HoldFuel.has_lever(gs)
   if not hold_lever then for _, c in ipairs(start_hand) do if c.enhancement == "m_gold" then hold_lever = true; break end end end
-  local pstate = { types = {}, first = nil } -- boss play-legality cross-hand state
+  -- boss play-legality cross-hand state, SEEDED from this blind (2026-09-30): it started empty, so a mid-blind
+  -- rollout under the Mouth ignored the type already locked and the Eye the types already played.
+  local pstate = { types = {}, first = nil }
+  do
+    local gb = gs.blind or {}
+    for ht in pairs(gb.played_hand_types or {}) do pstate.types[ht] = true end
+    pstate.first = gb.first_hand_type
+    if not pstate.first then           -- same fallback as DE's boss_filter: a lone entry is the lock
+      local keys = {}
+      for ht in pairs(pstate.types) do keys[#keys + 1] = ht end
+      table.sort(keys)
+      pstate.first = keys[1]
+    end
+  end
   local restricted = BossEffect.has_play_restriction(eff)
   local filter = restricted and function(sel, ht) return BossEffect.legal_play(eff, sel, ht, pstate) end or nil
 
@@ -176,9 +189,16 @@ local function rollout(gs, start_hand, pile, target, chips0, hands, discards, ha
   if first then
     if first.kind == "PLAY" and first.sel and #first.sel > 0 then
       local ev = HandEval.score(bgs, first.sel)   -- boss-aware score of the exact play
-      chips = chips + ((ev and ev.score) or 0)
-      money = money + ((ev and ev.money) or 0)
-      after_play(ev or { hand_type = "?" }, first.sel)
+      if filter and ev and not filter(first.sel, ev.hand_type) then
+        -- an illegal (Mouth off-type / Eye repeat / Psychic <5) play scores 0 and records nothing: it only cycles
+        remove_played(first.sel)
+        if eff and eff.discard_after then hook_discard(eff.discard_after) end
+        refill()
+      else
+        chips = chips + ((ev and ev.score) or 0)
+        money = money + ((ev and ev.money) or 0)
+        after_play(ev or { hand_type = "?" }, first.sel)
+      end
       hands_left = hands_left - 1
     elseif first.kind == "DISCARD" and first.cards and #first.cards > 0
        and #first.cards < #current and discards_left > 0 then
@@ -197,14 +217,28 @@ local function rollout(gs, start_hand, pile, target, chips0, hands, discards, ha
     -- subset of the start hand once the pile ran dry would otherwise keep the stale start hand)
     local hgs = with_hand(bgs, current)
     local ev, sel = HandEval.best_play_target(hgs, current, rem, filter, true)
-    if not ev then break end -- no legal play (e.g. can't make 5 under Psychic)
+    if not ev then
+      -- no legal play: the game still lets you play a hand for 0 (blind.lua debuff_hand), which cycles cards
+      -- like a discard. With discards or spare hands left, cycle what the legal-type dig would throw.
+      if not filter or hands_left + discards_left < 2 then break end
+      local dv = DiscardValue.best(hgs, { samples = (pol and pol.dig_samples) or 2, rng = rng, filter = filter })
+      local cyc = dv and dv.cards
+      if not (cyc and #cyc > 0 and #cyc < #current) then break end
+      remove_played(cyc)
+      if discards_left > 0 then
+        discards_left = discards_left - 1
+      else
+        if eff and eff.discard_after then hook_discard(eff.discard_after) end
+        hands_left = hands_left - 1
+      end
+      refill()
 
     -- MILK finishing policy: the clear is available NOW and a spare hand remains, so play a
     -- money-MAXIMAL non-clearing hand this turn (farm gold-seal/Lucky $, keep premium + cycle the
     -- deck) and defer the clear to a later hand. Deferring is HONESTLY risky -- a bad later draw can
     -- cost the clear -- so this stays inside the rollout and shows up as a lower `frac`, which the
     -- caller's survival gate reads. Only fires when a strictly-more-$ non-clearing play exists.
-    if milk and hands_left >= 2 and ev.score >= rem then
+    elseif milk and hands_left >= 2 and ev.score >= rem then
       local mev, msel = HandEval.best_fuel_play(hgs, current, 0, money_credit)
       if mev and msel and (mev.money or 0) > (ev.money or 0) and mev.score < rem then
         chips = chips + mev.score

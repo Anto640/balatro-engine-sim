@@ -540,12 +540,12 @@ function DE.decide(gs, opts)
   -- as if it scored, and (valued at its apparent score) it out-ranked digging -- so the engine burned its
   -- hands on 0-scorers instead of discarding to draw the locked type. Flag it: the play really scores 0,
   -- so its value is zeroed below and the DIG (discard to draw the locked type) is preferred while discards
-  -- remain. Only the Mouth zeroes a played hand's score; Psychic/Eye "no legal play" is a genuine can't-
-  -- play (the fallback there is still the least-bad real play), so gate the zeroing on single_hand_type.
+  -- remain. The same holds for Psychic (under 5 cards) and the Eye (a repeated type): the game lets you play
+  -- the hand, and it scores 0 ("Not allowed", blind.lua debuff_hand), so every play restriction zeroes it.
   local play_scores_zero = false
   if not play_ev and pfilter then
     local beff = b.boss_effect_key and BossEffect.of(b.boss_effect_key) or nil
-    play_scores_zero = beff and beff.single_hand_type or false
+    play_scores_zero = BossEffect.has_play_restriction(beff)
     -- least-bad legal-agnostic play (the actual cards to play if forced)
     play_ev, play_cards = HandEval.best_play_target(gs, hand, remaining)
   end
@@ -671,6 +671,33 @@ function DE.decide(gs, opts)
   -- hand is credited the boost (not just the immediate play).
   local held = held_planet_hands(gs)
   local gs_eval = leveled_gs(gs, held)
+  -- CYCLE PLAY under a play restriction (2026-09-30). A 0-scoring play is still PLAYED: its cards leave and new
+  -- ones are drawn, so with the discards gone it is the only dig left for the locked (Mouth) / unplayed (Eye)
+  -- type. The fallback above picked the best OFF-TYPE hand, which throws away the very cards the lock needs
+  -- (sim 142003: locked Three of a Kind, then pitched its pairs). Play what the legal-type dig would discard.
+  if play_scores_zero and not forced_play then
+    local md = DiscardValue.best(gs_eval, { samples = 10, rng = rng, filter = pfilter })
+    local cyc = md and md.cards
+    if not (cyc and #cyc > 0) then
+      local low, lv
+      for _, c in ipairs(hand) do
+        local v = DiscardValue.keep_value(c, gs)
+        if not low or v < lv then low, lv = c, v end
+      end
+      cyc = low and { low } or nil
+    end
+    if cyc and #cyc > 0 and #cyc <= 5 then
+      local cev = HandEval.score(gs, cyc)
+      play_action.cards = cyc
+      play_action.hand_type = (cev and cev.hand_type) or play_action.hand_type
+      play_action.ordering = nil
+      play_action.play_econ = nil
+      play_action.cycle_play = true
+      play_action.reason = string.format(
+        "No legal hand this deal and no discards — play %d spare card%s for 0 to draw toward a legal hand.",
+        #cyc, #cyc == 1 and "" or "s")
+    end
+  end
   local use_action = planet_use(gs, play_ev, remaining, held, gs_eval)
   -- held Tarots: use for income (Hermit/Temperance) or score (enhancement/suit).
   -- Pick whichever consumable use is most valuable.
@@ -1159,6 +1186,7 @@ function DE.decide(gs, opts)
     -- Arbitrate by E[frac] over the remaining hands, same rollout as the discard branch; only overrides
     -- on a clear margin, so a play that IS near enough still just plays.
     if not can_search and discards_left == 0 and hands_left >= 2 and best.type == "PLAY"
+       and not play_action.cycle_play   -- already the LEGAL-type dig (the unfiltered one below is not)
        and play_action.cards and #play_action.cards > 0 then
       local md = DiscardValue.best(gs_eval, { samples = 10, rng = rng })
       if md and md.cards and #md.cards > 0 and not same_cards(md.cards, play_action.cards) then

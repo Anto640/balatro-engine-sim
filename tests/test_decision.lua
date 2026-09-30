@@ -160,6 +160,34 @@ return function(t)
       "Mouth locked to Straight + hand can't make one + discards left -> DIG, not play an off-type 0-scorer")
   end
 
+  -- The Mouth locked to a type the hand can't make, with NO discards left (sim 142003, 2026-09-30: locked Three of a
+  -- Kind after spending every discard). The off-type play scores 0 either way but still cycles cards, so it must throw
+  -- the chaff and keep the pairs that can become Three of a Kind -- the old fallback played the best off-type hand
+  -- (Two Pair KK88), throwing away exactly those pairs.
+  do
+    local deck = {}
+    for i = 1, 52 do deck[#deck + 1] = card{ id = 3000 + i, rank_id = ((i - 1) % 13) + 2,
+      suit = ({ "Spades", "Hearts", "Clubs", "Diamonds" })[((i - 1) % 4) + 1] } end
+    local h = {
+      card{ id = 1, rank = "King", suit = "Hearts" }, card{ id = 2, rank = "King", suit = "Clubs" },
+      card{ id = 3, rank = "8", suit = "Spades" },   card{ id = 4, rank = "8", suit = "Diamonds" },
+      card{ id = 5, rank = "4", suit = "Hearts" },   card{ id = 6, rank = "2", suit = "Spades" },
+      card{ id = 7, rank = "Jack", suit = "Clubs" }, card{ id = 8, rank = "3", suit = "Diamonds" },
+    }
+    local function rng() local s = 7; return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end end
+    local gs = GS.new{ deck = deck, hand = h, remaining = deck,
+      run = { hand_levels = {}, hand_size = 8, joker_slots = 5 },
+      blind = { target_chips = 1600, chips_scored = 240, hands_left = 3, discards_left = 0,
+        boss = true, boss_effect_key = "bl_mouth", played_hand_types = { ["Three of a Kind"] = 1 },
+        first_hand_type = "Three of a Kind" } }
+    local best = DE.decide(gs, { rng = rng(), samples = 16 }).best
+    t.eq(best.type, "PLAY", "Mouth, no legal hand, no discards -> play (for 0) to cycle")
+    t.ok(best.cycle_play, "Mouth: the 0-scoring play is chosen as a cycle (legal-type dig), not the best off-type hand")
+    local kept = 0
+    for _, c in ipairs(best.cards or {}) do if c.rank == "King" or c.rank == "8" then kept = kept + 1 end end
+    t.eq(kept, 0, "Mouth cycle play keeps both pairs (they can become Three of a Kind)")
+  end
+
   -- HOLD-CONDITIONAL PLAY TIMING: Mystic Summit (+15 mult at 0 discards) makes a scoring play land far
   -- bigger once the discards are spent, so with discards still in hand the engine must DIG them out first
   -- (owner 2026-08-31: "use all its discards before playing" -- it was playing the flush at 2 discards
