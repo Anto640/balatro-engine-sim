@@ -6,8 +6,9 @@
 maths SHIPPED). **Sim baseline = `sim_out/fin20.jsonl` (21/160) / `fin20_7` (31/160)** -- the corrected sim (sim rules
 3A+3B), which now reproduces the live Big-blind deaths. Old baselines (fin18 etc.) are the inflated world.
 **Live/default now (`94b37f9`, main synced):** Stone fix + full joker pool (2 deals) + 32-joker reroll pool (SHIPPED
-2026-09-30 04:00, pooled wins 57 -> 66, reach-8 86 -> 99). Baselines: `pa2` / `pa2_7` (without rr32) until `rrc` (the
-new default, queued last) lands.
+2026-09-30 04:00, pooled wins 57 -> 66, reach-8 86 -> 99). Sim fixed 2026-09-30 (`b3ae087`): the sim shop
+now knows the next boss, as live always did (baseline jump +0.387, p 0.036). **Baseline now: `bf`** (pool 3; no pool-7
+counterpart yet -- run `bf_7` before the next fresh-seed check). Open: the live Mouth lock bug (plan).
 **In flight** (chain `%TMP%/bes/chain_next.sh`, log `%TMP%/bes/chain_f20.log`): `sb1` swap bar (BES_UPGRADE_MARGIN=0.6
 BES_SWAP_SLOPE=0.25, worktree `%TMP%/bes_wt_sb`) vs `stone`, ETA ~00:40, `sb1_7` if promising; then `rr32` (reroll pool,
 `%TMP%/bes_wt_rr`), `rr32_7` if promising. Swap-bar probe: 69% of better offers refused on live full boards (plan).

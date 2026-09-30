@@ -62,6 +62,14 @@ every A/B after that should be judged in a world that behaves like the real game
   sides ARE measured alike -- forward_measure on each -- so the probe's comparison is fair). Next: `ss24` = the lower
   bar + BES_SWAP_SAMPLES=24 (precise measurement of just the swap, +9% deals), then `sb2` -- both vs `pa2` on the
   shipped default (worktree `%TMP%/bes_wt_ss` at cba4e3f, chain `%TMP%/bes/chain_night.sh`, after rr32).
+- **`rrc` vs `pa2`** (rr32 on top of poolall): wins 28 -> 27, reach-8 36 -> 34, progress -0.126 (p 0.28), sign 51/65,
+  sold 459 -> 401 -- the two noise fixes overlap; rr32 kept (not significantly negative).
+- **`bf` vs `rrc` (sim shop now knows the next boss):** wins 27 -> 32, reach-8 34 -> 45, reach-7 54 -> 65, **progress
+  +0.387 (p 0.036), sign 86/60 (p 0.039)** -- the engine's existing boss-aware shop logic pays off; the old sim
+  under-rated it. **`bf` is the baseline now** (engine = shipped default `94b37f9`+, sim `b3ae087`).
+- **`bfpb` vs `bf` (boss-aware pacing): NOT promising** -- wins 32 -> 27, reach-8 45 -> 37, progress -0.120 (p 0.42),
+  sign 50/66. Fresh pair skipped. With the shop hint already weighting the next boss, the extra urgency over-spends.
+  Switch BES_PACE_BOSS stays off.
 - **Live self-play 2026-09-30 09:28-11:15** (bes_runs from line 24837, fixtures 22717, autoplay log 72660; seeds
   `tools/live_audit/seeds_2026-09-30.txt`): 3 runs ended, 0 wins -- 2E6KURK8 a8 Verdant Leaf (0.46), 16JEBAVN a3
   **The Mouth** (0.37), A3SQKZG5 a5 **The Mouth** (0.74); HU6QHE83 reached a8 when closed. Scoring: 24/24
