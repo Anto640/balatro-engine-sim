@@ -1009,6 +1009,10 @@ function Content.shop_phase(run, opts)
   local base_reroll = math.max(0, Content.BASE_REROLL - (run._reroll_discount or 0))  -- A4: Reroll Surplus -$2
   if run._free_reroll then base_reroll = 0; run._free_reroll = nil end                -- A5: D6 tag -> $0 reroll base (one shop)
   run.reroll_cost = base_reroll
+  -- `ostock` ceiling probe: a voucher owned from the first shop (inert without a config)
+  if run.probe and run.probe.free_voucher and not run._probe_voucher then
+    run._probe_voucher = true; apply_voucher(run, run.probe.free_voucher)
+  end
   local shop = Content.gen_shop(run, rng)
   -- Chaos the Clown (JOKER_FIDELITY P0): ONE free reroll each shop. Grant it and expose free_rerolls
   -- on the shop so the engine's OwnedSynergy.reroll_free values the roll as free; the free roll does
@@ -1017,6 +1021,11 @@ function Content.shop_phase(run, opts)
     local chaos = false
     for _, j in ipairs(run.jokers or {}) do if j.key == "j_chaos" then chaos = true; break end end
     run._chaos_free = chaos and 1 or 0
+    -- `reroll1` ceiling probe: free rerolls each shop through an ante (inert without a config)
+    local p = run.probe
+    if p and p.free_rerolls and (run.ante or 1) <= (p.free_rerolls_until or 8) then
+      run._chaos_free = math.max(run._chaos_free, p.free_rerolls)
+    end
     shop.free_rerolls = run._chaos_free
   end
   -- A5: Coupon tag -> the initial jokers & booster packs in THIS shop are free (one shop).

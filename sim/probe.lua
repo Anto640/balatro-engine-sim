@@ -608,6 +608,12 @@ Probe.CONFIGS = {
   -- SHOP CEILING PROBES (2026-10-01, see Probe.extra_jokers / Probe.xgreedy)
   wide         = { extra_jokers = 2 },
   xgreedy      = { xgreedy_until = 5, xgreedy_want = 2, xgreedy_tier = 7 },
+  -- REACHABLE-SUPPLY sizing (Phase 2 of the 2026-10-01 probe): how much of `wide` real channels can buy.
+  -- `ostock` = Overstock owned from the first shop (+1 shop CARD slot; the engine sees it as owned, so the
+  -- voucher slot offers Overstock Plus). `reroll1` = one free reroll per shop through ante 3, which the engine
+  -- prices as free (OwnedSynergy.reroll_free, the Chaos the Clown path) and takes only when it judges it worth it.
+  ostock       = { free_voucher = "v_overstock_norm" },
+  reroll1      = { free_rerolls = 1, free_rerolls_until = 3 },
 }
 
 -- Resolve a config name to the opts overlay Driver.run consumes. Returns nil for the
