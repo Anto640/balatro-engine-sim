@@ -77,22 +77,6 @@ end
 
 local SUITS = { "Spades", "Hearts", "Clubs", "Diamonds" }
 
--- The run's MOST-PLAYED poker-hand type (from K1 run.hand_type_plays), deterministic tie-break
--- (alphabetical) so it never flickers. nil when nothing has been played yet. Drives Obelisk.
-local function most_played_type(run)
-  local plays = run.hand_type_plays
-  if type(plays) ~= "table" then return nil end
-  local keys = {}
-  for ht in pairs(plays) do keys[#keys + 1] = ht end
-  table.sort(keys)
-  local best, bestn = nil, 0
-  for _, ht in ipairs(keys) do
-    local n = plays[ht] or 0
-    if n > bestn then best, bestn = ht, n end
-  end
-  return best
-end
-
 -- ---- per-ROUND (blind-start) joker state ------------------------------------
 -- State the sim used to never set, so these jokers scored ZERO when owned: Ancient/Idol's
 -- chosen suit/card (the real game re-picks a random one each round), Castle's chosen discard
@@ -169,8 +153,9 @@ function JokerTick.on_play(run, ev, played)
       end
       if gained > 0 then bump(j, "xmult", 0.1 * gained, 1) end
     elseif k == "j_obelisk" then                       -- +0.2x per hand that ISN'T your most-played type; reset on playing it -- VERIFY
-      local mp = most_played_type(run)                 -- most-played BEFORE this hand (track_play bumps the counts after)
-      if mp and ev.hand_type == mp then ab(j).x_mult = 1 else bump(j, "xmult", 0.2, 1) end
+      -- the game's rule (shared with the scorer): reset if no other hand was played as often, counting this play
+      if require("engine.joker_effects").obelisk_resets(run.hand_type_plays or {}, ev.hand_type) then ab(j).x_mult = 1
+      else bump(j, "xmult", 0.2, 1) end
     elseif k == "j_ice_cream" then                     -- -5 chips per hand played (starts 100; destroyed at 0) -- VERIFY
       bump(j, "chips", -5, 100)
     end

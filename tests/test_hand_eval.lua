@@ -311,4 +311,19 @@ return function(t)
     t.eq(sc({ "j_raised_fist" }, "Red"), 16 * 13, "Raised Fist: a Red Seal on the lowest card retriggers it")
     t.eq(sc({ "j_raised_fist" }, nil, true), 16 * 7, "Raised Fist: a rankless Stone card is not the lowest")
   end
+  -- Obelisk updates BEFORE scoring: resets to x1 on a hand no other hand has been played as often as (counting this
+  -- play), else +0.2 first (live I1SVUEAX: predicted 6997, the game scored 5208 on the reset)
+  do
+    local GSx = require("model.game_state")
+    local JE = require("engine.joker_effects")
+    t.ok(JE.obelisk_resets({ Pair = 3, Flush = 3 }, "Pair"), "Obelisk: playing the hand that becomes the most played resets it")
+    t.ok(not JE.obelisk_resets({ Pair = 2, Flush = 3 }, "Pair"), "Obelisk: a tie with another hand does not reset it")
+    local function sc(plays)
+      local ace = GSx.card{ id = 1, rank = "Ace", suit = "Spades" }
+      return HandEval.score(GSx.new{ hand = { ace }, run = { hand_levels = {}, hand_type_plays = plays },
+        jokers = { GSx.joker{ key = "j_obelisk", ability = { x_mult = 2 } } } }, { ace }).score
+    end
+    t.eq(sc({ ["High Card"] = 4, Pair = 1 }), 16, "Obelisk: reset hand scores at x1")
+    t.eq(sc({ ["High Card"] = 1, Pair = 4 }), math.floor(16 * 2.2 + 0.5), "Obelisk: other hand scores at x(stored + 0.2)")
+  end
 end

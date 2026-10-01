@@ -247,7 +247,26 @@ J.j_castle        = { on_hand = function(_, j) return { chips = scaled(j, CHIPS,
 J.j_wee           = { on_hand = function(_, j) return { chips = scaled(j, CHIPS, 0) } end }
 J.j_runner        = { on_hand = function(_, j) return { chips = scaled(j, CHIPS, 0) } end }
 -- xmult scalers (default x1 = no effect when the counter is unknown headless)
-J.j_obelisk       = { on_hand = function(_, j) return { xmult = scaled(j, XMULT, 1) } end }
+-- OBELISK updates BEFORE it scores (game: card.lua, context.before): the played hand's count already includes this
+-- play; if no other hand has been played as often, Obelisk RESETS to x1 for this very hand, otherwise it gains +0.2
+-- first. Scoring the stored x_mult over-predicted every reset hand (live I1SVUEAX a4 Big, Obelisk + Duo, Two Pair:
+-- predicted 6997, scored 5208). `plays` = run hand-type counts BEFORE this play.
+local function obelisk_resets(plays, hand_type)
+  if type(plays) ~= "table" or not hand_type then return false end
+  local n = (plays[hand_type] or 0) + 1
+  for ht, c in pairs(plays) do
+    if ht ~= hand_type and (c or 0) >= n then return false end
+  end
+  return true
+end
+J.j_obelisk       = { on_hand = function(ctx, j)
+  local plays = ctx and ctx.gs and ctx.gs.run and ctx.gs.run.hand_type_plays
+  if plays and ctx.hand_type then
+    if obelisk_resets(plays, ctx.hand_type) then return { xmult = 1 } end
+    return { xmult = scaled(j, XMULT, 1) + 0.2 }
+  end
+  return { xmult = scaled(j, XMULT, 1) }
+end }
 J.j_hologram      = { on_hand = function(_, j) return { xmult = scaled(j, XMULT, 1) } end }
 J.j_vampire       = { on_hand = function(_, j) return { xmult = scaled(j, XMULT, 1) } end }
 J.j_constellation = { on_hand = function(_, j) return { xmult = scaled(j, XMULT, 1) } end }
@@ -416,6 +435,7 @@ function M.registry() return J end
 function M.is_registered(key) return J[key] ~= nil end
 M.VALUE_ONLY = VALUE_ONLY
 M.is_uncommon = is_uncommon   -- used by hand_eval for Baseball Card's per-position x1.5
+M.obelisk_resets = obelisk_resets   -- shared with sim/joker_tick (the after-play update)
 function M.is_value_only(key) return VALUE_ONLY[key] == true end
 -- A joker is "covered" if it has a scoring hook OR is explicitly value-only.
 function M.is_covered(key) return J[key] ~= nil or VALUE_ONLY[key] == true end
