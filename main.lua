@@ -56,6 +56,7 @@ local PackOpenAdvisor = try_require("engine.pack_open_advisor")
 local BuildPlan = try_require("engine.build_plan")  -- live persistence of the archetype commitment
 local Overlay  = try_require("ui.overlay")
 local HUDPanel = try_require("ui.hud_panel")
+local Highlights = try_require("ui.highlights")  -- in-world tags on the recommended card / item / button
 local Dagger   = try_require("engine.dagger")    -- Ceremonial Dagger placement before blind select
 local Autoplay = try_require("ui.autoplay")   -- F11: translate the engine's decision into real inputs
 -- Phase 0 self-play instrumentation (SELFPLAY_PLAN.md): record real runs to JSONL
@@ -909,6 +910,7 @@ end
 -- ---- in-game wiring ---------------------------------------------------------
 if _G.G and _G.SMODS then
   if HUDPanel then HUDPanel.autoplay = Autoplay; HUDPanel.install() end   -- status row: self-play / auto-restart
+  if Highlights then Highlights.autoplay = Autoplay end                   -- tags reuse the self-player's lookups
 
   -- debug + toggle keys (chain to any previously-registered handler)
   if love then
@@ -956,6 +958,10 @@ if _G.G and _G.SMODS then
       -- AUTO-PLAY (F11): if enabled, translate the latest recommendation into real inputs. Gated on
       -- SELECTING_HAND + settled + once-per-hand inside Autoplay.tick, so this is a cheap no-op otherwise.
       if Autoplay and Autoplay.enabled then pcall(Autoplay.tick, BES.last, Log and Log.info) end
+      if Highlights then
+        local ok, err = pcall(Highlights.update, dt, BES.last)
+        if not ok and not BES.highlight_err then BES.highlight_err = true; Log.error("highlights failed:", err) end
+      end
       acc = acc + (dt or 0)
       if acc >= 0.25 then
         acc = 0

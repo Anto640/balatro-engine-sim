@@ -43,7 +43,7 @@ real hands, scored by a faithful re-implementation of Balatro's scoring), not fr
 | F10 | Capture-only mode (log decisions, no evaluation) |
 | F11 | Self-play on/off |
 
-The panel shows a live `Self-play: ON/OFF   Auto-restart: ON/OFF` row. Pack choices show "Evaluating pack…"
+The advice panel sits at the top of the left HUD (hover it for the reason, stats and Self-play / Auto-restart status), and a tag marks the recommended card, shop item or button. Pack choices show "Evaluating pack…"
 until the measured decision is ready.
 
 ## Install
@@ -84,7 +84,7 @@ engine/   hand_eval (scoring), joker_effects / joker_data / joker_value (measure
           eval_function (run strength, forward valuation), decision_engine / discard_value /
           ordering / simulation (in-blind play), shop_advisor, pack_open_advisor, consumable_value,
           tarot, packs, vouchers, tags, skip_advisor, build_plan, pacing, boss_effect, ...
-ui/       overlay panel, HUD drawing, autoplay (the self-player)
+ui/       advice state (overlay), native HUD panel, in-world highlights, autoplay (the self-player)
 sim/      world (rules referee), content (shops/packs/tags), driver (run loop)
 tools/    batch runners, analysis and replay tools (see tools/README.md)
 tests/    headless unit + simulator suites

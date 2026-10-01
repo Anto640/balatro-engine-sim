@@ -228,10 +228,13 @@ end
 
 -- ---- live behaviour -----------------------------------------------------------------------------
 
+-- Content-based, so the periodic re-set of IDENTICAL advice never recalculates the HUD.
+local SIG_FIELDS = { "headline", "move", "reason", "reorder", "conf", "ev", "winp", "cost", "banked", "conf_pct", "win_pct" }
 local function signature()
-  local ap = Panel.autoplay
-  return table.concat({ tostring(Overlay.visible), tostring(Overlay.state.version),
-    tostring(ap and ap.enabled), tostring(ap and ap.auto_restart) }, "|")
+  local ap, st = Panel.autoplay, Overlay.state
+  local parts = { tostring(Overlay.visible), tostring(ap and ap.enabled), tostring(ap and ap.auto_restart) }
+  for _, k in ipairs(SIG_FIELDS) do parts[#parts + 1] = tostring(st[k]) end
+  return table.concat(parts, "\31")
 end
 
 -- If the bar is taller than the visible screen, shorten the Run Info / Options buttons.

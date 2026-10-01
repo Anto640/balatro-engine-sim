@@ -4,7 +4,7 @@
 -- state shape -- an error in-game would only be logged, leaving the panel blank.
 
 return function(t)
-  local saved = { G = _G.G, lighten = _G.lighten, darken = _G.darken }
+  local saved = { G = _G.G, lighten = _G.lighten, darken = _G.darken, UIBox = _G.UIBox }
   local function col(n) return { n, n, n, 1 } end
   _G.G = {
     UIT = { T = 1, B = 2, C = 3, R = 4, O = 5, ROOT = 7 },
@@ -112,9 +112,80 @@ return function(t)
     end
     t.eq(words, 60, "wrap keeps every word")
     Overlay.set(nil)
+
+    -- ---- in-world highlights: the plan (pure) ----
+    local H = require("ui.highlights")
+    local function labels(plan)
+      local o = {}
+      for _, w in ipairs(plan) do o[#o + 1] = w.label .. ":" .. (w.kind == "card" and w.areas[1] or w.names[1]) end
+      return table.concat(o, ",")
+    end
+    t.eq(labels(H.plan({ type = "PLAY", cards = { { id = 1 }, { id = 2 } } })), "PLAY:hand,PLAY:hand", "play tags each hand card")
+    t.eq(labels(H.plan({ type = "DISCARD", cards = { { id = 3 } } })), "DISCARD:hand", "discard tags the card")
+    t.eq(labels(H.plan({ type = "USE_CONSUMABLE", target = { id = 9, key = "c_empress" }, target_cards = { { id = 1 } } })),
+      "USE:consumeables,TARGET:hand", "tarot: the card to use and its target")
+    t.eq(labels(H.plan({ type = "SELL_TO_BUY", target = { id = 5 }, then_buy = { key = "j_blueprint" } })),
+      "SELL:jokers,BUY:shop_jokers", "sell-to-buy tags both ends")
+    t.eq(labels(H.plan({ type = "BUY_PACK", target = { key = "p_arcana_normal_1" } })), "OPEN:shop_jokers", "pack -> OPEN")
+    t.eq(labels(H.plan({ type = "PICK", target = { key = "c_death", id = 7 }, target_cards = { { id = 1 }, { id = 2 } } })),
+      "TAKE:pack_cards,TARGET:hand,TARGET:hand", "pack pick + its targets")
+    t.eq(labels(H.plan({ type = "REROLL" })), "BEST:reroll_shop", "reroll -> the reroll button")
+    t.eq(labels(H.plan({ type = "SAVE" })), "BEST:toggle_shop", "save -> Next Round")
+    t.eq(labels(H.plan({ type = "SKIP" })), "BEST:skip_booster", "skip -> pack skip first, then blind skip")
+    t.eq(#H.plan({ type = "Evaluating pack…" }), 0, "a placeholder action tags nothing")
+    t.eq(#H.plan({ type = "BUY_JOKER" }), 0, "no target -> no tag")
+    t.eq(#H.plan(nil), 0, "nil action -> no tag")
+
+    -- ---- highlights runtime: tag lifecycle against stub areas + a fake UIBox ----
+    local made = 0
+    _G.UIBox = function(args)
+      made = made + 1
+      return { args = args, states = { collide = {} }, remove = function(self) self.REMOVED = true end }
+    end
+    local AP = require("ui.autoplay")
+    local fake = { _find_card = AP._find_card, _find_button = function() return nil end,
+      in_transition = function() return false end, _channel = function() return "shop" end,
+      _type_ok = function() return true end, _fresh = function() return true end }
+    H.autoplay = fake
+    local bp = { sort_id = 41, config = { center = { key = "j_blueprint" } } }
+    local sc = { sort_id = 42, config = { center = { key = "j_scholar" } } }
+    G.shop_jokers = { cards = { bp, sc } }; bp.area = G.shop_jokers; sc.area = G.shop_jokers
+    G.C.ORANGE, G.C.GOLD, G.C.PURPLE = col(0.9), col(0.8), col(0.6)
+    local last = { gs = {}, ranked = { best = { type = "BUY_JOKER", target = { id = 41, key = "j_blueprint" } } } }
+    H.update(1, last)
+    t.ok(H.tags[bp] and H.tags[bp].label == "BUY", "BUY tag on the recommended shop joker")
+    t.ok(not H.tags[sc], "no tag on the other shop joker")
+    t.eq(H.tags[bp].box.args.config.major, bp, "tag follows its card")
+    t.eq(H.tags[bp].box.args.config.align, "bm", "shop tags sit below the card (price is on top)")
+    t.ok(H.tags[bp].box.attention_text, "tag draws in the after-cards pass")
+    local n0 = made
+    H.update(1, last)
+    t.eq(made, n0, "an unchanged recommendation keeps its tag (no rebuild flicker)")
+    bp.highlighted = true
+    H.update(1, last)
+    t.ok(not H.tags[bp], "selected shop card: tag yields to the game's Buy button")
+    bp.highlighted = nil
+    H.update(1, last)
+    local box = H.tags[bp].box
+    last.ranked.best = { type = "BUY_JOKER", target = { id = 42, key = "j_scholar" } }
+    H.update(1, last)
+    t.ok(box.REMOVED and not H.tags[bp] and H.tags[sc], "new advice moves the tag")
+    sc.REMOVED = true
+    H.update(0, last)
+    t.ok(not H.tags[sc], "a bought / removed card drops its tag the same frame")
+    last.provisional = true
+    sc.REMOVED = nil
+    H.update(1, last)
+    t.ok(next(H.tags) == nil, "a provisional (still evaluating) pick shows no tag")
+    last.provisional = nil
+    Overlay.visible = false
+    H.update(1, last)
+    t.ok(next(H.tags) == nil, "F9 hides the tags too")
+    Overlay.visible = true
+    H.clear(); H.autoplay = nil
   end)
   t.ok(ok, "hud_panel suite ran without error: " .. tostring(err))
 
-  _G.G, _G.lighten, _G.darken = saved.G, saved.lighten, saved.darken
+  _G.G, _G.lighten, _G.darken, _G.UIBox = saved.G, saved.lighten, saved.darken, saved.UIBox
   package.loaded["ui.hud_panel"] = nil
 end

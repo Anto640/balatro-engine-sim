@@ -320,6 +320,8 @@ local function list_buttons(G, for_name)
   return table.concat(out, ", "), table.concat(rout, ", ")
 end
 Autoplay.list_buttons = list_buttons
+-- shared with ui/highlights.lua, so the in-world tags point at exactly what the self-player would click
+Autoplay._find_card, Autoplay._find_button, Autoplay._cid = find_card, find_button, cid
 
 -- Click a real button by name (optionally for a specific ref card). Strict: if the button isn't found we
 -- log + skip (never fabricate an event — that is what crashed). `nil_fallback` allows the highlight-based
@@ -559,6 +561,7 @@ local function sig(G, ch)
   end
   return tostring(ch)
 end
+Autoplay._channel, Autoplay._type_ok, Autoplay._fresh = channel, type_ok, fresh
 
 -- ---- executors (return true if an action was ISSUED) ------------------------
 -- NOTE: cards are already highlighted by the tick's phase-1 (a frame earlier), so Balatro's

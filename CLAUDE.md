@@ -78,7 +78,9 @@ thing **headless-testable**. See the Layout section in `README.md` for the per-f
   `F10` capture-only toggle (log decisions, no eval); **`F11` AUTO-PLAY toggle** (the self-player,
   `ui/autoplay.lua`, default OFF — plays whole runs; logs to `bes_autoplay.log`); **`F6` AUTO-RESTART toggle** (default OFF — with
   auto-play on, a finished run (game over / win) is restarted via the game's hold-R path after 4 s, so runs chain
-  unattended). The panel shows a live `Self-play: ON/OFF   Auto-restart: ON/OFF` row.
+  unattended). The advice panel is a native row at the top of the left HUD (`ui/hud_panel.lua`; label reads
+  `Auto` while self-playing); hover it for the reason, stats and `Self-play` / `Auto-restart` status. Tags on the
+  recommended card / shop item / button come from `ui/highlights.lua`.
 
 ## Self-play simulator & data-driven tuning (the main tuning workflow)
 
