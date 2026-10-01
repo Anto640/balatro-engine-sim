@@ -384,6 +384,7 @@ function BES.apply_pack(gs, po, provisional)
         id = pick.id or (pick.card and pick.card.id) or (pick.joker and pick.joker.id) } or nil,
       target_note = po.target_note,          -- "apply to AS, KS" in the BIG line (#10)
       target_cards = po.target_cards,        -- machine-readable target hand-card ids (auto-play selects them)
+      target_order = po.target_order,        -- Death: target_cards must sit left->right in the hand
       reason = po.reason, confidence = 0.75,
     }
   end

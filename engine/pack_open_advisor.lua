@@ -577,7 +577,8 @@ function PO.recommend(gs, opts)
     and { key = use_first.key, name = use_first.name or use_first.key, for_name = ordered[1].name } or nil
   return { ranked = valued, picks = ordered, best = ordered[1].it, reason = reason, sell = sell, use_first = use_first_item,
            skip = skip_full or nil,   -- full board + no worthwhile joker swap -> skip, don't recommend "take"
-           target_note = best_target_note, target_cards = best_target_cards }
+           target_note = best_target_note, target_cards = best_target_cards,
+           target_order = (best_target_cards and ordered[1].key == "c_death") or nil }   -- {target, source}, left->right
 end
 
 return PO

@@ -204,6 +204,39 @@ end
 -- Return a NEW hand list with the tarot applied to its best targets (highest
 -- chip cards), or nil if `key` isn't a card-modifying tarot. `gs` (optional) makes
 -- Strength build-aware (T.strength_targets).
+-- DEATH (game: card.lua use_consumeable): of the two selected cards, every one but the RIGHTMOST (screen position)
+-- becomes a copy of the rightmost -- rank, suit, enhancement, seal, edition. Pick: the source is the best card
+-- (highest rank; extras break ties), the target the worst card of another rank (lowest rank; fewer extras).
+-- Returns (target_index, source_index) into `cards`, or nil. Position is NOT required here: the action names the
+-- targets left->right ({target, source}, target_order) and the self-player moves them into that order before
+-- selecting, as a human drags them (the hand sits sorted high->low, so the target is usually to the right).
+-- One pick shared by the valuation (apply_to_hand) and the named targets (best_targets): they used to choose
+-- differently, and live 2026-10-01 the engine recommended "Use Death, then play Three of a Kind" with NO target
+-- cards (best_targets picked the two Queens, already a pair); the game shows no Use button without two selected,
+-- and the self-player stalled.
+local function extras(c) return (c.enhancement and 1 or 0) + (c.seal and 1 or 0) + (c.edition and 1 or 0) end
+function T.death_pick(cards)
+  local src
+  for i, c in ipairs(cards or {}) do
+    if not Cards.is_stone(c) then
+      local s = cards[src or 0]
+      if not s or Cards.rank_id(c) > Cards.rank_id(s)
+         or (Cards.rank_id(c) == Cards.rank_id(s) and extras(c) > extras(s)) then src = i end
+    end
+  end
+  if not src then return nil end
+  local tgt
+  for i, c in ipairs(cards) do
+    if i ~= src and Cards.rank_id(c) ~= Cards.rank_id(cards[src]) then
+      local t = cards[tgt or 0]
+      if not t or Cards.rank_id(c) < Cards.rank_id(t)
+         or (Cards.rank_id(c) == Cards.rank_id(t) and extras(c) < extras(t)) then tgt = i end
+    end
+  end
+  if not tgt then return nil end
+  return tgt, src
+end
+
 function T.apply_to_hand(hand, key, gs)
   local spec = T.ENH[key]
   if spec and gs then
@@ -264,24 +297,15 @@ function T.apply_to_hand(hand, key, gs)
     end
     return new
   end
-  -- Death: the LOWER of the 2 highest cards becomes a copy of the HIGHER (rank+suit),
-  -- making a pair of your best rank.
+  -- Death: of the 2 selected cards the LEFT one becomes a copy of the RIGHT one (see T.death_pick).
   if key == "c_death" then
-    local order = {}
-    for i, c in ipairs(hand) do if not Cards.is_stone(c) then order[#order + 1] = i end end
-    if #order < 2 then return nil end
-    table.sort(order, function(a, b)
-      local ca, cb = Cards.chips(hand[a]), Cards.chips(hand[b])
-      if ca ~= cb then return ca > cb end
-      return (hand[a].id or 0) < (hand[b].id or 0)
-    end)
-    local hi, lo = order[1], order[2]
-    if Cards.rank_id(hand[hi]) == Cards.rank_id(hand[lo]) then return nil end  -- already a pair
+    local lo, hi = T.death_pick(hand)
+    if not lo then return nil end
     local new = {}
-    for i, c in ipairs(hand) do new[i] = c end
-    local src = hand[hi]
-    new[lo] = copy_card(hand[lo])
-    new[lo].rank_id = Cards.rank_id(src); new[lo].suit = src.suit
+    for i, c in ipairs(hand) do new[i] = (i == lo) and copy_card(c) or c end
+    local s = hand[hi]
+    new[lo].rank_id = Cards.base_rank_id(s); new[lo].rank = s.rank; new[lo].suit = s.suit
+    new[lo].enhancement, new[lo].seal, new[lo].edition = s.enhancement, s.seal, s.edition
     return new
   end
   return nil
@@ -379,11 +403,11 @@ function T.best_targets(gs, key, pool)
     local out = T.strength_targets(pool, gs, 2)
     return (#out > 0) and out or nil
   end
-  -- RANK — Death: select the 2 highest; the lower becomes a copy of the higher (a pair). Both are chosen.
+  -- RANK — Death: the same two cards apply_to_hand converts (T.death_pick), so the named targets are the ones valued.
   if key == "c_death" then
-    local out = top_n(function() return true end, 2)
-    if #out < 2 or Cards.rank_id(out[1]) == Cards.rank_id(out[2]) then return nil end
-    return out
+    local lo, hi = T.death_pick(pool)
+    if not lo then return nil end
+    return { pool[lo], pool[hi] }
   end
   -- THIN — Hanged Man etc.: DESTROY the n WEAKEST cards (same order the sim world uses).
   if T.THIN[key] then
@@ -531,11 +555,13 @@ function T.best_use(gs, base_ev, remaining, dollar_value, filter)
             local tcards
             local tg = card_tarot and T.best_targets(gs, c.key, hand) or nil
             if tg and #tg > 0 then tcards = {}; for _, t in ipairs(tg) do tcards[#tcards + 1] = { id = t.id } end end
+            -- Death converts the LEFT selected card into the RIGHT one: tcards is {target, source}, in that order
+            local torder = (c.key == "c_death") or nil
             local credit = card_tarot and need * T.CARD_PERM_CREDIT or 0
             consider({ type = "USE_CONSUMABLE", target = { name = name, key = c.key }, kind = "score",
               play_cards = cards2, hand_type = ev2.hand_type, score = ev2.score,
               value = ev2.score + credit, permanence_credit = credit,
-              target_note = tn, target_cards = tcards, use_keys = { c.key },
+              target_note = tn, target_cards = tcards, target_order = torder, use_keys = { c.key },
               reason = string.format("Use %s%s, then play %s — %d vs %d.",
                 name, tn and (" (" .. tn .. ")") or "", ev2.hand_type, ev2.score, base) })
           end

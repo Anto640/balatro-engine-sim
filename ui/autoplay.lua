@@ -677,6 +677,8 @@ function Autoplay.tick(last, logger)
   end
 
   local best = last and last.ranked and last.ranked.best
+  -- a Use the game refused in this hand (see USE_CONSUMABLE below): act on the engine's next choice instead
+  if Autoplay._use_fallback and Autoplay._use_fallback.sig == s then best = Autoplay._use_fallback.action end
   if not best then return end
   if not type_ok(ch, best.type) then return end
   local isfresh = fresh(G, last.gs, ch)
@@ -792,6 +794,10 @@ function Autoplay.tick(last, logger)
     -- a card-tarot from the pack (Magician, Strength, ...) enhances SELECTED hand cards — its use button
     -- won't appear until the target cards are highlighted. Select them first (from best.target_cards).
     local tgt = best.target_cards
+    -- Death copies the RIGHTMOST selected card onto the other: put the targets in the engine's left->right order
+    if tgt and best.target_order and reorder_cards(G, tgt) then
+      log(logger, "order target cards for " .. tostring(target.key)); Autoplay.locked_until = now() + 0.5; return
+    end
     if tgt and #tgt > 0 and not highlighted_matches(G, tgt) then
       local n = highlight(G, tgt)
       log(logger, "target " .. n .. " hand card(s) for " .. tostring(target.key))
@@ -852,6 +858,11 @@ function Autoplay.tick(last, logger)
   if best.type == "USE_CONSUMABLE" then
     -- (a) tarot targeting: if the engine named target hand cards, highlight them before using the tarot.
     local tgt = best.target_cards or best.cards
+    -- Death copies the RIGHTMOST selected card onto the other: put the targets in the engine's left->right order
+    if tgt and best.target_order and reorder_cards(G, tgt) then
+      log(logger, "order target cards for " .. tostring(best.target and best.target.name))
+      Autoplay.locked_until = now() + 0.5; return
+    end
     if tgt and #tgt > 0 and not highlighted_matches(G, tgt) then
       local n = highlight(G, tgt)
       log(logger, "target " .. n .. " card(s) for " .. tostring(best.target and best.target.name))
@@ -878,10 +889,23 @@ function Autoplay.tick(last, logger)
     end
     log(logger, "use consumable " .. tostring(ckey(card) or kk))
     Autoplay.locked_until = now() + 1.2
-    click(G, "use_card", logger, { key = ckey(card), id = cid(card) })
-    -- if it worked the consumable is gone -> sig changes -> we re-enter (next consumable / the play);
-    -- if it failed the sig is unchanged -> last_sig stops it (no loop).
-    Autoplay.last_sig = s; Autoplay.pending_id = nil
+    if click(G, "use_card", logger, { key = ckey(card), id = cid(card) }) then
+      -- it worked: the consumable is gone -> sig changes -> we re-enter (next consumable / the play)
+      Autoplay.last_sig = s; Autoplay.pending_id = nil
+    elseif ch == "hand" then
+      -- No Use button: the game refuses this use (live 2026-10-01: Death with no target cards). Burning last_sig
+      -- here stalled the run for good -- a hand state only changes by acting. Keep retrying; after MAX_WAIT on this
+      -- state, act on the engine's next choice (the move the Use displaced, alternatives[1]).
+      if (now() - (Autoplay.wait_since or now())) > Autoplay.MAX_WAIT then
+        local alt = last.ranked and last.ranked.alternatives and last.ranked.alternatives[1]
+        if alt and (alt.type == "PLAY" or alt.type == "DISCARD") then
+          Autoplay._use_fallback = { sig = s, action = alt }
+          log(logger, "use refused -> engine's next choice: " .. alt.type)
+        end
+      end
+    else
+      Autoplay.last_sig = s; Autoplay.pending_id = nil  -- shop/pack: the old behaviour (no loop)
+    end
     return
   end
 

@@ -1315,4 +1315,25 @@ return function(t)
     local full = DE.decide(st({ joker{ key = "j_sixth_sense" } }, { { key = "c_fool", set = "Tarot" }, { key = "c_moon", set = "Tarot" } })).best
     t.ok(not full.sixth_sense, "Sixth Sense: no free consumable slot -> the 8 would be destroyed for nothing, so no")
   end
+  -- DEATH (live 2026-10-01 stall): the valuation and the named targets use ONE pick -- convert the worst card into a
+  -- copy of the best -- and name them {target, source} left->right (the game copies the RIGHTMOST selected card)
+  do
+    local T = require("engine.tarot")
+    local h = {
+      card{ id = 1, rank = "Queen", suit = "Spades" }, card{ id = 2, rank = "Queen", suit = "Diamonds" },
+      card{ id = 3, rank = "10", suit = "Diamonds" }, card{ id = 4, rank = "7", suit = "Spades" },
+      card{ id = 5, rank = "6", suit = "Hearts" }, card{ id = 6, rank = "5", suit = "Clubs" },
+      card{ id = 7, rank = "2", suit = "Clubs" }, card{ id = 8, rank = "2", suit = "Diamonds" },
+    }
+    local tgt, src = T.death_pick(h)
+    t.eq(h[src].id, 1, "Death: the source is the best card (a Queen)")
+    t.eq(h[tgt].rank, "2", "Death: the target is the worst card (a 2), even though it sits to the right")
+    local tg = T.best_targets(GS.new{ hand = h, run = { hand_levels = {} } }, "c_death", h)
+    t.ok(tg and #tg == 2 and tg[1] == h[tgt] and tg[2] == h[src], "Death: named targets = {target, source}, the same pick")
+    local nh = T.apply_to_hand(h, "c_death", GS.new{ hand = h })
+    t.eq(nh[tgt].rank_id, 12, "Death: the target becomes a Queen")
+    t.eq(nh[tgt].suit, "Spades", "Death: ... of the source's suit")
+    t.eq(T.death_pick({ card{ id = 9, rank = "King", suit = "Hearts" }, card{ id = 10, rank = "King", suit = "Clubs" } }), nil,
+      "Death: no pick when every card shares a rank")
+  end
 end
