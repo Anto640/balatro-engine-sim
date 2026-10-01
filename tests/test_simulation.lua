@@ -535,4 +535,18 @@ return function(t)
     local none, sharp = p_clear({}), p_clear({ joker{ key = "j_card_sharp" } })
     t.ok(sharp > none + 0.1, string.format("rollout credits Card Sharp's repeat-type x3 (%.2f vs %.2f)", sharp, none))
   end
+  -- the sim applies the engine's per-play reorder, as the live self-player does (2026-10-01, sim 55003 Needle)
+  do
+    local World = require("sim.world")
+    local a, b, c = { key = "j_half" }, { key = "j_blueprint" }, { key = "j_wily" }
+    local x, y = { rank = "Ace" }, { rank = "King" }
+    local run = { jokers = { a, c, b } }
+    local sel = World.apply_reorder(run, { reorder = { joker_changed = true, joker_order = { c, b, a },
+      card_changed = true, card_order = { y, x } } }, { x, y })
+    t.ok(run.jokers[1] == c and run.jokers[2] == b and run.jokers[3] == a, "sim applies the engine's joker order")
+    t.ok(sel[1] == y and sel[2] == x, "sim applies the engine's played-card order")
+    local run2 = { jokers = { a, b } }
+    World.apply_reorder(run2, { reorder = { joker_changed = true, joker_order = { b, c } } }, { x })
+    t.ok(run2.jokers[1] == a and run2.jokers[2] == b, "a reorder naming jokers not on the board is ignored")
+  end
 end

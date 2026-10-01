@@ -53,6 +53,35 @@ function World.optimize_joker_order(run)
   run.jokers = out
 end
 
+-- The player's per-play REORDER (2026-10-01). The engine attaches its best joker order and played-card order to a
+-- PLAY (best.reorder), and the live self-player applies both before playing (ui/autoplay.lua PHASE 0/0b) -- a human
+-- drags them the same way. The sim only had the fixed W3 order above, which on a board with no xmult parks
+-- Blueprint LAST, copying nothing (sim 55003 a4 Needle: 4736 vs 5000, the engine's order -- Blueprint left of Half
+-- Joker -- scored 7696 and the run died). Applies only a permutation of the jokers / cards actually in play.
+local function same_set(a, b)
+  if not a or not b or #a ~= #b then return false end
+  local in_b = {}
+  for _, x in ipairs(b) do in_b[x] = true end
+  for _, x in ipairs(a) do if not in_b[x] then return false end end
+  return true
+end
+local function apply_reorder(run, action, sel)
+  local ro = action and action.reorder
+  if not ro then return sel end
+  if ro.joker_changed and same_set(ro.joker_order, run.jokers) then
+    local js = {}
+    for i, j in ipairs(ro.joker_order) do js[i] = j end
+    run.jokers = js
+  end
+  if ro.card_changed and same_set(ro.card_order, sel) then
+    local cs = {}
+    for i, c in ipairs(ro.card_order) do cs[i] = c end
+    return cs
+  end
+  return sel
+end
+World.apply_reorder = apply_reorder
+
 -- ---- RNG (one world stream per run seed; INDEPENDENT of the engine's per-state RNG) --
 -- Park-Miller LCG, the same family the engine uses for determinism. The world owns ALL
 -- world randomness (shuffles, later: shop rolls) so a run is fully reproducible from its
@@ -1109,6 +1138,7 @@ function World.play_blind(run, blind)
         refill_after()
         after_draw()
       else
+        sel = apply_reorder(run, action, sel)
         sel = with_forced(sel)
         hook_discard(sel)
         local ev = referee_score(build_gs(run, b, hand, draw_pile, eff), sel, rng)
