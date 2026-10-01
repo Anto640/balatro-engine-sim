@@ -253,7 +253,7 @@ local function rollout(gs, start_hand, pile, target, chips0, hands, discards, ha
     -- cost the clear -- so this stays inside the rollout and shows up as a lower `frac`, which the
     -- caller's survival gate reads. Only fires when a strictly-more-$ non-clearing play exists.
     elseif milk and hands_left >= 2 and ev.score >= rem then
-      local mev, msel = HandEval.best_fuel_play(hgs, current, 0, money_credit)
+      local mev, msel = HandEval.best_fuel_play(hgs, current, 0, money_credit, filter)
       if mev and msel and (mev.money or 0) > (ev.money or 0) and mev.score < rem then
         chips = chips + mev.score
         money = money + (mev.money or 0)

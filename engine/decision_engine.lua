@@ -628,8 +628,9 @@ function DE.decide(gs, opts)
     if runway > 0 then
       local function fcredit(sel, ev) return ScalingFuel.credit(gs, sel, ev, owned, runway) end
       local base_fuel = fcredit(play_cards, play_ev)
-      local fev, fcards, fval = HandEval.best_fuel_play(gs, hand, remaining, fcredit)
-      if fev and fcards and (fval or 0) > base_fuel + 1e-9 and not same_cards(fcards, play_cards) then
+      local fev, fcards, fval = HandEval.best_fuel_play(gs, hand, remaining, fcredit, pfilter)
+      if fev and fcards and (fval or 0) > base_fuel + 1e-9 and not same_cards(fcards, play_cards)
+         and not (mouth_lock and fev.hand_type ~= play_ev.hand_type) then   -- never re-pick the chosen Mouth lock
         local fuel_guaranteed = remaining > 0 and (fev.score_min or fev.score) >= remaining
         local pace_ok = (not clears) and (not forced_play) and discards_left == 0
           and hands_left >= 2 and remaining > 0 and fev.score >= remaining / hands_left
@@ -924,7 +925,7 @@ function DE.decide(gs, opts)
     local milk_pool = {}
     for _, c in ipairs(hand) do if not in_clear[c] then milk_pool[#milk_pool + 1] = c end end
     local mev, mcards
-    if #milk_pool > 0 then mev, mcards = HandEval.best_fuel_play(gs, milk_pool, 0, milk_money) end
+    if #milk_pool > 0 then mev, mcards = HandEval.best_fuel_play(gs, milk_pool, 0, milk_money, pfilter) end
     if mev and mcards and not same_cards(mcards, play_cards)
        and milk_money(mcards, mev) > milk_money(play_cards, play_ev) + 1e-9 then
       local seed = disc_seed(gs)

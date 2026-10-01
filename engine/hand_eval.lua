@@ -898,7 +898,10 @@ end
 -- away; it only differs in the tie-break, preferring the play with the most
 -- scaling FUEL among equally-safe options, then score. fuel(played, ev) -> credit.
 -- Returns the chosen evaluation, its cards, and that play's fuel credit.
-function HandEval.best_fuel_play(gs, cards, remaining, fuel)
+-- `filter` (optional): a boss play-legality filter, as in best_play_target. Without it a fuel/milk play could pick
+-- a hand the boss forbids (live-replayed sim 84003 a3 Mouth: locked Pair, then "play the Full House to grow Spare
+-- Trousers" -- it scored 0 and the blind was lost).
+function HandEval.best_fuel_play(gs, cards, remaining, fuel, filter)
   gs = hand_ctx(gs, cards)
   remaining = remaining or 0
   local best, best_sel, bt, bf, bs
@@ -915,7 +918,7 @@ function HandEval.best_fuel_play(gs, cards, remaining, fuel)
     elseif f ~= bf then better = f > bf
     else better = ev.score > bs end
     if better then best, best_sel, bt, bf, bs = ev, copy(sel), tier, f, ev.score end
-  end)
+  end, filter)
   return best, best_sel, bf
 end
 

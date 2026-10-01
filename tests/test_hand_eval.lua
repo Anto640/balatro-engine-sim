@@ -279,4 +279,17 @@ return function(t)
     local pool_plain = HandEval.best_play(GS.new{ hand = deal, jokers = {} }, reds)
     t.eq(pool.score, pool_plain.score, "sub-pool of the live hand: other live cards still count as held")
   end
+  -- best_fuel_play honours a boss legality filter (sim 84003 Mouth: a fuel play picked the forbidden Full House)
+  do
+    local GSx = require("model.game_state")
+    local h = { GSx.card{ id = 1, rank = "King", suit = "Hearts" }, GSx.card{ id = 2, rank = "King", suit = "Clubs" },
+      GSx.card{ id = 3, rank = "Jack", suit = "Spades" }, GSx.card{ id = 4, rank = "Jack", suit = "Clubs" },
+      GSx.card{ id = 5, rank = "Jack", suit = "Hearts" } }
+    local gs = GSx.new{ hand = h, run = { hand_levels = {} } }
+    local function credit(sel) return #sel end      -- favours the biggest play (the Full House)
+    local ev = HandEval.best_fuel_play(gs, h, 0, credit)
+    t.eq(ev.hand_type, "Full House", "fuel play without a filter takes the 5-card Full House")
+    local fev = HandEval.best_fuel_play(gs, h, 0, credit, function(_, ht) return ht == "Pair" end)
+    t.eq(fev.hand_type, "Pair", "fuel play under a Pair lock stays a Pair")
+  end
 end
