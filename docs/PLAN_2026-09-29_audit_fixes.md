@@ -9,6 +9,22 @@ every A/B after that should be judged in a world that behaves like the real game
 (mostly by Cavendish). Engine tuning (reroll samples, pacing, guaranteed clears) comes last, measured on the corrected sim.
 
 ## Status (overnight 2026-09-29)
+- **OVERNIGHT 2026-10-01 (autonomous; owner asleep).** Engine `mze` deployed. `mze_7` baseline DONE: 34/160 wins,
+  reach-8 47 (vs bf_7: +0.062 p 0.15, sign 12/4 -- the two Mouth fixes together on fresh seeds).
+  Live self-play 01:01-03:00 (overlapped with an 8-worker batch; FORCED share 12.6% vs 16.5% in the morning -- the
+  tag marks a slow synchronous shop eval, not an early action): 8 runs, 0 wins, no stalls/errors (bes_runs from line
+  25731, fixtures 23591, autoplay log 75649). Found + fixed, each replayed on the recorded state:
+  * `fed037e` Mouth LOCK CHOICE by P(clear) (not E[frac]: Four of a Kind 3876/4000 read .97 but clears 0%) + lock
+    before over-digging. Sim 35003 now clears its Mouth. Arm `ml` vs mze.
+  * `5dba5db` SIM: apply the engine's per-play joker/card reorder (the live self-player does; the sim's fixed W3 order
+    parks Blueprint last with no xmult). Sim 55003 a4 Needle 4736/5000 -> 7696, run reaches a8. New baseline `jo`.
+  * `5c47a88` Campfire sale MEASURED (was flat 1.5 x run-long projection; it resets at the boss). Live 4CKRM5N5 a5 sold
+    Zany (just bought), Card Sharp, Wily "to feed Campfire" at ~90% risk, died by 149 chips. Replay: no sells. Arm `cf`.
+  * `e135552` conditional xmult whose trigger the run PLAYED is never inert. Live DZHHCFQ1 a6 sold The Family
+    ("contributes almost nothing", measured 0 on undug deals) right after two Four of a Kinds it decided; died at the
+    next Big at 95%. Replay: Family 0 -> 3.6, Sell -> Bank. Arm `tp`.
+  Chain `%TMP%/bes/chain_full2.sh` (11 workers, resumable): ml -> cf (vs ml) -> tp (vs cf) -> jo / jo_7 (new sim,
+  engine = all of the above). Verdict arms ml/cf/tp run on the OLD sim (worktrees bes_wt_ml/cf/tp).
 - **MOUTH (2026-09-30 evening).** Boss death rates (bf+bf_7, 320 runs): Mouth 19% vs 3-5% for the other x2 bosses, and
   **15 of 17 Mouth losses ended with hands unplayed**: the sim replaced an off-type play with a legal one, or ENDED the
   blind when none existed (audit 3.25, deferred as rare -- it was not). The game plays it for 0 and redraws.
