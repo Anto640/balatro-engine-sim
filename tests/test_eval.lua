@@ -201,4 +201,20 @@ return function(t)
     local gsx = CV.level_gain(strong, "Pair", 1, ctx_of(strong, "Pair"))
     t.ok(gsx > gw, "a hand level is worth MORE on a board with an xmult to multiply it")
   end
+  -- a hand-conditional xmult whose trigger the run has PLAYED is never "inert" (live DZHHCFQ1: an owned Family measured
+  -- 0 on undug deals after two Four of a Kinds, lost its floor and was sold as "contributes almost nothing")
+  do
+    local deck = {}
+    for i = 1, 52 do deck[#deck + 1] = GS.card{ id = 5000 + i, rank_id = ((i - 1) % 13) + 2,
+      suit = ({ "Spades", "Hearts", "Clubs", "Diamonds" })[((i - 1) % 4) + 1] } end
+    local function fam(plays)
+      return GS.new{ deck = deck, meta = { ante = 6 }, jokers = { GS.joker{ key = "j_joker" }, GS.joker{ key = "j_family" } },
+        run = { hand_levels = {}, joker_slots = 5, hand_type_plays = plays }, blind = { target_chips = 20000 } }
+    end
+    t.ok(Eval.trigger_played(fam({ ["Four of a Kind"] = 2 }), "j_family"), "Family: a played Four of a Kind is its trigger")
+    t.ok(not Eval.trigger_played(fam({ ["Full House"] = 5 }), "j_family"), "Family: a Full House is not")
+    t.ok(not Eval.is_inert("j_family", 0, fam({ ["Four of a Kind"] = 1 })), "Family: not inert once its trigger was played")
+    local played = Eval.joker_marginal_fv(fam({ ["Four of a Kind"] = 2, Pair = 9 }), 2, { rng = lcg(5), samples = 6 })
+    t.ok(played > 1, string.format("owned Family keeps its value after Four of a Kinds were played (%.2f)", played))
+  end
 end

@@ -1008,7 +1008,23 @@ end
 -- this deck (a Mime with no held effect to retrigger, a suit joker whose suit is absent): m == 0 on every
 -- paired sample, after the refine re-measure -- the Y1U5TZWJ case, and nothing broader.
 Eval.NO_TIER_FLOOR = os.getenv and os.getenv("BES_NO_TIER_FLOOR") == "1"   -- A/B switch: floor-free for all modelled jokers
-function Eval.is_inert(key, m)
+-- A hand-conditional xmult (Duo/Trio/Family/Order/Tribe) whose trigger hand this RUN has already played is not
+-- inert, whatever the samples read (2026-10-01, live DZHHCFQ1 a6: The Family played two Four of a Kinds -- 133733
+-- and 72816, the second a clear only with its x4 -- then measured 0 on 6 undug deals, lost its floor as "inert"
+-- and was sold as "contributes almost nothing"; the run died at the next Big blind at 95%. The buy side had priced
+-- it at its floor, ~144% of a boss hand, a few minutes earlier: the same joker flipped on sampling noise.)
+function Eval.trigger_played(gs, key)
+  local cx = COND_XMULT[key]
+  local plays = cx and gs and gs.run and gs.run.hand_type_plays
+  if not plays then return false end
+  for ht in pairs(CONTAINS_TRIGGER[cx.trigger]) do
+    if (plays[ht] or 0) > 0 then return true end
+  end
+  return false
+end
+-- `gs` (optional): with it, a conditional xmult whose trigger was played this run is never inert.
+function Eval.is_inert(key, m, gs)
+  if gs and Eval.trigger_played(gs, key) then return false end
   if Eval.NO_TIER_FLOOR then return Eval.floor_free(key) and m ~= nil end
   return Eval.floor_free(key) and m ~= nil and m <= 1e-9
 end
@@ -1110,7 +1126,7 @@ local function jp_from_measure(gs, key, edition, m, opts, owned)
   local an = conditional_xmult_marginal(gs, key, opts, owned)
   if an and an > m then m = an end
   local frac = m / Mechanics.boss_per_hand_need(gs)
-  if not Eval.is_inert(key, m) then frac = math.max(frac, Eval.tier_floor_frac(key)) end
+  if not Eval.is_inert(key, m, gs) then frac = math.max(frac, Eval.tier_floor_frac(key)) end
   -- measured path: foil/holo/poly already in the delta, add only the slot
   return frac * JP_PER_FRAC * proj + edition_jp(edition, false), true
 end
@@ -1373,7 +1389,7 @@ function Eval.joker_fires(gs, idx, opts)
   local m = JokerValue.score_delta(without, j, { samples = opts.samples or 6, rng = opts.rng, cache = opts.cache })
   if m == nil then return nil end
   m = Eval.refine_measure(without, j, m, opts)   -- a rare trigger must not read as "does nothing"
-  return m > 1e-9
+  return m > 1e-9 or Eval.trigger_played(gs, j.key)
 end
 
 
@@ -1585,7 +1601,7 @@ function Eval.joker_pick_frac(gs, sj, need, opts)
   local an = conditional_xmult_marginal(gs, key, opts, false)   -- add-side (X-1)*base, like a buy
   if an and an > m then m = an end
   local frac = m / (need or Mechanics.boss_per_hand_need(gs))
-  if Eval.is_inert(key, m) then return frac, true end
+  if Eval.is_inert(key, m, gs) then return frac, true end
   return math.max(frac, floor), true
 end
 

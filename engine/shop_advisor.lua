@@ -813,7 +813,7 @@ local function scoring_gain(gs, sj, rng, pace)
     -- R12: the tier floor applies unless the joker is measured to do NOTHING on this deck (Eval.is_inert:
     -- the floor inflated a Mime with nothing to retrigger to 1.62 of a boss hand). See Eval.is_inert for
     -- why the broader "no floor for any modelled joker" was reverted (sim wins 28 -> 15).
-    if not Eval.is_inert(sj.key, measured) then
+    if not Eval.is_inert(sj.key, measured, gs) then
       local floor_frac = 0.6
       if JokerData.has_tag(sj.key, "retrigger") or JokerData.has_tag(sj.key, "enh:steel") then
         floor_frac = 0.9
