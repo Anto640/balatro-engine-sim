@@ -1,23 +1,27 @@
 -- ui/overlay.lua
--- Builds the recommendation panel's UI node tree and owns the display state.
--- Uses plain UIT.T text nodes (the most reliable text in Balatro) built fresh
--- from the current state; the HUD is rebuilt on update (see ui/hud_inject.lua),
--- so we don't depend on DynaText live-binding.
--- Runtime-only: needs G.UIT, which exists in-game.
+-- Owns the recommendation DISPLAY STATE: Overlay.set() turns the engine's RankedActionList into the
+-- strings and numbers the native HUD panel (ui/hud_panel.lua) and the in-world highlights read.
+-- Pure: no G, no love -- headless-testable.
 
 local Cards = require("util.cards")
 
 local Overlay = {}
 
 Overlay.state = {
-  title   = "ENGINE SIM",
-  move    = "-",
-  conf    = "",
-  ev      = "",
-  winp    = "",
-  reorder = "",
-  reason  = "Press F8 to evaluate.",
+  title    = "ENGINE SIM",
+  move     = "-",     -- full one-line move (verb, target, pack size, cost, tarot target)
+  headline = "-",     -- the move WITHOUT the cost (the panel shows the cost as its own money tag)
+  conf     = "",
+  ev       = "",
+  winp     = "",
+  reorder  = "",
+  reason   = "Press F8 to evaluate.",
+  -- structured numbers for the panel's tags (nil = not applicable)
+  cost = nil, banked = nil, conf_pct = nil, sim_backed = false,
+  ev_pct = nil, ev_label = nil, win_pct = nil, run_pct = nil,
+  version  = 0,       -- bumped on every change; the panel rebuilds when it moves
 }
+Overlay.action  = nil -- the raw best action (the in-world highlights read its cards / target ids)
 Overlay.visible = true
 
 local function cards_str(cards)
@@ -32,71 +36,76 @@ local function jokers_str(list)
   return table.concat(out, " > ")
 end
 
-local function truncate(s, n)
-  if s and #s > n then return s:sub(1, n - 1) .. "…" end
-  return s
-end
+local function pct(x) return math.floor((x or 0) * 100 + 0.5) end
+
+local VERB = {
+  PLAY = "Play", DISCARD = "Discard", BUY_JOKER = "Buy", SELL_JOKER = "Sell",
+  BUY_VOUCHER = "Buy", BUY_PACK = "Open", REROLL = "Reroll", SAVE = "Save",
+  SKIP = "Skip", CONTINUE = "Play blind", PICK = "Take", BUY_CONSUMABLE = "Buy",
+  USE_CONSUMABLE = "Use", SELL_TO_BUY = "Sell",
+}
+local BUYS = { BUY_PACK = true, BUY_JOKER = true, BUY_CONSUMABLE = true, BUY_VOUCHER = true, SELL_TO_BUY = true }
 
 -- Populate display state from a RankedActionList (engine output).
 function Overlay.set(ranked)
   local s = Overlay.state
+  s.version = (s.version or 0) + 1
+  s.cost, s.banked, s.conf_pct, s.sim_backed = nil, nil, nil, false
+  s.ev_pct, s.ev_label, s.win_pct, s.run_pct = nil, nil, nil, nil
+  s.reorder = ""
   if not ranked or not ranked.best then
-    s.move, s.conf, s.ev, s.winp = "-", "", "", ""
+    Overlay.action = nil
+    s.move, s.headline, s.conf, s.ev, s.winp = "-", "-", "", "", ""
     s.reason = ranked and ranked.reason or "No recommendation."
     return
   end
   local a = ranked.best
-  local VERB = {
-    PLAY = "Play", DISCARD = "Discard", BUY_JOKER = "Buy", SELL_JOKER = "Sell",
-    BUY_VOUCHER = "Buy", BUY_PACK = "Open", REROLL = "Reroll", SAVE = "Save",
-    SKIP = "Skip", CONTINUE = "Play blind", PICK = "Take", BUY_CONSUMABLE = "Buy",
-    USE_CONSUMABLE = "Use", SELL_TO_BUY = "Sell",
-  }
+  Overlay.action = a
   local verb = VERB[a.type] or a.type
   local what = (a.cards and #a.cards > 0) and cards_str(a.cards)
     or (a.target and (a.target.name or a.target.key)) or ""
-  s.move = (what ~= "") and string.format("%s %s", verb, what) or verb
-  -- COST in the BIG line (was only in the small grey reason). For a pack, also its pick-count so
-  -- Normal/Jumbo (pick 1) vs Mega (pick 2) is unmistakable. 2026-08-26 advice-review request.
-  local BUYS = { BUY_PACK = true, BUY_JOKER = true, BUY_CONSUMABLE = true, BUY_VOUCHER = true, SELL_TO_BUY = true }
+  local head = (what ~= "") and string.format("%s %s", verb, what) or verb
+  -- For a pack, its pick-count so Normal/Jumbo (pick 1) vs Mega (pick 2) is unmistakable.
+  -- 2026-08-26 advice-review request.
   if a.type == "BUY_PACK" and a.target and a.target.key then
     local ok, P = pcall(require, "engine.packs")
     if ok and P and P.size_label then
       local sz = P.size_label(a.target.key)          -- "Mega" / "Jumbo" / "Normal"
       local pick = (sz == "Mega") and 2 or 1
-      s.move = s.move .. string.format(" [%s, pick %d]", sz, pick)
+      head = head .. string.format(" [%s, pick %d]", sz, pick)
     end
   end
+  local cost_str = ""
   if a.cost and a.cost > 0 and BUYS[a.type] then
-    s.move = s.move .. string.format(" — $%d", a.cost)
+    s.cost = a.cost
+    cost_str = string.format(" — $%d", a.cost)
   end
-  -- The target ("on which cards") is the actionable part of using a Tarot, so put it
-  -- in the BIG move line, not just the small reason text below. e.g. the headline
-  -- reads "Use Empress — apply to AS, KS" instead of a bare "Use Empress".
-  if a.target_note and a.target_note ~= "" then
-    s.move = s.move .. " — " .. a.target_note
-  end
+  -- The target ("on which cards") is the actionable part of using a Tarot, so it goes in the
+  -- headline, not just the reason: "Use Empress — apply to AS, KS" instead of a bare "Use Empress".
+  local note = (a.target_note and a.target_note ~= "") and (" — " .. a.target_note) or ""
+  s.headline = head .. note
+  s.move = head .. cost_str .. note
   -- Be honest about what "confidence" means: a calibrated probability (from the
   -- simulation) vs a heuristic preference strength. Likewise only call the
   -- number "EV" when it is sim-backed; a heuristic ratio is shown as "Edge".
   local basis = a.confidence_basis or "heuristic_margin"
   local sim_backed = (basis == "win_probability" or basis == "draw_probability")
-  local conf_tag = sim_backed and " (sim)" or " (heuristic)"
-  s.conf = string.format("Confidence: %d%%%s", math.floor((a.confidence or 0) * 100 + 0.5), conf_tag)
-  local ev_label = sim_backed and "EV" or "Edge"
-  s.ev   = string.format("%s: %+d%%", ev_label, math.floor((a.expected_value or 0) * 100 + 0.5))
+  s.sim_backed = sim_backed
+  s.conf_pct = pct(a.confidence)
+  s.conf = string.format("Confidence: %d%%%s", s.conf_pct, sim_backed and " (sim)" or " (heuristic)")
+  s.ev_label = sim_backed and "EV" or "Edge"
+  s.ev_pct = pct(a.expected_value)
+  s.ev = string.format("%s: %+d%%", s.ev_label, s.ev_pct)
   if a.banked_money and a.banked_money > 0 then
+    s.banked = a.banked_money
     s.ev = s.ev .. string.format("   Banks $%d", a.banked_money)
   end
   if a.win_probability ~= nil then
-    s.winp = string.format("Win: %d%%   Run: %d%%",
-      math.floor(a.win_probability * 100 + 0.5),
-      math.floor((a.run_strength or 0) * 100 + 0.5))
+    s.win_pct, s.run_pct = pct(a.win_probability), pct(a.run_strength)
+    s.winp = string.format("Win: %d%%   Run: %d%%", s.win_pct, s.run_pct)
   else
     s.winp = ""
   end
-  -- dedicated, untruncated reorder line (the reason gets truncated below)
-  s.reorder = ""
   if a.reorder then -- decision_engine only sets this when a reorder is worth it
     local o, parts = a.reorder, {}
     if o.joker_changed then parts[#parts + 1] = "jokers " .. jokers_str(o.joker_order) end
@@ -107,42 +116,13 @@ function Overlay.set(ranked)
     else tail = " (safer)" end
     s.reorder = "Reorder: " .. table.concat(parts, ", ") .. tail
   end
-  s.reason = a.reason or "" -- full text; the HUD word-wraps it so it stays on-screen
+  s.reason = a.reason or ""
 end
 
--- Build the UI subtree from the CURRENT state (static text; rebuilt on update).
-function Overlay.node()
-  if not _G.G or not _G.G.UIT then return nil end
-  local UIT, C = G.UIT, G.C
-  local st = Overlay.state
-
-  -- a text row; skips empty lines so the panel stays compact
-  local function row(text, scale, colour)
-    if text == nil or text == "" then return nil end
-    return { n = UIT.R, config = { align = "cl", padding = 0.02 }, nodes = {
-      { n = UIT.T, config = {
-        text = text, scale = scale or 0.32,
-        colour = colour or C.UI.TEXT_LIGHT, shadow = true,
-      } },
-    } }
-  end
-
-  local rows = {}
-  local function add(r) if r then rows[#rows + 1] = r end end
-  add(row(st.title,  0.40, C.GOLD))
-  add(row(st.move,   0.46, C.UI.TEXT_LIGHT))
-  add(row(st.conf,    0.32, C.WHITE))
-  add(row(st.ev,      0.32, C.GREEN))
-  add(row(st.winp,    0.30, C.BLUE))
-  add(row(st.reorder, 0.30, C.GOLD))
-  add(row(st.reason,  0.28, C.WHITE))
-
-  return { n = UIT.ROOT, config = {
-      align = "cm", padding = 0.08, r = 0.1, colour = C.BLACK,
-      emboss = 0.08, minw = 3.0,
-    }, nodes = {
-    { n = UIT.C, config = { align = "cl", padding = 0.04 }, nodes = rows },
-  } }
+-- Replace only the reason line (a transient status such as "Evaluating pack…").
+function Overlay.set_reason(text)
+  Overlay.state.reason = text or ""
+  Overlay.state.version = (Overlay.state.version or 0) + 1
 end
 
 return Overlay

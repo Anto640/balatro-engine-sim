@@ -55,7 +55,7 @@ local SkipAdvisor = try_require("engine.skip_advisor")
 local PackOpenAdvisor = try_require("engine.pack_open_advisor")
 local BuildPlan = try_require("engine.build_plan")  -- live persistence of the archetype commitment
 local Overlay  = try_require("ui.overlay")
-local HUDInject = try_require("ui.hud_inject")
+local HUDPanel = try_require("ui.hud_panel")
 local Dagger   = try_require("engine.dagger")    -- Ceremonial Dagger placement before blind select
 local Autoplay = try_require("ui.autoplay")   -- F11: translate the engine's decision into real inputs
 -- Phase 0 self-play instrumentation (SELFPLAY_PLAN.md): record real runs to JSONL
@@ -257,7 +257,7 @@ function BES.evaluate(with_sim, gs)
       end
       BES.last = { gs = gs, ranked = ranked, shop = true }
       if Overlay then Overlay.set(ranked) end
-      if HUDInject then HUDInject.refresh() end
+      if HUDPanel then HUDPanel.refresh() end
       Log.info(ShopAdvisor.summary(ranked))
       return ranked
     else
@@ -311,7 +311,7 @@ function BES.evaluate(with_sim, gs)
   end
   BES.last = { gs = gs, ranked = ranked, sim = sim }
   if Overlay then Overlay.set(ranked) end
-  if HUDInject then HUDInject.refresh() end
+  if HUDPanel then HUDPanel.refresh() end
   Log.info(Decision.summary(ranked))
   return ranked
 end
@@ -396,7 +396,7 @@ function BES.apply_pack(gs, po, provisional)
     if BES.last.provisional then
       Overlay.set({ best = { type = "Evaluating pack…" },
         reason = "Measuring each pick against your deck — the choice appears when it is decided." })
-      Overlay.state.reason = "Measuring each pick against your deck — the choice appears when it is decided."
+      Overlay.set_reason("Measuring each pick against your deck — the choice appears when it is decided.")
     else
       Overlay.set({ best = action })
     end
@@ -447,7 +447,7 @@ function BES.arm_job(gs, sig)
         if ok and ranked then
           BES.last = { gs = gs, ranked = ranked, sim = sim }
           if Overlay then Overlay.set(ranked) end
-          if HUDInject then HUDInject.refresh() end
+          if HUDPanel then HUDPanel.refresh() end
           Log.info(Decision.summary(ranked))
         else
           Log.error("decide(+sim) failed:", ranked)
@@ -782,7 +782,7 @@ function BES.tick()
       BES.job = nil
       BES.tracker.reset()
       if Overlay then Overlay.set({ best = nil, reason = "…" }) end
-      if HUDInject then HUDInject.refresh() end
+      if HUDPanel then HUDPanel.refresh() end
     end
     return
   end
@@ -908,7 +908,7 @@ end
 
 -- ---- in-game wiring ---------------------------------------------------------
 if _G.G and _G.SMODS then
-  if HUDInject then HUDInject.autoplay = Autoplay; HUDInject.install() end   -- status row: self-play / auto-restart
+  if HUDPanel then HUDPanel.autoplay = Autoplay; HUDPanel.install() end   -- status row: self-play / auto-restart
 
   -- debug + toggle keys (chain to any previously-registered handler)
   if love then
@@ -916,7 +916,7 @@ if _G.G and _G.SMODS then
     function love.keypressed(key, ...)
       if key == "f7" then Log.info("--- joker ability dump ---"); pcall(BES.dump_jokers) end
       if key == "f8" then Log.info("--- manual evaluation (with sim) ---"); BES.evaluate(true) end
-      if key == "f9" and HUDInject then HUDInject.toggle() end
+      if key == "f9" and HUDPanel then HUDPanel.toggle() end
       if key == "f10" then
         BES.capture_only = not BES.capture_only
         Log.info("BES capture-only " .. (BES.capture_only
