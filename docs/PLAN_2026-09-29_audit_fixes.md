@@ -9,6 +9,15 @@ every A/B after that should be judged in a world that behaves like the real game
 (mostly by Cavendish). Engine tuning (reroll samples, pacing, guaranteed clears) comes last, measured on the corrected sim.
 
 ## Status (overnight 2026-09-29)
+- **SHOP CEILING PROBE (2026-10-01, `846ee98`, paired n=160 vs `jo`; configs in `sim/probe.lua`).**
+  `wide` (4 jokers per shop + per reroll, free, derived rng): **wins 36 -> 49, reach-8 44 -> 74 (McNemar p 0.0006),
+  progress +0.607 (p 0.0003), sign 88/54 (p 0.006).** The gain is EARLY board power: capacity entering ante 2 +72%
+  (3390 -> 5842 median), jokers at a2 3 -> 4; ante 3-6 deaths pushed later. So the engine's valuation CONVERTS extra
+  choice: offer supply in antes 1-3 is binding, not ranking. `xgreedy` (force a tier>=7 xmult through ante 5, never
+  sell one): wins 36 -> 29, reach-8 44 -> 40, progress +0.012 (p 0.92), sign 54/61 -- NULL: multipliers are not
+  under-bought. Separator data (jo+jo_7): ante 4-6 deaths were offered xmult as often as reach-8 runs but entered
+  ante 3 with half the capacity (7.0k vs 11.6k). Next: size the REACHABLE share (Overstock / early rerolls / packs
+  all cost money the engine lacks at a1-a2).
 - **OVERNIGHT 2026-10-01 (autonomous; owner asleep).** Engine `mze` deployed. `mze_7` baseline DONE: 34/160 wins,
   reach-8 47 (vs bf_7: +0.062 p 0.15, sign 12/4 -- the two Mouth fixes together on fresh seeds).
   Live self-play 01:01-03:00 (overlapped with an 8-worker batch; FORCED share 12.6% vs 16.5% in the morning -- the
