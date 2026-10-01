@@ -370,6 +370,101 @@ function Probe.no_early_churn(run, shop, ranked)
 end
 
 -- ---------------------------------------------------------------------------
+-- SHOP CEILING PROBES (2026-10-01). ~70% of deaths are BUILD deaths (weak boards entering antes
+-- 4-7) and every per-decision shop tweak has measured flat, so these bound how much win rate
+-- better SHOPPING could buy at all, and which part of shopping is binding:
+--
+--  `wide`    -- CHOICE/SUPPLY: every shop (and every reroll) shows `extra_jokers` more jokers,
+--               drawn from a DERIVED rng so the rest of the shop stream is untouched. Same engine
+--               valuation; if more choice converts into wins, the engine picks well and the binding
+--               constraint is what it is offered.
+--  `xgreedy` -- VALUATION/BUILD: a scripted multiplier-first build on top of the engine. Through
+--               ante `xgreedy_until`, while the board holds fewer than `xgreedy_want` strong
+--               multipliers (JokerData.is_xmult, tier >= `xgreedy_tier`), buy the best affordable one
+--               on offer (selling the weakest non-multiplier to make room) and never let the engine
+--               sell one. Data that motivated it (jo + jo_7): runs dying at antes 4-6 were OFFERED
+--               affordable xmult as often as runs that reached ante 8 (0.84 vs 0.87 through a2) but
+--               took fewer (0.37 vs 0.53); scaling xmult (Obelisk, Campfire, Hologram, Ancient,
+--               Vampire) are priced negative and taken 0-18% of the times offered.
+-- Both are BOUNDS, not policies. Inert without a config.
+-- ---------------------------------------------------------------------------
+function Probe.extra_jokers(run, jokers)
+  local p = run and run.probe
+  if not (p and p.extra_jokers) then return end
+  local Content = require("sim.content")   -- lazy: content requires this module
+  run._wide_n = (run._wide_n or 0) + 1
+  local rng = require("sim.world").lcg(((tonumber(run.seed) or 1) * 7919 + run._wide_n * 104729 + 17) % 2147483647 + 1)
+  for _ = 1, p.extra_jokers do
+    local j
+    for _ = 1, 6 do
+      j = Content.gen_joker(run, rng)
+      local dup = false
+      for _, x in ipairs(jokers) do if j and x.key == j.key then dup = true; break end end
+      if j and not dup then break end
+      j = nil
+    end
+    if j then jokers[#jokers + 1] = j end
+  end
+end
+
+local function strong_x(run, key)
+  local d = JokerData.resolve(key) or {}
+  return JokerData.is_xmult(key) and (d.tier or 0) >= (run.probe.xgreedy_tier or 7)
+end
+
+function Probe.xgreedy(run, shop, ranked)
+  local p = run.probe
+  if (run.ante or 1) > p.xgreedy_until then return nil end
+  local best = ranked and ranked.best
+  -- never let the engine sell a strong multiplier inside the window
+  if best and (best.type == "SELL_JOKER" or best.type == "SELL_TO_BUY") and best.target
+     and best.target.key and strong_x(run, best.target.key) then
+    for _, a in ipairs((ranked and ranked.alternatives) or {}) do
+      if not ((a.type == "SELL_JOKER" or a.type == "SELL_TO_BUY") and a.target and a.target.key
+              and strong_x(run, a.target.key)) then
+        return { best = a, alternatives = {} }
+      end
+    end
+    return { best = { type = "SAVE", value = 0, reason = "probe: keep multiplier" }, alternatives = {} }
+  end
+  local have = 0
+  for _, j in ipairs(run.jokers or {}) do if strong_x(run, j.key) then have = have + 1 end end
+  if have >= (p.xgreedy_want or 2) then return nil end
+  if best and best.type == "BUY_JOKER" and best.target and strong_x(run, best.target.key) then return nil end
+  local cash = (run.economy and run.economy.dollars) or 0
+  -- best strong multiplier on offer (tier, then key -- deterministic)
+  local bj, bt
+  for _, j in ipairs(shop.jokers or {}) do
+    if strong_x(run, j.key) then
+      local t = (JokerData.resolve(j.key) or {}).tier or 0
+      if not bt or t > bt or (t == bt and tostring(j.key) < tostring(bj.key)) then bj, bt = j, t end
+    end
+  end
+  if not bj then return nil end
+  local free = #(run.jokers or {}) < (run.joker_slots or 5) or bj.edition == "negative"
+  if free then
+    if cash >= (bj.cost or 0) then
+      return { best = { type = "BUY_JOKER", target = bj, cost = bj.cost, value = 0,
+                        reason = "probe: xmult-greedy buy" }, alternatives = {} }
+    end
+    return nil
+  end
+  -- full board: sell the weakest non-multiplier (tier, then key) if the sale funds the buy
+  local wj, wt
+  for _, j in ipairs(run.jokers or {}) do
+    if not JokerData.is_xmult(j.key) then
+      local t = (JokerData.resolve(j.key) or {}).tier or 0
+      if not wt or t < wt or (t == wt and tostring(j.key) < tostring(wj.key)) then wj, wt = j, t end
+    end
+  end
+  if wj and cash + (wj.sell_value or 1) >= (bj.cost or 0) then
+    return { best = { type = "SELL_JOKER", target = wj, value = 0,
+                      reason = "probe: xmult-greedy make room" }, alternatives = {} }
+  end
+  return nil
+end
+
+-- ---------------------------------------------------------------------------
 -- Config plumbing
 -- ---------------------------------------------------------------------------
 
@@ -510,6 +605,9 @@ Probe.CONFIGS = {
   toppool      = { top_pool = true },
   everything   = { income_bonus = 100, joker_slots = 8, top_pool = true },
   expert_rich  = { policy = "expert", income_bonus = 100 },
+  -- SHOP CEILING PROBES (2026-10-01, see Probe.extra_jokers / Probe.xgreedy)
+  wide         = { extra_jokers = 2 },
+  xgreedy      = { xgreedy_until = 5, xgreedy_want = 2, xgreedy_tier = 7 },
 }
 
 -- Resolve a config name to the opts overlay Driver.run consumes. Returns nil for the

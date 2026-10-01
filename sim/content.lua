@@ -395,6 +395,7 @@ function Content.gen_shop(run, rng)
     if slot and slot.kind == "joker" then jokers[#jokers + 1] = slot.joker
     elseif slot and slot.kind == "consumable" then consumables[#consumables + 1] = slot.item end
   end
+  Probe.extra_jokers(run, jokers)   -- `wide` ceiling probe; inert without a config
   local boosters = {}
   for _ = 1, Content.PACK_SLOTS do boosters[#boosters + 1] = Content.gen_pack(rng, run) end
   -- The run's FIRST shop always has a (normal) Buffoon Pack in its first booster slot (the game's first_shop_buffoon);
@@ -825,6 +826,7 @@ local function apply_action(run, shop, a, rng)
       if slot and slot.kind == "joker" then shop.jokers[#shop.jokers + 1] = slot.joker
       elseif slot and slot.kind == "consumable" then shop.consumables[#shop.consumables + 1] = slot.item end
     end
+    Probe.extra_jokers(run, shop.jokers)   -- `wide` ceiling probe; inert without a config
     return true
   end
   return false  -- SAVE / unknown -> stop
@@ -1077,6 +1079,12 @@ function Content.shop_phase(run, opts)
     if run.probe and run.probe.min_bank then
       local hv = Probe.hoard(run, shop, ranked)
       if hv then ranked = hv end
+    end
+    -- XMULT-GREEDY lesion (2026-10-01 shop ceiling probe): a scripted multiplier-first build on
+    -- top of the engine. Inert without a probe config.
+    if run.probe and run.probe.xgreedy_until then
+      local xv = Probe.xgreedy(run, shop, ranked)
+      if xv then ranked = xv end
     end
     -- record the offering whenever it changes (shop open + after each reroll)
     local sig = offer_sig(shop)
