@@ -10,17 +10,23 @@ self-player fixes -- hidden Play button no longer stalls a hand, in-blind (Verda
 
 **Sim fixed 2026-09-30 (`b3ae087`):** the sim shop now knows the next boss (live always did): +0.387 progress
 (p 0.036), wins 27 -> 32.
-**OVERNIGHT 2026-10-01 (autonomous) -- read the plan's status block "OVERNIGHT 2026-10-01" for every number.**
-Live install = `debddfa` (= branch tip engine). Shipped tonight (all correctness, each REPLAYED on recorded state):
-Mouth lock by P(clear) `fed037e`; Campfire sale measured `5c47a88`; played-trigger conditional xmults never inert
-`e135552`; fuel/milk plays obey boss rules `9d907c1`; Raised Fist held effect `2d49fc1`; Obelisk pre-score reset
-`debddfa`; SIM applies the engine's reorder `5dba5db`. Verdicts: `mze_7` 34/160 (baseline); `ml` vs mze -0.037 n.s.
-(Mouth deaths 9->7); `cf` vs ml 156/160 tied. Running (resumable `%TMP%/bes/chain_full2.sh`, log chain_mz.log):
-`tp` (trigger+fuel+Raised Fist vs cf, old sim) -> `jo`/`jo_7` = NEW BASELINES (all fixes, new sim incl. reorder +
-Obelisk). **Compare new arms against `jo` / `jo_7` once they exist.**
-Live: 10 runs 01:00-03:00 + 05:10-06:15, 0 wins; deterministic live plays now re-score at median 1.000, 0% under
-0.8x (`tools/live_audit/seeds_2026-10-01.txt`). Open: two YCVG9T3J House-blind plays still x0.74 / x1.75 (Raised
-Fist tie + Red Seal order?); shop eval ~7% slower on the same states (6.54 -> 7.02 s under load).
+**OVERNIGHT 2026-10-01 (autonomous) -- every number is in the plan's status block "OVERNIGHT 2026-10-01".**
+**Live install = main = `b367843`.** Shipped (all correctness, each REPLAYED on the recorded live/sim state): Mouth lock
+by P(clear) `fed037e`; Campfire sale measured `5c47a88`; played-trigger conditional xmults never inert `e135552`;
+fuel/milk plays obey boss rules `9d907c1`; Raised Fist held effect `2d49fc1`; Obelisk pre-score reset `debddfa`;
+Death one shared pick, named left->right + self-player Use fallback `b367843` (live stall, verified live). SIM:
+applies the engine's per-play reorder `5dba5db`.
+**BASELINES NOW: `sim_out/jo.jsonl` (pool 3) 36/160 wins, reach-8 44; `sim_out/jo_7.jsonl` (pool 7) 26/160, reach-8
+43** (worktree `%TMP%/bes_wt_jo` at b367843). Compare: `lua tools/analyze_runs.lua sim_out/jo.jsonl compare ...`.
+Pooled 320 (both pools): engine fixes tp vs mze -0.063 (p 0.07, sign 37/39); Death+Obelisk+sim jo vs tp -0.012
+(p 0.86); all tonight jo vs mze -0.075 (p 0.26, sign 85/108). Nothing significant -> kept per the correctness rule.
+The pool-7-only sign test (38/63, p 0.017) did not survive pooling. If revisiting: the only policy change in the
+engine bundle is the Mouth lock choice (`ml`) -- a pool-7 `ml_7` arm would isolate it.
+Live: ~12 runs over three windows, 0 wins (one ante-8 boss death); deterministic live plays re-score at median 1.000,
+0% under 0.8x. **Why batches are flat:** these fixes are rare-situation (frequency ceiling) and deaths are 70% BUILD
+(weak boards), not play errors. Proposed next lever: a SHOP CEILING PROBE (how much win rate perfect shopping could
+buy) before building dug-hand joker valuation or build planning. Open: two YCVG9T3J House plays x0.74 / x1.75;
+shop eval ~7% slower than before tonight.
 
 **Closed levers (don't retry without a new idea):** swap bar (sb1 / ss24 / sb2 -- lower bar trades more, not better,
 even with 24-deal measurement); boss-aware pacing (bfpb -0.12, shop hint already covers it); pacing risk refits;
