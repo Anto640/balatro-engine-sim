@@ -1394,7 +1394,7 @@ function SA.recommend(gs, opts)
         upgrade = math.max(0, upgrade - keep - sell_margin)
       end
       local nudge = SA.SELL_NUDGE[j.key] or 0      -- decay/downside proactive credit
-      local sbonus, sbnote = OwnedSynergy.sell_bonus(gs) -- Campfire etc: selling itself is valuable
+      local sbonus, sbnote = OwnedSynergy.sell_bonus(gs, mopts) -- Campfire etc: selling itself is valuable
       local farm = 0   -- the spawner farm sale is its own candidate (SA.SLOT_SPAWNER, below)
       local value
       if upgrade > 0 then

@@ -1523,6 +1523,28 @@ function Eval.joker_marginal_fv(gs, idx, opts)
   return jp_to_fv(gs, j, jp, idx, measured), measured
 end
 
+-- CAMPFIRE SALE (2026-10-01). Campfire gains x0.25 Mult per card sold and RESETS when a boss is beaten. The sell
+-- path priced each sale at a flat 1.5 x the RUN-long scaling projection -- as if the gain were permanent -- which
+-- out-valued any joker on the board, so the engine sold scorers one after another (live 4CKRM5N5 a5, at ~90% risk:
+-- sold a Zany it had just bought, then Card Sharp, then Wily, and died to the Small blind by 149 chips with 3
+-- jokers). Measured instead: +0.25 on a Campfire at X raises the board's score by 0.25/X of what one more x1.0
+-- adds (unit_spu), and only for the blinds left before the next boss (k of the R blinds the sold joker's loss
+-- lasts). 0 when the board can't be measured.
+Eval.CAMPFIRE_BLINDS_LEFT = { Small = 3, Big = 2, Boss = 1 }
+function Eval.campfire_sale_fv(gs, opts)
+  local cf
+  for _, j in ipairs(gs.jokers or {}) do if j.key == "j_campfire" then cf = j; break end end
+  if not cf or not opts or not can_measure(gs, opts) then return 0 end
+  local ab = type(cf.ability) == "table" and cf.ability or {}
+  local x = math.max(1, tonumber(ab.x_mult) or tonumber(ab.Xmult) or 1)
+  local need = Mechanics.boss_per_hand_need(gs)
+  if not need or need <= 0 then return 0 end
+  local raw = 0.25 * unit_spu(gs, "j_campfire", "xmult", opts) / x
+  local k = Eval.CAMPFIRE_BLINDS_LEFT[(gs.blind or {}).blind_type or ""] or 2
+  local r = math.max(k, Eval.blinds_remaining(gs))
+  return VU.frac_to_fv(raw / need) * (k / r)
+end
+
 -- FV-point marginal of ADDING shop joker `sj` to the current board: one measured
 -- score_delta (NOT a full board re-measure), so valuing a buy/upgrade is O(1) in
 -- the board size. Falls back to the tier prior with no deck. opts as above.

@@ -93,11 +93,14 @@ function OS.consumable_free(gs, set)
 end
 
 -- ---- selling a card ---------------------------------------------------------
--- Future-value bonus to SELLING because a sale triggers a joker. Campfire gains
--- X0.25 mult per card sold (until a boss is beaten) -- a permanent scaling gain,
--- so selling chaff is much better than usual.
-function OS.sell_bonus(gs)
-  if owns(gs, "j_campfire") then return feed(gs, "j_campfire", 1.5), "feeds Campfire (xmult per sale)" end
+-- Future-value bonus to SELLING because a sale triggers a joker. Campfire gains X0.25 mult per card sold,
+-- until a boss is beaten -- a TEMPORARY gain, measured by Eval.campfire_sale_fv (opts = the shop's
+-- measurement options; 0 without them). It replaced a flat 1.5 x the run-long projection.
+function OS.sell_bonus(gs, opts)
+  if owns(gs, "j_campfire") then
+    local v = Eval.campfire_sale_fv(gs, opts)
+    if v > 0 then return v, "feeds Campfire (+x0.25 Mult until the boss)" end
+  end
   return 0, nil
 end
 

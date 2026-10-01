@@ -684,8 +684,29 @@ return function(t)
     -- Tarot synergy (Fortune Teller), sell (Campfire), reroll (Chaos free / Flash Card)
     t.ok(OS.consumable_bonus(GS.new{ jokers = { joker{ key = "j_fortune_teller" } } }, "Tarot") > 0,
       "Fortune Teller rewards buying Tarots")
-    t.ok(OS.sell_bonus(GS.new{ jokers = { joker{ key = "j_campfire" } } }) > 0, "Campfire rewards selling")
     t.eq(OS.sell_bonus(none), 0, "no sell synergy without Campfire")
+    -- Campfire's sale value is MEASURED and temporary (live 4CKRM5N5: a flat bonus sold three scorers):
+    -- 0 when the board can't be measured, positive when it can, ~1/3 as much with 1 blind left before the
+    -- boss resets it as with 3, and below the measured value of keeping a plain Joker.
+    t.eq(OS.sell_bonus(GS.new{ jokers = { joker{ key = "j_campfire" } } }), 0, "Campfire: no flat sell bonus unmeasured")
+    do
+      local Eval = require("engine.eval_function")
+      local function lcg(s) return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end end
+      local deck = {}
+      for i = 1, 52 do deck[#deck + 1] = card{ id = i, rank_id = ((i - 1) % 13) + 2,
+        suit = ({ "Spades", "Hearts", "Clubs", "Diamonds" })[((i - 1) % 4) + 1] } end
+      local function cgs(bt)
+        return GS.new{ deck = deck, meta = { ante = 5 }, run = { hand_levels = {}, joker_slots = 5 },
+          jokers = { joker{ key = "j_campfire", ability = { x_mult = 1.5 } }, joker{ key = "j_joker" } },
+          blind = { target_chips = 11000, blind_type = bt } }
+      end
+      local small = OS.sell_bonus(cgs("Small"), { rng = lcg(3), samples = 12 })
+      local boss = OS.sell_bonus(cgs("Boss"), { rng = lcg(3), samples = 12 })
+      local keep = Eval.joker_marginal_fv(cgs("Small"), 2, { rng = lcg(3), samples = 12 })
+      t.ok(small > 0, "Campfire: a measured sale has value")
+      t.ok(math.abs(boss * 3 - small) < 1e-9, "Campfire: the gain lasts only until the boss (1 blind vs 3)")
+      t.ok(small < keep, string.format("Campfire: one sale (%.3f) is worth less than keeping a Joker (%.3f)", small, keep))
+    end
     -- reroll is free only while a free reroll is actually AVAILABLE (game zeroes
     -- reroll_cost / free_rerolls counter), not merely because Chaos is owned -- else
     -- the advisor keeps recommending a reroll the player can no longer pay for.
