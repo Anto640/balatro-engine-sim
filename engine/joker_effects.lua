@@ -301,14 +301,24 @@ J.j_blackboard = { on_hand = function(ctx)
   end
   return { xmult = 3 }
 end }
-J.j_raised_fist = { on_hand = function(ctx)
-  -- adds 2x the rank of the lowest held card to mult
-  local low = nil
-  for _, c in ipairs(ctx.held) do
-    local v = Cards.chips(c)
-    if not low or v < low then low = v end
+-- Raised Fist is a HELD-card effect on the lowest-ranked held card (game: card.lua, context.individual +
+-- cardarea == G.hand): +2x that card's base value (2-10, faces 10, Ace 11) in the held phase, so Mime and a Red
+-- Seal on that card retrigger it. Rankless Stone cards are skipped; ties go to the rightmost (the game's >= scan).
+-- It used to be a once-per-hand on_hand bonus on card CHIPS (perma bonuses and Stone's 50 included) that no
+-- retrigger reached (live YCVG9T3J a5 boss, Mime + Raised Fist: plays scored ~1.5x their prediction).
+local function raised_card(held)
+  local low, low_id
+  for _, c in ipairs(held or {}) do
+    local id = Cards.rank_id(c)
+    if id > 0 and (not low_id or id <= low_id) then low, low_id = c, id end
   end
-  if low then return { mult = 2 * low } end
+  return low, low_id
+end
+J.j_raised_fist = { on_held = function(card, ctx)
+  local low, id = raised_card(ctx and ctx.held)
+  if card ~= low then return nil end
+  local nominal = (id == 14) and 11 or math.min(id, 10)
+  return { mult = 2 * nominal }
 end }
 
 -- ---- suit-variety xmult ------------------------------------------------------

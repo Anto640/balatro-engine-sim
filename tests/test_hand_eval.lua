@@ -292,4 +292,23 @@ return function(t)
     local fev = HandEval.best_fuel_play(gs, h, 0, credit, function(_, ht) return ht == "Pair" end)
     t.eq(fev.hand_type, "Pair", "fuel play under a Pair lock stays a Pair")
   end
+  -- Raised Fist: a held effect on the lowest-ranked held card (+2x its base value), retriggered by Mime and a Red
+  -- Seal; rankless Stone cards are skipped (live YCVG9T3J, Mime + Raised Fist scored ~1.5x the prediction)
+  do
+    local GSx = require("model.game_state")
+    local function sc(jokers, seal3, stone)
+      local ace = GSx.card{ id = 1, rank = "Ace", suit = "Spades" }
+      local h = { ace, GSx.card{ id = 2, rank = "5", suit = "Hearts" },
+        GSx.card{ id = 3, rank = "3", suit = "Clubs", seal = seal3 }, GSx.card{ id = 4, rank = "King", suit = "Hearts" } }
+      if stone then h[#h + 1] = GSx.card{ id = 5, rank = "2", suit = "Clubs", enhancement = "m_stone" } end
+      local js = {}
+      for _, k in ipairs(jokers) do js[#js + 1] = GSx.joker{ key = k } end
+      return HandEval.score(GSx.new{ hand = h, jokers = js, run = { hand_levels = {} } }, { ace }).score
+    end
+    t.eq(sc({}), 16, "Raised Fist test base: a lone Ace is 16 x 1")
+    t.eq(sc({ "j_raised_fist" }), 16 * 7, "Raised Fist: +2x the lowest held rank (3 -> +6 Mult)")
+    t.eq(sc({ "j_raised_fist", "j_mime" }), 16 * 13, "Raised Fist: Mime retriggers it")
+    t.eq(sc({ "j_raised_fist" }, "Red"), 16 * 13, "Raised Fist: a Red Seal on the lowest card retriggers it")
+    t.eq(sc({ "j_raised_fist" }, nil, true), 16 * 7, "Raised Fist: a rankless Stone card is not the lowest")
+  end
 end
