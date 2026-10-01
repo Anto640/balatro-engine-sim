@@ -60,15 +60,18 @@ thing **headless-testable**. See the Layout section in `README.md` for the per-f
   take minutes): `luajit tests/runner_sim.lua` (`test_world`, `test_driver`, `test_consumables`, `test_content_rates`, …). `luajit`
   is installed and ~2.5x faster — prefer it for anything that runs the `sim/` forward
   simulator (`World.play_blind` / `Driver.run`).
-- **Deploy to the live game (manual copy — the repo is NOT the install):** the running
-  mod lives at `%APPDATA%/Balatro/Mods/balatroenginesim/`. After editing, copy changed
-  files there or the game won't see them. Green tests ≠ works in-game.
+- **Deploy to the live game (manual copy — the repo is NOT the install):** since 2026-10-01 the game runs through
+  **r2modman** (Balatro Mod Manager was shut down). The running mod lives in the r2modman profile at
+  `%APPDATA%/r2modmanPlus-local/Balatro/profiles/Default/mods/balatroenginesim/`. After editing, copy changed
+  files there or the game won't see them. Green tests ≠ works in-game. r2modman launches with
+  `steam.exe -applaunch 2379780 --mod-dir "<profile>/mods"`; a plain Steam launch (no `--mod-dir`) makes Lovely fall
+  back to the OLD `%APPDATA%/Balatro/Mods/` folder and its stale copy of the mod.
   Verify by diffing the whole tree against the install with `diff -q --strip-trailing-cr` (the checkout is CRLF,
   the install LF, so a byte compare reports false differences). Keep backups outside `Mods/`: Steamodded loads any
   copy inside it as a second, conflicting instance of the mod. The game loads code only at startup, and only the
   owner starts or restarts Balatro.
 - **Live logs** (save folder `%APPDATA%/Balatro/`): `bes_runs.jsonl` (run telemetry), `bes_fixtures.jsonl` (full `gs` per
-  decision), `bes_autoplay.log` (self-player actions and failures). Crashes: the Lovely log in `Mods/lovely/log/`.
+  decision), `bes_autoplay.log` (self-player actions and failures). Crashes: the Lovely log in the profile's `mods/lovely/log/`.
 - **In-game debug keys:** `F7` dump owned jokers' live `ability` tables (to the console
   and to `bes_joker_dump.txt` in the LÖVE save folder, each tagged
   `scored`/`value-only`/`UNCOVERED`); `F8` force a re-evaluation; `F9` toggle the overlay;

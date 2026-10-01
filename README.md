@@ -51,7 +51,8 @@ until the measured decision is ready.
 1. Install [Lovely](https://github.com/ethangreen-dev/lovely-injector), then
    [Steamodded](https://github.com/Steamodded/smods).
 2. Copy the mod files (`main.lua`, `your_mod.json`, `core/`, `engine/`, `model/`, `ui/`, `util/`) into
-   `%APPDATA%/Balatro/Mods/balatroenginesim/`.
+   your mod folder: with r2modman, `%APPDATA%/r2modmanPlus-local/Balatro/profiles/<profile>/mods/balatroenginesim/`;
+   with a plain Lovely install, `%APPDATA%/Balatro/Mods/balatroenginesim/`.
 3. Start a run; the panel appears in the HUD.
 
 Telemetry is written to the LÖVE save folder (`%APPDATA%/Balatro/`): `bes_runs.jsonl` (the run),
