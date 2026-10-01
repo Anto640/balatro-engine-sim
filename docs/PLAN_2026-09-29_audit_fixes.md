@@ -25,6 +25,14 @@ every A/B after that should be judged in a world that behaves like the real game
     next Big at 95%. Replay: Family 0 -> 3.6, Sell -> Bank. Arm `tp`.
   Chain `%TMP%/bes/chain_full2.sh` (11 workers, resumable): ml -> cf (vs ml) -> tp (vs cf) -> jo / jo_7 (new sim,
   engine = all of the above). Verdict arms ml/cf/tp run on the OLD sim (worktrees bes_wt_ml/cf/tp).
+  **VERDICTS (paired n=160):** `ml` vs mze: wins 32->30, reach-8 46->44, -0.037 (p 0.22), sign 5/5 -- 3 of the 4
+  regressions are cascades (first divergence at a Mouth blind BOTH arms cleared), the 4th (84003) the fuel bug below;
+  Mouth deaths 9->7. `cf` vs ml: 156/160 tied. `tp` (= trigger-played + FUEL LEGALITY `9d907c1` + RAISED FIST
+  `2d49fc1`) vs cf: wins 30->31, reach-8 44->46, +0.008 (p 0.85), sign 16/13. Night total `tp` vs mze: wins 32->31,
+  reach-8 46->46, -0.038 (p 0.42); Mouth deaths 9->6 (20.0% -> 15.4%). All SHIPPED as correctness (none significant).
+  Later the same night: OBELISK pre-score reset `debddfa` (scorer + sim; live deterministic plays now 0% under 0.8x)
+  and DEATH targets/direction + self-player Use fallback `b367843` (live stall, verified live in window 3). Both in
+  the `jo` worktree (new-sim baselines), not in a verdict arm. Live install = b367843.
 - **MOUTH (2026-09-30 evening).** Boss death rates (bf+bf_7, 320 runs): Mouth 19% vs 3-5% for the other x2 bosses, and
   **15 of 17 Mouth losses ended with hands unplayed**: the sim replaced an off-type play with a legal one, or ENDED the
   blind when none existed (audit 3.25, deferred as rare -- it was not). The game plays it for 0 and redraws.
