@@ -18,6 +18,13 @@ every A/B after that should be judged in a world that behaves like the real game
   under-bought. Separator data (jo+jo_7): ante 4-6 deaths were offered xmult as often as reach-8 runs but entered
   ante 3 with half the capacity (7.0k vs 11.6k). Next: size the REACHABLE share (Overstock / early rerolls / packs
   all cost money the engine lacks at a1-a2).
+- **REACHABLE-SUPPLY sizing (2026-10-02, `0beb4b2`, paired n=160 vs `jo`).** Both channels given FREE:
+  `ostock` (Overstock owned from the first shop): progress +0.360 (p 0.046), sign 89/64 (p 0.052), reach-7 65 -> 80,
+  reach-8 44 -> 51, **wins 36 -> 34**. `reroll1` (one free reroll per shop to ante 3): progress +0.330 (p 0.044),
+  sign 88/63, reach-8 44 -> 47, **wins 36 -> 29**. Each recovers ~55% of `wide`'s progress but NONE of its wins,
+  and these are upper bounds (the real channels cost $5-10 at antes 1-2). Verdict: the early-supply engine change
+  (re-price Overstock / early rerolls) is NOT built -- even free, the reachable channels push deaths later without
+  converting to wins; `wide`'s wins need ~2 extra JOKER offers per shop, which no real channel supplies.
 - **OVERNIGHT 2026-10-01 (autonomous; owner asleep).** Engine `mze` deployed. `mze_7` baseline DONE: 34/160 wins,
   reach-8 47 (vs bf_7: +0.062 p 0.15, sign 12/4 -- the two Mouth fixes together on fresh seeds).
   Live self-play 01:01-03:00 (overlapped with an 8-worker batch; FORCED share 12.6% vs 16.5% in the morning -- the
