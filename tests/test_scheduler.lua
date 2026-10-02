@@ -76,6 +76,33 @@ return function(t)
     t.ok(not leaked, "the replaced job never publishes")
     t.ok(BES.last and BES.last.gs == b, "the newer state's advice is what lands")
 
+    -- 2b. F5 flag: the last decisions are remembered, one entry per decision STATE, capped
+    local Json = require("util.json")
+    local RF = require("core.replay_fixture")
+    BES.recent = {}
+    local s1 = state(0)
+    BES.remember({ gs = s1, ranked = { best = { type = "DISCARD", cards = { s1.hand[1] }, reason = "cheap" } } })
+    BES.remember({ gs = s1, ranked = { best = { type = "PLAY", cards = { s1.hand[2] }, reason = "refined" } } })
+    t.eq(#BES.recent, 1, "the refined answer for the same state replaces the first")
+    t.eq(BES.recent[1].reason, "refined", "... and is the one kept")
+    for k = 1, 14 do BES.remember({ gs = state(k), ranked = { best = { type = "PLAY", cards = {} } } }) end
+    t.eq(#BES.recent, BES_FLAG_KEEP, "history capped at BES_FLAG_KEEP")
+    local recs = BES.flag_records("test-flag")
+    t.eq(#recs, BES_FLAG_KEEP, "a flag saves the whole history (the misplay may predate the key press)")
+    t.eq(recs[1].steps_before, BES_FLAG_KEEP - 1, "oldest first")
+    t.eq(recs[#recs].steps_before, 0, "steps_before 0 = on screen at the press")
+    t.eq(recs[#recs].decision, "blind", "decision kind recorded for replay")
+    local okj, line = pcall(Json.encode, recs[#recs])
+    t.ok(okj, "flag record encodes to JSON")
+    local back = Json.decode(line)
+    local okr, res = pcall(DE.decide, RF.rehydrate(back), {})
+    t.ok(okr and res and res.best, "a flagged state replays under the engine")
+    t.eq(back.flag_id, "test-flag", "flag id round-trips")
+    local nsaved = BES.flag()
+    t.eq(nsaved, BES_FLAG_KEEP, "F5 reports how many decisions it saved")
+    t.eq(Overlay.active_notice(T), "Flagged (" .. BES_FLAG_KEEP .. ")", "F5 confirms on the panel")
+    t.eq(Overlay.active_notice(T + 10), nil, "... briefly")
+
     -- 3. safety valve: a thinking flag with no job must not stall the self-player
     BES.thinking = { kind = "blind", t0 = T, units0 = BES.work_units }
     BES.job = nil

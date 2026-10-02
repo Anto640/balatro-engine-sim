@@ -37,6 +37,17 @@ function Overlay.add_error(msg, now, clock)
   while #e > Overlay.ERRORS_KEEP do table.remove(e, 1) end
 end
 
+-- A short confirmation tag on the panel (e.g. "Flagged (12)" after F5), shown for `dur` seconds.
+Overlay.notice = nil           -- { text, until_t }
+function Overlay.notify(text, now, dur)
+  Overlay.notice = { text = tostring(text), until_t = (now or 0) + (dur or 3) }
+end
+function Overlay.active_notice(now)
+  local n = Overlay.notice
+  if n and (now or 0) < n.until_t then return n.text end
+  return nil
+end
+
 -- the errors still worth showing at time `now` (newest last)
 function Overlay.recent_errors(now)
   local out = {}

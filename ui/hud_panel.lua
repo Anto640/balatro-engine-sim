@@ -161,12 +161,17 @@ function Panel.content()
   local head = has_move and st.headline or clip(st.reason ~= "" and st.reason or "No recommendation.", 44)
   if think and not has_move then head = "Working it out..." end
   local tags = think and {} or Panel.tags()
+  local note = Overlay.active_notice(Panel.now())
+  if note then   -- a confirmation (F5 flag) leads the tag row
+    if #tags > 0 then table.insert(tags, 1, { n = G.UIT.B, config = { w = 0.08, h = 0.1 } }) end
+    table.insert(tags, 1, tag(note, G.C.GREEN))
+  end
   local body = {
     { n = G.UIT.R, config = { align = "cm", maxw = 3.2 }, nodes = {
       text(head, has_move and 0.36 or 0.3, (has_move and not think) and G.C.WHITE or G.C.UI.TEXT_INACTIVE),
     } },
   }
-  if think then
+  if think and not note then
     body[#body + 1] = progress_bar()
   elseif #tags > 0 then
     body[#body + 1] = { n = G.UIT.R, config = { align = "cm", maxw = 3.2, padding = 0.03 }, nodes = tags }
@@ -244,7 +249,7 @@ function Panel.tooltip()
           badge("Auto-restart", ap and ap.auto_restart),
         } },
         { n = G.UIT.R, config = { align = "cm" }, nodes = {
-          text("F11 self-play   F6 auto-restart   F8 re-evaluate   F9 hide", 0.26, G.C.UI.TEXT_INACTIVE),
+          text("F11 self-play   F6 auto-restart   F5 flag a misplay   F9 hide", 0.26, G.C.UI.TEXT_INACTIVE),
         } },
       } },
     } },
@@ -290,7 +295,8 @@ local SIG_FIELDS = { "headline", "move", "reason", "reorder", "conf", "ev", "win
 local function signature()
   local ap, st = Panel.autoplay, Overlay.state
   local parts = { tostring(Overlay.visible), tostring(ap and ap.enabled), tostring(ap and ap.auto_restart),
-    tostring(thinking()), tostring(#Overlay.recent_errors(Panel.now())), tostring(#Overlay.errors > 0 and Overlay.errors[#Overlay.errors].t) }
+    tostring(thinking()), tostring(#Overlay.recent_errors(Panel.now())), tostring(#Overlay.errors > 0 and Overlay.errors[#Overlay.errors].t),
+    tostring(Overlay.active_notice(Panel.now())) }
   for _, k in ipairs(SIG_FIELDS) do parts[#parts + 1] = tostring(st[k]) end
   return table.concat(parts, "\31")
 end

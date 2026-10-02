@@ -703,6 +703,68 @@ function BES.emit_fixture(gs)
   pcall(love.filesystem.append, BES_FIXLOG, Json.encode(fx) .. "\n")
 end
 
+-- ---- F5: FLAG A MISPLAY (owner 2026-10-02) ------------------------------------
+-- The key is usually pressed AFTER the wrong move (you notice a step or two later), so the flag saves the last
+-- BES_FLAG_KEEP decisions, not just the current one: every published advice is remembered with its full state.
+-- F5 appends them to bes_flagged.jsonl in the bes_fixtures format (so the replay tools read them as-is), oldest
+-- first, each tagged with flag_id, steps_before (0 = the decision on screen at the press) and its clock time
+-- (joins bes_autoplay.log). `lua tools/flagged.lua` lists them and replays each under the current engine.
+BES_FLAGLOG = "bes_flagged.jsonl"
+BES_FLAG_KEEP = 12
+BES.recent = {}            -- ring of { gs, best, move, reason, kind, t, clock, auto }
+
+local function flag_choice(best)
+  return best and { type = best.type, target = best.target and (best.target.name or best.target.key),
+    hand_type = best.hand_type, key = best.target and best.target.key } or nil
+end
+
+-- remember a published advice (one entry per decision STATE: the refined answer replaces the first one)
+function BES.remember(last)
+  if not (last and last.gs) then return end
+  local best = last.ranked and last.ranked.best
+  local entry = { gs = last.gs, best = best, kind = decision_kind(last.gs), provisional = last.provisional,
+    move = Overlay and Overlay.state.move, reason = best and best.reason,
+    cards = best and best.cards, t = clock(), clock = os.date("%H:%M:%S"),
+    auto = (Autoplay and Autoplay.enabled) or false }
+  local r = BES.recent
+  if r[#r] and r[#r].gs == last.gs then r[#r] = entry else r[#r + 1] = entry end
+  while #r > BES_FLAG_KEEP do table.remove(r, 1) end
+end
+
+-- build the flag records (pure apart from the clock; exposed for tests)
+function BES.flag_records(flag_id)
+  local out, n = {}, #BES.recent
+  for i, e in ipairs(BES.recent) do
+    local fx = ReplayFixture.fixture_of(e.gs, flag_choice(e.best), i, e.kind)
+    fx.flag_id, fx.steps_before, fx.flag_clock = flag_id, n - i, e.clock
+    fx.t, fx.advice_move, fx.advice_reason, fx.provisional, fx.self_play = e.t, e.move, e.reason, e.provisional, e.auto
+    local ids = {}
+    for _, c in ipairs(e.cards or {}) do ids[#ids + 1] = c.id end
+    if #ids > 0 then fx.advice_cards = ids end
+    out[#out + 1] = fx
+  end
+  return out
+end
+
+function BES.flag()
+  if not (ReplayFixture and Json) then return 0 end
+  local flag_id = os.date("%Y-%m-%d %H:%M:%S")
+  local recs = BES.flag_records(flag_id)
+  local lines = {}
+  for _, fx in ipairs(recs) do
+    local ok, line = pcall(Json.encode, fx)
+    if ok then lines[#lines + 1] = line end
+  end
+  if #lines > 0 and love and love.filesystem then
+    pcall(love.filesystem.append, BES_FLAGLOG, table.concat(lines, "\n") .. "\n")
+  end
+  Log.info(string.format("FLAGGED %s: saved the last %d decision(s) to %s", flag_id, #lines, BES_FLAGLOG))
+  if Overlay and Overlay.notify then
+    Overlay.notify(string.format("Flagged (%d)", #lines), clock(), 4)
+  end
+  return #lines
+end
+
 -- ids of the currently SELECTED (highlighted) cards, matching state_extraction's id scheme so a
 -- play record's cards line up with the blind fixture's hand cards.
 local function bes_highlighted_ids()
@@ -1011,6 +1073,7 @@ if _G.G and _G.SMODS then
       if key == "f7" then Log.info("--- joker ability dump ---"); pcall(BES.dump_jokers) end
       if key == "f8" then Log.info("--- manual evaluation (with sim) ---"); BES.evaluate(true) end
       if key == "f9" and HUDPanel then HUDPanel.toggle() end
+      if key == "f5" then pcall(BES.flag) end   -- flag a misplay: saves the last BES_FLAG_KEEP decisions
       if key == "f10" then
         BES.capture_only = not BES.capture_only
         Log.info("BES capture-only " .. (BES.capture_only
@@ -1050,6 +1113,7 @@ if _G.G and _G.SMODS then
       if FastMode and not FastMode.installed then pcall(FastMode.ensure) end   -- Handy may load after this mod
       pcall(BES.pump_job, BES.job and BES.slice_budget() or BES_BUDGET_BUSY)
       pcall(BES.think_progress)
+      if BES.last ~= BES._remembered then BES._remembered = BES.last; pcall(BES.remember, BES.last) end
       -- AUTO-PLAY (F11): if enabled, translate the latest recommendation into real inputs. Gated on
       -- SELECTING_HAND + settled + once-per-hand inside Autoplay.tick, so this is a cheap no-op otherwise.
       -- not while the advice for the live state is still being worked out (BES.last is the previous state's)
@@ -1070,7 +1134,7 @@ if _G.G and _G.SMODS then
   end
 
   BES.telemetry_instance()  -- create the run log up front so its path is logged on load
-  Log.info("Balatro Engine Sim loaded. F7 = dump jokers, F8 = evaluate, F9 = toggle overlay, "
+  Log.info("Balatro Engine Sim loaded. F5 = flag a misplay, F7 = dump jokers, F8 = evaluate, F9 = toggle overlay, "
     .. "F10 = capture-only toggle, F11 = AUTO-PLAY toggle (blind PLAY/DISCARD)."
     .. "  CAPTURE-ONLY is " .. (BES.capture_only and "ON (data-collection: no lag, logs decisions to "
       .. BES_FIXLOG .. "; press F10 for live recommendations)" or "OFF")
