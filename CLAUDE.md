@@ -76,7 +76,9 @@ thing **headless-testable**. See the Layout section in `README.md` for the per-f
   and to `bes_joker_dump.txt` in the LÖVE save folder, each tagged
   `scored`/`value-only`/`UNCOVERED`); `F8` force a re-evaluation; `F9` toggle the overlay;
   `F10` capture-only toggle (log decisions, no eval); **`F11` AUTO-PLAY toggle** (the self-player,
-  `ui/autoplay.lua`, default OFF — plays whole runs; logs to `bes_autoplay.log`); **`F6` AUTO-RESTART toggle** (default OFF — with
+  `ui/autoplay.lua`, default OFF — plays whole runs; logs to `bes_autoplay.log`; while it plays, `ui/fast_mode.lua`
+  skips animations through the Handy mod's own skip ('Everything', x16) without touching Handy's saved settings, and
+  the engine thinks in 50 ms slices); **`F6` AUTO-RESTART toggle** (default OFF — with
   auto-play on, a finished run (game over / win) is restarted via the game's hold-R path after 4 s, so runs chain
   unattended). The advice panel is a native row at the top of the left HUD (`ui/hud_panel.lua`; label reads
   `Auto` while self-playing); hover it for the reason, stats and `Self-play` / `Auto-restart` status. Tags on the

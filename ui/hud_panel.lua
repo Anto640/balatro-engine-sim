@@ -24,6 +24,7 @@ local Log = require("util.log")
 local Panel = {}
 Panel.installed = false
 Panel.autoplay = nil          -- the ui/autoplay module (set by main.lua): .enabled / .auto_restart
+Panel.fast = nil              -- the ui/fast_mode module (set by main.lua): .engaged()
 
 local PANEL_ID   = "bes_panel"
 local OPTIONS_ID = "bes_options_button"
@@ -201,6 +202,9 @@ function Panel.tooltip()
   local stats = {}
   for _, s in ipairs({ st.conf, st.ev, st.winp }) do if s and s ~= "" then stats[#stats + 1] = s end end
   if #stats > 0 then para(table.concat(stats, "   "), G.C.BLUE) end
+  if Panel.fast and Panel.fast.engaged and Panel.fast.engaged() then
+    para("Fast mode: animations are skipped while self-play runs.", G.C.GREEN)
+  end
   if #lines == 0 then para("No recommendation yet.") end
 
   local function badge(label, on)

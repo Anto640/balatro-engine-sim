@@ -85,6 +85,11 @@ return function(t)
 
     -- 4. slice budget: idle (no game -> nothing animating) gets the larger slice
     t.eq(BES.slice_budget(), BES_BUDGET_IDLE, "idle frames get the larger slice")
+    local AP = require("ui.autoplay")
+    local was = AP.enabled
+    AP.enabled = true
+    t.eq(BES.slice_budget(), BES_BUDGET_AUTO, "self-play gets the largest slice (nobody watching frames)")
+    AP.enabled = was
   end)
   t.ok(ok, "scheduler suite ran without error: " .. tostring(err))
 

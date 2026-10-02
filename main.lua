@@ -57,6 +57,7 @@ local BuildPlan = try_require("engine.build_plan")  -- live persistence of the a
 local Overlay  = try_require("ui.overlay")
 local HUDPanel = try_require("ui.hud_panel")
 local Highlights = try_require("ui.highlights")  -- in-world tags on the recommended card / item / button
+local FastMode = try_require("ui.fast_mode")      -- skip animations while the F11 self-player plays (via Handy)
 local Dagger   = try_require("engine.dagger")    -- Ceremonial Dagger placement before blind select
 local Autoplay = try_require("ui.autoplay")   -- F11: translate the engine's decision into real inputs
 -- Phase 0 self-play instrumentation (SELFPLAY_PLAN.md): record real runs to JSONL
@@ -335,6 +336,7 @@ end
 -- slicing affects only WHEN the work runs -- and the panel shows "Thinking" with a progress bar meanwhile.
 BES_BUDGET_BUSY = 0.006  -- engine seconds per frame while the game is animating (keeps animations smooth)
 BES_BUDGET_IDLE = 0.020  -- ... while the screen is still (finish sooner; nothing moving to stutter)
+BES_BUDGET_AUTO = 0.050  -- ... while the F11 self-player plays: nobody watches the frames, so think faster
 BES_SIM_BUDGET = BES_BUDGET_BUSY   -- (legacy name)
 BES_TRANSITION_MAX = 6   -- seconds a mid-animation hold may last before the state is treated as settled
 BES.job = nil            -- in-flight background job: { thread, gs, sig, finish }
@@ -378,7 +380,10 @@ function BES.animating()
   if q then for _, ev in ipairs(q) do if ev.blocking ~= false then return true end end end
   return false
 end
-function BES.slice_budget() return BES.animating() and BES_BUDGET_BUSY or BES_BUDGET_IDLE end
+function BES.slice_budget()
+  if Autoplay and Autoplay.enabled then return BES_BUDGET_AUTO end
+  return BES.animating() and BES_BUDGET_BUSY or BES_BUDGET_IDLE
+end
 
 -- Build + push the overlay action for a pack recommendation (shared by the cheap
 -- instant pass and the measured background refine).
@@ -989,6 +994,11 @@ end
 if _G.G and _G.SMODS then
   if HUDPanel then HUDPanel.autoplay = Autoplay; HUDPanel.install() end   -- status row: self-play / auto-restart
   if Highlights then Highlights.autoplay = Autoplay end                   -- tags reuse the self-player's lookups
+  if FastMode then
+    FastMode.autoplay = Autoplay
+    if HUDPanel then HUDPanel.fast = FastMode end                        -- tooltip says when fast mode is on
+    pcall(FastMode.ensure)
+  end
 
   -- debug + toggle keys (chain to any previously-registered handler)
   if love then
@@ -1009,6 +1019,7 @@ if _G.G and _G.SMODS then
       end
       if key == "f11" and Autoplay then
         local on = Autoplay.toggle()
+        if FastMode then pcall(FastMode.refresh) end   -- animations skip / return at once
         -- auto-play needs live recommendations, so force full evaluation ON
         if on and BES.capture_only then
           BES.capture_only = false
@@ -1032,6 +1043,7 @@ if _G.G and _G.SMODS then
       if prev_update then prev_update(dt, ...) end
       -- advance any in-flight background job a few ms EVERY frame (cheap when idle)
       -- so the expensive Monte-Carlo / pack measurement never blocks rendering.
+      if FastMode and not FastMode.installed then pcall(FastMode.ensure) end   -- Handy may load after this mod
       pcall(BES.pump_job, BES.job and BES.slice_budget() or BES_BUDGET_BUSY)
       pcall(BES.think_progress)
       -- AUTO-PLAY (F11): if enabled, translate the latest recommendation into real inputs. Gated on
