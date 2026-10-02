@@ -9,6 +9,14 @@ every A/B after that should be judged in a world that behaves like the real game
 (mostly by Cavendish). Engine tuning (reroll samples, pacing, guaranteed clears) comes last, measured on the corrected sim.
 
 ## Status (overnight 2026-09-29)
+- **LIVE SELF-PLAY 2026-10-02 + fixes.** Session 15:09-15:52 (bes_runs from line 28535, fixtures 26486, autoplay log
+  81939; seeds `tools/live_audit/seeds_2026-10-02.txt`): 4 runs ended (a5 Boss .79, a3 Boss .92, a8 Big .33, a6 Boss
+  .75), 0 wins, no stalls/errors. Plays faithful (40 deterministic at median 1.000, 25/25 guaranteed clears). Fixed:
+  `6896168` fixtures now record the build plan + Mouth lock (0/892 had them -> replays disagreed with live);
+  `f0a1e05` a full-board trade whose buy leans on the joker sold for it is rejected (Z9ZPREGI sold Raised Fist for a
+  Mime that only retriggered it, board -19%). **`tr` vs `jo`: 138/160 tied, +0.057 (p 0.17), sign 14/8, wins 36 -> 35,
+  reach-8 44 -> 46 -> SHIPPED + deployed (r2modman `Anto640-EngineSim`).** `5c64497` skip advisor risk-aware forgone
+  shop behind BES_SKIP_RISK (CYDQ4Q9N skipped both a5 blinds at 88% risk, died with $50); arm `skr` (k=3) vs `tr`.
 - **SHOP CEILING PROBE (2026-10-01, `846ee98`, paired n=160 vs `jo`; configs in `sim/probe.lua`).**
   `wide` (4 jokers per shop + per reroll, free, derived rng): **wins 36 -> 49, reach-8 44 -> 74 (McNemar p 0.0006),
   progress +0.607 (p 0.0003), sign 88/54 (p 0.006).** The gain is EARLY board power: capacity entering ante 2 +72%
