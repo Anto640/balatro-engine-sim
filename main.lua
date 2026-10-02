@@ -190,6 +190,34 @@ function BES.run_state_for(gs)
     end
     out.first_key, out.first_hand = fkey, first
   end
+  -- PAIRED TRADE in progress (SA.paired_trade, 2026-10-03): the last advice sold a joker FOR a shop joker and that
+  -- joker is now gone, so its buy is due -- the shop must still see the trade, or it re-prices the buy alone and can
+  -- leave the slot empty. Lapses when the offer leaves the shop or the round changes.
+  if gs.shop and gs.run then
+    local seed = (gs.meta and gs.meta.seed_hash) or ""
+    local round = gs.meta and gs.meta.round
+    local p = BES._pending_swap
+    if p and (p.seed ~= seed or p.round ~= round) then p = nil end
+    local last = BES.last
+    local lb = last and last.ranked and last.ranked.best
+    if lb and lb.type == "SELL_JOKER" and lb.pending_swap and lb.target and last.gs
+       and #(gs.jokers or {}) < #(last.gs.jokers or {}) then
+      local gone = true
+      for _, j in ipairs(gs.jokers or {}) do
+        if j == lb.target or (lb.target.id ~= nil and j.id == lb.target.id) then gone = false end
+      end
+      if gone then
+        p = { key = lb.pending_swap.key, edition = lb.pending_swap.edition, up = lb.pending_swap.up,
+              sold_fv = lb.pending_swap.sold_fv, seed = seed, round = round }
+      end
+    end
+    if p then
+      local offered = false
+      for _, sj in ipairs(gs.shop.jokers or {}) do if sj.key == p.key then offered = true end end
+      if not offered then p = nil end
+    end
+    out.pending_set, out.pending = true, p
+  end
   return out
 end
 
@@ -211,6 +239,10 @@ function BES.evaluate(with_sim, gs)
   if rs.first_key then
     BES._first_hand_key, BES._first_hand = rs.first_key, rs.first_hand
     gs.blind.first_hand_type = rs.first_hand
+  end
+  if rs.pending_set then
+    BES._pending_swap = rs.pending
+    gs.run.pending_swap = rs.pending
   end
 
   -- An open booster pack: recommend which revealed items to take, and in what
@@ -739,6 +771,7 @@ function BES.emit_fixture(gs)
   local rs = BES.run_state_for(gs)
   if rs.plan_key then gs.run.build_plan = rs.plan end
   if rs.first_key then gs.blind.first_hand_type = rs.first_hand end
+  if rs.pending_set then gs.run.pending_swap = rs.pending end
   local fx = ReplayFixture.fixture_of(gs, choice, BES._fix.idx, kind)
   -- timestamp (same clock as bes_runs.jsonl) so a fixture can be JOINED to the human's ACTUAL
   -- action -- the joker_gain/loss/consumable/blind_result with the smallest t greater than this.

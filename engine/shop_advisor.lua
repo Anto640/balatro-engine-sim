@@ -168,6 +168,20 @@ SA.DEAD_FUNDER_FV = 0.1
 -- acquisition lever is re-tested on the W3 world. Slope tuned to the mechanism (probe), not seeds.
 SA.SWAP_KEEP_SLOPE = tonumber(os.getenv and os.getenv("BES_SWAP_SLOPE") or "") or 0.5   -- env: swap-bar A/B
 SA.SWAP_SAMPLES = tonumber(os.getenv and os.getenv("BES_SWAP_SAMPLES") or "")   -- env: deals per swap measurement (A/B)
+-- PAIRED TRADE eligibility: jokers whose whole value is their score now (+ money) -- what JV.swap_delta measures.
+-- OUT: plain flat scorers only (scalers, xmult/retrigger cores and utility keep their own protections). IN: plain
+-- scorers of any kind, or a money-only joker (its edition and $ are what it brings).
+SA.PAIRED_SAMPLES = 12
+local PLAIN_OUT = { flat_mult = true, flat_chips = true }
+local PLAIN_IN = { flat_mult = true, flat_chips = true, xmult = true, retrigger = true }
+function SA.trade_out_plain(key)
+  return PLAIN_OUT[JokerData.resolve(key).cat or ""] == true and not JokerData.is_scaling(key)
+end
+function SA.trade_in_plain(key)
+  if JokerData.is_unmodelled(key) then return false end
+  if Eval.is_money_only(key) then return true end
+  return PLAIN_IN[JokerData.resolve(key).cat or ""] == true and not JokerData.is_scaling(key)
+end
 
 -- First-scorer priority (in the sgain*5 buy-value units). When the board has NO effective
 -- scorer, a flat immediate scorer is worth much more than its marginal -- it's the jump from
@@ -992,6 +1006,13 @@ function SA.recommend(gs, opts)
     local fit, fnote = BuildPlan.fit(gs, sj, build, invest)  -- planning: build the core / avoid dilution
     local value = w_score * (sgain * 5 + syn + fit + first_scorer) + w_econ * econ - w_score * down
       - net_cost_c(cost) - econ_floor_penalty(gs, cost)
+    -- the second half of a PAIRED TRADE whose sale was already made (SA.paired_trade): the slot was emptied FOR this
+    -- joker, so buying it is worth what the trade measured (the sold joker's value + the measured gain), not the
+    -- floored, dilution-damped value of a fresh buy -- which would leave the engine having sold a joker for nothing.
+    local pend = gs.run and gs.run.pending_swap
+    if pend and pend.key == sj.key and (pend.edition or false) == (sj.edition or false) then
+      value = math.max(value, SA.W_FV * ((pend.sold_fv or 0) + (pend.up or 0)))
+    end
     local why = note and (" — " .. note)
       or (fnote and (" — " .. fnote))
       or (down > 0 and " — but has a situational downside")
@@ -1457,11 +1478,44 @@ function SA.recommend(gs, opts)
           end
         end
       end
+      -- PAIRED TRADES (2026-10-03, live NUJ9ENYU a6/a7): between two jokers whose value IS their score (+ money),
+      -- measure the trade itself on shared hands (JV.swap_delta) instead of two separately-floored FVs. At ante 6
+      -- Swashbuckler (2351 a hand) and the offered Abstract Joker (3966) both read the 1.80 tier floor, so the
+      -- trade could never clear its margin; paired, it is +898 a hand +-51. Accepted when the gain (score + money)
+      -- beats twice its standard error -- the margin follows from the noise instead of a constant.
+      local need = Mechanics.boss_per_hand_need(gs)
+      if need and need > 0 then
+        for i = 1, #gs.jokers do
+          local jk = gs.jokers[i]
+          local ab = jk.ability
+          local ex = (type(ab) == "table" and type(ab.extra) == "table") and ab.extra or nil
+          local eternal = type(ab) == "table" and (ab.eternal or (ex and ex.eternal))
+          if not eternal and SA.trade_out_plain(jk.key) then
+            local cash_i = jk.sell_value or 1
+            for _, sj in ipairs(shop.jokers) do
+              if SA.trade_in_plain(sj.key) and (dollars(gs) + cash_i - (sj.cost or 0)) >= reserve then
+                local m, se = JokerValue.swap_delta(gs, i, sj, { rng = rng, samples = SA.PAIRED_SAMPLES })
+                if m then
+                  local gain = VU.frac_to_fv(m / need) + 0.8 * (Eval.joker_money(gs, sj.key) - Eval.joker_money(gs, jk.key))
+                  local up = gain - 2 * VU.frac_to_fv((se or 0) / need)
+                  if up > 0 and (not best_t or up > best_t.up) then
+                    best_t = { up = up, i = i, sj = sj, cash = cash_i, paired = true,
+                               sold_fv = joker_contribution(gs, i, mopts) }
+                  end
+                end
+              end
+            end
+          end
+        end
+      end
       if best_t then
         local tj = gs.jokers[best_t.i]
         actions[#actions + 1] = {
           type = "SELL_JOKER", target = tj, cost = 0, value = SA.W_FV * best_t.up,
           swap_for = best_t.sj, swap_cash = best_t.cash,
+          -- a paired trade carries what its buy is worth, so the next state (slot now free) still completes it
+          pending_swap = best_t.paired and { key = best_t.sj.key, edition = best_t.sj.edition or false,
+            up = best_t.up, sold_fv = best_t.sold_fv } or nil,
           reason = string.format("Sell %s (+$%d) — frees a slot for %s, a clear upgrade.",
             tj.name or tj.key or "joker", best_t.cash, best_t.sj.name or best_t.sj.key or "a better joker"),
         }

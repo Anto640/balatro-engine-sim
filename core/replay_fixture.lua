@@ -125,7 +125,7 @@ function RF.fixture_of(gs, choice, idx, kind)
               tags = deep(r.tags), hand_size = r.hand_size, consumable_slots = r.consumable_slots,
               joker_slots = r.joker_slots, boss_key = r.boss_key,
               hand_type_plays = deep(r.hand_type_plays), hands_played = r.hands_played,
-              build_plan = deep(r.build_plan) },
+              build_plan = deep(r.build_plan), pending_swap = deep(r.pending_swap) },
     },
   }
 end

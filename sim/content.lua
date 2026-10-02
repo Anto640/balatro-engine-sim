@@ -544,7 +544,8 @@ local function shop_gs(run, shop, pack)
             hand_size = run.hand_size, consumable_slots = run.consumable_slots,
             joker_slots = run.joker_slots, boss_key = run._next_boss,
             hand_type_plays = run.hand_type_plays, hands_played = run.hands_played,
-            build_plan = run.build_plan },  -- K1/K2 + Phase 5 persistent archetype
+            build_plan = run.build_plan,    -- K1/K2 + Phase 5 persistent archetype
+            pending_swap = run._pending_swap },  -- a paired trade's sale was made; its buy is due (SA.paired_trade)
     shop = shop, pack = pack,
   }
 end
@@ -734,6 +735,7 @@ local function apply_action(run, shop, a, rng)
     if not can_afford(run, a.cost) or not slot_ok then return false end
     local before = dollars(run)
     spend(run, a.cost); run.jokers[#run.jokers + 1] = a.target
+    if run._pending_swap and run._pending_swap.key == a.target.key then run._pending_swap = nil end
     note_negative_gain(run, a.target)
     trace(run, { kind = "joker_gain", key = a.target.key, via = "shop",
       dollars_before = before, dollars_after = dollars(run) })
@@ -765,6 +767,7 @@ local function apply_action(run, shop, a, rng)
     for _, j in ipairs(run.jokers) do
       if j == a.target then Content.sell_joker(run, j, rng); break end
     end
+    if a.pending_swap then run._pending_swap = a.pending_swap end   -- the trade's buy is due next
     return true
   elseif tp == "SELL_TO_BUY" and a.target then
     -- sell the funder, then re-roll the loop so the now-affordable buy is taken next pass
@@ -1101,6 +1104,7 @@ function Content.shop_phase(run, opts)
     if ranked.best.type == "SAVE" then break end
     if not apply_action(run, shop, ranked.best, rng) then break end
   end
+  run._pending_swap = nil   -- a trade not completed in its shop lapses (the offer is gone)
   -- Perkeo (JOKER_FIDELITY P2): on shop exit, create a Negative copy of a random held consumable.
   -- Negative consumables take no slot, so grant a matching +1 consumable slot. -- VERIFY (1 copy, wiki).
   do

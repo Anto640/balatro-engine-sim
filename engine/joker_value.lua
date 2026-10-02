@@ -245,6 +245,40 @@ function JV.score_delta(gs, joker, opts)
   return result
 end
 
+-- PAIRED TRADE (2026-10-03): the per-hand score change of REPLACING owned joker `idx` with `joker` (in its slot),
+-- both boards scored on the SAME sampled hands. Returns mean, standard error (nil if unmeasurable). The swap bar
+-- compared two separately-floored FVs: at ante 6 (live NUJ9ENYU) Swashbuckler measured 2351 a hand, the offered
+-- Abstract Joker 3966, and both read the 1.80 tier floor, so no trade could ever clear the margin. Measuring the
+-- trade itself on shared hands removes most of the noise the margin exists for.
+-- `joker` need not have a scoring model: the board is scored whole, so a money-only joker's edition (Holo Golden Joker
+-- +10 Mult) and the sold joker's loss are both measured. Callers restrict it to jokers whose value IS their score
+-- (plus money), so an unmodelled effect is never priced at 0 here.
+function JV.swap_delta(gs, idx, joker, opts)
+  local jokers = gs.jokers or {}
+  if not jokers[idx] then return nil end
+  opts = opts or {}
+  local rng = opts.rng or math.random
+  local samples = mc(opts.samples or 12)
+  local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
+  if not deck or #deck < JV.MIN_DECK then return nil end
+  local hs = math.min((gs.run and gs.run.hand_size) or 8, #deck)
+  local swapped = {}
+  for i, j in ipairs(jokers) do swapped[i] = (i == idx) and joker or j end
+  local cur = clone_with_jokers(gs, jokers)
+  local new = clone_with_jokers(gs, swapped)
+  local sum, sumsq = 0, 0
+  for _ = 1, samples do
+    local hand = sample_hand(gs, deck, hs, rng)
+    local a = HandEval.best_play(cur, hand)
+    local b = HandEval.best_play(new, hand)
+    local d = (b and b.score or 0) - (a and a.score or 0)
+    sum, sumsq = sum + d, sumsq + d * d
+  end
+  local mean = sum / samples
+  local var = (samples > 1) and math.max(0, (sumsq - samples * mean * mean) / (samples - 1)) or 0
+  return mean, math.sqrt(var / samples)
+end
+
 -- Measured BOARD-LEVEL score change from removing joker `idx` (score with it minus
 -- score without it), paired per sampled hand. Unlike score_delta this does NOT
 -- require the joker to have a scoring model -- it measures the whole board -- so it

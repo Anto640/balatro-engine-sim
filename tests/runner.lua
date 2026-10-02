@@ -57,6 +57,7 @@ local suites = {
   "tests.test_fixture_run_state",
   "tests.test_trade_dependence",
   "tests.test_reorder_clear",
+  "tests.test_paired_trade",
   "tests.test_telemetry",
   "tests.test_probe",
   "tests.test_autoplay",
