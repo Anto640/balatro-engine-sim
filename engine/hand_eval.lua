@@ -861,6 +861,7 @@ function HandEval.best_play_target(gs, cards, remaining, filter, cheap)
   if sensitive then effective = HandEval.effective_jokers(gs); mods = joker_mods(effective) end
   local best, best_sel, bt, be, bs, bmin, bsk
   local cands = sensitive and {} or nil
+  local cand_by_key = {}
   each_subset(gs, cards, function(ev, sel, copy)
     local tier = 0
     if remaining > 0 then
@@ -886,11 +887,32 @@ function HandEval.best_play_target(gs, cards, remaining, filter, cheap)
     if better then
       best, best_sel, bt, be, bs, bmin, bsk = ev, copy(sel), tier, econ, ev.score, floor, sk
     end
-    if cands then cands[#cands + 1] = { sel = copy(sel), score = ev.score } end
+    if cands then
+      -- one candidate per (hand type, SCORING cards): subsets that differ only in non-scoring kickers are the
+      -- same play to reorder, and ten of them used to fill the top-K and push out a different play whose best
+      -- order wins (Hanging Chad + a Glass King: ten High Card KS variants at 280 hid the Pair that scores 800
+      -- led by the Glass King). The best dealt-order variant represents its group (the held cards it keeps).
+      local ids = {}
+      local _, sflags = HandEval.analyze(sel, mods)
+      for i, c in ipairs(sel) do
+        if mods.splash or not sflags or sflags[i] then ids[#ids + 1] = tostring(c.id or c) end
+      end
+      table.sort(ids)
+      local key = tostring(ev.hand_type) .. "|" .. table.concat(ids, ",")
+      local cur = cand_by_key[key]
+      if not cur then
+        cur = { sel = copy(sel), score = ev.score }
+        cand_by_key[key] = cur; cands[#cands + 1] = cur
+      elseif ev.score > cur.score then
+        cur.sel, cur.score = copy(sel), ev.score
+      end
+    end
   end, filter)
 
   if cands and #cands > 0 then
-    table.sort(cands, function(x, y) return x.score > y.score end)
+    -- stable on ties: the enumeration order breaks them (Lua's sort is not stable), so the pick never flickers
+    for i, x in ipairs(cands) do x.i = i end
+    table.sort(cands, function(x, y) if x.score ~= y.score then return x.score > y.score end return x.i < y.i end)
     for i = 1, math.min(HandEval.ORDER_TOPK, #cands) do
       local oev, osel = best_card_order(gs, cands[i].sel, remaining, effective, mods)
       local tier, econ, score, floor = target_tier(gs, oev, osel, remaining)

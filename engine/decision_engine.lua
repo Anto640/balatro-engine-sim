@@ -1435,14 +1435,23 @@ function DE._annotate(best, c)
     -- shown when it actually makes a difference (improves score, or is safer at
     -- the same score). Flags when the reorder is what clears/guarantees the blind.
     local o = best.ordering
+    -- A MONEY-objective reorder is suggested on a real $ gain -- or when it is what keeps the clear: the clear was
+    -- judged on the play in its best order, and the cards as dealt may not reach it (live NUJ9ENYU a6, 2026-10-02:
+    -- a Flush listed 8S-first for Hanging Chad was "guaranteed" at 45198, the self-player had no reorder to apply,
+    -- and it scored 13400 as dealt against 30000).
+    local keeps_clear = o and o.objective == "money" and c.remaining > 0
+      and (o.current_min or 0) < c.remaining and (o.best_min or 0) >= c.remaining
     local worth_it = o and o.improves
-      and (o.objective ~= "money" or o.money_gain > 1e-9) -- money tip only on real $ gain
+      and (o.objective ~= "money" or o.money_gain > 1e-9 or keeps_clear)
     if worth_it then
       local tips = {}
       if o.joker_changed then tips[#tips + 1] = "jokers " .. joker_labels(o.joker_order) end
       if o.card_changed then tips[#tips + 1] = "cards " .. labels(o.card_order) end
       local desc, note
-      if o.objective == "money" then
+      if keeps_clear and o.money_gain <= 1e-9 then
+        desc = "the clear"
+        note = " — as dealt it falls short"
+      elseif o.objective == "money" then
         desc = string.format("+$%g this blind", o.money_gain) -- clear is already locked
         note = ""
       else

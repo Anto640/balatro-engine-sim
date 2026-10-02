@@ -82,6 +82,25 @@ local function apply_reorder(run, action, sel)
 end
 World.apply_reorder = apply_reorder
 
+-- The game scores a play in the cards' SCREEN order (play_cards_from_highlighted sorts by position), not in the order
+-- the engine listed them. Its listed order is already the best one, so the sim used to score every play optimally
+-- ordered while live played it as dealt unless a reorder was attached -- and a missing reorder was invisible here.
+-- Live NUJ9ENYU a6 (2026-10-02): a Flush listed 8S-first for Hanging Chad (45198) scored 13400 as dealt. Play the
+-- hand order; apply_reorder then moves the cards exactly when the engine asks, as the live self-player does.
+local function in_hand_order(sel, hand)
+  local pos = {}
+  for i, c in ipairs(hand or {}) do pos[c] = i end
+  local idx, out = {}, {}
+  for i, c in ipairs(sel) do idx[c] = i; out[i] = c end
+  table.sort(out, function(a, b)
+    local pa, pb = pos[a] or math.huge, pos[b] or math.huge
+    if pa ~= pb then return pa < pb end
+    return idx[a] < idx[b]
+  end)
+  return out
+end
+World.in_hand_order = in_hand_order
+
 -- ---- RNG (one world stream per run seed; INDEPENDENT of the engine's per-state RNG) --
 -- Park-Miller LCG, the same family the engine uses for determinism. The world owns ALL
 -- world randomness (shuffles, later: shop rolls) so a run is fully reproducible from its
@@ -1138,7 +1157,7 @@ function World.play_blind(run, blind)
         refill_after()
         after_draw()
       else
-        sel = apply_reorder(run, action, sel)
+        sel = apply_reorder(run, action, in_hand_order(sel, hand))
         sel = with_forced(sel)
         hook_discard(sel)
         local ev = referee_score(build_gs(run, b, hand, draw_pile, eff), sel, rng)
