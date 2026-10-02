@@ -197,6 +197,17 @@ return function(t)
     t.eq(labels(H.plan({ type = "REROLL" })), "BEST:reroll_shop", "reroll -> the reroll button")
     t.eq(labels(H.plan({ type = "SAVE" })), "BEST:toggle_shop", "save -> Next Round")
     t.eq(labels(H.plan({ type = "SKIP" })), "BEST:skip_booster", "skip -> pack skip first, then blind skip")
+    t.eq(labels(H.plan({ type = "PLAY", cards = { { id = 1 }, { id = 2 } },
+      reorder = { card_changed = true, card_order = { { id = 2 }, { id = 1 } },
+                  joker_changed = true, joker_order = { { id = 30, key = "j_a" }, { id = 31, key = "j_b" } } } })),
+      "1:hand,2:hand,1:jokers,2:jokers", "reorder: cards and jokers numbered in the order to arrange them")
+    local rp = H.plan({ type = "PLAY", cards = { { id = 1 }, { id = 2 } },
+      reorder = { card_changed = true, card_order = { { id = 2 }, { id = 1 } } } })
+    t.eq(rp[1].target.id, 2, "number 1 goes on the card to play first")
+    t.eq(labels(H.plan({ type = "PLAY", cards = { { id = 1 } }, reorder = { card_changed = false, joker_changed = false } })),
+      "PLAY:hand", "no order change -> plain PLAY tags")
+    t.eq(labels(H.plan({ type = "CONTINUE", arrange = { { id = 30 }, { id = 31 } } })),
+      "BEST:select_blind,1:jokers,2:jokers", "Dagger arrangement numbered")
     t.eq(#H.plan({ type = "Evaluating pack…" }), 0, "a placeholder action tags nothing")
     t.eq(#H.plan({ type = "BUY_JOKER" }), 0, "no target -> no tag")
     t.eq(#H.plan(nil), 0, "nil action -> no tag")

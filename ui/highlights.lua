@@ -8,6 +8,7 @@
 --   SELL_* / sell-to-buy -> the joker (+ the item it funds) ("SELL" green)
 --   PICK             -> the pack card (+ tarot targets)    ("TAKE" green)
 --   REROLL / SAVE / SKIP / CONTINUE -> the real button     ("BEST" gold)
+--   a recommended ORDER -> numbers 1..n: played cards (blue) / jokers (gold) / the Dagger arrangement
 --
 -- Targets are resolved with the SELF-PLAYER's own lookups (ui/autoplay.lua), so a tag marks exactly what
 -- auto-play would click; tags only show when the advice is FRESH for the live state and the game isn't
@@ -45,10 +46,21 @@ function H.plan(a)
   end
   local function button(names) out[#out + 1] = { kind = "button", names = names, label = "BEST", colour = "GOLD" } end
 
+  -- a recommended ORDER (jokers score left to right; some boards care about card order): number the
+  -- items 1..n in the order to arrange them, instead of a text line
+  local function numbered(areas, list, colour)
+    for i, it in ipairs(list or {}) do card(areas, { id = it.id, key = it.key }, tostring(i), colour) end
+  end
+  local ro = a.reorder
   if t == "PLAY" or t == "DISCARD" then
-    for _, c in ipairs(a.cards or {}) do
-      if c.id ~= nil then card({ "hand" }, { id = c.id }, t, t == "PLAY" and "BLUE" or "RED") end
+    if t == "PLAY" and ro and ro.card_changed and ro.card_order then
+      numbered({ "hand" }, ro.card_order, "BLUE")                  -- play these, in this order
+    else
+      for _, c in ipairs(a.cards or {}) do
+        if c.id ~= nil then card({ "hand" }, { id = c.id }, t, t == "PLAY" and "BLUE" or "RED") end
+      end
     end
+    if t == "PLAY" and ro and ro.joker_changed then numbered({ "jokers" }, ro.joker_order, "GOLD") end
   elseif t == "USE_CONSUMABLE" then
     card({ "consumeables" }, a.target, "USE", "RED")
     targets(a.target_cards)
@@ -67,7 +79,9 @@ function H.plan(a)
   elseif t == "REROLL" then button({ "reroll_shop" })
   elseif t == "SAVE" then button({ "toggle_shop" })                     -- "Next Round"
   elseif t == "SKIP" or t == "SKIP_PACK" then button({ "skip_booster", "skip_blind" })
-  elseif t == "CONTINUE" then button({ "select_blind" })
+  elseif t == "CONTINUE" then
+    button({ "select_blind" })
+    if a.arrange then numbered({ "jokers" }, a.arrange, "GOLD") end   -- Ceremonial Dagger arrangement
   end
   return out
 end
