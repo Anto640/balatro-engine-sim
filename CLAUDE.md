@@ -62,17 +62,32 @@ thing **headless-testable**. See the Layout section in `README.md` for the per-f
   take minutes): `luajit tests/runner_sim.lua` (`test_world`, `test_driver`, `test_consumables`, `test_content_rates`, …). `luajit`
   is installed and ~2.5x faster — prefer it for anything that runs the `sim/` forward
   simulator (`World.play_blind` / `Driver.run`).
-- **Deploy to the live game (manual copy — the repo is NOT the install):** since 2026-10-01 the game runs through
-  **r2modman** (Balatro Mod Manager was shut down). The running mod lives in the r2modman profile at
-  `%APPDATA%/r2modmanPlus-local/Balatro/profiles/Default/mods/Anto640-EngineSim/` (imported 2026-10-02 from
-  `python tools/package_r2.py`'s zip via r2modman's Import local mod, so r2modman lists it). After editing, copy
-  changed files there or the game won't see them; never leave a second copy of the mod inside `mods/`. Green tests ≠ works in-game. r2modman launches with
-  `steam.exe -applaunch 2379780 --mod-dir "<profile>/mods"`; a plain Steam launch (no `--mod-dir`) makes Lovely fall
-  back to the OLD `%APPDATA%/Balatro/Mods/` folder and its stale copy of the mod.
-  Verify by diffing the whole tree against the install with `diff -q --strip-trailing-cr` (the checkout is CRLF,
-  the install LF, so a byte compare reports false differences). Keep backups outside `Mods/`: Steamodded loads any
-  copy inside it as a second, conflicting instance of the mod. The game loads code only at startup, and only the
-  owner starts or restarts Balatro.
+- **Deploy to the live game — `bash tools/deploy.sh` (the repo is NOT the install).**
+  Green tests ≠ works in-game. `tools/deploy.sh --check` reports drift and writes nothing.
+  **Stop hand-copying the files you edited** — that is what silently drifted the install by SIX
+  files once, and it also cannot see DELETIONS: `ui/hud_inject.lua` became `ui/hud_panel.lua`, and
+  a leftover `.lua` still gets loaded. The script mirrors the whole tracked tree instead.
+  Since 2026-10-01 the game runs through **r2modman** (Balatro Mod Manager was shut down), so there
+  are **TWO** install targets and `deploy.sh` keeps both current:
+  1. `%APPDATA%/r2modmanPlus-local/Balatro/profiles/Default/mods/Anto640-EngineSim/` — what an
+     r2modman launch loads (`steam.exe -applaunch 2379780 --mod-dir "<profile>/mods"`). Imported
+     2026-10-02 from `python tools/package_r2.py`'s zip via r2modman's Import local mod, so r2modman
+     lists it; `deploy.sh` keeps that package's own files (`manifest.json`, `icon.png`,
+     `mm_v2_manifest.json`) and falls back to the older `mods/balatroenginesim/` only when the
+     package folder is absent. **Never leave a second copy of the mod inside `mods/`.**
+  2. `%APPDATA%/Balatro/Mods/balatroenginesim/` — the OLD folder Lovely falls back to on a plain
+     Steam launch with no `--mod-dir`. It is not harmless dead weight: left behind it makes a plain
+     launch run STALE code silently. `--no-legacy` skips it.
+  For a FRIEND's install, build the zip with `python tools/package_r2.py` (bump `your_mod.json`'s
+  version first) and send `dist/Anto640-EngineSim-<version>.zip` for r2modman's Import local mod.
+  The older local-mod registration also rebuilds r2modman's own file manifest (`tools/r2modman_state.py`,
+  called by `deploy.sh` for the `balatroenginesim` target only). ⚠ r2modman ships a far newer
+  **Steamodded 26.829.0** (vs BMM's `1.0.0~BETA-1620a`); the mod uses `SMODS.load_file` and the
+  per-mod config / `config_tab` API, so suspect those first if the panel or settings page never appear.
+  Verify drift with `diff -q --strip-trailing-cr` (the checkout is CRLF, the install LF, so a byte
+  compare reports false differences — `deploy.sh` already does this). Keep backups outside `Mods/`:
+  Steamodded loads any copy inside it as a second, conflicting instance of the mod. The game loads
+  code only at startup, and only the owner starts or restarts Balatro.
 - **Live logs** (save folder `%APPDATA%/Balatro/`): `bes_runs.jsonl` (run telemetry), `bes_fixtures.jsonl` (full `gs` per
   decision), `bes_autoplay.log` (self-player actions and failures). Crashes: the Lovely log in the profile's `mods/lovely/log/`.
 - **In-game debug keys:** `F5` FLAG A MISPLAY (saves the last ~12 decisions to `bes_flagged.jsonl`); `F7` dump owned jokers' live `ability` tables (to the console

@@ -82,6 +82,13 @@ Almost everything here reads **existing** telemetry and costs nothing to run. On
 | **`flagged.lua`** | which decisions did the owner flag in-game (F5)? `luajit tools/flagged.lua [--list] [--flag "<id>"] [--replay]` -- one flag holds the last ~12 decisions (the key is usually pressed AFTER the misplay; `steps_before` 0 = on screen at the press), each a full fixture-format state; `--replay` re-decides them with the current engine |
 | **`slice_check.lua`** | is time-sliced advice identical to synchronous advice, with no yield inside a C call? Run it after touching any engine loop; exit 1 on a mismatch |
 
+## Getting a change into the live game
+
+| tool | question |
+|---|---|
+| **`deploy.sh`** | **is the running mod the code I just wrote?** Mirrors the whole tracked tree into BOTH install targets — the r2modman profile and the old `%APPDATA%/Balatro/Mods` folder a plain Steam launch falls back to — then rebuilds r2modman's file manifest. Handles adds, edits **and** deletions, and compares with `--strip-trailing-cr` so the CRLF/LF split does not read as drift. `--check` reports and writes nothing; `--no-legacy` skips target 2. Use it instead of copying the files you edited: that is what drifted the install by six files |
+| `r2modman_state.py` | rebuild r2modman's own manifest for the mod (`mods.yml` entry + `_state/*.yml`) from what is on disk, at `your_mod.json`'s version. `deploy.sh` calls it; run it standalone only if the profile's state looks wrong |
+
 ---
 
 ## Two habits worth keeping
