@@ -102,6 +102,14 @@ return function(t)
     t.eq(nsaved, BES_FLAG_KEEP, "F5 reports how many decisions it saved")
     t.eq(Overlay.active_notice(T), "Flagged (" .. BES_FLAG_KEEP .. ")", "F5 confirms on the panel")
     t.eq(Overlay.active_notice(T + 10), nil, "... briefly")
+    -- a state that cannot be serialised must not lose the press (live NUJ9ENYU: presses vanished silently)
+    local broken = { meta = {}, jokers = 5 }   -- serialising its jokers fails (ipairs on a number)
+    BES.remember({ gs = broken, ranked = { best = { type = "PLAY", cards = {} } } })
+    local recs2 = BES.flag_records("test-flag-2")
+    t.eq(#recs2, BES_FLAG_KEEP, "every remembered decision still gets a record")
+    t.ok(recs2[#recs2].error ~= nil, "the unreadable one is kept as a minimal record with its error")
+    t.eq(recs2[#recs2].steps_before, 0, "... in its place in the history")
+    t.eq(BES.flag(), BES_FLAG_KEEP, "F5 still saves the whole press")
 
     -- 3. safety valve: a thinking flag with no job must not stall the self-player
     BES.thinking = { kind = "blind", t0 = T, units0 = BES.work_units }

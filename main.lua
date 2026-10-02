@@ -754,7 +754,7 @@ end
 -- first, each tagged with flag_id, steps_before (0 = the decision on screen at the press) and its clock time
 -- (joins bes_autoplay.log). `lua tools/flagged.lua` lists them and replays each under the current engine.
 BES_FLAGLOG = "bes_flagged.jsonl"
-BES_FLAG_KEEP = 12
+BES_FLAG_KEEP = 4      -- owner 2026-10-03: F5 is pressed right after the misplay; 12 diluted the flag (was 12)
 BES.recent = {}            -- ring of { gs, best, move, reason, kind, t, clock, auto }
 
 local function flag_choice(best)
@@ -776,10 +776,18 @@ function BES.remember(last)
 end
 
 -- build the flag records (pure apart from the clock; exposed for tests)
+-- Each state is serialised in its OWN pcall (2026-10-02: the owner pressed F5 well over 9 times in NUJ9ENYU but only 9
+-- flags were saved, none with an error logged -- the whole flag ran under one pcall, so one state that failed to
+-- serialise dropped every state of that press silently). A state that fails is still written as a minimal record
+-- (advice, time, the error) and the failure is logged, so a press is never lost.
 function BES.flag_records(flag_id)
   local out, n = {}, #BES.recent
   for i, e in ipairs(BES.recent) do
-    local fx = ReplayFixture.fixture_of(e.gs, flag_choice(e.best), i, e.kind)
+    local ok_fx, fx = pcall(ReplayFixture.fixture_of, e.gs, flag_choice(e.best), i, e.kind)
+    if not ok_fx or type(fx) ~= "table" then
+      Log.error("F5: could not save decision " .. i .. " (" .. tostring(e.kind) .. "): " .. tostring(fx))
+      fx = { kind = "state", v = 2, decision = e.kind, idx = i, error = tostring(fx) }
+    end
     fx.flag_id, fx.steps_before, fx.flag_clock = flag_id, n - i, e.clock
     fx.t, fx.advice_move, fx.advice_reason, fx.provisional, fx.self_play = e.t, e.move, e.reason, e.provisional, e.auto
     local ids = {}
@@ -793,11 +801,22 @@ end
 function BES.flag()
   if not (ReplayFixture and Json) then return 0 end
   local flag_id = os.date("%Y-%m-%d %H:%M:%S")
-  local recs = BES.flag_records(flag_id)
+  local ok_r, recs = pcall(BES.flag_records, flag_id)
+  if not ok_r then
+    Log.error("F5: flag failed: " .. tostring(recs))
+    recs = { { kind = "state", v = 2, flag_id = flag_id, steps_before = 0, error = tostring(recs) } }
+  end
   local lines = {}
   for _, fx in ipairs(recs) do
     local ok, line = pcall(Json.encode, fx)
-    if ok then lines[#lines + 1] = line end
+    if ok then lines[#lines + 1] = line
+    else
+      Log.error("F5: could not encode a decision: " .. tostring(line))
+      local ok2, l2 = pcall(Json.encode, { kind = "state", v = 2, flag_id = flag_id, steps_before = fx.steps_before,
+        flag_clock = fx.flag_clock, decision = fx.decision, advice_move = tostring(fx.advice_move),
+        error = tostring(line) })
+      if ok2 then lines[#lines + 1] = l2 end
+    end
   end
   if #lines > 0 and love and love.filesystem then
     pcall(love.filesystem.append, BES_FLAGLOG, table.concat(lines, "\n") .. "\n")
@@ -1121,7 +1140,10 @@ if _G.G and _G.SMODS then
       if key == "f9" then   -- the panel setting (also in the Mods menu); applied next frame
         if Settings and Settings.cfg then Settings.toggle_panel() elseif HUDPanel then HUDPanel.toggle() end
       end
-      if key == "f5" then pcall(BES.flag) end   -- flag a misplay: saves the last BES_FLAG_KEEP decisions
+      if key == "f5" then                     -- flag a misplay: saves the last BES_FLAG_KEEP decisions
+        local ok, err = pcall(BES.flag)
+        if not ok then Log.error("F5: flag failed: " .. tostring(err)) end
+      end
       if key == "f10" then
         BES.capture_only = not BES.capture_only
         Log.info("BES capture-only " .. (BES.capture_only

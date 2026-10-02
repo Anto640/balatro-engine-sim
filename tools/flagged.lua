@@ -1,6 +1,6 @@
 -- tools/flagged.lua
 -- Read the misplays the owner flagged in-game with F5 (bes_flagged.jsonl, written by main.lua BES.flag).
--- One F5 saves the last ~12 decisions, because the key is usually pressed a step or two AFTER the wrong move:
+-- One F5 saves the last 4 decisions (BES_FLAG_KEEP), because the key is usually pressed a step or two AFTER the wrong move:
 -- steps_before = 0 is the decision on screen at the press, 1 the one before, ... Each record is a full
 -- bes_fixtures-format state, so it replays under the current engine exactly like a fixture.
 --

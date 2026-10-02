@@ -15,7 +15,7 @@ plus a large correctness/coverage/strategy pass.
 > **A live misplay can now be traced from board state → valuation → the exact line of code, because the mod
 > records both the run and the DECISION STATE.** The loop, in four steps:
 > 0. if the owner pressed **F5** at the misplay, start from **`bes_flagged.jsonl`** (`luajit tools/flagged.lua --replay`): it holds
->    the last ~12 decision states before the press, already in fixture format -- skip to step 3;
+>    the last 4 decision states before the press (the one on screen + 3), already in fixture format -- skip to step 3;
 > 1. owner reports a misplay → find the run in **`bes_runs.jsonl`** (in the LÖVE save folder, `%APPDATA%/Balatro/`)
 >    — `joker_gain`/`joker_loss`/`death` records give the board over time and the death stats;
 > 2. pull the matching decision from **`bes_fixtures.jsonl`**, which stores the FULL `gs` at every shop/pack
@@ -90,7 +90,7 @@ thing **headless-testable**. See the Layout section in `README.md` for the per-f
   code only at startup, and only the owner starts or restarts Balatro.
 - **Live logs** (save folder `%APPDATA%/Balatro/`): `bes_runs.jsonl` (run telemetry), `bes_fixtures.jsonl` (full `gs` per
   decision), `bes_autoplay.log` (self-player actions and failures). Crashes: the Lovely log in the profile's `mods/lovely/log/`.
-- **In-game debug keys:** `F5` FLAG A MISPLAY (saves the last ~12 decisions to `bes_flagged.jsonl`); `F7` dump owned jokers' live `ability` tables (to the console
+- **In-game debug keys:** `F5` FLAG A MISPLAY (saves the last 4 decisions to `bes_flagged.jsonl`); `F7` dump owned jokers' live `ability` tables (to the console
   and to `bes_joker_dump.txt` in the LÖVE save folder, each tagged
   `scored`/`value-only`/`UNCOVERED`); `F8` force a re-evaluation; `F9` toggle the overlay;
   `F10` capture-only toggle (log decisions, no eval); **`F11` AUTO-PLAY toggle** (the self-player,
