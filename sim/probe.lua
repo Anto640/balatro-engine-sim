@@ -610,6 +610,9 @@ Probe.CONFIGS = {
   wide         = { extra_jokers = 2 },
   -- `wide` restricted to antes 1-2: are its wins bought in the ante-1/2 window alone?
   wide_early   = { extra_jokers = 2, extra_jokers_until = 2 },
+  -- EARLY INCOME (2026-10-02): +$3 per cleared blind through ante 2 only (~$18 a run). Same window as
+  -- `wide_early`: does early MONEY buy what early extra offers bought (+0.302, wins 36 -> 41)?
+  rich3_early  = { income_bonus = 3, income_bonus_until = 2 },
   xgreedy      = { xgreedy_until = 5, xgreedy_want = 2, xgreedy_tier = 7 },
   -- REACHABLE-SUPPLY sizing (Phase 2 of the 2026-10-01 probe): how much of `wide` real channels can buy.
   -- `ostock` = Overstock owned from the first shop (+1 shop CARD slot; the engine sees it as owned, so the
