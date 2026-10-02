@@ -1363,6 +1363,7 @@ function SA.recommend(gs, opts)
             -- less likely to clear (the Smiley -> Blackboard trade). nil cur (money-only) adds no score.
             local sv = surv()
             local swap_ok = not (sv and sv.unsafe(worst_i, math.max(0, cur or 0) / sv.need))
+              and not Eval.trade_leans_on(gs, worst_i, sj, mopts)   -- the buy must not lean on the joker sold
             if swap_ok and (cur == nil or cur > 0 or (keystone and invest)) then
               -- PLAN the swap toward the core too: on a full board of additive commons, a
               -- core piece (xmult that multiplies the base) is a real upgrade even if its
@@ -1441,7 +1442,8 @@ function SA.recommend(gs, opts)
               local cur = JokerValue.score_delta(gs, sj, mopts)
               local sv = surv()
               local ok_s = not (sv and sv.unsafe(i, math.max(0, cur or 0) / sv.need))
-              if ok_s and (cur == nil or cur > 0) then
+              -- a trade whose buy leans on the joker sold for it is no trade (Eval.trade_leans_on; live Z9ZPREGI)
+              if ok_s and (cur == nil or cur > 0) and not Eval.trade_leans_on(gs, i, sj, mopts) then
                 local g = buy_fv_delta(gs, sj, swap_mopts) + (BuildPlan.fit(gs, sj, build, invest))
                 local up = g - keep
                 -- diagnostic only (tools/swap_bar_probe.lua): every full-board trade the bar weighed

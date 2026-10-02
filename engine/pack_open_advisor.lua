@@ -163,10 +163,9 @@ end
 -- MEASURED scoring fraction. Now both sides are the same currency (see the pack pick
 -- valuation below). Eternal jokers can't be sold (skipped). `mopts` carries the
 -- shared rng/cache/samples (or {measure=false} for the instant cheap pass).
-local function weakest_owned_joker(gs, mopts)
+local function owned_sell_bars(gs, mopts)
   local jks = gs.jokers or {}
-  if #jks == 0 then return nil end
-  local wi, wname, wfv = nil, nil, math.huge
+  local bars = {}
   for i, j in ipairs(jks) do
     local ab = j.ability
     local eternal = type(ab) == "table" and (ab.eternal or (type(ab.extra) == "table" and ab.extra.eternal))
@@ -192,10 +191,18 @@ local function weakest_owned_joker(gs, mopts)
       local c = math.max(0, (Eval.joker_marginal_fv(gs, i, mopts)))
       local kb = BuildPlan.keep_bias(j.key, gs, Eval.joker_fires(gs, i, mopts)) or 0
       local fv = c * (1 + slope * c) + math.max(margin, kb)
-      if fv < wfv then wi, wname, wfv = i, (j.name or j.key), fv end
+      bars[#bars + 1] = { i = i, name = (j.name or j.key), bar = fv }
     end
   end
-  return wi, wname, wfv
+  table.sort(bars, function(a, b) if a.bar ~= b.bar then return a.bar < b.bar end return a.i < b.i end)
+  return bars
+end
+
+-- the cheapest joker to sell: index, name and the bar a pick must beat (nil on an empty / all-eternal board)
+local function weakest_owned_joker(gs, mopts)
+  local b = owned_sell_bars(gs, mopts)[1]
+  if not b then return nil end
+  return b.i, b.name, b.bar
 end
 
 -- recommend(gs, opts) -> { ranked, picks, best, skip, reason, sell }
@@ -477,23 +484,48 @@ function PO.recommend(gs, opts)
     -- swap measure differently (a scaler keeps its tier floor in the ranking), so the ranking's top joker
     -- (Lucky Cat, 0.58 FV here) could fail the bar while another (Half Joker, 2.58) clears it (Y1U5TZWJ a4).
     local jpick, jpick_fv
+    local picks = {}
     for _, pk in ipairs(valued) do
       if pk.it.set == "Joker" and pk.it.joker then
         local fv = Eval.add_joker_marginal_fv(gs, pk.it.joker, mopts)
+        picks[#picks + 1] = { pk = pk, fv = fv }
         if not jpick or fv > jpick_fv then jpick, jpick_fv = pk, fv end
       end
     end
-    local wi, wname, wfv = weakest_owned_joker(gs, mopts)
-    -- survival-first (SA.sell_survival): the swap must not leave a board materially less likely to clear
-    -- the boss -- judged on the board AFTER it (the pick's measured gain added back). Lazy require: the
-    -- shop advisor is a sibling module. Skipped on the cheap pass (no measurement).
-    local swap_safe = true
-    if jpick and wi and jpick_fv > wfv and not (mopts and mopts.measure == false) then
+    local bars = owned_sell_bars(gs, mopts)
+    local wi, wname, wfv
+    if bars[1] then wi, wname, wfv = bars[1].i, bars[1].name, bars[1].bar end
+    -- THE TRADE IS A PAIR (2026-10-02, live Z9ZPREGI a5): the pick was priced on the board that still holds the
+    -- joker sold for it, and the sale chosen apart from it -- so Raised Fist was sold to take a Mime whose whole
+    -- gain came from retriggering Raised Fist (the board measured -19%). A (pick, sale) pair where the pick leans
+    -- on the sold joker (Eval.trade_leans_on) is not a trade. The sale is still the cheapest bar a pick clears --
+    -- the weakest joker unless every pick leans on it, then the next. The cheap pass has no measurement and keeps
+    -- the additive pair.  survival-first (SA.sell_survival): the swap must not leave a board materially
+    -- less likely to clear the boss -- judged on the board AFTER it (the pick's measured gain added back). Lazy
+    -- require: the shop advisor is a sibling module. Skipped on the cheap pass (no measurement).
+    local measured = not (mopts and mopts.measure == false)
+    local sv
+    if measured then
       local ok, SA = pcall(require, "engine.shop_advisor")
-      local sv = ok and SA.sell_survival and SA.sell_survival(gs) or nil
-      if sv and sv.unsafe(wi, VU.fv_to_frac(math.max(0, jpick_fv))) then swap_safe = false end
+      sv = ok and SA.sell_survival and SA.sell_survival(gs) or nil
     end
-    if jpick and wi and jpick_fv > wfv and swap_safe then
+    local trade
+    for _, b in ipairs(bars) do
+      for _, p in ipairs(picks) do
+        if p.fv > b.bar then
+          local fv = p.fv
+          local leans = measured and Eval.trade_leans_on(gs, b.i, p.pk.it.joker, mopts)
+          local safe = not (sv and sv.unsafe(b.i, VU.fv_to_frac(math.max(0, fv))))
+          if not leans and safe and (not trade or fv - b.bar > trade.up) then
+            trade = { up = fv - b.bar, pk = p.pk, fv = fv, i = b.i, name = b.name, bar = b.bar,
+                      weakest = (b == bars[1]) }
+          end
+        end
+      end
+      if trade then break end
+    end
+    if trade then jpick, jpick_fv, wi, wname, wfv = trade.pk, trade.fv, trade.i, trade.name, trade.bar end
+    if trade then
       -- (a) carry the make-room joker's IDENTITY (key/id) + what it makes room FOR, so the overlay can
       -- promote the SELL to its OWN primary action and the actuator can address the live joker.
       local wj = gs.jokers[wi]
@@ -509,8 +541,8 @@ function PO.recommend(gs, opts)
         table.insert(ordered, 1, jpick)
         reason = string.format("Take %s (clears the swap bar)", jpick.name)
       end
-      reason = reason .. string.format(" — Joker slots full: sell %s (your weakest) to make room for %s.",
-        wname, jpick.name)
+      reason = reason .. string.format(" — Joker slots full: sell %s (%s) to make room for %s.",
+        wname, trade.weakest and "your weakest" or "it leans on your weakest", jpick.name)
     elseif ordered[1] and ordered[1].it.set == "Joker" then
       -- The recommended pick is a joker but the board is full and no swap is worth it (jpick doesn't beat
       -- the weakest, or every owned joker is a protected keeper). Demote to the best FITTING pick, else SKIP.

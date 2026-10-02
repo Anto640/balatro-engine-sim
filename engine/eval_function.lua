@@ -1564,6 +1564,41 @@ end
 -- FV-point marginal of ADDING shop joker `sj` to the current board: one measured
 -- score_delta (NOT a full board re-measure), so valuing a buy/upgrade is O(1) in
 -- the board size. Falls back to the tier prior with no deck. opts as above.
+-- The board after SELLING owned joker `i`: a shallow copy of gs whose joker list drops it.
+function Eval.without_joker(gs, i)
+  local g = {}
+  for k, v in pairs(gs) do g[k] = v end
+  local rest = {}
+  for k, j in ipairs(gs.jokers or {}) do if k ~= i then rest[#rest + 1] = j end end
+  g.jokers = rest
+  return g
+end
+
+-- A full-board TRADE (sell owned joker `i`, take `sj`) is self-defeating when most of sj's measured gain comes from
+-- the joker being sold: Mime retriggering Raised Fist, a copier copying it, Baron's Kings-in-hand partner... The
+-- trade used to price sj on the board that still holds joker i. Live Z9ZPREGI a5 (2026-10-02) sold Raised Fist to
+-- take Mime: Mime added ~4045 a hand with Raised Fist and ~118 without it, the board measured -19% after the
+-- trade. Its FV could not show it -- both boards read Mime at its tier floor -- so this compares the MEASURED gain
+-- on both boards: true when the gain without joker i is under half the gain with it. nil when unmeasurable.
+Eval.TRADE_DEPENDENCE = 0.5
+-- Its own stream, the SAME for both boards (paired hands), seeded from the pair: drawing from the caller's rng
+-- would reshuffle every later Monte-Carlo sample of the decision (noise, and a cascade in a sim batch).
+local function trade_rng(i, key)
+  local s = 7919 * i + 104729
+  for c in tostring(key):gmatch(".") do s = (s * 31 + c:byte()) % 2147483647 end
+  if s <= 0 then s = s + 2147483646 end
+  return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end
+end
+function Eval.trade_leans_on(gs, i, sj, opts)
+  if not (opts and opts.rng) or not can_measure(gs, opts) then return nil end
+  local n = opts.samples or 6
+  local with = JokerValue.score_delta(gs, sj, { samples = n, rng = trade_rng(i, sj.key) })
+  if not with or with <= 0 then return nil end
+  local without = JokerValue.score_delta(Eval.without_joker(gs, i), sj, { samples = n, rng = trade_rng(i, sj.key) })
+  if not without then return nil end
+  return without < Eval.TRADE_DEPENDENCE * with
+end
+
 function Eval.add_joker_marginal_fv(gs, sj, opts)
   opts = opts or {}
   local m
