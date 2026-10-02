@@ -31,6 +31,12 @@ every A/B after that should be judged in a world that behaves like the real game
   `wide`'s progress and ~40% of its wins (+5 of +13); the rest needs extra choice in antes 3+. Together with
   ostock/reroll1 (free, 0 wins): the shop-supply line is effectively exhausted for win rate -- the reachable share
   is below an n=160 MDE. Next candidates: an early-income probe, or the live-vs-sim gap (advice quality).
+- **`rich3_early` (2026-10-02, `c6d0a5a`; +$3 per cleared blind through ante 2, ~$18 a run) vs `jo`:** progress
+  +0.282 (p 0.15), sign 84/67, wins 36 -> 38, reach-8 44 -> 52 (n.s.). Capacity entering ante 3 10.1k (jo 7.0k,
+  wide_early 13.3k); it carries $20 into ante 3 vs $13 -- part of the money is banked, not turned into board.
+  **Conclusion of the shop/economy ceiling series:** free early resources (offers OR money) are worth ~+0.3 progress
+  and +2..+5 wins at their upper bound; the reachable share is below what n=160 can detect. Only unrealistic
+  all-game supply (`wide`) moves wins. No big win-rate step is left on the shop/economy side.
 - **OVERNIGHT 2026-10-01 (autonomous; owner asleep).** Engine `mze` deployed. `mze_7` baseline DONE: 34/160 wins,
   reach-8 47 (vs bf_7: +0.062 p 0.15, sign 12/4 -- the two Mouth fixes together on fresh seeds).
   Live self-play 01:01-03:00 (overlapped with an 8-worker batch; FORCED share 12.6% vs 16.5% in the morning -- the
