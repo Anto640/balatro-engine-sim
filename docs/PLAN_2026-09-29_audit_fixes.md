@@ -17,6 +17,10 @@ every A/B after that should be judged in a world that behaves like the real game
   Mime that only retriggered it, board -19%). **`tr` vs `jo`: 138/160 tied, +0.057 (p 0.17), sign 14/8, wins 36 -> 35,
   reach-8 44 -> 46 -> SHIPPED + deployed (r2modman `Anto640-EngineSim`).** `5c64497` skip advisor risk-aware forgone
   shop behind BES_SKIP_RISK (CYDQ4Q9N skipped both a5 blinds at 88% risk, died with $50); arm `skr` (k=3) vs `tr`.
+  **`skr` vs `tr`: NEUTRAL, not shipped (switch stays off)** -- wins 35 -> 35, reach-8 46 -> 46, reach-7 67 -> 71,
+  progress +0.093 (p 0.42), sign 50/51. It fired hard (skip rate antes 4+ 22% -> 6%, antes 1-3 18% -> 11%) and moved
+  nothing: skipping less at high risk doesn't save those runs (extra shops don't rescue a weak board, consistent with
+  the ostock/reroll1 supply probes). Don't retry the skip family for wins.
 - **SHOP CEILING PROBE (2026-10-01, `846ee98`, paired n=160 vs `jo`; configs in `sim/probe.lua`).**
   `wide` (4 jokers per shop + per reroll, free, derived rng): **wins 36 -> 49, reach-8 44 -> 74 (McNemar p 0.0006),
   progress +0.607 (p 0.0003), sign 88/54 (p 0.006).** The gain is EARLY board power: capacity entering ante 2 +72%
