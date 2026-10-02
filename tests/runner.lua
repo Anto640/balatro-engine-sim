@@ -54,6 +54,7 @@ local suites = {
   "tests.test_advisors",
   "tests.test_value_units",
   "tests.test_replay_fixture",
+  "tests.test_fixture_run_state",
   "tests.test_telemetry",
   "tests.test_probe",
   "tests.test_autoplay",

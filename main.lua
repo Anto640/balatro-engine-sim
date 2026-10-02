@@ -148,6 +148,51 @@ function BES.warn_uncovered(gs)
   if gs.shop then scan(gs.shop.jokers, "shop") end
 end
 
+-- The run state the live mod carries across snapshots, as it applies to `gs` -- WITHOUT storing it (the fixture
+-- writer calls this too, before the evaluation; only BES.evaluate commits the result to BES._*).
+--
+-- BUILD-COMMITMENT persistence (2026-09-20 field-diff audit, PROVABLE dead-field). BP.commitment
+-- reads gs.run.build_plan, which the SIM advances every shop and carries across states
+-- (sim/content.lua:923). The LIVE overlay never did -- state_extraction doesn't write it and
+-- main.lua never called BP.advance -- so BP.commitment / anchored_commitment were nil and
+-- BP.planet_credit was 0 in the ACTUAL mod. Mirror the sim: keep a run-scoped plan, advance
+-- it in the shop (where the sim does), and thread it into every gs the advisors read (in-blind
+-- planet_credit included). Reset on a new run (the run seed changes).
+--
+-- THE MOUTH's lock = the FIRST hand type played this blind. played_hand_types (GAME.hands[*].played_this_round)
+-- can hold more than one type, and the legality filter took an arbitrary one: live 16JEBAVN (2026-09-30) locked
+-- Three of a Kind, then the engine recommended three Pairs predicting +558/+2016/+360 -- each scored 0 and the run
+-- died. Record the first type ourselves: when exactly one hand has been played this round and the game has
+-- registered it (last_hand_played is among this round's types), that is the lock. Keyed by run + round.
+--
+-- Fixtures (2026-10-02): bes_fixtures.jsonl used to be written BEFORE the evaluation attached these, so 0 of 892
+-- recorded states carried the build plan and every replay of a commitment-dependent decision (sell protection,
+-- planet credit, build fit) disagreed with live -- live Z9ZPREGI sold Raised Fist (Sly core to a Full House plan),
+-- the replay sold Sly. BES.emit_fixture now records this same state.
+function BES.run_state_for(gs)
+  local out = {}
+  if BuildPlan and gs.run then
+    local seed = (gs.meta and gs.meta.seed_hash) or ""
+    local plan = (seed == BES._build_seed) and BES._build_plan or nil
+    if gs.shop then
+      local ok_bp, p = pcall(BuildPlan.advance, gs, plan)   -- pure: returns a new plan, never edits `plan`
+      if ok_bp then plan = p end
+    end
+    out.plan_key, out.plan = seed, plan
+  end
+  if gs.blind then
+    local fkey = tostring(gs.meta and gs.meta.seed_hash) .. ":" .. tostring(gs.meta and gs.meta.round)
+    local first = (BES._first_hand_key == fkey) and BES._first_hand or nil
+    local b = gs.blind
+    if not first and b.hands_played_round == 1 and b.last_hand_played
+       and b.played_hand_types and b.played_hand_types[b.last_hand_played] then
+      first = b.last_hand_played
+    end
+    out.first_key, out.first_hand = fkey, first
+  end
+  return out
+end
+
 function BES.evaluate(with_sim, gs)
   if not (Extract and Decision) then return end
   gs = gs or Extract.snapshot()   -- caller may pass an already-built snapshot (C4)
@@ -157,39 +202,15 @@ function BES.evaluate(with_sim, gs)
   end
   pcall(BES.warn_uncovered, gs)
 
-  -- BUILD-COMMITMENT persistence (2026-09-20 field-diff audit, PROVABLE dead-field). BP.commitment
-  -- reads gs.run.build_plan, which the SIM advances every shop and carries across states
-  -- (sim/content.lua:923). The LIVE overlay never did -- state_extraction doesn't write it and
-  -- main.lua never called BP.advance -- so BP.commitment / anchored_commitment were nil and
-  -- BP.planet_credit was 0 in the ACTUAL mod. The whole build-commitment -> valuation channel
-  -- (the "located next lever", shipped +0.049 in sim) was silently DEAD live. Same class as the
-  -- Mouth (played_hand_types) and boss_effect gaps. Mirror the sim: keep a run-scoped plan, advance
-  -- it in the shop (where the sim does), and thread it into every gs the advisors read (in-blind
-  -- planet_credit included). Reset on a new run (the run seed changes).
-  if BuildPlan and gs.run then
-    local seed = (gs.meta and gs.meta.seed_hash) or ""
-    if seed ~= BES._build_seed then BES._build_seed, BES._build_plan = seed, nil end
-    if gs.shop then
-      local ok_bp, plan = pcall(BuildPlan.advance, gs, BES._build_plan)
-      if ok_bp then BES._build_plan = plan end
-    end
-    gs.run.build_plan = BES._build_plan   -- so BP.commitment/planet_credit see it (shop AND blind)
+  -- carried run state (build commitment, Mouth lock): see BES.run_state_for
+  local rs = BES.run_state_for(gs)
+  if rs.plan_key then
+    BES._build_seed, BES._build_plan = rs.plan_key, rs.plan
+    gs.run.build_plan = rs.plan   -- so BP.commitment/planet_credit see it (shop AND blind)
   end
-
-  -- THE MOUTH's lock = the FIRST hand type played this blind. played_hand_types (GAME.hands[*].played_this_round)
-  -- can hold more than one type, and the legality filter took an arbitrary one: live 16JEBAVN (2026-09-30) locked
-  -- Three of a Kind, then the engine recommended three Pairs predicting +558/+2016/+360 -- each scored 0 and the run
-  -- died. Record the first type ourselves: when exactly one hand has been played this round and the game has
-  -- registered it (last_hand_played is among this round's types), that is the lock. Keyed by run + round.
-  if gs.blind then
-    local fkey = tostring(gs.meta and gs.meta.seed_hash) .. ":" .. tostring(gs.meta and gs.meta.round)
-    if BES._first_hand_key ~= fkey then BES._first_hand_key, BES._first_hand = fkey, nil end
-    local b = gs.blind
-    if not BES._first_hand and b.hands_played_round == 1 and b.last_hand_played
-       and b.played_hand_types and b.played_hand_types[b.last_hand_played] then
-      BES._first_hand = b.last_hand_played
-    end
-    b.first_hand_type = BES._first_hand
+  if rs.first_key then
+    BES._first_hand_key, BES._first_hand = rs.first_key, rs.first_hand
+    gs.blind.first_hand_type = rs.first_hand
   end
 
   -- An open booster pack: recommend which revealed items to take, and in what
@@ -696,6 +717,11 @@ function BES.emit_fixture(gs)
   local choice = best and { type = best.type,
       target = best.target and (best.target.name or best.target.key),
       hand_type = best.hand_type, key = best.target and best.target.key } or nil
+  -- the carried run state the evaluation will attach (this runs before it): without it no fixture recorded the
+  -- build plan or the Mouth lock, and replays disagreed with live (BES.run_state_for)
+  local rs = BES.run_state_for(gs)
+  if rs.plan_key then gs.run.build_plan = rs.plan end
+  if rs.first_key then gs.blind.first_hand_type = rs.first_hand end
   local fx = ReplayFixture.fixture_of(gs, choice, BES._fix.idx, kind)
   -- timestamp (same clock as bes_runs.jsonl) so a fixture can be JOINED to the human's ACTUAL
   -- action -- the joker_gain/loss/consumable/blind_result with the smallest t greater than this.
