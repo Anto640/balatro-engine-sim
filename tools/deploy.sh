@@ -48,8 +48,14 @@ done
 
 [ -d "$PROFILE/mods" ] || { echo "no r2modman profile at $PROFILE" >&2; exit 1; }
 
-# The deployed set: everything the game needs, minus repo-only research material.
+# The deployed set: everything the game needs, minus repo-only research material. For the imported PACKAGE it is
+# exactly what tools/package_r2.py ships (the mod's code + main.lua, your_mod.json, config.lua), so the install
+# stays the same shape as the zip a friend imports.
 mod_files() {
+  if [ "${PACKAGED:-0}" = 1 ]; then
+    git ls-files core engine model ui util main.lua your_mod.json config.lua
+    return
+  fi
   git ls-files \
     ':!:sim/*' ':!:tools/*' ':!:data/*' ':!:sim_out/*' ':!:docs/*' \
     ':!:.agents/*' ':!:.claude/*' ':!:NEXT_SESSION.md'
@@ -74,7 +80,7 @@ sync_into() {
   if [ -d "$dest" ]; then
     local tracked; tracked="$(mod_files)"
     while IFS= read -r g; do
-      case "$g" in manifest.json|icon.png|mm_v2_manifest.json) continue ;; esac   # r2modman / package files, not ours
+      case "$g" in manifest.json|icon.png|mm_v2_manifest.json|README.md) continue ;; esac   # r2modman / package files, not ours
       if ! printf '%s\n' "$tracked" | grep -qxF "$g"; then
         echo "  STALE  $label  $g"; n=$((n + 1))
         [ "$CHECK" = 0 ] && rm -f "$dest/$g" ${cache:+"$cache/$g"}

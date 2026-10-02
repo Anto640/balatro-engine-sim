@@ -9,6 +9,12 @@ animations keep running -- verified identical to synchronous advice by `tools/sl
 animations through the Handy mod (`ui/fast_mode.lua`); F5 flags a misplay (last 12 decisions -> `bes_flagged.jsonl`,
 `tools/flagged.lua --replay`); predicted score vs target tag; red "!" for engine errors; Mods-menu settings page
 (`ui/settings.lua`, defaults `config.lua`). Not yet seen in-game when merged -- watch the first live session.
+v0.5.1 (a friend's install): the left bar now FITS any screen (`Panel.fit` steps: buttons, spacing, compact panel,
+box heights, then keep-the-top; logs `HUD fit:`), and the engine's per-frame budget is FRAME-AWARE (`BES.slice_budget`:
+what is left of a 60 fps frame after the game's own measured work; Settings "While thinking" Smooth/Balanced/Fast).
+Friends install `Anto640-EngineSim-<version>.zip` from `python tools/package_r2.py` via r2modman Import local mod;
+`tools/deploy.sh --no-legacy` now syncs the package folder (the old `mods/balatroenginesim` target would have made a
+second copy).
 
 **PARKED (owner 2026-10-02, possible future work): make the shop calculation faster WITHOUT changing any advice.**
 A shop recommendation takes ~5 s (max ~10 s; `tools/yield_gaps.lua`), nearly all of it scoring card subsets inside

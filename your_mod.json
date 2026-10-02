@@ -9,7 +9,7 @@
   "prefix": "bes",
   "main_file": "main.lua",
   "priority": 0,
-  "version": "0.5.0",
+  "version": "0.5.1",
   "badge_colour": "4F86C6",
   "dependencies": [
     "Steamodded (>=1.0.0~)"
