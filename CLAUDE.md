@@ -64,8 +64,9 @@ thing **headless-testable**. See the Layout section in `README.md` for the per-f
   simulator (`World.play_blind` / `Driver.run`).
 - **Deploy to the live game (manual copy — the repo is NOT the install):** since 2026-10-01 the game runs through
   **r2modman** (Balatro Mod Manager was shut down). The running mod lives in the r2modman profile at
-  `%APPDATA%/r2modmanPlus-local/Balatro/profiles/Default/mods/balatroenginesim/`. After editing, copy changed
-  files there or the game won't see them. Green tests ≠ works in-game. r2modman launches with
+  `%APPDATA%/r2modmanPlus-local/Balatro/profiles/Default/mods/Anto640-EngineSim/` (imported 2026-10-02 from
+  `python tools/package_r2.py`'s zip via r2modman's Import local mod, so r2modman lists it). After editing, copy
+  changed files there or the game won't see them; never leave a second copy of the mod inside `mods/`. Green tests ≠ works in-game. r2modman launches with
   `steam.exe -applaunch 2379780 --mod-dir "<profile>/mods"`; a plain Steam launch (no `--mod-dir`) makes Lovely fall
   back to the OLD `%APPDATA%/Balatro/Mods/` folder and its stale copy of the mod.
   Verify by diffing the whole tree against the install with `diff -q --strip-trailing-cr` (the checkout is CRLF,
