@@ -1,6 +1,28 @@
 # NEXT_SESSION.md — fresh-session handoff
 
 ## START HERE (2026-09-30 checkpoint)
+**2026-10-02 -- NATIVE UI (branch `worktree-native-ui`, merged; live install = main = this merge).** No engine
+decisions changed. The advice panel is a native row in the left HUD (`ui/hud_panel.lua`, hover popup for details,
+pulsing "Thinking" + progress bar); tags on the recommended card / item / button (`ui/highlights.lua`, numbered for
+reorders); every recommendation is TIME-SLICED (`BES.begin_eval`, HandEval yields every 32 candidates) so the game's
+animations keep running -- verified identical to synchronous advice by `tools/slice_check.lua`; F11 self-play skips
+animations through the Handy mod (`ui/fast_mode.lua`); F5 flags a misplay (last 12 decisions -> `bes_flagged.jsonl`,
+`tools/flagged.lua --replay`); predicted score vs target tag; red "!" for engine errors; Mods-menu settings page
+(`ui/settings.lua`, defaults `config.lua`). Not yet seen in-game when merged -- watch the first live session.
+
+**PARKED (owner 2026-10-02, possible future work): make the shop calculation faster WITHOUT changing any advice.**
+A shop recommendation takes ~5 s (max ~10 s; `tools/yield_gaps.lua`), nearly all of it scoring card subsets inside
+the per-offer measurements (joker buy/sell `JokerValue.*`, pack EV, reroll-pool EV). How it would work:
+1. Profile first: `tools/seed_flip_probe.lua --timing` already prices each estimator per recorded shop decision --
+   find where the 5 s goes before touching code.
+2. Output-preserving speed-ups only: (a) cache the CURRENT board's best play per sampled hand once per recommend
+   (each offer is measured against the same common-random-number samples, so this is likely recomputed per offer);
+   (b) hoist effective-jokers / mods / per-board setup out of repeated calls; (c) fewer short-lived tables (less GC);
+   (d) exact pruning in the subset enumeration (skip a subset whose upper bound can't beat the best so far).
+3. Prove nothing changed: `tools/slice_check.lua`-style fingerprints on recorded shop/pack/blind decisions must be
+   byte-identical before vs after. Cutting sample counts is NOT in scope -- that changes decisions and needs an A/B.
+Plausible gain 1.5-3x if (a) is real; unknown until profiled. About one session: profile, fix the biggest item, verify.
+
 **Read `docs/PLAN_2026-09-29_audit_fixes.md`** (status block at the top has every verdict with its numbers).
 
 **Live install = main = branch tip** (winrate-v4-bundle, synced 2026-09-30). Shipped since 09-29: Stone cards have no
