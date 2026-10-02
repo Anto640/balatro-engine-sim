@@ -84,7 +84,8 @@ thing **headless-testable**. See the Layout section in `README.md` for the per-f
   auto-play on, a finished run (game over / win) is restarted via the game's hold-R path after 4 s, so runs chain
   unattended). The advice panel is a native row at the top of the left HUD (`ui/hud_panel.lua`; label reads
   `Auto` while self-playing); hover it for the reason, stats and `Self-play` / `Auto-restart` status. Tags on the
-  recommended card / shop item / button come from `ui/highlights.lua`.
+  recommended card / shop item / button come from `ui/highlights.lua`. Settings (panel, tags, fast self-play, its
+  speed): Mods menu > Engine Sim > Config (`ui/settings.lua`; defaults in `config.lua` -- deploy it with the rest).
 
 ## Self-play simulator & data-driven tuning (the main tuning workflow)
 

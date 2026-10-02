@@ -18,6 +18,7 @@ local Fast = {}
 Fast.SKIP_LEVEL = 4        -- Handy.animation_skip.EVERYTHING (NONE 1 / MESSAGES 2 / ANIMATIONS 3 / EVERYTHING 4 / UNSAFE 5)
 Fast.SPEED = 16            -- Handy speed multiplier while self-playing (its max SAFE value is 512)
 Fast.autoplay = nil        -- the ui/autoplay module (set by main.lua)
+Fast.enabled = true        -- the Mods-menu setting (ui/settings.lua)
 Fast.installed = false
 local warned = false
 
@@ -26,6 +27,7 @@ local function handy() return rawget(_G, "Handy") end
 -- Is fast mode in effect right now? (self-play on, Handy present, not in a multiplayer lobby)
 function Fast.engaged()
   local ap, H = Fast.autoplay, handy()
+  if Fast.enabled == false then return false end        -- switched off in the Mods menu settings
   if not (Fast.installed and ap and ap.enabled and H) then return false end
   if H.b_is_in_multiplayer and H.b_is_in_multiplayer() then return false end
   return true

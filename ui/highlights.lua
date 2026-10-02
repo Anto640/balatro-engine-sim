@@ -146,6 +146,7 @@ end
 local function active(last)
   local Overlay = require("ui.overlay")
   local AP = H.autoplay
+  if H.enabled == false then return nil end   -- switched off in the Mods menu settings
   if not (Overlay.visible and AP and AP._find_card and last and last.ranked and last.ranked.best) then return nil end
   if last.provisional then return nil end
   -- never point at a stale move (same anti-flash delay as the panel, so a quick answer doesn't blink the tags)

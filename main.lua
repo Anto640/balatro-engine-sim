@@ -58,6 +58,7 @@ local Overlay  = try_require("ui.overlay")
 local HUDPanel = try_require("ui.hud_panel")
 local Highlights = try_require("ui.highlights")  -- in-world tags on the recommended card / item / button
 local FastMode = try_require("ui.fast_mode")      -- skip animations while the F11 self-player plays (via Handy)
+local Settings = try_require("ui.settings")       -- the Mods-menu settings page
 local Dagger   = try_require("engine.dagger")    -- Ceremonial Dagger placement before blind select
 local Autoplay = try_require("ui.autoplay")   -- F11: translate the engine's decision into real inputs
 -- Phase 0 self-play instrumentation (SELFPLAY_PLAN.md): record real runs to JSONL
@@ -1060,6 +1061,8 @@ if _G.G and _G.SMODS then
   if Overlay and Overlay.add_error then
     Log.on_error = function(msg) Overlay.add_error(msg, clock(), os.date("%H:%M")) end
   end
+  -- settings page in the Mods menu (SMODS loaded config.lua + the saved values into current_mod.config)
+  if Settings then pcall(Settings.install, SMODS.current_mod) end
   if FastMode then
     FastMode.autoplay = Autoplay
     if HUDPanel then HUDPanel.fast = FastMode end                        -- tooltip says when fast mode is on
@@ -1072,7 +1075,9 @@ if _G.G and _G.SMODS then
     function love.keypressed(key, ...)
       if key == "f7" then Log.info("--- joker ability dump ---"); pcall(BES.dump_jokers) end
       if key == "f8" then Log.info("--- manual evaluation (with sim) ---"); BES.evaluate(true) end
-      if key == "f9" and HUDPanel then HUDPanel.toggle() end
+      if key == "f9" then   -- the panel setting (also in the Mods menu); applied next frame
+        if Settings and Settings.cfg then Settings.toggle_panel() elseif HUDPanel then HUDPanel.toggle() end
+      end
       if key == "f5" then pcall(BES.flag) end   -- flag a misplay: saves the last BES_FLAG_KEEP decisions
       if key == "f10" then
         BES.capture_only = not BES.capture_only
@@ -1111,6 +1116,7 @@ if _G.G and _G.SMODS then
       -- advance any in-flight background job a few ms EVERY frame (cheap when idle)
       -- so the expensive Monte-Carlo / pack measurement never blocks rendering.
       if FastMode and not FastMode.installed then pcall(FastMode.ensure) end   -- Handy may load after this mod
+      if Settings then pcall(Settings.apply, { overlay = Overlay, highlights = Highlights, fast = FastMode }) end
       pcall(BES.pump_job, BES.job and BES.slice_budget() or BES_BUDGET_BUSY)
       pcall(BES.think_progress)
       if BES.last ~= BES._remembered then BES._remembered = BES.last; pcall(BES.remember, BES.last) end
