@@ -8,6 +8,7 @@ local Tags = require("engine.tags")
 local Mechanics = require("engine.mechanics")
 local Generators = require("engine.generators")
 local Eval = require("engine.eval_function")
+local Pacing = require("engine.pacing")
 
 local SK = {}
 
@@ -24,6 +25,13 @@ SK.BOARDLESS_SHOP_MULT = 2.0
 -- speculative tag, so the tag must CLEARLY beat playing, not merely edge it out --
 -- otherwise the engine skips every time a tag's raw $-equivalent tops playing.
 SK.SKIP_MARGIN = 1.25
+
+-- RISK-AWARE SHOP (A/B switch BES_SKIP_RISK=<k>, default off). The forgone shop is where an AT-RISK board finds
+-- power, so its value grows with the calibrated P(die within 2 antes) (Pacing.risk): x(1 + k*risk). Live CYDQ4Q9N
+-- a5 (2026-10-02): at ~88% risk it skipped BOTH blinds (Economy tag $25 vs a flat ~$12 for playing, then Standard),
+-- reached the boss with $50 and no shop since ante 4, and died at 0.79. k = 3 puts the line where the largest money
+-- tag ($25) stops beating a full board's play at ~70% risk.
+SK.RISK_SHOP_MULT = tonumber(os.getenv and os.getenv("BES_SKIP_RISK") or "") or 0
 
 -- Deterministic per-state RNG so the measured tag values (Orbital, pack tags) are
 -- stable across re-evaluations of the same blind-select.
@@ -67,6 +75,13 @@ function SK.recommend(gs, opts)
   local slots = (gs.run and gs.run.joker_slots) or 5
   local fill = math.min(1, njokers / math.max(1, slots))
   local shop_value = SK.SHOP_VALUE * (1 + SK.BOARDLESS_SHOP_MULT * (1 - fill))
+  local risk_note = ""
+  if SK.RISK_SHOP_MULT > 0 then
+    local ok, pc = pcall(Pacing.pace, gs, { rng = lcg(state_seed(gs) + 17) })
+    local risk = ok and pc and pc.risk or 0
+    shop_value = shop_value * (1 + SK.RISK_SHOP_MULT * risk)
+    if risk >= 0.5 then risk_note = string.format(", ~%d%% risk: the shop is where power comes from", math.floor(risk * 100 + 0.5)) end
+  end
   local play_value = reward + shop_value + hand_money + gen_v + joker_econ
   local gen_str = (gen_note ~= "" and (" + " .. gen_note)) or ""
   if joker_econ >= 1 then gen_str = gen_str .. string.format(" + ~$%d joker econ", math.floor(joker_econ + 0.5)) end
@@ -78,9 +93,9 @@ function SK.recommend(gs, opts)
     tag = tname, tag_value = tval, play_value = play_value,
     reason = skip
       and string.format("Skip: %s tag (~$%d) beats playing (~$%d: $%d reward + shop + hands%s).",
-            tname, tval, pv, reward, gen_str)
+            tname, tval, pv, reward, gen_str .. risk_note)
       or string.format("Play: %s tag (~$%d) < playing (~$%d: $%d reward + shop + hands%s).",
-            tname, tval, pv, reward, gen_str),
+            tname, tval, pv, reward, gen_str .. risk_note),
   }
 end
 
