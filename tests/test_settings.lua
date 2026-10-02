@@ -52,8 +52,14 @@ return function(t)
     t.eq(G.FUNCS.bes_cfg_fast_speed, S.on_speed, "speed callback registered")
     local page = mod.config_tab()
     t.ok(page and page.n == 7, "page is a UI root")
-    t.eq(table.concat(made, ","), "toggle:show_panel,toggle:show_tags,toggle:fast_selfplay,cycle:1:x4",
-      "page: three toggles and the speed cycle at the current speed")
+    t.eq(table.concat(made, ","), "toggle:show_panel,toggle:show_tags,cycle:2:Balanced,toggle:fast_selfplay,cycle:1:x4",
+      "page: panel, tags, while-thinking (default Balanced), fast self-play, speed")
+    S.on_think_mode({ to_key = 1 })
+    t.eq(cfg.think_mode, "smooth", "while-thinking cycle sets the mode")
+    local sched = {}
+    S.apply({ scheduler = sched })
+    t.eq(sched.think_mode, "smooth", "mode reaches the scheduler")
+    t.eq(G.FUNCS.bes_cfg_think_mode, S.on_think_mode, "while-thinking callback registered")
 
     -- fast mode honours the switch
     package.loaded["ui.fast_mode"] = nil

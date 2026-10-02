@@ -153,7 +153,7 @@ function Panel.label_row()
 end
 
 -- The panel's single child (rebuilt whenever the advice changes).
-function Panel.content()
+function Panel.content(compact)
   if not Overlay.visible then
     return { n = G.UIT.B, config = { w = 0.1, h = 0.3 } }   -- hidden: same height as the spacer it replaced
   end
@@ -184,6 +184,27 @@ function Panel.content()
   local mode, mode_col = "Advice", G.C.UI.TEXT_LIGHT
   if think then mode, mode_col = "Thinking", pulse_colour()
   elseif auto then mode, mode_col = "Auto", G.C.GREEN end
+  if compact then
+    -- one line (a short screen, see Panel.fit): mode word (+ the error "!"), then the move with its tags inline
+    local label = { text(mode, 0.34, mode_col) }
+    if #Overlay.recent_errors(Panel.now()) > 0 then
+      label[#label + 1] = { n = G.UIT.B, config = { w = 0.05, h = 0.1 } }
+      label[#label + 1] = tag("!", G.C.RED, 0.28)
+    end
+    local line = { text(head, 0.3, (has_move and not think) and G.C.WHITE or G.C.UI.TEXT_INACTIVE) }
+    local tail = (think and not note) and { { n = G.UIT.C, config = { align = "cm", minw = 0.9, minh = 0.12, r = 0.05,
+      colour = G.C.BLACK, progress_bar = { max = 1, ref_table = Overlay.state, ref_value = "progress",
+        empty_col = G.C.BLACK, filled_col = G.C.FILTER } }, nodes = {} } } or tags
+    if #tail > 0 then line[#line + 1] = { n = G.UIT.B, config = { w = 0.1, h = 0.1 } } end
+    for _, n in ipairs(tail) do line[#line + 1] = n end
+    return { n = G.UIT.C, config = { align = "cm", padding = 0.05 }, nodes = {
+      { n = G.UIT.C, config = { align = "cm", minw = 1.1, maxw = 1.1 }, nodes = {
+        { n = G.UIT.R, config = { align = "cm" }, nodes = label } } },
+      { n = G.UIT.C, config = { align = "cm", minw = 3.6, minh = 0.42, r = 0.1, padding = 0.04,
+          colour = G.C.DYN_UI.BOSS_DARK }, nodes = {
+        { n = G.UIT.R, config = { align = "cm", maxw = 3.5 }, nodes = line } } },
+    } }
+  end
   return { n = G.UIT.C, config = { align = "cm", padding = 0.1 }, nodes = {
     { n = G.UIT.C, config = { align = "cm", minw = 1.3 }, nodes = {
       { n = G.UIT.R, config = { align = "cm", maxw = 1.3 }, nodes = Panel.label_row() },
@@ -291,11 +312,25 @@ function Panel.inject(def)
   local prev = parent.nodes[i - 1]
   local is_spacer = prev and prev.n == G.UIT.R and prev.config and prev.config.minh
     and not prev.config.id and (not prev.nodes or #prev.nodes == 0)
-  if is_spacer then parent.nodes[i - 1] = Panel.row()
-  else table.insert(parent.nodes, i, Panel.row()) end
+  local row = Panel.row()
+  if is_spacer then parent.nodes[i - 1] = row
+  else table.insert(parent.nodes, i, row) end
+  -- what Panel.fit may tighten if the bar overflows the screen. UIElements keep their definition's config
+  -- TABLE, so editing these configs + recalculating resizes the live elements.
+  local fitcfg = { bar = parent.config, buttons = {}, boxes = {} }
   walk(def, function(n)
-    if n.config and n.config.button == "options" and not n.config.id then n.config.id = OPTIONS_ID end
+    local c = n.config
+    if c and c.button == "options" and not c.id then c.id = OPTIONS_ID end
+    if c and (c.button == "options" or c.button == "run_info") then fitcfg.buttons[#fitcfg.buttons + 1] = c end
   end)
+  local rparent, ri = find_parent(def, function(c) return c.config and c.config.id == "row_round" end)
+  if rparent then   -- the hands / discards / money / ante / round boxes (minh 1 and 1.15) beside the buttons
+    walk(rparent.nodes[ri], function(n)
+      local c = n.config
+      if c and not c.button and (c.minh == 1 or c.minh == 1.15) then fitcfg.boxes[#fitcfg.boxes + 1] = c end
+    end)
+  end
+  row.config.bes_fitcfg = fitcfg
   return def
 end
 
@@ -313,26 +348,70 @@ local function signature()
   return table.concat(parts, "\31")
 end
 
--- If the bar is taller than the visible screen, shorten the Run Info / Options buttons.
+-- ---- fitting the left bar on screen ------------------------------------------------------------------
+-- The base bar is ~12.1 of the 12.9 visible units (16:9 and wider; squarer windows show more), and other mods,
+-- languages or Steamodded versions can make it taller -- a friend's install overflowed top AND bottom (the bar is
+-- centred). Panel.fit measures the real bar against the real visible height and applies the gentlest changes
+-- first, re-measuring after each, until it fits. Steps stay applied for that HUD (a new run rebuilds it).
+local FIT_MARGIN = 0.08   -- game units kept clear above and below
+
+-- Visible screen height in game units (the game scales the room to fit and centres it on the bar's centre).
+function Panel.visible_h()
+  local h = love and love.graphics and love.graphics.getHeight and love.graphics.getHeight()
+  local s = (G.TILESIZE or 20) * (G.TILESCALE or 1)
+  if not (h and h > 0 and s > 0) then return nil end
+  return h / s
+end
+
+local function rebuild_children(e)
+  if e.children[1] then e.children[1]:remove(); e.children[1] = nil end
+  e.UIBox:add_child(Panel.content(e.config.bes_compact), e)   -- add_child recalculates the HUD box
+end
+
+Panel.FIT_STEPS = {
+  { name = "shorter Run Info / Options buttons", apply = function(e, f)
+      for _, c in ipairs(f.buttons) do c.minh = math.min(c.minh or MIN_BTN_H, MIN_BTN_H) end end },
+  { name = "tighter bar spacing", apply = function(e, f)
+      if f.bar and (f.bar.padding or 0) > 0.04 then f.bar.padding = 0.04 end end },
+  { name = "compact one-line panel", apply = function(e, f)
+      e.config.bes_compact = true; rebuild_children(e) end },
+  { name = "shorter hands / money / ante boxes", apply = function(e, f)
+      for _, c in ipairs(f.boxes) do c.minh = c.minh * 0.82 end
+      for _, c in ipairs(f.buttons) do c.minh = 1.0 end end },
+}
+
 function Panel.fit(e)
-  local hud = e.UIBox
+  local hud, f = e.UIBox, e.config.bes_fitcfg
   local last = hud and hud:get_UIE_by_ID("row_round")
-  if not (last and G.ROOM and G.ROOM.T) then return end
-  local h = (last.T.y + last.T.h) - e.T.y
-  local avail = G.ROOM.T.h + 2 * (G.ROOM_PADDING_H or 0.7) - 0.1
-  local over = h - avail
-  if over <= 0.005 then return end
-  local changed = false
-  for _, id in ipairs({ "run_info_button", OPTIONS_ID }) do
-    local b = hud:get_UIE_by_ID(id)
-    if b and b.config.minh then
-      local nh = math.max(MIN_BTN_H, b.config.minh - over / 2)
-      if nh < b.config.minh - 0.001 then b.config.minh = nh; changed = true end
-    end
-  end
-  if changed then
+  local vis_h = Panel.visible_h()
+  if not (last and f and vis_h) then return end
+  e.config.bes_vis_h = vis_h
+  local avail = vis_h - 2 * FIT_MARGIN
+  -- measure the bar WITHOUT any last-resort push (minh / align are restored first)
+  if e.config.bes_push then e.config.minh, e.config.align, e.config.bes_push = nil, "cm", nil; hud:recalculate() end
+  local function bar_h() return (last.T.y + last.T.h) - e.T.y end
+  local h0 = bar_h()
+  local step, applied = e.config.bes_fit or 0, {}
+  while bar_h() - avail > 0.005 and step < #Panel.FIT_STEPS do
+    step = step + 1
+    Panel.FIT_STEPS[step].apply(e, f)
     hud:recalculate()
-    Log.info(string.format("HUD panel: bar %.2f > %.2f visible units; shortened Run Info / Options", h, avail))
+    applied[#applied + 1] = Panel.FIT_STEPS[step].name
+  end
+  e.config.bes_fit = step
+  local over = bar_h() - avail
+  if over > 0.005 then
+    -- last resort: keep the TOP (blind, score) on screen. Growing this first row upward by the overflow, with its
+    -- content pinned to the bottom, moves the centred bar down by half of it; the extra row height sits off-screen.
+    e.config.minh = (e.T.h or 0) + over
+    e.config.align = "bm"
+    e.config.bes_push = over
+    hud:recalculate()
+  end
+  if #applied > 0 or over > 0.005 then
+    Log.info(string.format("HUD fit: bar %.2f vs %.2f visible units; %s%s", h0, avail,
+      #applied > 0 and table.concat(applied, ", ") or "no change",
+      over > 0.005 and string.format("; still %.2f over -> top kept, bottom cut", over) or ""))
   end
 end
 
@@ -341,8 +420,7 @@ local function rebuild(e)
   e.config.colour = vis and G.C.DYN_UI.BOSS_MAIN or G.C.CLEAR
   e.config.emboss = vis and 0.05 or nil
   e.states.collide.can = vis
-  if e.children[1] then e.children[1]:remove(); e.children[1] = nil end
-  e.UIBox:add_child(Panel.content(), e)      -- add_child recalculates the HUD box
+  rebuild_children(e)
   if e.children.h_popup then                 -- refresh an open tooltip
     e.children.h_popup:remove(); e.children.h_popup = nil
     if vis and e.states.hover.is then e:hover() end
@@ -374,6 +452,9 @@ local function on_frame(e)
   if sig ~= e.config.bes_sig then
     e.config.bes_sig = sig
     rebuild(e)
+  else
+    local vh = Panel.visible_h()      -- the window was resized: fit again
+    if vh and math.abs(vh - (e.config.bes_vis_h or vh)) > 0.01 then Panel.fit(e) end
   end
 end
 

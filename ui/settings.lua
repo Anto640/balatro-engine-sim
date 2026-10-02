@@ -6,8 +6,11 @@
 -- change takes effect at once. F9 flips `show_panel` too, so the key and the menu never disagree.
 
 local S = {}
-S.DEFAULTS = { show_panel = true, show_tags = true, fast_selfplay = true, fast_speed = 16 }
+S.DEFAULTS = { show_panel = true, show_tags = true, fast_selfplay = true, fast_speed = 16, think_mode = "balanced" }
 S.SPEEDS = { 4, 8, 16, 32, 64 }
+-- "While thinking": how much of each frame the engine may use (main.lua BES.slice_budget)
+S.THINK_MODES = { "smooth", "balanced", "fast" }
+S.THINK_LABELS = { "Smooth", "Balanced", "Fast" }
 S.cfg = nil
 S._applied_panel = nil
 
@@ -35,6 +38,7 @@ function S.apply(ctx)
     ctx.fast.enabled = c.fast_selfplay and true or false
     ctx.fast.SPEED = tonumber(c.fast_speed) or S.DEFAULTS.fast_speed
   end
+  if ctx.scheduler then ctx.scheduler.think_mode = c.think_mode or S.DEFAULTS.think_mode end
 end
 
 -- F9: flip the panel setting (S.apply shows / hides it next frame).
@@ -47,6 +51,10 @@ end
 local function speed_index(v)
   for i, s in ipairs(S.SPEEDS) do if s == v then return i end end
   return 3
+end
+local function think_index(v)
+  for i, s in ipairs(S.THINK_MODES) do if s == v then return i end end
+  return 2
 end
 
 -- The settings page (Steamodded calls this when the mod's Config tab opens).
@@ -63,6 +71,9 @@ function S.tab()
     heading("Advice"),
     create_toggle({ label = "Show the advice panel (F9)", ref_table = cfg, ref_value = "show_panel", w = 4.5 }),
     create_toggle({ label = "Tag the recommended cards", ref_table = cfg, ref_value = "show_tags", w = 4.5 }),
+    create_option_cycle({ label = "While thinking", options = S.THINK_LABELS,
+      current_option = think_index(cfg.think_mode), opt_callback = "bes_cfg_think_mode", scale = 0.8, w = 3,
+      info = { "Smooth: full frame rate.  Balanced: 60 fps.  Fast: answers sooner, frames drop." } }),
     heading("Self-play (F11)"),
     create_toggle({ label = "Skip animations while it plays", ref_table = cfg, ref_value = "fast_selfplay", w = 4.5,
       info = { "Uses the Handy mod's animation skip. Your own play is never affected." } }),
@@ -79,10 +90,17 @@ function S.on_speed(args)
   if S.cfg and args then S.cfg.fast_speed = S.SPEEDS[args.to_key] or S.cfg.fast_speed end
 end
 
+function S.on_think_mode(args)
+  if S.cfg and args then S.cfg.think_mode = S.THINK_MODES[args.to_key] or S.cfg.think_mode end
+end
+
 -- Register with Steamodded (in-game only).
 function S.install(mod)
   S.init(mod)
-  if G and G.FUNCS then G.FUNCS.bes_cfg_fast_speed = S.on_speed end
+  if G and G.FUNCS then
+    G.FUNCS.bes_cfg_fast_speed = S.on_speed
+    G.FUNCS.bes_cfg_think_mode = S.on_think_mode
+  end
   if mod then mod.config_tab = S.tab end
 end
 

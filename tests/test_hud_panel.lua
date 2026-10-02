@@ -160,6 +160,48 @@ return function(t)
     Overlay.errors = {}
     _G.love = saved_love
 
+    -- ---- fitting the left bar on screen: gentlest steps first, re-measured after each ----
+    local function fit_case(extra)
+      local f = { bar = { padding = 0.08 }, buttons = { { minh = 1.75 }, { minh = 1.75 } },
+        boxes = { { minh = 1.15 }, { minh = 1 }, { minh = 1 } } }
+      local last = { T = { y = 0, h = 0 } }
+      local e = { config = { bes_fitcfg = f, align = "cm" }, T = { y = 0, h = 1.0 }, states = { collide = {}, hover = {} } }
+      local hud = {}
+      function hud.get_UIE_by_ID(_, id) return id == "row_round" and last or nil end
+      function hud.recalculate()   -- a bar whose height follows the same configs Panel.fit edits
+        local panel = e.config.bes_compact and 0.55 or 1.0
+        if e.config.minh then panel = math.max(panel, e.config.minh) end
+        local btn = f.buttons[1].minh + f.buttons[2].minh + 0.6
+        local col = f.boxes[1].minh + f.boxes[2].minh + f.boxes[3].minh + 0.6
+        local rr = math.max(btn, col)
+        local bar = panel + extra + 7.05 + rr + 6 * f.bar.padding
+        e.T.h = panel
+        last.T.y, last.T.h = e.T.y + bar - rr, rr
+      end
+      function hud.add_child() hud.recalculate() end
+      e.UIBox = hud
+      e.children = { { remove = function() end } }
+      hud.recalculate()
+      Panel.fit(e)
+      local h = (last.T.y + last.T.h) - e.T.y
+      return e, h
+    end
+    local saved_love2 = _G.love
+    _G.love = { graphics = { getHeight = function() return 258 end }, timer = { getTime = function() return 0 end } }
+    G.TILESIZE, G.TILESCALE = 20, 1          -- 258 px / 20 = 12.9 units visible (16:9)
+    local e0, h0 = fit_case(0)
+    t.eq(e0.config.bes_fit or 0, 0, "a bar that fits is left alone")
+    local e1, h1 = fit_case(1.0)
+    t.eq(e1.config.bes_fit, 3, "a taller bar: buttons, spacing, then the compact panel")
+    t.ok(e1.config.bes_compact, "... compact one-line panel")
+    t.ok(h1 <= 12.9 - 0.16 + 1e-9, "... and it now fits (" .. string.format("%.2f", h1) .. ")")
+    t.eq(e1.config.align, "cm", "... with no last-resort push")
+    local e2 = fit_case(2.0)
+    t.eq(e2.config.bes_fit, #Panel.FIT_STEPS, "a very tall bar uses every step")
+    t.eq(e2.config.align, "bm", "... then keeps the top on screen (content pinned to the bottom of a taller first row)")
+    t.ok(e2.config.bes_push and e2.config.bes_push > 0, "... by exactly the remaining overflow")
+    _G.love = saved_love2
+
     -- hidden (F9): a spacer-sized blank
     Overlay.visible = false
     t.eq(Panel.content().n, UIT.B, "hidden panel collapses to a spacer")

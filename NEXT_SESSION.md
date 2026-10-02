@@ -4,7 +4,7 @@
 **2026-10-02 -- NATIVE UI (branch `worktree-native-ui`, merged; live install = main = this merge).** No engine
 decisions changed. The advice panel is a native row in the left HUD (`ui/hud_panel.lua`, hover popup for details,
 pulsing "Thinking" + progress bar); tags on the recommended card / item / button (`ui/highlights.lua`, numbered for
-reorders); every recommendation is TIME-SLICED (`BES.begin_eval`, HandEval yields every 32 candidates) so the game's
+reorders); every recommendation is TIME-SLICED (`BES.begin_eval`, HandEval yields every 16 candidates) so the game's
 animations keep running -- verified identical to synchronous advice by `tools/slice_check.lua`; F11 self-play skips
 animations through the Handy mod (`ui/fast_mode.lua`); F5 flags a misplay (last 12 decisions -> `bes_flagged.jsonl`,
 `tools/flagged.lua --replay`); predicted score vs target tag; red "!" for engine errors; Mods-menu settings page

@@ -33,7 +33,7 @@ local HandEval = {}
 -- YIELD_EVERY scored subsets inside one: a single enumeration of a big hand under a heavy
 -- board runs ~100 ms, too long to hold a frame (tools/yield_gaps.lua measures the gaps).
 local YIELD = nil
-local YIELD_EVERY = 32
+local YIELD_EVERY = 16   -- small enough that a slice overshoots its frame budget by little even on a slow PC
 function HandEval.set_yield(fn) YIELD = fn end
 -- The light boundary, for every scoring loop (subset / permutation enumerations in here and in
 -- engine/ordering.lua): one YIELD(true) per YIELD_EVERY scored candidates. No-op when undriven.

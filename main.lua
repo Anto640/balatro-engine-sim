@@ -353,18 +353,29 @@ end
 -- 2026-10-02 (owner: "the animations freeze midway while it's calculating"): the MAIN recommendation is now
 -- time-sliced too. It used to run synchronously on every state change -- a shop ~5 s (up to 10 s), a hand up to
 -- ~7 s -- holding the frame, so the game's own animations froze mid-way. Now BES.begin_eval runs it in the same
--- coroutine job as the refinement, pumped each frame; the engine's slice boundaries (HandEval YIELD, one per 32
+-- coroutine job as the refinement, pumped each frame; the engine's slice boundaries (HandEval YIELD, one per 16
 -- scored candidates) keep each slice to a few ms (tools/yield_gaps.lua: p99 3-6 ms). The advice is unchanged --
 -- slicing affects only WHEN the work runs -- and the panel shows "Thinking" with a progress bar meanwhile.
-BES_BUDGET_BUSY = 0.006  -- engine seconds per frame while the game is animating (keeps animations smooth)
-BES_BUDGET_IDLE = 0.020  -- ... while the screen is still (finish sooner; nothing moving to stutter)
-BES_BUDGET_AUTO = 0.050  -- ... while the F11 self-player plays: nobody watches the frames, so think faster
+-- 2026-10-02 (a friend's PC: "the animations play but the frames drop a lot while it thinks"): the per-frame engine
+-- budget is now FRAME-AWARE. A fixed 20 ms slice on top of the game's own frame work overran a 16.7 ms vsync frame
+-- (dropping a 60 Hz screen to 30 fps -- worse the slower the PC). BES.slice_budget gives the engine only what is
+-- left of the target frame after the game's own measured work (BES.note_frame), with a small floor so thinking
+-- always progresses. Settings > "While thinking": Smooth (the monitor's refresh rate), Balanced (60 fps, default),
+-- Fast (the old fixed 20 ms -- answers sooner, frames drop).
+BES_BUDGET_MIN  = 0.0015 -- engine seconds per frame, at least (a slow PC still gets its answer, just later)
+BES_BUDGET_BUSY = 0.006  -- default slice before any frame has been measured
+BES_BUDGET_IDLE = 0.020  -- the "Fast" setting, and the cap for every other mode
+BES_BUDGET_AUTO = 0.050  -- while the F11 self-player plays: nobody watches the frames, so think faster
+BES_FRAME_SAFETY = 0.002 -- headroom kept below the target frame time (frame-to-frame jitter)
 BES_SIM_BUDGET = BES_BUDGET_BUSY   -- (legacy name)
+BES.think_mode = "balanced"        -- "smooth" | "balanced" | "fast" (ui/settings.lua)
+BES.game_cost = nil      -- the game's own work per frame (update + draw, without our slice), decaying max
+BES.refresh_rate = nil   -- the monitor's refresh rate (Hz), read once in-game
 BES_TRANSITION_MAX = 6   -- seconds a mid-animation hold may last before the state is treated as settled
 BES.job = nil            -- in-flight background job: { thread, gs, sig, finish }
 BES.work_units = 0       -- slice-boundary count (progress measure for the thinking bar)
 -- expected work units per decision kind, learned as an EMA of finished decisions (seeded from tools/yield_gaps.lua)
-BES.EXPECT = { blind = 2700, shop = 9400, pack = 2500, skip = 40 }
+BES.EXPECT = { blind = 5000, shop = 17000, pack = 4700, skip = 60 }
 BES.thinking = nil       -- { kind, t0, units0 } while the main recommendation for the live state is being worked out
 
 local function clock() return (love and love.timer and love.timer.getTime()) or os.clock() end
@@ -393,18 +404,24 @@ function BES.think_progress()
   Overlay.state.progress = math.min(0.97, (BES.work_units - th.units0) / math.max(1, exp))
 end
 
--- Is the game animating? (a blocking event queued in the base queue -- dealing, scoring, the shop sliding in --
--- or a mid-action transition). Non-blocking events are background loops and don't count.
-function BES.animating()
-  local G = _G.G
-  if Autoplay and Autoplay.in_transition and Autoplay.in_transition(G) then return true end
-  local q = G and G.E_MANAGER and G.E_MANAGER.queues and G.E_MANAGER.queues.base
-  if q then for _, ev in ipairs(q) do if ev.blocking ~= false then return true end end end
-  return false
+-- One finished frame: `work` = seconds from the start of love.update to the end of love.draw, `slice` = the part
+-- the engine used. The game's own cost rises at once and decays slowly (a decaying max), so a heavy frame is not
+-- forgotten the next frame.
+function BES.note_frame(work, slice)
+  local own = math.max(0, (work or 0) - (slice or 0))
+  local c = BES.game_cost
+  BES.game_cost = c and math.max(own, c * 0.95 + own * 0.05) or own
 end
+
+-- Seconds of engine work allowed this frame.
 function BES.slice_budget()
   if Autoplay and Autoplay.enabled then return BES_BUDGET_AUTO end
-  return BES.animating() and BES_BUDGET_BUSY or BES_BUDGET_IDLE
+  local mode = BES.think_mode or "balanced"
+  if mode == "fast" then return BES_BUDGET_IDLE end
+  if not BES.game_cost then return BES_BUDGET_BUSY end
+  local fps = (mode == "smooth") and math.max(60, BES.refresh_rate or 60) or 60
+  local left = 1 / fps - BES.game_cost - BES_FRAME_SAFETY
+  return math.max(BES_BUDGET_MIN, math.min(BES_BUDGET_IDLE, left))
 end
 
 -- Build + push the overlay action for a pack recommendation (shared by the cheap
@@ -1138,12 +1155,17 @@ if _G.G and _G.SMODS then
     -- self-play + auto-restart on at launch and continues the saved run
     if Autoplay and Autoplay.check_autostart then pcall(Autoplay.check_autostart) end
     love.update = function(dt, ...)
+      BES._frame_t0 = clock()                  -- frame work is timed from here to the end of love.draw
       if prev_update then prev_update(dt, ...) end
       -- advance any in-flight background job a few ms EVERY frame (cheap when idle)
       -- so the expensive Monte-Carlo / pack measurement never blocks rendering.
       if FastMode and not FastMode.installed then pcall(FastMode.ensure) end   -- Handy may load after this mod
-      if Settings then pcall(Settings.apply, { overlay = Overlay, highlights = Highlights, fast = FastMode }) end
+      if Settings then
+        pcall(Settings.apply, { overlay = Overlay, highlights = Highlights, fast = FastMode, scheduler = BES })
+      end
+      local s0 = clock()
       pcall(BES.pump_job, BES.job and BES.slice_budget() or BES_BUDGET_BUSY)
+      BES._frame_slice = clock() - s0
       pcall(BES.think_progress)
       if BES.last ~= BES._remembered then BES._remembered = BES.last; pcall(BES.remember, BES.last) end
       -- AUTO-PLAY (F11): if enabled, translate the latest recommendation into real inputs. Gated on
@@ -1163,6 +1185,17 @@ if _G.G and _G.SMODS then
         if not held then pcall(BES.tick) end
       end
     end
+
+    -- end of the frame's work: feed the frame-aware engine budget (BES.slice_budget)
+    local prev_draw = love.draw
+    love.draw = function(...)
+      if prev_draw then prev_draw(...) end
+      if BES._frame_t0 then pcall(BES.note_frame, clock() - BES._frame_t0, BES._frame_slice) end
+    end
+    pcall(function()
+      local _, _, flags = love.window.getMode()
+      BES.refresh_rate = flags and tonumber(flags.refreshrate) or nil
+    end)
   end
 
   BES.telemetry_instance()  -- create the run log up front so its path is logged on load

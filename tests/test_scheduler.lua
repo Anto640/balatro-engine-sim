@@ -111,7 +111,23 @@ return function(t)
     t.ok(BES.thinking == nil, "stale thinking flag cleared without a job")
 
     -- 4. slice budget: idle (no game -> nothing animating) gets the larger slice
-    t.eq(BES.slice_budget(), BES_BUDGET_IDLE, "idle frames get the larger slice")
+    -- frame-aware budget: what is left of the target frame after the game's own work
+    BES.game_cost = nil
+    t.eq(BES.slice_budget(), BES_BUDGET_BUSY, "no frame measured yet -> the default slice")
+    BES.note_frame(0.010, 0.002)                       -- the game itself took 8 ms
+    t.near(BES.game_cost, 0.008, "game cost = frame work minus our slice", 1e-12)
+    BES.think_mode = "balanced"
+    t.near(BES.slice_budget(), 1 / 60 - 0.008 - BES_FRAME_SAFETY, "balanced: the rest of a 60 fps frame", 1e-12)
+    BES.note_frame(0.004, 0)
+    t.ok(BES.game_cost > 0.0075, "a lighter frame lowers the estimate only slowly (decaying max)")
+    BES.note_frame(0.030, 0)
+    t.near(BES.game_cost, 0.030, "a heavier frame raises it at once", 1e-12)
+    t.eq(BES.slice_budget(), BES_BUDGET_MIN, "a slow PC still gets a minimum slice")
+    BES.game_cost = 0.005; BES.refresh_rate = 144; BES.think_mode = "smooth"
+    t.eq(BES.slice_budget(), BES_BUDGET_MIN, "smooth: a 144 Hz frame leaves only the minimum")
+    BES.think_mode = "fast"
+    t.eq(BES.slice_budget(), BES_BUDGET_IDLE, "fast: the old fixed slice")
+    BES.think_mode = "balanced"; BES.game_cost = nil; BES.refresh_rate = nil
     local AP = require("ui.autoplay")
     local was = AP.enabled
     AP.enabled = true
