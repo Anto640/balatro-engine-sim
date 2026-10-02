@@ -3,7 +3,7 @@
   "name": "Balatro Engine Sim",
   "display_name": "Engine Sim - Decision Assistant",
   "author": [
-    "kisala.dawid"
+    "Anto640"
   ],
   "description": "Recommends the best move in every situation (play, discard, shop, packs, skips) by measuring each option against your deck, and can play whole runs by itself (F11, auto-restart F6).",
   "prefix": "bes",
