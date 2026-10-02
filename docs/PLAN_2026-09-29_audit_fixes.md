@@ -18,6 +18,19 @@ every A/B after that should be judged in a world that behaves like the real game
   under-bought. Separator data (jo+jo_7): ante 4-6 deaths were offered xmult as often as reach-8 runs but entered
   ante 3 with half the capacity (7.0k vs 11.6k). Next: size the REACHABLE share (Overstock / early rerolls / packs
   all cost money the engine lacks at a1-a2).
+- **REACHABLE-SUPPLY sizing (2026-10-02, `0beb4b2`, paired n=160 vs `jo`).** Both channels given FREE:
+  `ostock` (Overstock owned from the first shop): progress +0.360 (p 0.046), sign 89/64 (p 0.052), reach-7 65 -> 80,
+  reach-8 44 -> 51, **wins 36 -> 34**. `reroll1` (one free reroll per shop to ante 3): progress +0.330 (p 0.044),
+  sign 88/63, reach-8 44 -> 47, **wins 36 -> 29**. Each recovers ~55% of `wide`'s progress but NONE of its wins,
+  and these are upper bounds (the real channels cost $5-10 at antes 1-2). Verdict: the early-supply engine change
+  (re-price Overstock / early rerolls) is NOT built -- even free, the reachable channels push deaths later without
+  converting to wins; `wide`'s wins need ~2 extra JOKER offers per shop, which no real channel supplies.
+- **`wide_early` (2026-10-02, `c07a22f`; extra jokers through ante 2 only) vs `jo`:** progress +0.302 (p 0.076),
+  sign 87/59 (p 0.025), wins 36 -> 41, reach-8 44 -> 52 (n.s.). Board capacity entering ante 3 is the SAME as `wide`
+  (13.3k vs jo 7.0k) but the lead fades by ante 5 (26.0k vs wide 29.5k). So the ante-1/2 window holds ~half of
+  `wide`'s progress and ~40% of its wins (+5 of +13); the rest needs extra choice in antes 3+. Together with
+  ostock/reroll1 (free, 0 wins): the shop-supply line is effectively exhausted for win rate -- the reachable share
+  is below an n=160 MDE. Next candidates: an early-income probe, or the live-vs-sim gap (advice quality).
 - **OVERNIGHT 2026-10-01 (autonomous; owner asleep).** Engine `mze` deployed. `mze_7` baseline DONE: 34/160 wins,
   reach-8 47 (vs bf_7: +0.062 p 0.15, sign 12/4 -- the two Mouth fixes together on fresh seeds).
   Live self-play 01:01-03:00 (overlapped with an 8-worker batch; FORCED share 12.6% vs 16.5% in the morning -- the

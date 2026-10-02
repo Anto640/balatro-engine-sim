@@ -391,6 +391,7 @@ end
 function Probe.extra_jokers(run, jokers)
   local p = run and run.probe
   if not (p and p.extra_jokers) then return end
+  if (run.ante or 1) > (p.extra_jokers_until or 8) then return end
   local Content = require("sim.content")   -- lazy: content requires this module
   run._wide_n = (run._wide_n or 0) + 1
   local rng = require("sim.world").lcg(((tonumber(run.seed) or 1) * 7919 + run._wide_n * 104729 + 17) % 2147483647 + 1)
@@ -607,6 +608,8 @@ Probe.CONFIGS = {
   expert_rich  = { policy = "expert", income_bonus = 100 },
   -- SHOP CEILING PROBES (2026-10-01, see Probe.extra_jokers / Probe.xgreedy)
   wide         = { extra_jokers = 2 },
+  -- `wide` restricted to antes 1-2: are its wins bought in the ante-1/2 window alone?
+  wide_early   = { extra_jokers = 2, extra_jokers_until = 2 },
   xgreedy      = { xgreedy_until = 5, xgreedy_want = 2, xgreedy_tier = 7 },
   -- REACHABLE-SUPPLY sizing (Phase 2 of the 2026-10-01 probe): how much of `wide` real channels can buy.
   -- `ostock` = Overstock owned from the first shop (+1 shop CARD slot; the engine sees it as owned, so the
