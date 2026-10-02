@@ -116,6 +116,23 @@ return function(t)
     t.ok(table.concat(found, "\n"):find("wait for it before acting"), "tooltip says to wait")
     Overlay.set_thinking(false, now)
     t.eq(Panel.content().nodes[1].nodes[2].nodes[1].config.text, "Advice", "back to Advice when the answer lands")
+
+    -- error indicator: Log.error reaches the panel through util/log's on_error hook
+    local Log = require("util.log")
+    local lvl, hook = Log.level, Log.on_error
+    Log.level = "off"   -- the listener fires even when the line itself is filtered
+    Log.on_error = function(msg) Overlay.add_error(msg, now, "12:34") end
+    t.eq(#Panel.label_row(), 1, "no error -> plain Engine label")
+    Log.error("shop advisor failed:", "boom")
+    Log.level, Log.on_error = lvl, hook
+    local lr = Panel.label_row()
+    t.eq(#lr, 3, "an error adds a red ! beside the label")
+    t.eq(lr[3].nodes[1].config.text, "!", "... the ! tag")
+    found = {}; walk(Panel.tooltip())
+    t.ok(table.concat(found, "\n"):find("12:34 shop advisor failed: boom", 1, true), "popup lists the error with its time")
+    now = now + Overlay.ERROR_SHOW_FOR + 1
+    t.eq(#Panel.label_row(), 1, "the indicator clears once the error is old")
+    Overlay.errors = {}
     _G.love = saved_love
 
     -- hidden (F9): a spacer-sized blank

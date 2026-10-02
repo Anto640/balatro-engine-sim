@@ -9,12 +9,17 @@ Log.level = "info" -- "debug" | "info" | "warn" | "error" | "off"
 
 local ORDER = { debug = 1, info = 2, warn = 3, error = 4, off = 5 }
 
+-- Optional listener for ERROR lines (the in-game panel shows them), called with the message text
+-- whatever Log.level is. A failing listener never breaks logging.
+Log.on_error = nil
+
 local function emit(level, ...)
-  if ORDER[level] < ORDER[Log.level] then return end
   local parts = { Log.PREFIX, "[" .. level:upper() .. "]" }
   for i = 1, select("#", ...) do
     parts[#parts + 1] = tostring(select(i, ...))
   end
+  if level == "error" and Log.on_error then pcall(Log.on_error, table.concat(parts, " ", 3)) end
+  if ORDER[level] < ORDER[Log.level] then return end
   print(table.concat(parts, " "))
 end
 

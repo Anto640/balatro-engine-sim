@@ -25,6 +25,26 @@ Overlay.state = {
 }
 -- Show "Thinking" only once it has lasted this long, so a quick answer doesn't flash the panel.
 Overlay.THINK_SHOW_AFTER = 0.15
+
+-- Engine errors (util/log on_error): the panel shows a red "!" while any is recent, the popup lists them.
+Overlay.errors = {}            -- newest last: { t = <seconds>, clock = "HH:MM", msg = "..." }
+Overlay.ERRORS_KEEP = 5
+Overlay.ERROR_SHOW_FOR = 600   -- seconds an error keeps the indicator lit
+
+function Overlay.add_error(msg, now, clock)
+  local e = Overlay.errors
+  e[#e + 1] = { t = now or 0, clock = clock or "", msg = tostring(msg) }
+  while #e > Overlay.ERRORS_KEEP do table.remove(e, 1) end
+end
+
+-- the errors still worth showing at time `now` (newest last)
+function Overlay.recent_errors(now)
+  local out = {}
+  for _, e in ipairs(Overlay.errors) do
+    if (now or 0) - e.t <= Overlay.ERROR_SHOW_FOR then out[#out + 1] = e end
+  end
+  return out
+end
 Overlay.action  = nil -- the raw best action (the in-world highlights read its cards / target ids)
 Overlay.visible = true
 

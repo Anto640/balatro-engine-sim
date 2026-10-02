@@ -994,6 +994,10 @@ end
 if _G.G and _G.SMODS then
   if HUDPanel then HUDPanel.autoplay = Autoplay; HUDPanel.install() end   -- status row: self-play / auto-restart
   if Highlights then Highlights.autoplay = Autoplay end                   -- tags reuse the self-player's lookups
+  -- engine errors light a red "!" on the panel (they used to reach only the log)
+  if Overlay and Overlay.add_error then
+    Log.on_error = function(msg) Overlay.add_error(msg, clock(), os.date("%H:%M")) end
+  end
   if FastMode then
     FastMode.autoplay = Autoplay
     if HUDPanel then HUDPanel.fast = FastMode end                        -- tooltip says when fast mode is on

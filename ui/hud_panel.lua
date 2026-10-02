@@ -137,6 +137,16 @@ function Panel.tags()
   return out
 end
 
+-- "Engine", plus a red "!" while an engine error is recent (details in the hover popup).
+function Panel.label_row()
+  local nodes = { text("Engine", 0.42) }
+  if #Overlay.recent_errors(Panel.now()) > 0 then
+    nodes[#nodes + 1] = { n = G.UIT.B, config = { w = 0.06, h = 0.1 } }
+    nodes[#nodes + 1] = tag("!", G.C.RED, 0.32)
+  end
+  return nodes
+end
+
 -- The panel's single child (rebuilt whenever the advice changes).
 function Panel.content()
   if not Overlay.visible then
@@ -166,7 +176,7 @@ function Panel.content()
   elseif auto then mode, mode_col = "Auto", G.C.GREEN end
   return { n = G.UIT.C, config = { align = "cm", padding = 0.1 }, nodes = {
     { n = G.UIT.C, config = { align = "cm", minw = 1.3 }, nodes = {
-      { n = G.UIT.R, config = { align = "cm", maxw = 1.3 }, nodes = { text("Engine", 0.42) } },
+      { n = G.UIT.R, config = { align = "cm", maxw = 1.3 }, nodes = Panel.label_row() },
       { n = G.UIT.R, config = { align = "cm", maxw = 1.3 }, nodes = { text(mode, 0.42, mode_col) } },
     } },
     { n = G.UIT.C, config = { align = "cm", minw = 3.3, minh = 0.7, r = 0.1, padding = 0.05,
@@ -204,6 +214,11 @@ function Panel.tooltip()
   if #stats > 0 then para(table.concat(stats, "   "), G.C.BLUE) end
   if Panel.fast and Panel.fast.engaged and Panel.fast.engaged() then
     para("Fast mode: animations are skipped while self-play runs.", G.C.GREEN)
+  end
+  local errs = Overlay.recent_errors(Panel.now())
+  if #errs > 0 then
+    para("Engine errors (full text in the Lovely log):", G.C.RED)
+    for i = #errs, 1, -1 do para(errs[i].clock .. " " .. clip(errs[i].msg, 140), G.C.RED) end
   end
   if #lines == 0 then para("No recommendation yet.") end
 
@@ -275,7 +290,7 @@ local SIG_FIELDS = { "headline", "move", "reason", "reorder", "conf", "ev", "win
 local function signature()
   local ap, st = Panel.autoplay, Overlay.state
   local parts = { tostring(Overlay.visible), tostring(ap and ap.enabled), tostring(ap and ap.auto_restart),
-    tostring(thinking()) }
+    tostring(thinking()), tostring(#Overlay.recent_errors(Panel.now())), tostring(#Overlay.errors > 0 and Overlay.errors[#Overlay.errors].t) }
   for _, k in ipairs(SIG_FIELDS) do parts[#parts + 1] = tostring(st[k]) end
   return table.concat(parts, "\31")
 end
