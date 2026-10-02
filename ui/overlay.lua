@@ -81,12 +81,23 @@ local VERB = {
 }
 local BUYS = { BUY_PACK = true, BUY_JOKER = true, BUY_CONSUMABLE = true, BUY_VOUCHER = true, SELL_TO_BUY = true }
 
--- Populate display state from a RankedActionList (engine output).
-function Overlay.set(ranked)
+-- 1234567 -> "1,234,567"; >= 10 million -> "12.3M" (keeps the panel tag short)
+function Overlay.fmt_num(n)
+  n = math.floor((n or 0) + 0.5)
+  if n >= 1e7 then return string.format("%.1fM", n / 1e6) end
+  local s = tostring(n)
+  local out = s:reverse():gsub("(%d%d%d)", "%1,"):reverse()
+  return (out:gsub("^,", ""))
+end
+
+-- Populate display state from a RankedActionList (engine output). `gs` (optional) is the state it
+-- was decided on: for a PLAY it gives the chips still needed, so the panel can show the prediction.
+function Overlay.set(ranked, gs)
   local s = Overlay.state
   s.version = (s.version or 0) + 1
   s.cost, s.banked, s.conf_pct, s.sim_backed = nil, nil, nil, false
   s.ev_pct, s.ev_label, s.win_pct, s.run_pct = nil, nil, nil, nil
+  s.score_pred, s.score_need = nil, nil
   s.reorder = ""
   if not ranked or not ranked.best then
     Overlay.action = nil
@@ -150,6 +161,12 @@ function Overlay.set(ranked)
     elseif o.gain and o.gain > 0 then tail = string.format(" (+%d)", o.gain)
     else tail = " (safer)" end
     s.reorder = "Reorder: " .. table.concat(parts, ", ") .. tail
+  end
+  -- predicted score of this play vs the chips still needed this blind (the engine's expected score)
+  local b = gs and gs.blind
+  if a.type == "PLAY" and a.score and b and (b.target_chips or 0) > 0 then
+    local need = math.max(0, (b.target_chips or 0) - (b.chips_scored or 0))
+    if need > 0 then s.score_pred, s.score_need = a.score, need end
   end
   s.reason = a.reason or ""
 end

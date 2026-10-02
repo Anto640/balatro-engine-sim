@@ -258,7 +258,7 @@ function BES.evaluate(with_sim, gs)
         end
       end
       BES.last = { gs = gs, ranked = ranked, shop = true }
-      if Overlay then Overlay.set(ranked) end
+      if Overlay then Overlay.set(ranked, gs) end
       if HUDPanel then HUDPanel.refresh() end
       Log.info(ShopAdvisor.summary(ranked))
       return ranked
@@ -312,7 +312,7 @@ function BES.evaluate(with_sim, gs)
     return
   end
   BES.last = { gs = gs, ranked = ranked, sim = sim }
-  if Overlay then Overlay.set(ranked) end
+  if Overlay then Overlay.set(ranked, gs) end
   if HUDPanel then HUDPanel.refresh() end
   Log.info(Decision.summary(ranked))
   return ranked
@@ -500,7 +500,7 @@ function BES.refine_for(gs)
         local ok, ranked = pcall(Decision.decide, gs, { sim = sim })
         if ok and ranked then
           BES.last = { gs = gs, ranked = ranked, sim = sim }
-          if Overlay then Overlay.set(ranked) end
+          if Overlay then Overlay.set(ranked, gs) end
           if HUDPanel then HUDPanel.refresh() end
           Log.info(Decision.summary(ranked))
         else

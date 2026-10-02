@@ -78,6 +78,31 @@ return function(t)
     t.eq(table.concat(tags, ","), "Conf 82%,$10", "tags: confidence then cost")
     t.eq(body[2].nodes[1].config.colour, G.C.GREEN, "high confidence is green")
 
+    -- predicted score vs the chips still needed (PLAY only)
+    t.eq(Overlay.fmt_num(1234567), "1,234,567", "thousands separators")
+    t.eq(Overlay.fmt_num(999), "999", "small numbers plain")
+    t.eq(Overlay.fmt_num(23456789), "23.5M", "very large numbers shortened")
+    local blind_gs = { blind = { target_chips = 3300, chips_scored = 300 } }
+    Overlay.set({ best = { type = "PLAY", cards = {}, score = 4200, confidence = 0.8 } }, blind_gs)
+    local function tag_texts(c2)
+      local o = {}
+      for _, n in ipairs((c2.nodes[2].nodes[2] or { nodes = {} }).nodes) do
+        if n.n == UIT.C then o[#o + 1] = { n.nodes[1].config.text, n.config.colour } end
+      end
+      return o
+    end
+    local tt = tag_texts(Panel.content())
+    t.eq(tt[1] and tt[1][1], "~4,200 / 3,000", "score tag: predicted vs still needed")
+    t.eq(tt[1] and tt[1][2], G.C.GREEN, "green when the play clears")
+    Overlay.set({ best = { type = "PLAY", cards = {}, score = 1800, confidence = 0.8 } }, blind_gs)
+    tt = tag_texts(Panel.content())
+    t.eq(tt[1] and tt[1][2], G.C.RED, "red when it falls short")
+    Overlay.set({ best = { type = "DISCARD", cards = {}, score = 1800, confidence = 0.8 } }, blind_gs)
+    tt = tag_texts(Panel.content())
+    t.ok(not (tt[1] and tt[1][1]:find("/")), "no score tag for a discard")
+    Overlay.set({ best = { type = "BUY_JOKER", target = { name = "Blueprint" }, cost = 10,
+      confidence = 0.82, expected_value = 0.12, reason = "Copies your best joker — big gain." } })
+
     -- self-play status: label + tooltip badges
     Panel.autoplay = { enabled = true, auto_restart = false }
     c = Panel.content()

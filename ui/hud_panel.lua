@@ -130,6 +130,11 @@ function Panel.tags()
     if #out > 0 then out[#out + 1] = { n = G.UIT.B, config = { w = 0.08, h = 0.1 } } end
     out[#out + 1] = node
   end
+  -- predicted score vs the chips still needed: green = this play clears, red = it falls short
+  if st.score_pred and st.score_need then
+    add(tag("~" .. Overlay.fmt_num(st.score_pred) .. " / " .. Overlay.fmt_num(st.score_need),
+      st.score_pred >= st.score_need and G.C.GREEN or G.C.RED))
+  end
   if st.conf_pct then add(tag(string.format("Conf %d%%", st.conf_pct), conf_colour(st.conf_pct))) end
   if st.win_pct then add(tag(string.format("Win %d%%", st.win_pct), G.C.BLUE)) end
   if st.cost then add(tag(string.format("$%d", st.cost), G.C.MONEY))
@@ -213,6 +218,12 @@ function Panel.tooltip()
       .. "The move below is the previous one.", G.C.FILTER)
   end
   para(st.reason)
+  if st.score_pred and st.score_need then
+    local clears = st.score_pred >= st.score_need
+    para(string.format("Predicted score ~%s, %s still needed: %s.", Overlay.fmt_num(st.score_pred),
+      Overlay.fmt_num(st.score_need), clears and "clears the blind" or "falls short"),
+      clears and G.C.GREEN or G.C.RED)
+  end
   para(st.reorder, G.C.FILTER)
   local stats = {}
   for _, s in ipairs({ st.conf, st.ev, st.winp }) do if s and s ~= "" then stats[#stats + 1] = s end end
@@ -291,7 +302,8 @@ end
 -- ---- live behaviour -----------------------------------------------------------------------------
 
 -- Content-based, so the periodic re-set of IDENTICAL advice never recalculates the HUD.
-local SIG_FIELDS = { "headline", "move", "reason", "reorder", "conf", "ev", "winp", "cost", "banked", "conf_pct", "win_pct" }
+local SIG_FIELDS = { "headline", "move", "reason", "reorder", "conf", "ev", "winp", "cost", "banked", "conf_pct", "win_pct",
+  "score_pred", "score_need" }
 local function signature()
   local ap, st = Panel.autoplay, Overlay.state
   local parts = { tostring(Overlay.visible), tostring(ap and ap.enabled), tostring(ap and ap.auto_restart),
