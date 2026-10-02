@@ -62,16 +62,29 @@ thing **headless-testable**. See the Layout section in `README.md` for the per-f
   take minutes): `luajit tests/runner_sim.lua` (`test_world`, `test_driver`, `test_consumables`, `test_content_rates`, …). `luajit`
   is installed and ~2.5x faster — prefer it for anything that runs the `sim/` forward
   simulator (`World.play_blind` / `Driver.run`).
-- **Deploy to the live game (manual copy — the repo is NOT the install):** since 2026-10-01 the game runs through
-  **r2modman** (Balatro Mod Manager was shut down). The running mod lives in the r2modman profile at
-  `%APPDATA%/r2modmanPlus-local/Balatro/profiles/Default/mods/balatroenginesim/`. After editing, copy changed
-  files there or the game won't see them. Green tests ≠ works in-game. r2modman launches with
-  `steam.exe -applaunch 2379780 --mod-dir "<profile>/mods"`; a plain Steam launch (no `--mod-dir`) makes Lovely fall
-  back to the OLD `%APPDATA%/Balatro/Mods/` folder and its stale copy of the mod.
-  Verify by diffing the whole tree against the install with `diff -q --strip-trailing-cr` (the checkout is CRLF,
-  the install LF, so a byte compare reports false differences). Keep backups outside `Mods/`: Steamodded loads any
-  copy inside it as a second, conflicting instance of the mod. The game loads code only at startup, and only the
-  owner starts or restarts Balatro.
+- **Deploy to the live game — `bash tools/deploy.sh` (the repo is NOT the install).**
+  Green tests ≠ works in-game. `tools/deploy.sh --check` reports drift and writes nothing.
+  **Stop hand-copying the files you edited** — that is what silently drifted the install by SIX
+  files once, and it also cannot see DELETIONS: `ui/hud_inject.lua` became `ui/hud_panel.lua`, and
+  a leftover `.lua` still gets loaded. The script mirrors the whole tracked tree instead.
+  Since 2026-10-01 the game runs through **r2modman** (Balatro Mod Manager was shut down), so there
+  are **TWO** install targets and `deploy.sh` keeps both current:
+  1. `%APPDATA%/r2modmanPlus-local/Balatro/profiles/Default/mods/balatroenginesim/` — what an
+     r2modman launch loads (`steam.exe -applaunch 2379780 --mod-dir "<profile>/mods"`), because
+     r2modman points Lovely, and therefore `SMODS.MODS_DIR`, at the profile's `mods/` dir;
+  2. `%APPDATA%/Balatro/Mods/balatroenginesim/` — the OLD folder Lovely falls back to on a plain
+     Steam launch with no `--mod-dir`. It is not harmless dead weight: left behind it makes a plain
+     launch run STALE code silently. `--no-legacy` skips it.
+  The mod is registered as a **local r2modman mod**, so a deploy also rebuilds r2modman's own file
+  manifest (`tools/r2modman_state.py`, called by `deploy.sh`, and it tracks `your_mod.json`'s
+  version) — copying files without it leaves r2modman's enable/disable/uninstall acting on a stale
+  list. ⚠ r2modman ships a far newer **Steamodded 26.829.0** (vs BMM's `1.0.0~BETA-1620a`); the mod
+  is insulated because `SMODS.load_file` is the only Steamodded API it uses, but suspect that first
+  if the panel never appears.
+  Verify drift with `diff -q --strip-trailing-cr` (the checkout is CRLF, the install LF, so a byte
+  compare reports false differences — `deploy.sh` already does this). Keep backups outside `Mods/`:
+  Steamodded loads any copy inside it as a second, conflicting instance of the mod. The game loads
+  code only at startup, and only the owner starts or restarts Balatro.
 - **Live logs** (save folder `%APPDATA%/Balatro/`): `bes_runs.jsonl` (run telemetry), `bes_fixtures.jsonl` (full `gs` per
   decision), `bes_autoplay.log` (self-player actions and failures). Crashes: the Lovely log in the profile's `mods/lovely/log/`.
 - **In-game debug keys:** `F5` FLAG A MISPLAY (saves the last ~12 decisions to `bes_flagged.jsonl`); `F7` dump owned jokers' live `ability` tables (to the console
