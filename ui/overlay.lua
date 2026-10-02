@@ -20,7 +20,11 @@ Overlay.state = {
   cost = nil, banked = nil, conf_pct = nil, sim_backed = false,
   ev_pct = nil, ev_label = nil, win_pct = nil, run_pct = nil,
   version  = 0,       -- bumped on every change; the panel rebuilds when it moves
+  -- the engine is working out the advice for the live state (main.lua BES.think_begin / think_end)
+  thinking = false, thinking_since = 0, progress = 0,
 }
+-- Show "Thinking" only once it has lasted this long, so a quick answer doesn't flash the panel.
+Overlay.THINK_SHOW_AFTER = 0.15
 Overlay.action  = nil -- the raw best action (the in-world highlights read its cards / target ids)
 Overlay.visible = true
 
@@ -117,6 +121,19 @@ function Overlay.set(ranked)
     s.reorder = "Reorder: " .. table.concat(parts, ", ") .. tail
   end
   s.reason = a.reason or ""
+end
+
+function Overlay.set_thinking(on, now)
+  local s = Overlay.state
+  s.thinking = on and true or false
+  s.thinking_since = now or 0
+  s.progress = 0
+end
+
+-- Is the thinking state worth SHOWING at time `now`? (past the anti-flash delay)
+function Overlay.show_thinking(now)
+  local s = Overlay.state
+  return s.thinking and ((now or 0) - (s.thinking_since or 0)) >= Overlay.THINK_SHOW_AFTER
 end
 
 -- Replace only the reason line (a transient status such as "Evaluating pack…").

@@ -1,0 +1,95 @@
+-- tests/test_scheduler.lua
+-- The live scheduler (main.lua): the main recommendation is TIME-SLICED (owner 2026-10-02: animations froze
+-- while it computed). Loads main.lua headlessly (its in-game wiring is gated on G/SMODS) with a fake clock and
+-- drives BES.begin_eval / BES.pump_job with a zero budget, so every slice boundary hands the frame back.
+
+local DE = require("engine.decision_engine")
+local GS = require("model.game_state")
+local card = GS.card
+
+return function(t)
+  local saved = { love = _G.love, samples = _G.BES_SAMPLES }
+  local T = 100
+  _G.love = { timer = { getTime = function() return T end } }
+  local Log = require("util.log")
+  local saved_level = Log.level
+  local HandEval = require("engine.hand_eval")
+  local Overlay = require("ui.overlay")
+
+  local ok, err = pcall(function()
+    local BES = dofile(package.searchpath("main", package.path))
+    Log.level = "off"
+    _G.BES_SAMPLES = 6                      -- keep the play-state refinement (survival sim) quick
+
+    local RANKS = { "Ace", "King", "Queen", "Jack", "10", "9", "7", "4", "2" }
+    local SUITS = { "Spades", "Hearts", "Clubs", "Diamonds" }
+    local function state(offset)
+      local hand = {}
+      for i = 1, 8 do
+        hand[i] = card{ id = i + offset, rank = RANKS[((i + offset) % #RANKS) + 1], suit = SUITS[(i % 4) + 1] }
+      end
+      return GS.new{ hand = hand, run = { hand_levels = {}, hand_size = 8 },
+        blind = { target_chips = 600, chips_scored = 0, hands_left = 4, discards_left = 3, played_hand_types = {} } }
+    end
+    local function ids(a)
+      local o = {}
+      for _, c in ipairs((a and a.cards) or {}) do o[#o + 1] = c.id end
+      return (a and a.type or "nil") .. ":" .. table.concat(o, ",")
+    end
+
+    -- 1. the main answer is spread over many frames, and equals the synchronous decide
+    local want = ids(DE.decide(state(0), { sim = nil }).best)
+    BES.last = nil
+    BES.begin_eval(state(0), nil)
+    t.ok(BES.thinking ~= nil and Overlay.state.thinking, "thinking starts with the evaluation")
+    local pumps, first, prog_ok, last_prog = 0, nil, true, 0
+    while BES.job and pumps < 200000 do
+      BES.pump_job(0)
+      pumps = pumps + 1
+      BES.think_progress()
+      local p = Overlay.state.progress or 0
+      if BES.thinking then
+        if p < last_prog - 1e-9 or p > 0.97 + 1e-9 then prog_ok = false end
+        last_prog = p
+      end
+      if not first and not BES.thinking then first = { pumps = pumps, best = ids(BES.last and BES.last.ranked.best) } end
+    end
+    t.ok(first ~= nil, "thinking ends")
+    t.ok(first and first.pumps > 10, "main recommendation spread over many frames (" .. tostring(first and first.pumps) .. ")")
+    t.eq(first and first.best, want, "sliced main answer == synchronous decide")
+    t.ok(prog_ok, "progress bar only rises and stays below full while thinking")
+    t.ok(not Overlay.state.thinking, "panel leaves thinking once the answer lands")
+    t.ok(BES.EXPECT.blind ~= 2700, "the expected-work estimate learns from a finished decision")
+
+    -- 2. a newer state replaces an in-flight job: the stale answer is never published
+    BES.last = nil
+    local a, b = state(0), state(20)
+    BES.begin_eval(a, nil)
+    for _ = 1, 5 do BES.pump_job(0) end
+    BES.begin_eval(b, nil)
+    local leaked = false
+    local n = 0
+    while BES.job and n < 200000 do
+      BES.pump_job(0); n = n + 1
+      if BES.last and BES.last.gs == a then leaked = true end
+    end
+    t.ok(not leaked, "the replaced job never publishes")
+    t.ok(BES.last and BES.last.gs == b, "the newer state's advice is what lands")
+
+    -- 3. safety valve: a thinking flag with no job must not stall the self-player
+    BES.thinking = { kind = "blind", t0 = T, units0 = BES.work_units }
+    BES.job = nil
+    T = T + 3
+    BES.think_progress()
+    t.ok(BES.thinking == nil, "stale thinking flag cleared without a job")
+
+    -- 4. slice budget: idle (no game -> nothing animating) gets the larger slice
+    t.eq(BES.slice_budget(), BES_BUDGET_IDLE, "idle frames get the larger slice")
+  end)
+  t.ok(ok, "scheduler suite ran without error: " .. tostring(err))
+
+  HandEval.set_yield(nil)              -- main.lua installs its GC-step hook at load; leave the engine pure
+  Log.level = saved_level
+  _G.love, _G.BES_SAMPLES = saved.love, saved.samples
+  Overlay.set_thinking(false, 0); Overlay.set(nil)
+end

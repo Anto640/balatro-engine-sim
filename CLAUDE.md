@@ -235,6 +235,11 @@ NOTE: `xmult_scaling` jokers ARE xmult — use `JokerData.is_xmult()`.
   samples MUST use a **per-state seeded RNG** (see the `lcg`/`*_seed` helpers in
   `shop_advisor`, `decision_engine`, `pack_open_advisor`, `search`). Using global
   `math.random` makes the panel **flicker** between ticks — treat that as a bug.
+- **Live evaluation is time-sliced** (2026-10-02): every recommendation runs in a coroutine that yields at
+  `HandEval`'s slice boundaries (`HandEval.yield_tick()`, one per 32 scored candidates), so the game keeps
+  animating while the panel shows "Thinking". A NEW heavy loop that scores without going through
+  `each_subset` must call `HandEval.yield_tick()`, and never score inside a C callback (a `table.sort`
+  comparator, `gsub`): a yield there errors live. Check with `tools/slice_check.lua` / `tools/yield_gaps.lua`.
 - **Live-key mismatches are silent zeros.** A joker's in-game center key can differ from
   our catalogue key — the base game itself misspells some (Gluttonous is
   `j_gluttenous_joker`). A mismatch means the joker scores **zero** everywhere. The mod

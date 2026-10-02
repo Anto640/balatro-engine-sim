@@ -94,6 +94,34 @@ local function auto_on()
   return ap and ap.enabled and true or false
 end
 
+function Panel.now() return (love and love.timer and love.timer.getTime and love.timer.getTime()) or 0 end
+local function thinking() return Overlay.show_thinking(Panel.now()) end
+
+-- the "Thinking" label colour: one table, re-tinted in place every frame (a soft orange pulse) -- the
+-- text node draws whatever this table holds, so the pulse needs no rebuild / recalculate
+Panel.pulse = nil
+local function pulse_colour()
+  if not Panel.pulse then
+    local f = G.C.FILTER
+    Panel.pulse = { f[1], f[2], f[3], f[4] or 1 }
+  end
+  return Panel.pulse
+end
+function Panel.tick_pulse(t)
+  local p, f, w = pulse_colour(), G.C.FILTER, G.C.WHITE
+  local k = 0.25 + 0.25 * math.sin(t * 5)          -- 0..0.5 toward white
+  for i = 1, 3 do p[i] = f[i] + (w[i] - f[i]) * k end
+end
+
+-- the thinking row: the game's own progress bar (UIT progress_bar, drawn live from Overlay.state.progress)
+local function progress_bar()
+  return { n = G.UIT.R, config = { align = "cm", padding = 0.04 }, nodes = {
+    { n = G.UIT.C, config = { align = "cm", minw = 3.0, minh = 0.14, r = 0.05, colour = G.C.BLACK,
+        progress_bar = { max = 1, ref_table = Overlay.state, ref_value = "progress",
+          empty_col = G.C.BLACK, filled_col = G.C.FILTER } }, nodes = {} },
+  } }
+end
+
 -- The tags under the headline: confidence, win chance, and the money involved.
 function Panel.tags()
   local st, out = Overlay.state, {}
@@ -115,24 +143,30 @@ function Panel.content()
   end
   local st = Overlay.state
   local auto = auto_on()
+  local think = thinking()
   local has_move = st.headline and st.headline ~= "" and st.headline ~= "-"
-  -- no move yet: show the status line ("Waiting for the next hand…") greyed in the headline slot
+  -- no move yet: show the status line ("Waiting for the next hand…") greyed in the headline slot.
+  -- Thinking: the previous move stays, greyed, so the panel doesn't jump; the bar replaces the tags.
   local head = has_move and st.headline or clip(st.reason ~= "" and st.reason or "No recommendation.", 44)
-  local tags = Panel.tags()
+  if think and not has_move then head = "Working it out..." end
+  local tags = think and {} or Panel.tags()
   local body = {
     { n = G.UIT.R, config = { align = "cm", maxw = 3.2 }, nodes = {
-      text(head, has_move and 0.36 or 0.3, has_move and G.C.WHITE or G.C.UI.TEXT_INACTIVE),
+      text(head, has_move and 0.36 or 0.3, (has_move and not think) and G.C.WHITE or G.C.UI.TEXT_INACTIVE),
     } },
   }
-  if #tags > 0 then
+  if think then
+    body[#body + 1] = progress_bar()
+  elseif #tags > 0 then
     body[#body + 1] = { n = G.UIT.R, config = { align = "cm", maxw = 3.2, padding = 0.03 }, nodes = tags }
   end
+  local mode, mode_col = "Advice", G.C.UI.TEXT_LIGHT
+  if think then mode, mode_col = "Thinking", pulse_colour()
+  elseif auto then mode, mode_col = "Auto", G.C.GREEN end
   return { n = G.UIT.C, config = { align = "cm", padding = 0.1 }, nodes = {
     { n = G.UIT.C, config = { align = "cm", minw = 1.3 }, nodes = {
       { n = G.UIT.R, config = { align = "cm", maxw = 1.3 }, nodes = { text("Engine", 0.42) } },
-      { n = G.UIT.R, config = { align = "cm", maxw = 1.3 }, nodes = {
-        text(auto and "Auto" or "Advice", 0.42, auto and G.C.GREEN or G.C.UI.TEXT_LIGHT),
-      } },
+      { n = G.UIT.R, config = { align = "cm", maxw = 1.3 }, nodes = { text(mode, 0.42, mode_col) } },
     } },
     { n = G.UIT.C, config = { align = "cm", minw = 3.3, minh = 0.7, r = 0.1, padding = 0.05,
         colour = G.C.DYN_UI.BOSS_DARK }, nodes = body },
@@ -157,6 +191,10 @@ function Panel.tooltip()
         { n = G.UIT.T, config = { text = l, scale = TIP_SCALE, colour = colour or dark } },
       } }
     end
+  end
+  if thinking() then
+    para("Working out the best move for what's on screen now - wait for it before acting. "
+      .. "The move below is the previous one.", G.C.FILTER)
   end
   para(st.reason)
   para(st.reorder, G.C.FILTER)
@@ -232,7 +270,8 @@ end
 local SIG_FIELDS = { "headline", "move", "reason", "reorder", "conf", "ev", "winp", "cost", "banked", "conf_pct", "win_pct" }
 local function signature()
   local ap, st = Panel.autoplay, Overlay.state
-  local parts = { tostring(Overlay.visible), tostring(ap and ap.enabled), tostring(ap and ap.auto_restart) }
+  local parts = { tostring(Overlay.visible), tostring(ap and ap.enabled), tostring(ap and ap.auto_restart),
+    tostring(thinking()) }
   for _, k in ipairs(SIG_FIELDS) do parts[#parts + 1] = tostring(st[k]) end
   return table.concat(parts, "\31")
 end
@@ -293,6 +332,7 @@ end
 
 local function on_frame(e)
   if not e.bes_hooked then e.hover = hover; e.bes_hooked = true end
+  if Overlay.state.thinking then Panel.tick_pulse(Panel.now()) end
   local sig = signature()
   if sig ~= e.config.bes_sig then
     e.config.bes_sig = sig

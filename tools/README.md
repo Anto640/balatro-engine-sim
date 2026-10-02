@@ -74,6 +74,13 @@ Almost everything here reads **existing** telemetry and costs nothing to run. On
 | `envelope.lua` | the reachability envelope over several policies — ⚠ read it as a **noise** measure, never as an oracle |
 | `replay_states.lua` / `replay_lib.lua` / `extract_states.lua` | replay a fixed corpus of in-blind decision states under the current engine |
 
+## Live smoothness (the time-sliced evaluation)
+
+| tool | question |
+|---|---|
+| **`yield_gaps.lua`** | how long does each live recommendation take, and how long can it run between slice boundaries (= the worst animation stutter)? `luajit tools/yield_gaps.lua [--per N]` over the newest recorded decisions per kind. 2026-10-02: shop ~5 s (max 10 s) total; gap p99 3-6 ms, max ~50 ms |
+| **`slice_check.lua`** | is time-sliced advice identical to synchronous advice, with no yield inside a C call? Run it after touching any engine loop; exit 1 on a mismatch |
+
 ---
 
 ## Two habits worth keeping

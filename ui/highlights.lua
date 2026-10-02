@@ -134,6 +134,9 @@ local function active(last)
   local AP = H.autoplay
   if not (Overlay.visible and AP and AP._find_card and last and last.ranked and last.ranked.best) then return nil end
   if last.provisional then return nil end
+  -- never point at a stale move (same anti-flash delay as the panel, so a quick answer doesn't blink the tags)
+  local now = (love and love.timer and love.timer.getTime and love.timer.getTime()) or 0
+  if Overlay.show_thinking(now) then return nil end
   if AP.in_transition and AP.in_transition(G) then return nil end
   local ch = AP._channel(G)
   local best = last.ranked.best

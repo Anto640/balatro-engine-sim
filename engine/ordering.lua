@@ -62,7 +62,7 @@ local function permute(list, visit)
   local n = #list
   local a = copy(list)
   local function rec(k)
-    if k > n then visit(a); return end
+    if k > n then visit(a); HandEval.yield_tick(); return end
     for i = k, n do
       a[k], a[i] = a[i], a[k]
       rec(k + 1)

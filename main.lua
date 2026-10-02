@@ -103,7 +103,7 @@ BES.last = nil
 -- reclaimed as it is produced. Pure: it changes no decision, only when memory is freed. The
 -- background sim overrides YIELD with coroutine.yield during its own resumes (see pump_job),
 -- which restores this stepper afterwards.
-BES.gc_yield = function() collectgarbage("step") end
+BES.gc_yield = function(light) if not light then collectgarbage("step") end end   -- light = mid-enumeration tick
 if HandEval and HandEval.set_yield then HandEval.set_yield(BES.gc_yield) end
 
 -- Bound the Lua heap after an evaluation. Step normally (cheap, non-stuttering), but once
@@ -327,9 +327,58 @@ end
 -- the deal churn never completes a wasted rollout -- only the SETTLED hand's sim
 -- finishes, then patches calibrated win/draw probabilities onto the panel.
 
-BES_SIM_BUDGET = 0.003   -- max seconds of background work per frame
+-- 2026-10-02 (owner: "the animations freeze midway while it's calculating"): the MAIN recommendation is now
+-- time-sliced too. It used to run synchronously on every state change -- a shop ~5 s (up to 10 s), a hand up to
+-- ~7 s -- holding the frame, so the game's own animations froze mid-way. Now BES.begin_eval runs it in the same
+-- coroutine job as the refinement, pumped each frame; the engine's slice boundaries (HandEval YIELD, one per 32
+-- scored candidates) keep each slice to a few ms (tools/yield_gaps.lua: p99 3-6 ms). The advice is unchanged --
+-- slicing affects only WHEN the work runs -- and the panel shows "Thinking" with a progress bar meanwhile.
+BES_BUDGET_BUSY = 0.006  -- engine seconds per frame while the game is animating (keeps animations smooth)
+BES_BUDGET_IDLE = 0.020  -- ... while the screen is still (finish sooner; nothing moving to stutter)
+BES_SIM_BUDGET = BES_BUDGET_BUSY   -- (legacy name)
 BES_TRANSITION_MAX = 6   -- seconds a mid-animation hold may last before the state is treated as settled
 BES.job = nil            -- in-flight background job: { thread, gs, sig, finish }
+BES.work_units = 0       -- slice-boundary count (progress measure for the thinking bar)
+-- expected work units per decision kind, learned as an EMA of finished decisions (seeded from tools/yield_gaps.lua)
+BES.EXPECT = { blind = 2700, shop = 9400, pack = 2500, skip = 40 }
+BES.thinking = nil       -- { kind, t0, units0 } while the main recommendation for the live state is being worked out
+
+local function clock() return (love and love.timer and love.timer.getTime()) or os.clock() end
+
+function BES.think_begin(kind)
+  BES.thinking = { kind = kind, t0 = clock(), units0 = BES.work_units }
+  if Overlay and Overlay.set_thinking then Overlay.set_thinking(true, clock()) end
+end
+-- `learn`: a decision that ran to completion updates the expected-work estimate for its kind
+function BES.think_end(learn)
+  local th = BES.thinking
+  if not th then return end
+  local used = BES.work_units - th.units0
+  if learn and used > 0 then BES.EXPECT[th.kind] = 0.7 * (BES.EXPECT[th.kind] or used) + 0.3 * used end
+  BES.thinking = nil
+  if Overlay and Overlay.set_thinking then Overlay.set_thinking(false, clock()) end
+end
+-- per frame: the progress bar fills toward the learned expectation (capped below full until the answer lands)
+function BES.think_progress()
+  local th = BES.thinking
+  if not th then return end
+  -- safety valve: the self-player waits on BES.thinking, so a flag left set with no job must never stall it
+  if not BES.job and clock() - th.t0 > 2 then BES.think_end(false); return end
+  if not Overlay then return end
+  local exp = BES.EXPECT[th.kind] or 1000
+  Overlay.state.progress = math.min(0.97, (BES.work_units - th.units0) / math.max(1, exp))
+end
+
+-- Is the game animating? (a blocking event queued in the base queue -- dealing, scoring, the shop sliding in --
+-- or a mid-action transition). Non-blocking events are background loops and don't count.
+function BES.animating()
+  local G = _G.G
+  if Autoplay and Autoplay.in_transition and Autoplay.in_transition(G) then return true end
+  local q = G and G.E_MANAGER and G.E_MANAGER.queues and G.E_MANAGER.queues.base
+  if q then for _, ev in ipairs(q) do if ev.blocking ~= false then return true end end end
+  return false
+end
+function BES.slice_budget() return BES.animating() and BES_BUDGET_BUSY or BES_BUDGET_IDLE end
 
 -- Build + push the overlay action for a pack recommendation (shared by the cheap
 -- instant pass and the measured background refine).
@@ -436,13 +485,12 @@ function BES.start_job(gs, sig, body, finish)
   BES.job = { gs = gs, sig = sig, finish = finish, thread = coroutine.create(body) }
 end
 
--- Arm the right background refinement for the current state: the survival sim for
--- a play state, the measured pack valuation for an open pack, nothing otherwise.
-function BES.arm_job(gs, sig)
+-- The background refinement for a state, as (body, finish): the survival sim for a play
+-- state, the measured pack valuation for an open pack, nil otherwise.
+function BES.refine_for(gs)
   if is_play_state(gs) and Simulation then
     local rng = bes_lcg(sim_seed(gs))
-    BES.start_job(gs, sig,
-      function() return Simulation.simulate(gs, { samples = BES_SAMPLES, rng = rng, yield = coroutine.yield }) end,
+    return function() return Simulation.simulate(gs, { samples = BES_SAMPLES, rng = rng, yield = coroutine.yield }) end,
       function(sim)
         local ok, ranked = pcall(Decision.decide, gs, { sim = sim })
         if ok and ranked then
@@ -453,16 +501,48 @@ function BES.arm_job(gs, sig)
         else
           Log.error("decide(+sim) failed:", ranked)
         end
-      end)
+      end
   elseif gs.pack and PackOpenAdvisor then
-    -- measured pack ranking (best_play sampling) -> time-sliced via the hand_eval
-    -- yield hook the pump sets around each resume; refines the instant cheap pass.
-    BES.start_job(gs, sig,
-      function() return PackOpenAdvisor.recommend(gs) end,
-      function(po) if po and po.reason then BES.apply_pack(gs, po) end end)
-  else
-    BES.job = nil
+    -- measured pack ranking (best_play sampling); refines the instant cheap pass
+    return function() return PackOpenAdvisor.recommend(gs) end,
+      function(po) if po and po.reason then BES.apply_pack(gs, po) end end
   end
+end
+
+local function decision_kind(gs)
+  if gs.pack then return "pack" end
+  if gs.meta and gs.meta.in_blind_select then return "skip" end
+  if gs.shop then return "shop" end
+  return "blind"
+end
+
+-- Work out the advice for the live state as ONE time-sliced job: the main recommendation (published the
+-- moment it is ready -- "Thinking" ends there unless it is only a provisional pack estimate), then the
+-- refinement. A newer state replaces the job, so a stale answer is never published.
+function BES.begin_eval(gs, sig)
+  BES.think_begin(decision_kind(gs))
+  BES.start_job(gs, sig,
+    function()
+      BES.evaluate(false, gs)
+      if not (BES.last and BES.last.provisional) then BES.think_end(true) end
+      local body, finish = BES.refine_for(gs)
+      if not body then return nil end
+      return { finish = finish, value = body() }
+    end,
+    function(res)
+      if res and res.finish then res.finish(res.value) end
+      BES.think_end(true)                  -- a provisional pack ends its thinking with the measured pick
+    end)
+end
+
+-- The slice hook the pump installs around each resume: counts work (the progress bar), keeps the
+-- per-enumeration GC step that bounds the heap (see BES.gc_yield), and hands the frame back once
+-- this frame's budget is spent.
+local slice_deadline = 0
+local function slice_hook(light)
+  BES.work_units = BES.work_units + 1
+  if not light then collectgarbage("step") end
+  if clock() >= slice_deadline then coroutine.yield() end
 end
 
 -- Advance the in-flight job for up to `budget` seconds; when it finishes, run its
@@ -472,29 +552,27 @@ end
 function BES.pump_job(budget)
   local job = BES.job
   if not job then return end
-  local now = (love and love.timer and love.timer.getTime()) or 0
-  local deadline = now + (budget or BES_SIM_BUDGET)
+  slice_deadline = clock() + (budget or BES_BUDGET_BUSY)
   repeat
-    if HandEval then HandEval.set_yield(coroutine.yield) end
+    if HandEval then HandEval.set_yield(slice_hook) end
     local ok, res = coroutine.resume(job.thread)
     -- restore the foreground GC-stepping hook (NOT nil) so the next foreground decide keeps its
     -- per-subset-enum memory bound (see BES.gc_yield). nil here would leave the heavy foreground
     -- dig unbounded again between background jobs.
     if HandEval then HandEval.set_yield(BES.gc_yield) end
     if not ok then
-      Log.error("background job failed:", res); BES.job = nil; return
+      Log.error("background job failed:", res); BES.job = nil; BES.think_end(false); return
     end
     if coroutine.status(job.thread) == "dead" then
       BES.job = nil
       -- the background sim (BES_SAMPLES rollouts) is the heaviest allocator; reclaim it
       -- before it stacks with the next decide toward the OOM ceiling (see BES_GC_FULL_KB).
       BES.gc_guard()
-      if BES.tracker and BES.tracker.current() ~= job.sig then return end -- moved on
+      if BES.tracker and BES.tracker.current() ~= job.sig then BES.think_end(false); return end -- moved on
       pcall(job.finish, res)
       return
     end
-    now = (love and love.timer and love.timer.getTime()) or deadline
-  until now >= deadline
+  until clock() >= slice_deadline
 end
 
 -- ---- Phase 0 run telemetry --------------------------------------------------
@@ -781,6 +859,7 @@ function BES.tick()
     if not BES._waiting then
       BES._waiting = true
       BES.job = nil
+      BES.think_end(false)
       BES.tracker.reset()
       if Overlay then Overlay.set({ best = nil, reason = "…" }) end
       if HUDPanel then HUDPanel.refresh() end
@@ -789,10 +868,9 @@ function BES.tick()
   end
   BES._waiting = false
   if not BES.tracker.changed(gs) then return end
-  -- cheap, measurement-free pass for EVERY state -> panel updates immediately (C4:
-  -- the only snapshot this cycle; evaluate reuses it rather than snapshotting again)
-  BES.evaluate(false, gs)
-  BES.arm_job(gs, BES.tracker.current())
+  -- the advice for the new state, time-sliced (C4: the only snapshot this cycle; evaluate
+  -- reuses it rather than snapshotting again)
+  BES.begin_eval(gs, BES.tracker.current())
 end
 
 -- ---- debug: dump owned joker ability tables (Phase 0) -----------------------
@@ -954,10 +1032,12 @@ if _G.G and _G.SMODS then
       if prev_update then prev_update(dt, ...) end
       -- advance any in-flight background job a few ms EVERY frame (cheap when idle)
       -- so the expensive Monte-Carlo / pack measurement never blocks rendering.
-      pcall(BES.pump_job, BES_SIM_BUDGET)
+      pcall(BES.pump_job, BES.job and BES.slice_budget() or BES_BUDGET_BUSY)
+      pcall(BES.think_progress)
       -- AUTO-PLAY (F11): if enabled, translate the latest recommendation into real inputs. Gated on
       -- SELECTING_HAND + settled + once-per-hand inside Autoplay.tick, so this is a cheap no-op otherwise.
-      if Autoplay and Autoplay.enabled then pcall(Autoplay.tick, BES.last, Log and Log.info) end
+      -- not while the advice for the live state is still being worked out (BES.last is the previous state's)
+      if Autoplay and Autoplay.enabled and not BES.thinking then pcall(Autoplay.tick, BES.last, Log and Log.info) end
       if Highlights then
         local ok, err = pcall(Highlights.update, dt, BES.last)
         if not ok and not BES.highlight_err then BES.highlight_err = true; Log.error("highlights failed:", err) end

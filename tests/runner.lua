@@ -58,6 +58,7 @@ local suites = {
   "tests.test_probe",
   "tests.test_autoplay",
   "tests.test_hud_panel",
+  "tests.test_scheduler",
 }
 -- NOTE: the Phase-1 simulator integration suites (tests.test_world, tests.test_driver)
 -- drive the REAL engine per hand (Monte-Carlo) and take minutes, so they are NOT in the

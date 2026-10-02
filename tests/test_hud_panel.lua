@@ -95,6 +95,29 @@ return function(t)
     t.ok(all:find("Copies your best joker %- big gain%."), "tooltip carries the reason (dash made plain)")
     t.ok(not all:find("\226\128\148"), "no em dash reaches the pixel font")
 
+    -- thinking: pulsing label, the old move greyed, the game's progress bar instead of the tags
+    local saved_love = _G.love
+    local now = 50
+    _G.love = { timer = { getTime = function() return now end } }
+    Panel.autoplay = nil
+    Overlay.set_thinking(true, now)
+    t.eq(Panel.content().nodes[1].nodes[2].nodes[1].config.text, "Advice", "a quick answer never flashes Thinking")
+    now = now + 0.5
+    c = Panel.content()
+    t.eq(c.nodes[1].nodes[2].nodes[1].config.text, "Thinking", "label reads Thinking once it lasts")
+    body = c.nodes[2].nodes
+    t.eq(body[1].nodes[1].config.text, "Buy Blueprint", "the previous move stays in place")
+    t.eq(body[1].nodes[1].config.colour, G.C.UI.TEXT_INACTIVE, "... greyed")
+    local bar = body[2].nodes[1].config.progress_bar
+    t.ok(bar and bar.ref_table == Overlay.state and bar.ref_value == "progress", "progress bar bound to the live progress")
+    Panel.tick_pulse(1.0)
+    t.ok(Panel.pulse and Panel.pulse[1] ~= nil, "pulse colour animates in place")
+    found = {}; walk(Panel.tooltip())
+    t.ok(table.concat(found, "\n"):find("wait for it before acting"), "tooltip says to wait")
+    Overlay.set_thinking(false, now)
+    t.eq(Panel.content().nodes[1].nodes[2].nodes[1].config.text, "Advice", "back to Advice when the answer lands")
+    _G.love = saved_love
+
     -- hidden (F9): a spacer-sized blank
     Overlay.visible = false
     t.eq(Panel.content().n, UIT.B, "hidden panel collapses to a spacer")

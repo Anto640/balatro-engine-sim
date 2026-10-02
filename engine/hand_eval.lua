@@ -29,8 +29,22 @@ local HandEval = {}
 -- the duration of a coroutine.resume by the driver and cleared immediately after,
 -- so synchronous/headless callers (and the tests) never see it -> pure by default.
 -- Calling it affects scheduling only, never the computed result.
+-- It is called YIELD() at the start of each enumeration and YIELD(true) ("light") every
+-- YIELD_EVERY scored subsets inside one: a single enumeration of a big hand under a heavy
+-- board runs ~100 ms, too long to hold a frame (tools/yield_gaps.lua measures the gaps).
 local YIELD = nil
+local YIELD_EVERY = 32
 function HandEval.set_yield(fn) YIELD = fn end
+-- The light boundary, for every scoring loop (subset / permutation enumerations in here and in
+-- engine/ordering.lua): one YIELD(true) per YIELD_EVERY scored candidates. No-op when undriven.
+local tick_n = 0
+function HandEval.yield_tick()
+  if YIELD then
+    tick_n = tick_n + 1
+    if tick_n >= YIELD_EVERY then tick_n = 0; YIELD(true) end
+  end
+end
+local yield_tick = HandEval.yield_tick
 
 -- Base (level 1) chips/mult for every Balatro poker hand.
 HandEval.HAND_BASE = {
@@ -675,6 +689,7 @@ local function each_subset(gs, cards, f, filter)
     if #sel >= 1 and #sel <= 5 then
       local ev = HandEval.score_with(gs, sel, effective, mods)
       if not filter or filter(sel, ev.hand_type) then f(ev, sel, copy) end
+      yield_tick()
     end
     if #sel == 5 then return end
     for i = start, n do
@@ -813,6 +828,7 @@ local function best_card_order(gs, sel, remaining, effective, mods)
       best_ev = ev; best_sel = {}; for i = 1, n do best_sel[i] = a[i] end
       bt, be, bs, bf = t, e, s, f
     end
+    yield_tick()
   end
   local function rec(k)
     if k > n then visit(); return end
