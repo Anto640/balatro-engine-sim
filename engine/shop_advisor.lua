@@ -1000,7 +1000,7 @@ function SA.recommend(gs, opts)
     if JokerData.is_unmodelled(sj.key) then return end
     local cost = sj.cost or 0
     local sgain = scoring_gain(gs, sj, rng, pace)       -- measured (or prior); pace damps scaler projection
-    local econ = Eval.joker_money(gs, sj.key)           -- $/round, DECK-AWARE (+ Chaos's reroll saving)
+    local econ = Eval.joker_money(gs, sj.key, (slots_free or 0) > 0)   -- $/round, DECK-AWARE (+ Chaos's reroll saving); measured income only into a free slot
     -- first-scorer priority: a board with no scorer NEEDS one that scores NOW (flat); a
     -- board with only ONE still wants a second (survivors carry ~2 flat scorers, deaths ~1),
     -- so graduate the bonus -- strong at 0, smaller at 1, gone at 2+.

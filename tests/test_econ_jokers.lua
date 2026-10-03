@@ -13,14 +13,15 @@ return function(t)
   end
   local gs = GS.new{ deck = deck, run = { hand_levels = {}, hand_size = 8 }, blind = { base_discards = 4, base_hands = 4 } }
   -- 4 copies of the drawn rank x (8 + 4 discards x 4) / 52 seen x $5
-  t.near(Eval.econ_value(gs, "j_mail"), 5 * 4 * 24 / 52, "Mail-In Rebate: $5 x expected matches discarded", 1e-6)
-  t.ok(Eval.econ_value(gs, "j_mail") > Eval.econ_value(gs, "j_delayed_grat"), "... beats Delayed Gratification")
+  t.near(Eval.econ_value(gs, "j_mail", true), 5 * 4 * 24 / 52, "Mail-In Rebate: $5 x expected matches discarded", 1e-6)
+  t.ok(Eval.econ_value(gs, "j_mail", true) > Eval.econ_value(gs, "j_delayed_grat", true), "... beats Delayed Gratification")
   local gm = GS.new{ deck = deck, jokers = { GS.joker{ key = "j_mail" } }, meta = { ante = 1 },
     run = { hand_levels = {}, hand_size = 8 }, blind = { base_discards = 4, base_hands = 4 } }
-  t.eq(Eval.econ_value(gm, "j_delayed_grat"), 0, "Delayed Gratification earns nothing next to Mail-In Rebate (it wants discards)")
-  local dg = Eval.econ_value(gs, "j_delayed_grat")
+  t.eq(Eval.econ_value(gm, "j_delayed_grat", true), 0, "Delayed Gratification earns nothing next to Mail-In Rebate (it wants discards)")
+  local dg = Eval.econ_value(gs, "j_delayed_grat", true)
   t.ok(dg >= 0 and dg <= 8, "Delayed Gratification: at most $2 x 4 discards, scaled by rounds needing none")
-  local todo = Eval.econ_value(gs, "j_todo_list")
+  t.eq(Eval.econ_value(gs, "j_mail"), 4, "without the free-slot flag Mail-In keeps its $4 prior (swaps/sells)")
+  local todo = Eval.econ_value(gs, "j_todo_list", true)
   t.ok(todo > 0 and todo < 4, "To Do List: measured availability of a random listed hand")
 
   -- playing To Do List's listed hand earns $4 (so the engine can farm it)

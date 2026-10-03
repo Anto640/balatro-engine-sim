@@ -470,9 +470,9 @@ Eval.ASTRONOMER_SAVING = 0.215 * 5 + 0.034 * 3
 Eval.GIFT_REALISED = 0.106 * 4.45
 local SAVING = { j_astronomer = function() return Eval.ASTRONOMER_SAVING end,
                  j_gift = function() return Eval.GIFT_REALISED end }
-function Eval.joker_money(gs, key)
+function Eval.joker_money(gs, key, measured_income)
   local sv = SAVING[key]
-  return Eval.econ_value(gs, key) + Eval.reroll_saving(gs, key) + (sv and sv() or 0)
+  return Eval.econ_value(gs, key, measured_income) + Eval.reroll_saving(gs, key) + (sv and sv() or 0)
 end
 
 -- DECK-GROWTH deck-modifiers (Marble adds Stone cards; DNA duplicates your best card). Both reduce to
@@ -1756,9 +1756,14 @@ end
 Eval._mail_income, Eval._todo_income, Eval._dg_income = mail_income, todo_income, delayed_grat_income
 
 local CONDITIONAL_ECON = {
-  j_mail = function(gs, base) return mail_income(gs) or base end,
-  j_todo_list = function(gs, base) return todo_income(gs) or base end,
-  j_delayed_grat = function(gs, base) return delayed_grat_income(gs) or base end,
+  -- MEASURED-INCOME jokers: the measurement is used only where the caller asks for it (a buy into a FREE slot,
+  -- see Eval.econ_value). Everywhere a joker is weighed AGAINST another (swaps, trades, sells) they keep the prior:
+  -- the joker FV's money term is a flat 0.8 per \$/round at every ante, and with Mail-In at \$9 that sold real
+  -- scorers for it from ante 3 on (bundle arm bn, 2026-10-03: Rebate bought 16x vs 3, replacing Wily, Jolly,
+  -- Swashbuckler, Abstract...). Lift this once the money->FV rate is ante-aware.
+  j_mail = function(gs, base, measured) return measured and mail_income(gs) or base end,
+  j_todo_list = function(gs, base, measured) return measured and todo_income(gs) or base end,
+  j_delayed_grat = function(gs, base, measured) return measured and delayed_grat_income(gs) or base end,
   -- Rough Gem: $1 per Diamond scored. Baseline 13/52 = 25% diamonds.
   j_rough_gem = function(gs, base)
     local n, dia = deck_counts(gs)
@@ -1822,10 +1827,12 @@ end
 
 -- $/round a single joker generates, deck-aware for the conditional ones (Rough
 -- Gem / Business Card / Cloud 9); the flat prior for everything else.
-function Eval.econ_value(gs, key)
+-- `measured_income` (optional): use the MEASURED income of Mail-In Rebate / To Do List / Delayed Gratification
+-- (only a buy into a free slot passes it; see CONDITIONAL_ECON).
+function Eval.econ_value(gs, key, measured_income)
   local base = JokerData.resolve(key).econ or 0
   local fn = CONDITIONAL_ECON[key]
-  if fn and base ~= 0 then base = fn(gs, base) end
+  if fn and base ~= 0 then base = fn(gs, base, measured_income) end
   return base * probability_factor(gs, key)
 end
 
