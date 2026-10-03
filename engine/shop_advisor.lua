@@ -177,14 +177,18 @@ SA.SWAP_SAMPLES = tonumber(os.getenv and os.getenv("BES_SWAP_SAMPLES") or "")   
 SA.PAIRED_SAMPLES = 12
 SA.PAIRED_MIN_SHARE = 0.25   -- the trade must add >= this share of what the sold joker itself scores
 local PLAIN_OUT = { flat_mult = true, flat_chips = true }
-local PLAIN_IN = { flat_mult = true, flat_chips = true, xmult = true, retrigger = true }
-local function plain_scorer(key, cats)
+-- IN may also be a MONEY joker (2026-10-03, live NUJ9ENYU a7: Holo Golden Joker over Swashbuckler): the trade is still
+-- judged on its measured SCORE alone (an edition's +Mult/+Chips/xMult), so its income is a bonus the trade never counts
+-- -- the pt failure needed money ON the scale, and selling a money joker (OUT) still is not allowed. A plain econ joker
+-- scores nothing and never passes the measured-gain test.
+local PLAIN_IN = { flat_mult = true, flat_chips = true, xmult = true, retrigger = true, economy = true }
+local function plain_scorer(key, cats, money_ok)
   local d = JokerData.resolve(key)
   return cats[d.cat or ""] == true and not JokerData.is_scaling(key) and not JokerData.is_unmodelled(key)
-    and (d.econ or 0) == 0 and not Downside.has_downside(key)
+    and (money_ok or (d.econ or 0) == 0) and not Downside.has_downside(key)
 end
 function SA.trade_out_plain(key) return plain_scorer(key, PLAIN_OUT) end
-function SA.trade_in_plain(key) return plain_scorer(key, PLAIN_IN) end
+function SA.trade_in_plain(key) return plain_scorer(key, PLAIN_IN, true) end
 -- the paired trade's measured score gain in FV (nil = not a trade): gain beats 2 SE and >= MIN_SHARE of the sold
 -- joker's own paired contribution. Shared by the shop's best-trade swap and the pack swap.
 function SA.paired_trade_gain(gs, i, sj, rng)
@@ -1001,6 +1005,7 @@ function SA.recommend(gs, opts)
     local cost = sj.cost or 0
     local sgain = scoring_gain(gs, sj, rng, pace)       -- measured (or prior); pace damps scaler projection
     local econ = Eval.joker_money(gs, sj.key, (slots_free or 0) > 0)   -- $/round, DECK-AWARE (+ Chaos's reroll saving); measured income only into a free slot
+      * Eval.money_weight(gs)   -- worth less as fewer rounds remain (Eval.money_weight)
     -- first-scorer priority: a board with no scorer NEEDS one that scores NOW (flat); a
     -- board with only ONE still wants a second (survivors carry ~2 flat scorers, deaths ~1),
     -- so graduate the bonus -- strong at 0, smaller at 1, gone at 2+.

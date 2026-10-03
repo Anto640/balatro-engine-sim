@@ -97,9 +97,14 @@ function SK.recommend(gs, opts)
     shop_value = shop_value * (1 + SK.RISK_SHOP_MULT * risk)
     if risk >= 0.5 then risk_note = string.format(", ~%d%% risk: the shop is where power comes from", math.floor(risk * 100 + 0.5)) end
   end
-  local play_value = reward + shop_value + hand_money + gen_v + joker_econ
+  -- INTEREST (2026-10-03, owner on live NUJ9ENYU a2): skipping a blind skips its CASH-OUT, and interest is paid only
+  -- there (\$1 per \$5 held, capped) -- money playing banks on top of the reward and the spare hands. It was missing.
+  local e = gs.economy or {}
+  local interest = Mechanics.interest(e.dollars or 0, e.interest_cap)
+  local play_value = reward + shop_value + hand_money + gen_v + joker_econ + interest
   local gen_str = (gen_note ~= "" and (" + " .. gen_note)) or ""
   if joker_econ >= 1 then gen_str = gen_str .. string.format(" + ~$%d joker econ", math.floor(joker_econ + 0.5)) end
+  if interest >= 1 then gen_str = gen_str .. string.format(" + $%d interest", interest) end
 
   local skip = tval > play_value * SK.SKIP_MARGIN
   local pv = math.floor(play_value + 0.5)   -- play_value is now fractional (board-scaled shop)

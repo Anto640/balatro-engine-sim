@@ -887,8 +887,10 @@ return function(t)
     -- nothing against an ante-7 blind -- so "the advantage GROWS" was the floor, not E-13. E-13's claim is
     -- that econ does not outrank power when behind late: the scorer must still beat the pure-econ joker.
     local r7 = SA.recommend(endgame_gs(7))
-    local adv7 = val(r7, "j_even_steven") - val(r7, "j_golden")
-    t.ok(adv7 > 0, "E-13: behind at ante 7, a scorer still outranks a pure-econ joker")
+    -- (2026-10-03 Eval.money_weight: at ante 7 the econ joker's income is worth ~0.2 of its early weight, so it may
+    -- not be listed as a buy at all -- which also satisfies the claim)
+    local s7, g7 = val(r7, "j_even_steven"), val(r7, "j_golden")
+    t.ok(s7 ~= nil and (g7 == nil or s7 > g7), "E-13: behind at ante 7, a scorer still outranks a pure-econ joker")
   end
 
   -- 23. Interest breakpoints: the $5 curve + the "spend down to the boundary for

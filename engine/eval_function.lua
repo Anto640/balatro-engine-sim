@@ -1510,6 +1510,23 @@ function Eval.joker_power(gs, opts)
   return s
 end
 
+-- MONEY WEIGHT BY ANTE (2026-10-03). A joker's income was priced at a flat 0.8 FV per \$/round at every ante. But an
+-- income only pays for the rounds LEFT, and a late dollar buys less (VU.dollar_frac falls along the requirement curve),
+-- while a scorer's FV is needed in full at every remaining blind. So the money term is scaled by rounds left x dollar
+-- rate, relative to the ante the 0.8 was calibrated around (VU.REF_ANTE), and never raised (early money unchanged):
+-- ante <=3 1.00, 4 0.73, 5 0.52, 6 0.35, 7 0.22, 8 0.10. Arm pt (wins 35 -> 17) showed the flat rate letting \$/round
+-- outweigh real scoring late. BES_MONEY_FLAT=1 restores the flat rate (A/B).
+Eval.MONEY_LAST_ANTE = 8
+function Eval.money_weight(gs)
+  if _G.BES_MONEY_FLAT or (os.getenv and os.getenv("BES_MONEY_FLAT") == "1") then return 1 end
+  local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
+  if ante <= VU.REF_ANTE then return 1 end
+  local left = math.max(1, Eval.MONEY_LAST_ANTE + 1 - ante)
+  local ref_left = Eval.MONEY_LAST_ANTE + 1 - VU.REF_ANTE
+  local rate = VU.dollar_frac(gs) / VU.dollar_frac({ meta = { ante = VU.REF_ANTE } })
+  return math.min(1, (left / ref_left) * rate)
+end
+
 -- FV points from a joker's jp + its passive econ - its situational downside. `j`
 -- is the real joker (so stickers/ability inform the downside); idx is its board
 -- position or nil for a not-yet-placed shop joker.
@@ -1524,7 +1541,7 @@ local function jp_to_fv(gs, j, jp, idx, measured)
   -- a MEASURED resource joker already has its hands/discards/hand-size trade-off inside jp (Eval.utility_fraction);
   -- don't charge the flat resource downside a second time (the anti-synergies it can't see are still charged)
   local dopts = (measured and Eval.UTILITY_MODELLED[j.key]) and { resource_measured = true } or nil
-  return FV_JOKER_WEIGHT * jp + 0.8 * econ - Downside.penalty(gs, j, idx, dopts)
+  return FV_JOKER_WEIGHT * jp + 0.8 * econ * Eval.money_weight(gs) - Downside.penalty(gs, j, idx, dopts)
 end
 
 -- FV-point marginal of OWNING joker idx (what selling it gives up). Measuring this
@@ -1896,7 +1913,7 @@ function Eval.future_value(gs, opts)
   return FV_JOKER_WEIGHT * Eval.joker_power(gs, opts)
        + 0.1 * Eval.economy_power(gs)
        + 0.5 * Eval.handlevel_power(gs)
-       + 0.8 * Eval.econ_power(gs)
+       + 0.8 * Eval.econ_power(gs) * Eval.money_weight(gs)
        - Eval.downside_total(gs)
 end
 
