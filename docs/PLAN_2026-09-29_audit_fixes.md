@@ -15,9 +15,9 @@ every A/B after that should be judged in a world that behaves like the real game
   | `co` 304e8c5 | card order: reorder that keeps a clear is attached; chooser dedupes its shortlist; sim plays hand order | tr | 35->35 | 46->45 | -0.015 (0.71), 130 tied | kept (correctness) |
   | `pt` ee39796 | paired trades incl. money + all plain jokers | co | 35->**17** | 45->26 | **-0.597 (p~0)** | REVERTED -> narrowed (9a120e1): money swamped unfloored score FV; decaying buys |
   | `bn` (33 seeds) | bundle with measured Rebate in swaps | co | -- | -- | -0.46 interim | stopped: Rebate bought 16x vs 3, selling scorers -> income measured only for free-slot buys (2fe9e49) |
-  | `bn2` 2fe9e49 | bundle: paired trades (score-only plain scorers), Rebate/To Do/DG income (free-slot buys), To Do per play + farmed, skip prices the forgone shop in the tag's currency, pack paired trades, Judgement full board/use when free, Purple-seal slot | co | **35->43** | **45->60** (McNemar p 0.025) | **+0.259 (p 0.042)**, sign 73/51 | SHIPPED + deployed; OOS co_7 / bn2_7 running |
+  | `bn2` 2fe9e49 | bundle: paired trades (score-only plain scorers), Rebate/To Do/DG income (free-slot buys), To Do per play + farmed, skip prices the forgone shop in the tag's currency, pack paired trades, Judgement full board/use when free, Purple-seal slot | co | **35->43** | **45->60** (McNemar p 0.025) | **+0.259 (p 0.042)**, sign 73/51 | SHIPPED + deployed; **OOS pool 7: co_7 -> bn2_7 wins 30->40, reach-8 42->61, +0.381 (p 0.006), sign 72/49; pooled n=320 wins 65->83, reach-8 87->121 (McNemar p 0.0003), +0.320 (p 0.0006)** |
   Also live-only: F5 never loses a press, keeps 4 decisions (fe11846); fixtures record build plan + Mouth lock (6896168).
-  **New baseline: `bn2`** (pool 3). Open: the joker FV money term is a flat 0.8/\$ at every ante (why measured income
+  **New baselines: `bn2` / `bn2_7`** (co_7 vs jo_7: -0.014 n.s., card order confirmed neutral). Open: the joker FV money term is a flat 0.8/\$ at every ante (why measured income
   is free-slot-only); the free Mega Buffoon still out-values the ante-2 Big blind's shop (owner flag 2 -- ask why).
 - **LIVE SELF-PLAY 2026-10-02 + fixes.** Session 15:09-15:52 (bes_runs from line 28535, fixtures 26486, autoplay log
   81939; seeds `tools/live_audit/seeds_2026-10-02.txt`): 4 runs ended (a5 Boss .79, a3 Boss .92, a8 Big .33, a6 Boss

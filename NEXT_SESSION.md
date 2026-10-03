@@ -3,9 +3,9 @@
 ## START HERE (2026-10-03)
 **Live install = 2fe9e49** (deployed with `bash tools/deploy.sh`; r2modman package `Anto640-EngineSim`). Overnight F5-flag
 review (owner workflow: per flag, state what was wrong, ask, act only after confirmation -- memory f5-flag-review-workflow)
-shipped 8 fixes; bundle `bn2` vs `co`: wins 35 -> 43, reach-8 45 -> 60, +0.259 (p 0.042). **Baselines now: `sim_out/bn2.jsonl`**
-(pool 3); pool-7 confirmation `co_7` / `bn2_7` (worktrees %TMP%/bes_wt_co, bes_wt_bn2). Details + the `pt` failure: plan doc
-status block "F5 FLAG REVIEW". Next: OOS verdict; the money->FV rate is not ante-aware (blocks measured econ in swaps);
+shipped 8 fixes; bundle `bn2` vs `co`: wins 35 -> 43, reach-8 45 -> 60, +0.259 (p 0.042). **Baselines now: `sim_out/bn2.jsonl` / `sim_out/bn2_7.jsonl`** (OOS replicated: pool 7 wins 30 -> 40, +0.381 p 0.006; pooled n=320 wins 65 -> 83, reach-8 87 -> 121)
+(worktrees %TMP%/bes_wt_co, bes_wt_bn2). Details + the `pt` failure: plan doc
+status block "F5 FLAG REVIEW". Next: the money->FV rate is not ante-aware (blocks measured econ in swaps);
 friend's Needle/Blueprint runs need their logs; UI thinking-text/progress-bar notes from the owner are still open.
 
 ## START HERE (2026-09-30 checkpoint)
