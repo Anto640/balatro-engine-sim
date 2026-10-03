@@ -1342,6 +1342,30 @@ function DE.leaf_sell(gs)
   }
 end
 
+-- FREE A SLOT FOR A PURPLE SEAL (2026-10-03, live NUJ9ENYU a6, owner-confirmed flag 8): a discard with a Purple-seal
+-- card makes a Tarot only if a consumable slot is free; with a full tray it makes nothing. When a held card can be
+-- used now with no side effect -- a Planet / Black Hole (a level is permanent) or Hermit / Temperance (money) --
+-- use it first, so the same discard also makes the Tarot. (Suit / enhancement tarots change the deck for good, so
+-- they are never spent just to free the slot.)
+local HARMLESS_USE = { c_black_hole = true, c_hermit = true, c_temperance = true }
+function DE.free_slot_for_purple(gs, best)
+  if not (best and best.type == "DISCARD" and best.cards) then return nil end
+  local purple = false
+  for _, c in ipairs(best.cards) do if c.seal == "Purple" then purple = true; break end end
+  if not purple then return nil end
+  local cons = gs.consumables or {}
+  local slots = (gs.run and gs.run.consumable_slots) or 2
+  if #cons < slots then return nil end
+  for _, c in ipairs(cons) do
+    if c.set == "Planet" or HARMLESS_USE[c.key] then
+      local name = c.name or c.key
+      return { type = "USE_CONSUMABLE", target = { name = name, key = c.key }, use_names = { c.key }, use_keys = { c.key },
+        reason = string.format("Use %s first — it frees a consumable slot, so the Purple seal in your discard makes a Tarot.", name) }
+    end
+  end
+  return nil
+end
+
 local decide_core = DE.decide
 function DE.decide(gs, opts)
   local r = decide_core(gs, opts)
@@ -1349,6 +1373,11 @@ function DE.decide(gs, opts)
   if leaf then
     table.insert(r.alternatives, 1, r.best)
     r.best, r.reason = leaf, leaf.reason
+  end
+  local fp = r and DE.free_slot_for_purple(gs, r.best)
+  if fp then
+    table.insert(r.alternatives, 1, r.best)
+    r.best, r.reason = fp, fp.reason
   end
   local fc = r and forced_card(gs)
   if not fc then return r end
