@@ -225,7 +225,7 @@ return function(t)
 
     -- To Do List: $4 at round end IF the target hand was played this round
     local todo = { jokers = { { key = "j_todo_list" } }, _todo_hand = "Flush" }
-    t.eq(World._conditional_econ(todo, { played_types = { Flush = true } }), 4, "To Do List: target hand played -> $4")
+    t.eq(World._conditional_econ(todo, { played_types = { Flush = true } }), 0, "To Do List: paid per play via ev.money, not at round end (2026-10-03)")
     t.eq(World._conditional_econ(todo, { played_types = { Pair = true } }), 0, "To Do List: target hand NOT played -> $0")
   end
 

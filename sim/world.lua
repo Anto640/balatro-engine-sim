@@ -829,7 +829,9 @@ local function blind_start_generators(run, rng)
     if j.key == "j_mail" then
       run._mail_rank = 2 + math.floor(rng() * 13)             -- a random rank 2..14, $5 per discarded match
     elseif j.key == "j_todo_list" then
-      run._todo_hand = TODO_HANDS[1 + math.floor(rng() * #TODO_HANDS)]  -- $4 if this hand is played
+      run._todo_hand = TODO_HANDS[1 + math.floor(rng() * #TODO_HANDS)]  -- $4 each time this hand is played
+      if type(j.ability) ~= "table" then j.ability = {} end
+      j.ability.to_do_poker_hand = run._todo_hand   -- the live field the engine reads (HandEval play money)
     elseif j.key == "j_marble" then
       add_card_to_deck(run, GS.card{ id = Content.next_card_id(run), rank = "Ace",
         rank_id = 14, suit = "Spades", enhancement = "m_stone" })   -- Marble: +1 Stone card / blind
@@ -1410,10 +1412,8 @@ local function conditional_econ(run, blind_result)
     for _ in pairs(run._planets_used or {}) do n = n + 1 end   -- $1 per unique planet used this RUN
     m = m + n
   end
-  if owns("j_todo_list") and run._todo_hand and blind_result.played_types
-     and blind_result.played_types[run._todo_hand] then
-    m = m + 4                                                   -- To Do List: $4 if the target hand was played
-  end
+  -- To Do List pays \$4 PER PLAY of its hand (the game's context.before check), banked per play through ev.money
+  -- in post_play_econ (HandEval counts it) -- it used to be paid once per round here (2026-10-03).
   return m
 end
 World._conditional_econ = conditional_econ   -- exposed for the fidelity tests

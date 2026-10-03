@@ -448,6 +448,14 @@ function HandEval.score_with(gs, played, effective, mods)
   local business = 0
   for _, j in ipairs(gs.jokers or {}) do if j.key == "j_business" then business = business + 1 end end
 
+  -- To Do List: \$4 each time its listed hand is played (2026-10-03, owner: "on pairs it could've farmed money").
+  -- Counted as play money so the tier-2 money tie-break and the milk plays farm it like a Gold seal. The listed
+  -- hand is the joker's live ability field (the sim sets the same field when it draws the round's hand).
+  for _, j in ipairs(gs.jokers or {}) do
+    if j.key == "j_todo_list" and not j.debuffed and type(j.ability) == "table"
+       and j.ability.to_do_poker_hand == ht then money = money + 4 end
+  end
+
   local njokers = #(gs.jokers or {})
   local joker_slots = (gs.shop and gs.shop.joker_slots) or (gs.run and gs.run.joker_slots) or 5
   local ctx = {

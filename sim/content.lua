@@ -303,9 +303,14 @@ function Content.gen_joker(run, rng)
   local cost = d.cost or 5
   if edition then cost = cost + (Content.EDITION_COST[edition] or 1) end   -- A9: per-edition adder
   cost = priced(run, cost)                            -- A4: Clearance Sale -25%
+  local ability = { extra = {} }
+  if key == "j_todo_list" then   -- the game draws its listed hand at creation (it then changes each round)
+    local H = { "Pair", "Two Pair", "Three of a Kind", "Straight", "Flush", "Full House", "Four of a Kind", "Straight Flush" }
+    ability.to_do_poker_hand = H[1 + math.floor(rng() * #H)]
+  end
   return GS.joker{ key = key, name = d.name or key, cost = cost,
     sell_value = math.max(1, math.floor(cost / 2)), edition = edition,
-    rarity = d.rarity, ability = { extra = {} } }
+    rarity = d.rarity, ability = ability }
 end
 
 -- Riff-Raff (JOKER_FIDELITY P2): a COMMON joker (not rarity-weighted), avoiding a duplicate of one

@@ -58,6 +58,7 @@ local suites = {
   "tests.test_trade_dependence",
   "tests.test_reorder_clear",
   "tests.test_paired_trade",
+  "tests.test_econ_jokers",
   "tests.test_telemetry",
   "tests.test_probe",
   "tests.test_autoplay",

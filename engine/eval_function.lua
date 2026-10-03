@@ -1661,7 +1661,82 @@ local function clampf(x, lo, hi) return math.max(lo, math.min(hi, x)) end
 -- 52-card baseline the prior assumed -- so a Diamonds deck earns more from Rough
 -- Gem, a no-Diamonds deck earns ~nothing, and a balanced deck reproduces the prior
 -- (keeping existing behaviour). Scale is bounded so an extreme deck can't run away.
+-- MEASURED discard/play money (2026-10-03, live NUJ9ENYU flags 1-2, owner: Mail-In Rebate is "pretty easy at least
+-- 10 dollars", To Do List "on pairs could've farmed money"). Both sat on the catalogue's flat \$4/round, tying
+-- Rebate with Delayed Gratification and losing To Do List to a foil Ice Cream.
+local function rank_suit_counts(cards)
+  local ranks, suits, n = {}, {}, 0
+  for _, c in ipairs(cards or {}) do
+    if not Cards.is_stone(c) then
+      local r = Cards.rank_id(c)
+      if r and r > 0 then ranks[r] = (ranks[r] or 0) + 1; n = n + 1 end
+      if c.suit then suits[c.suit] = (suits[c.suit] or 0) + 1 end
+    end
+  end
+  return ranks, suits, n
+end
+-- Mail-In Rebate: \$5 per discarded card of the round's rank. The game draws that rank from a deck card, so the
+-- expected copies of it are sum(n_r^2)/N; a round's discards cycle about hand_size + discards x 4 cards (a discard
+-- takes up to 5) of the N-card deck, and the engine dumps every match it sees (Heuristics money_discard).
+local function mail_income(gs)
+  local ranks, _, n = rank_suit_counts(gs.deck)
+  if n == 0 then return nil end
+  local sq = 0
+  for _, c in pairs(ranks) do sq = sq + c * c end
+  local copies = sq / n
+  local hs = (gs.run and gs.run.hand_size) or 8
+  local d = (gs.blind and (gs.blind.base_discards or gs.blind.discards_left)) or 3
+  local seen = math.min(1, (hs + 4 * math.max(0, d)) / n)
+  return 5 * copies * seen
+end
+-- To Do List: \$4 per play of the round's listed hand (one of 8, drawn each round). Expected plays of a hand = the
+-- share of dealt hands that contain it x the hands a round can spend on it (half the round's hands: the clear
+-- needs the rest), averaged over the list. Availability is measured on deals from the deck.
+local TODO_HANDS = { "Pair", "Two Pair", "Three of a Kind", "Straight", "Flush", "Full House", "Four of a Kind",
+  "Straight Flush" }
+local function deal_contains(cards)
+  local ranks, suits = rank_suit_counts(cards)
+  local pairs_, three, four = 0, false, false
+  for _, c in pairs(ranks) do
+    if c >= 2 then pairs_ = pairs_ + 1 end
+    if c >= 3 then three = true end
+    if c >= 4 then four = true end
+  end
+  local flush = false
+  for _, c in pairs(suits) do if c >= 5 then flush = true end end
+  local straight = false
+  for lo = 1, 10 do
+    local ok = true
+    for r = lo, lo + 4 do
+      local rr = (r == 1) and 14 or r
+      if not ranks[rr] then ok = false; break end
+    end
+    if ok then straight = true; break end
+  end
+  return { ["Pair"] = pairs_ >= 1, ["Two Pair"] = pairs_ >= 2, ["Three of a Kind"] = three,
+    ["Straight"] = straight, ["Flush"] = flush, ["Full House"] = three and pairs_ >= 2,
+    ["Four of a Kind"] = four, ["Straight Flush"] = false }
+end
+local function todo_income(gs)
+  local deck = gs.deck
+  if not deck or #deck < 8 then return nil end
+  local hs = math.min((gs.run and gs.run.hand_size) or 8, #deck)
+  local s = (#deck * 7919 + 104729) % 2147483647
+  local rng = function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end
+  local SAMPLES = 12
+  local avail = 0
+  for _ = 1, SAMPLES do
+    local has = deal_contains(JokerValue._sample_hand(gs, deck, hs, rng))
+    for _, h in ipairs(TODO_HANDS) do if has[h] then avail = avail + 1 end end
+  end
+  local hands = (gs.blind and gs.blind.base_hands) or 4
+  return 4 * (avail / (SAMPLES * #TODO_HANDS)) * (hands / 2)
+end
+Eval._mail_income, Eval._todo_income = mail_income, todo_income   -- exposed for tests
+
 local CONDITIONAL_ECON = {
+  j_mail = function(gs, base) return mail_income(gs) or base end,
+  j_todo_list = function(gs, base) return todo_income(gs) or base end,
   -- Rough Gem: $1 per Diamond scored. Baseline 13/52 = 25% diamonds.
   j_rough_gem = function(gs, base)
     local n, dia = deck_counts(gs)
