@@ -451,6 +451,7 @@ local function synergy_bonus(gs, sj)
   for _, tag in ipairs(e.tags) do
     if tag == "copy" then
       if have > 0 then bonus = bonus + 2.5; note = note or "copies your best joker"
+      elseif ShopState.slots_free(gs) >= 2 then note = "copies the next joker you buy"   -- SA.copier_future_frac
       else bonus = bonus - 3.0; note = "no joker to copy yet" end
     elseif tag == "xmult" and have > 0 then
       bonus = bonus + 1.0
@@ -787,6 +788,20 @@ local function with_discards(gs, dl)
   return g
 end
 
+-- COPIER FUTURE VALUE (2026-10-03, a friend's live runs, reported twice: "rerolled Blueprint when it could take it").
+-- A copier (Blueprint, Brainstorm) was valued only as a copy of the board it joins NOW, so on an empty or thin early
+-- board it measured ~0 (plus a -3 "no joker to copy yet" penalty) and the engine rerolled past it: probe, ante 1 \$20
+-- empty board, Blueprint -11.4 vs reroll +1.9. But it copies whatever joker sits next to it, and the next joker is
+-- one shop away. So when a slot will still be free after buying it, a copier is worth at least the joker you are
+-- expected to buy next (the best of a fresh shop's two, measured on this deck, as a reroll is valued), discounted
+-- for the wait (the Invisible Joker delay).
+SA.COPIER_WAIT = 0.75
+function SA.copier_future_frac(gs, rng)
+  if ShopState.slots_free(gs) < 2 then return 0 end   -- room for the copier AND the joker it will copy
+  local ok, e = pcall(Packs.expected_shop_joker, gs, 2, { rng = rng, samples = 3 })
+  return (ok and e and e > 0) and SA.COPIER_WAIT * e or 0
+end
+
 local function scoring_gain(gs, sj, rng, pace)
   -- MEASURED-SCALER / DECK-MODIFIER bridge (Tasks 1-2): if the joker is one the measured system models
   -- (Ride the Bus at equilibrium, the accumulating scalers, Hiker, Marble/DNA, or an econ deck-mod), use
@@ -854,6 +869,8 @@ local function scoring_gain(gs, sj, rng, pace)
     end
     -- a negative-edition joker is SLOT-FREE (+1 permanent slot); price that slot board-awarely
     -- (GRAND_AUDIT P1) instead of the flat 0.5 the edition helper falls back to.
+    -- a COPIER is worth the joker it will copy, which need not be owned yet (SA.copier_future_frac)
+    if JokerData.has_tag(sj.key, "copy") then m = math.max(m, SA.copier_future_frac(gs, rng)) end
     local ed = (sj.edition == "negative") and Eval.negative_slot_fv(gs) or Eval.edition_score_bonus(sj.edition, false)
     return m * proj + ed
   end

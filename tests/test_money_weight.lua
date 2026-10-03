@@ -35,4 +35,21 @@ return function(t)
     t.eq(rich.play_value - poor.play_value, 5, "playing is credited the interest the skip forgoes ($25 -> $5)")
     t.ok(rich.reason:find("interest") ~= nil, "... and says so")
   end
+
+  -- a copier on an EMPTY board is worth the joker it will copy (a friend's live runs: rerolled past Blueprint)
+  local deck, id = {}, 0
+  for _, s in ipairs({ "Spades", "Hearts", "Clubs", "Diamonds" }) do
+    for _, r in ipairs({ "2", "3", "4", "5", "6", "7", "8", "9", "10", "Jack", "Queen", "King", "Ace" }) do
+      id = id + 1; deck[#deck + 1] = GS.card{ id = id, rank = r, suit = s }
+    end
+  end
+  local gs = GS.new{ deck = deck, jokers = {}, economy = { dollars = 20, interest_cap = 5 },
+    meta = { ante = 1, round = 1, state = "SHOP", seed_hash = "BP120" },
+    run = { hand_levels = {}, hand_size = 8, joker_slots = 5 }, blind = { base_hands = 4, base_discards = 3 },
+    shop = { jokers = { GS.joker{ key = "j_blueprint", cost = 10, id = 201 }, GS.joker{ key = "j_egg", cost = 4, id = 202 } },
+             boosters = {}, vouchers = {}, consumables = {}, reroll_cost = 5, joker_slots = 5 } }
+  t.ok(SA.copier_future_frac(gs) > 0, "a copier with room for a target has future value")
+  local r = SA.recommend(gs, {})
+  t.eq(r.best.type, "BUY_JOKER", "an empty board with $20 buys Blueprint (does not reroll past it)")
+  t.eq(r.best.target and r.best.target.key, "j_blueprint", "... Blueprint")
 end
