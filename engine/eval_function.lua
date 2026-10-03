@@ -1732,11 +1732,33 @@ local function todo_income(gs)
   local hands = (gs.blind and gs.blind.base_hands) or 4
   return 4 * (avail / (SAMPLES * #TODO_HANDS)) * (hands / 2)
 end
-Eval._mail_income, Eval._todo_income = mail_income, todo_income   -- exposed for tests
+-- Delayed Gratification: \$2 per discard, only in a round where NO discard is used. The share of rounds that need
+-- none = the share of sampled deals whose best play clears this ante's Big blind over the round's hands. Owning
+-- Mail-In Rebate (which wants every discard) makes it 0 -- owner 2026-10-03: they work against each other.
+local function delayed_grat_income(gs)
+  for _, j in ipairs(gs.jokers or {}) do if j.key == "j_mail" then return 0 end end
+  local deck = gs.deck
+  if not deck or #deck < 8 then return nil end
+  local HandEval = require("engine.hand_eval")
+  local hs = math.min((gs.run and gs.run.hand_size) or 8, #deck)
+  local hands = (gs.blind and gs.blind.base_hands) or 4
+  local d = (gs.blind and (gs.blind.base_discards or gs.blind.discards_left)) or 3
+  local need = Mechanics.blind_requirement(math.floor((gs.meta and gs.meta.ante) or 1), "Big")
+  local s = (#deck * 104729 + 7919) % 2147483647
+  local rng = function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end
+  local SAMPLES, ok = 8, 0
+  for _ = 1, SAMPLES do
+    local ev = HandEval.best_play(gs, JokerValue._sample_hand(gs, deck, hs, rng))
+    if ev and ev.score * hands >= need then ok = ok + 1 end
+  end
+  return 2 * d * ok / SAMPLES
+end
+Eval._mail_income, Eval._todo_income, Eval._dg_income = mail_income, todo_income, delayed_grat_income
 
 local CONDITIONAL_ECON = {
   j_mail = function(gs, base) return mail_income(gs) or base end,
   j_todo_list = function(gs, base) return todo_income(gs) or base end,
+  j_delayed_grat = function(gs, base) return delayed_grat_income(gs) or base end,
   -- Rough Gem: $1 per Diamond scored. Baseline 13/52 = 25% diamonds.
   j_rough_gem = function(gs, base)
     local n, dia = deck_counts(gs)

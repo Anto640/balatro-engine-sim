@@ -524,6 +524,36 @@ function PO.recommend(gs, opts)
       end
       if trade then break end
     end
+    -- PAIRED TRADE (2026-10-03, live NUJ9ENYU a3, owner-confirmed flag 3): every flat common reads the same tier
+    -- floor, so a Buffoon pick (Crafty 0.54, Delayed Gratification 0.54) never cleared the bar against a board of
+    -- redundant flat Mult and the pack was skipped. When the FV test finds no trade, measure each (plain owned ->
+    -- plain or money-only pick) trade on shared hands, as the shop does (SA.trade_out_plain / trade_in_plain).
+    if not trade and measured then
+      local okSA, SA = pcall(require, "engine.shop_advisor")
+      local need = Mechanics.boss_per_hand_need(gs)
+      if okSA and SA.trade_out_plain and need and need > 0 then
+        for _, b in ipairs(bars) do
+          local jk = gs.jokers[b.i]
+          if jk and SA.trade_out_plain(jk.key) then
+            for _, p in ipairs(picks) do
+              local pj = p.pk.it.joker
+              if SA.trade_in_plain(pj.key) then
+                local m, se = JokerValue.swap_delta(gs, b.i, pj, { rng = mopts.rng, samples = SA.PAIRED_SAMPLES })
+                if m then
+                  local gain = VU.frac_to_fv(m / need) + 0.8 * (Eval.joker_money(gs, pj.key) - Eval.joker_money(gs, jk.key))
+                  local up = gain - 2 * VU.frac_to_fv((se or 0) / need)
+                  local safe = not (sv and sv.unsafe(b.i, VU.fv_to_frac(math.max(0, p.fv))))
+                  if up > 0 and safe and (not trade or up > trade.up) then
+                    trade = { up = up, pk = p.pk, fv = p.fv, i = b.i, name = b.name, bar = b.bar,
+                              weakest = (b == bars[1]), paired = true }
+                  end
+                end
+              end
+            end
+          end
+        end
+      end
+    end
     if trade then jpick, jpick_fv, wi, wname, wfv = trade.pk, trade.fv, trade.i, trade.name, trade.bar end
     if trade then
       -- (a) carry the make-room joker's IDENTITY (key/id) + what it makes room FOR, so the overlay can
@@ -542,7 +572,8 @@ function PO.recommend(gs, opts)
         reason = string.format("Take %s (clears the swap bar)", jpick.name)
       end
       reason = reason .. string.format(" — Joker slots full: sell %s (%s) to make room for %s.",
-        wname, trade.weakest and "your weakest" or "it leans on your weakest", jpick.name)
+        wname, trade.paired and "measured upgrade" or (trade.weakest and "your weakest" or "it leans on your weakest"),
+        jpick.name)
     elseif ordered[1] and ordered[1].it.set == "Joker" then
       -- The recommended pick is a joker but the board is full and no swap is worth it (jpick doesn't beat
       -- the weakest, or every owned joker is a protected keeper). Demote to the best FITTING pick, else SKIP.
