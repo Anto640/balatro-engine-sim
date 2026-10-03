@@ -1515,10 +1515,12 @@ end
 -- while a scorer's FV is needed in full at every remaining blind. So the money term is scaled by rounds left x dollar
 -- rate, relative to the ante the 0.8 was calibrated around (VU.REF_ANTE), and never raised (early money unchanged):
 -- ante <=3 1.00, 4 0.73, 5 0.52, 6 0.35, 7 0.22, 8 0.10. Arm pt (wins 35 -> 17) showed the flat rate letting \$/round
--- outweigh real scoring late. BES_MONEY_FLAT=1 restores the flat rate (A/B).
+-- outweigh real scoring late.
+-- ⚠ OPT-IN (sim verdict 2026-10-03, arm mw vs bn2, n=160): progress +0.070 (p 0.40), sign 39/37, reach-8 60 -> 62,
+-- wins 43 -> 38 -- no positive evidence for a magnitude change, so the flat rate stays the default. BES_MONEY_ANTE=1.
 Eval.MONEY_LAST_ANTE = 8
 function Eval.money_weight(gs)
-  if _G.BES_MONEY_FLAT or (os.getenv and os.getenv("BES_MONEY_FLAT") == "1") then return 1 end
+  if not (_G.BES_MONEY_ANTE or (os.getenv and os.getenv("BES_MONEY_ANTE") == "1")) then return 1 end
   local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
   if ante <= VU.REF_ANTE then return 1 end
   local left = math.max(1, Eval.MONEY_LAST_ANTE + 1 - ante)
