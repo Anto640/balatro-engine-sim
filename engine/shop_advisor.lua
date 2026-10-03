@@ -1077,8 +1077,15 @@ function SA.recommend(gs, opts)
     -- (mirrors pack_open_advisor's output-quality room_credit). A free slot keeps full value.
     if SA.CREATES_JOKER[it.key] then
       local created = Packs.expected_shop_joker(gs, 1, { rng = rng, samples = 4 }) or 0
-      if (slots_free or 0) <= 0 then created = created * SA.CREATE_FULL_BOARD_CREDIT end
-      vfrac = math.max(vfrac, created)
+      if (slots_free or 0) <= 0 then
+        -- the low full-board credit IS the value: taking max() with card_value (which only haircuts x0.7) let a
+        -- Judgement bought on a full board read as nearly a free joker -- live NUJ9ENYU a5 (2026-10-02, owner-
+        -- confirmed flag 5) bought one at 5/5 and it sat unusable in the tray for the rest of the run. With no free
+        -- slot it does nothing until a joker is sold, and it can be bought THEN: no score value now.
+        vfrac = 0
+      else
+        vfrac = math.max(vfrac, created)
+      end
     end
     local sbonus, snote = OwnedSynergy.consumable_bonus(gs, it.set) -- Constellation/Satellite/Perkeo
     local value, verb
@@ -1798,6 +1805,26 @@ function SA.recommend(gs, opts)
           reason = string.format("Use %s now — the level is permanent, and holding it blocks a slot and keeps that planet out of the shop.",
             c.name or c.key),
         }
+      end
+    end
+  end)
+
+  -- USE A HELD JOKER-MAKER WHEN A SLOT IS FREE (owner 2026-10-03, flag 5: "judgement could've been used in between
+  -- selling a joker for a new one while the slots open"). A held Judgement does nothing until a joker slot opens;
+  -- when one is free it is worth the joker it makes. Not while a paired trade's buy is due -- that slot is taken.
+  try(function()
+    if (slots_free or 0) <= 0 or (gs.run and gs.run.pending_swap) then return end
+    for _, c in ipairs(gs.consumables or {}) do
+      if SA.CREATES_JOKER[c.key] then
+        local created = Packs.expected_shop_joker(gs, 1, { rng = rng, samples = 4 }) or 0
+        if created > 0 then
+          actions[#actions + 1] = {
+            type = "USE_CONSUMABLE", target = c, cost = 0, use_keys = { c.key },
+            value = w_score * SA.JOKER_SCORE_WEIGHT * created,
+            reason = string.format("Use %s now — a joker slot is free for the joker it makes.", c.name or c.key),
+          }
+        end
+        break
       end
     end
   end)

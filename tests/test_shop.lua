@@ -1063,9 +1063,9 @@ return function(t)
     t.ok(v_full < v_room, "full Joker board lowers the Buffoon pack's value vs an open slot")
   end
 
-  -- 29. Judgement (creates a joker) is valued DECK-AWARE on the joker scale, floored
-  -- at its prior -- and a full Joker board does NOT block it (you sell to make room,
-  -- or sell the weak creation for cash), so it's still recommended over saving.
+  -- 29. Judgement (creates a joker) is valued DECK-AWARE on the joker scale. On a FULL board it does nothing until
+  -- a joker is sold and can be bought then (owner 2026-10-03, live NUJ9ENYU flag 5: bought at 5/5, it sat in the
+  -- tray all run), so it is not bought there; with a free slot it is.
   do
     local deck = {}
     for r = 2, 14 do deck[#deck + 1] = card{ id = r, rank_id = r, suit = "Hearts" } end
@@ -1081,7 +1081,10 @@ return function(t)
     local r = SA.recommend(gs)
     local jud = find(r, "BUY_CONSUMABLE")
     t.ok(jud ~= nil and jud.target.key == "c_judgement", "Judgement considered even with a full Joker board")
-    t.ok(jud.value > 0, "creating a joker is worth more than saving despite the full board")
+    t.ok(jud.value <= 0, "full board: not bought (it waits for a free slot)")
+    gs.run.joker_slots = 3; gs.shop.joker_slots = 3
+    local jud2 = find(SA.recommend(gs), "BUY_CONSUMABLE")
+    t.ok(jud2 and jud2.value > 0, "a free slot: creating a joker is worth more than saving")
   end
 
   -- 30. SELL_TO_BUY: fund a wanted-but-unaffordable purchase by selling a low-value
@@ -1127,10 +1130,12 @@ return function(t)
     t.ok(buys and not sells, "affordable -> buy outright, never sell to fund it")
 
     -- a VALUABLE held item (Judgement creates a joker) is NOT sold for a cheap pack
-    t.eq(SA.recommend(shop_with{ dollars = 3,
+    -- (with a free joker slot it is USED -- the joker it makes beats holding it, 2026-10-03; never SOLD)
+    local jb = SA.recommend(shop_with{ dollars = 3,
       consumables = { { set = "Tarot", key = "c_judgement", name = "Judgement", sell_cost = 1 } },
-      boosters = { { key = "p_standard_normal", name = "Standard Pack", cost = 4 } } }).best.type,
-      "SAVE", "won't sell a joker-creating Judgement to fund a cheap Standard pack")
+      boosters = { { key = "p_standard_normal", name = "Standard Pack", cost = 4 } } }).best
+    t.ok(jb.type == "SAVE" or (jb.type == "USE_CONSUMABLE" and jb.target.key == "c_judgement"),
+      "won't sell a joker-creating Judgement to fund a cheap Standard pack")
   end
 
   -- 30c. ANTI-CHURN: SELL_TO_BUY must not dump a LIVE joker to fund junk (2026-08-27, run MALEJYHW).
