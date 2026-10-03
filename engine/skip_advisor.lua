@@ -9,6 +9,8 @@ local Mechanics = require("engine.mechanics")
 local Generators = require("engine.generators")
 local Eval = require("engine.eval_function")
 local Pacing = require("engine.pacing")
+local Packs = require("engine.packs")
+local VU = require("engine.value_units")
 
 local SK = {}
 
@@ -25,6 +27,7 @@ SK.BOARDLESS_SHOP_MULT = 2.0
 -- speculative tag, so the tag must CLEARLY beat playing, not merely edge it out --
 -- otherwise the engine skips every time a tag's raw $-equivalent tops playing.
 SK.SKIP_MARGIN = 1.25
+SK.TYPICAL_JOKER_COST = 5   -- \$ a shop joker costs (as SA.TYPICAL_JOKER_COST)
 
 -- RISK-AWARE SHOP (A/B switch BES_SKIP_RISK=<k>, default off). The forgone shop is where an AT-RISK board finds
 -- power, so its value grows with the calibrated P(die within 2 antes) (Pacing.risk): x(1 + k*risk). Live CYDQ4Q9N
@@ -75,6 +78,18 @@ function SK.recommend(gs, opts)
   local slots = (gs.run and gs.run.joker_slots) or 5
   local fill = math.min(1, njokers / math.max(1, slots))
   local shop_value = SK.SHOP_VALUE * (1 + SK.BOARDLESS_SHOP_MULT * (1 - fill))
+  -- THE SAME CURRENCY AS THE TAG (2026-10-03, live NUJ9ENYU a2, owner-confirmed): a pack tag is the pack's MEASURED
+  -- joker value converted to dollars (Buffoon tag ~\$128 at ante 2, where every joker is a large share of a small
+  -- boss), while the forgone shop was a flat ~\$6 -- so early pack tags beat playing almost regardless. With a free
+  -- slot the shop you skip is worth the joker you would buy there: the best of a fresh shop's jokers, measured and
+  -- converted at the same rate, less its price.
+  local free = slots - njokers
+  if free > 0 and gs.deck and #gs.deck >= 5 then
+    local ok, e = pcall(Packs.expected_shop_joker, gs, 2, { rng = lcg(state_seed(gs) + 31), samples = 3, measure_count = 4 })
+    if ok and e and e > 0 then
+      shop_value = math.max(shop_value, VU.frac_to_dollars(gs, e) - SK.TYPICAL_JOKER_COST)
+    end
+  end
   local risk_note = ""
   if SK.RISK_SHOP_MULT > 0 then
     local ok, pc = pcall(Pacing.pace, gs, { rng = lcg(state_seed(gs) + 17) })

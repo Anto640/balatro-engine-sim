@@ -123,6 +123,29 @@ return function(t)
     -- weak tag -> PLAY (even with a full board, a Juggle tag isn't worth a skip)
     local gs = GS.new{ blind = { blind_type = "Small", base_hands = 4, skip_tag = "tag_juggle" } }
     t.eq(Skip.recommend(gs).recommend, "PLAY", "play through a weak tag")
+    -- SAME CURRENCY (2026-10-03): with a free slot the forgone shop is the measured joker you'd buy there,
+    -- converted like a pack tag -- not a flat ~$6 against a ~$128 measured pack
+    do
+      local deck, id = {}, 0
+      for _, su in ipairs({ "Spades", "Hearts", "Clubs", "Diamonds" }) do
+        for _, rk in ipairs({ "2", "3", "4", "5", "6", "7", "8", "9", "10", "Jack", "Queen", "King", "Ace" }) do
+          id = id + 1; deck[#deck + 1] = GS.card{ id = id, rank = rk, suit = su }
+        end
+      end
+      local g2 = GS.new{ deck = deck, jokers = { joker{ key = "j_joker" }, joker{ key = "j_jolly" }, joker{ key = "j_zany" } },
+        meta = { ante = 2 },
+        run = { joker_slots = 5, hand_levels = {}, hand_size = 8 },
+        blind = { blind_type = "Big", base_hands = 4, skip_tag = "tag_juggle" } }
+      local Packs = require("engine.packs")
+      local real = Packs.expected_shop_joker
+      Packs.expected_shop_joker = function() return 6.0 end   -- a strong shop joker (as at ante 2 live)
+      local hi = Skip.recommend(g2).play_value
+      Packs.expected_shop_joker = function() return 0.01 end
+      local lo = Skip.recommend(g2).play_value
+      Packs.expected_shop_joker = real
+      t.ok(hi > lo + 20, "free slot: the forgone shop is priced as the joker it would buy, in the tag's currency")
+      t.ok(lo > 0, "... and keeps its prior when that is higher")
+    end
   end
   do
     -- boss blind is unskippable
