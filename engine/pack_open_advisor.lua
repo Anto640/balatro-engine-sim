@@ -538,12 +538,10 @@ function PO.recommend(gs, opts)
             for _, p in ipairs(picks) do
               local pj = p.pk.it.joker
               if SA.trade_in_plain(pj.key) then
-                local m, se = JokerValue.swap_delta(gs, b.i, pj, { rng = mopts.rng, samples = SA.PAIRED_SAMPLES })
-                if m then
-                  local gain = VU.frac_to_fv(m / need) + 0.8 * (Eval.joker_money(gs, pj.key) - Eval.joker_money(gs, jk.key))
-                  local up = gain - 2 * VU.frac_to_fv((se or 0) / need)
+                local up = SA.paired_trade_gain(gs, b.i, pj, mopts.rng)
+                if up then
                   local safe = not (sv and sv.unsafe(b.i, VU.fv_to_frac(math.max(0, p.fv))))
-                  if up > 0 and safe and (not trade or up > trade.up) then
+                  if safe and (not trade or up > trade.up) then
                     trade = { up = up, pk = p.pk, fv = p.fv, i = b.i, name = b.name, bar = b.bar,
                               weakest = (b == bars[1]), paired = true }
                   end

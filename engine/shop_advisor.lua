@@ -10,6 +10,7 @@
 -- guard forces save), not magic constants.
 
 local Eval = require("engine.eval_function")
+local Downside = require("engine.joker_downside")
 local JokerData = require("engine.joker_data")
 local JokerValue = require("engine.joker_value")
 local Vouchers = require("engine.vouchers")
@@ -168,19 +169,32 @@ SA.DEAD_FUNDER_FV = 0.1
 -- acquisition lever is re-tested on the W3 world. Slope tuned to the mechanism (probe), not seeds.
 SA.SWAP_KEEP_SLOPE = tonumber(os.getenv and os.getenv("BES_SWAP_SLOPE") or "") or 0.5   -- env: swap-bar A/B
 SA.SWAP_SAMPLES = tonumber(os.getenv and os.getenv("BES_SWAP_SAMPLES") or "")   -- env: deals per swap measurement (A/B)
--- PAIRED TRADE eligibility: jokers whose whole value is their score now (+ money) -- what JV.swap_delta measures.
--- OUT: plain flat scorers only (scalers, xmult/retrigger cores and utility keep their own protections). IN: plain
--- scorers of any kind, or a money-only joker (its edition and $ are what it brings).
+-- PAIRED TRADE eligibility: jokers whose whole value is their SCORE NOW -- what JV.swap_delta measures. Both sides
+-- must be plain scorers with no downside and no money of their own: arm pt (2026-10-03, wins 35 -> 17, p~0) let a
+-- money joker's \$/round (0.8 FV per \$) swamp a real score value of ~0.2-0.6 FV (sold Ice Cream for Mail-In Rebate,
+-- Shoot the Moon for Trading Card) and bought decaying jokers on a today-only measurement (Popcorn, Ice Cream).
+-- OUT: plain flat scorers (scalers, xmult/retrigger cores and utility keep their own protections).
 SA.PAIRED_SAMPLES = 12
+SA.PAIRED_MIN_SHARE = 0.25   -- the trade must add >= this share of what the sold joker itself scores
 local PLAIN_OUT = { flat_mult = true, flat_chips = true }
 local PLAIN_IN = { flat_mult = true, flat_chips = true, xmult = true, retrigger = true }
-function SA.trade_out_plain(key)
-  return PLAIN_OUT[JokerData.resolve(key).cat or ""] == true and not JokerData.is_scaling(key)
+local function plain_scorer(key, cats)
+  local d = JokerData.resolve(key)
+  return cats[d.cat or ""] == true and not JokerData.is_scaling(key) and not JokerData.is_unmodelled(key)
+    and (d.econ or 0) == 0 and not Downside.has_downside(key)
 end
-function SA.trade_in_plain(key)
-  if JokerData.is_unmodelled(key) then return false end
-  if Eval.is_money_only(key) then return true end
-  return PLAIN_IN[JokerData.resolve(key).cat or ""] == true and not JokerData.is_scaling(key)
+function SA.trade_out_plain(key) return plain_scorer(key, PLAIN_OUT) end
+function SA.trade_in_plain(key) return plain_scorer(key, PLAIN_IN) end
+-- the paired trade's measured score gain in FV (nil = not a trade): gain beats 2 SE and >= MIN_SHARE of the sold
+-- joker's own paired contribution. Shared by the shop's best-trade swap and the pack swap.
+function SA.paired_trade_gain(gs, i, sj, rng)
+  local need = Mechanics.boss_per_hand_need(gs)
+  if not (need and need > 0) then return nil end
+  local m, se = JokerValue.swap_delta(gs, i, sj, { rng = rng, samples = SA.PAIRED_SAMPLES })
+  if not m or m - 2 * (se or 0) <= 0 then return nil end
+  local own = JokerValue.remove_delta(gs, i, { rng = rng, samples = SA.PAIRED_SAMPLES })
+  if not own or own <= 0 or m < SA.PAIRED_MIN_SHARE * own then return nil end
+  return VU.frac_to_fv((m - 2 * (se or 0)) / need)
 end
 
 -- First-scorer priority (in the sgain*5 buy-value units). When the board has NO effective
@@ -1501,11 +1515,9 @@ function SA.recommend(gs, opts)
             local cash_i = jk.sell_value or 1
             for _, sj in ipairs(shop.jokers) do
               if SA.trade_in_plain(sj.key) and (dollars(gs) + cash_i - (sj.cost or 0)) >= reserve then
-                local m, se = JokerValue.swap_delta(gs, i, sj, { rng = rng, samples = SA.PAIRED_SAMPLES })
-                if m then
-                  local gain = VU.frac_to_fv(m / need) + 0.8 * (Eval.joker_money(gs, sj.key) - Eval.joker_money(gs, jk.key))
-                  local up = gain - 2 * VU.frac_to_fv((se or 0) / need)
-                  if up > 0 and (not best_t or up > best_t.up) then
+                local up = SA.paired_trade_gain(gs, i, sj, rng)
+                if up then
+                  if (not best_t or up > best_t.up) then
                     best_t = { up = up, i = i, sj = sj, cash = cash_i, paired = true,
                                sold_fv = joker_contribution(gs, i, mopts) }
                   end

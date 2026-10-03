@@ -71,6 +71,9 @@ local SPEC = {
   j_ramen       = { decay = true },         -- loses xmult as you discard
 }
 
+-- true when the joker has a situational downside (decay, destroying jokers, hand/discard costs...)
+function D.has_downside(key) return SPEC[key] ~= nil end
+
 -- penalty(gs, joker, idx) -> future-value penalty (>= 0). idx is the joker's
 -- board position (needed for "destroys the joker to its right"); pass nil when
 -- valuing a shop joker not yet placed.
