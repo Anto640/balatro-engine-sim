@@ -9,6 +9,16 @@ every A/B after that should be judged in a world that behaves like the real game
 (mostly by Cavendish). Engine tuning (reroll samples, pacing, guaranteed clears) comes last, measured on the corrected sim.
 
 ## Status (overnight 2026-09-29)
+- **F5 FLAG REVIEW 2026-10-02/03 (owner-confirmed flags, NUJ9ENYU) -> 8 fixes, verdicts paired n=160:**
+  | arm | what | vs | wins | reach-8 | progress (p) | verdict |
+  |---|---|---|---|---|---|---|
+  | `co` 304e8c5 | card order: reorder that keeps a clear is attached; chooser dedupes its shortlist; sim plays hand order | tr | 35->35 | 46->45 | -0.015 (0.71), 130 tied | kept (correctness) |
+  | `pt` ee39796 | paired trades incl. money + all plain jokers | co | 35->**17** | 45->26 | **-0.597 (p~0)** | REVERTED -> narrowed (9a120e1): money swamped unfloored score FV; decaying buys |
+  | `bn` (33 seeds) | bundle with measured Rebate in swaps | co | -- | -- | -0.46 interim | stopped: Rebate bought 16x vs 3, selling scorers -> income measured only for free-slot buys (2fe9e49) |
+  | `bn2` 2fe9e49 | bundle: paired trades (score-only plain scorers), Rebate/To Do/DG income (free-slot buys), To Do per play + farmed, skip prices the forgone shop in the tag's currency, pack paired trades, Judgement full board/use when free, Purple-seal slot | co | **35->43** | **45->60** (McNemar p 0.025) | **+0.259 (p 0.042)**, sign 73/51 | SHIPPED + deployed; OOS co_7 / bn2_7 running |
+  Also live-only: F5 never loses a press, keeps 4 decisions (fe11846); fixtures record build plan + Mouth lock (6896168).
+  **New baseline: `bn2`** (pool 3). Open: the joker FV money term is a flat 0.8/\$ at every ante (why measured income
+  is free-slot-only); the free Mega Buffoon still out-values the ante-2 Big blind's shop (owner flag 2 -- ask why).
 - **LIVE SELF-PLAY 2026-10-02 + fixes.** Session 15:09-15:52 (bes_runs from line 28535, fixtures 26486, autoplay log
   81939; seeds `tools/live_audit/seeds_2026-10-02.txt`): 4 runs ended (a5 Boss .79, a3 Boss .92, a8 Big .33, a6 Boss
   .75), 0 wins, no stalls/errors. Plays faithful (40 deterministic at median 1.000, 25/25 guaranteed clears). Fixed:
