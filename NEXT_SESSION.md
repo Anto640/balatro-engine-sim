@@ -7,7 +7,7 @@
 **Overnight 10-03/04 (owner-confirmed F5 flags, NSWJJKK8):** Hologram picks use the scaler model (pack picks never
 called Eval.modeled_scoring_fraction) + card_add rate 0.06 -> 0.18 measured; Faceless income measured \$1.9/blind
 (\$0.2 with Ramen) not \$3; money dig keeps only scoring cards; Chaos / Overstock / Glass-5 pick checked, no change
-(see plan doc). Arm `fx` (3ed2be3) vs `cp`: see plan doc. Live: two-row panel kept (Panel.fit squeezes the bar
+(see plan doc). Arm `fx` (3ed2be3) vs `cp`: wins 40 -> 45, progress -0.006 n.s., sign 22/12 -> shipped. **Live install = f35f242+ (main).** Baseline for new arms: `sim_out/fx.jsonl`. Live: two-row panel kept (Panel.fit squeezes the bar
 first; verified in-game at 2560x1440 with the Multiplayer mod), real progress bar (util/progress), 'Working it
 out...' while thinking, GAME_OVER auto-saves the last 12 decisions as '<date> death' to bes_flagged.jsonl.
 Sim probe `faceless` (BES_PROBE, start_jokers) measures one joker's realised income.
