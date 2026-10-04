@@ -244,11 +244,14 @@ function Driver.run(seed, opts)
       -- take the tag's effect and move to the next blind (no play, no income, NO shop).
       if blind.type ~= "Boss" and content.gen_tag then
         blind.skip_tag = content.gen_tag(run.rng, run.ante)   -- E-11: 9 tags are ante-gated (min_ante 2)
+        -- the Orbital tag names its hand when offered; the engine sees it (live: G.GAME.orbital_choices)
+        run._orbital_hand = (blind.skip_tag == "tag_orbital" and content.orbital_hand) and content.orbital_hand(run, run.rng) or nil
         local sgs = GS.new{
           deck = run.deck, jokers = run.jokers, economy = run.economy,
           meta = { ante = run.ante }, run = { hand_levels = run.hand_levels,
             base_hands = run.base_hands, build_plan = run.build_plan },
-          blind = { blind_type = blind.type, base_hands = run.base_hands, skip_tag = blind.skip_tag },
+          blind = { blind_type = blind.type, base_hands = run.base_hands, skip_tag = blind.skip_tag,
+                    skip_tag_hand = run._orbital_hand },
         }
         local ok, sk = pcall(SkipAdvisor.recommend, sgs)
         -- P2: record the skip decision on BOTH branches (a DECLINED skip matters as

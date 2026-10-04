@@ -913,20 +913,27 @@ end
 
 -- Apply a skipped tag's effect to the run. High-value/economy/build tags are modelled
 -- faithfully; minor tags get a light approximation. -- VERIFY exact effects
+-- The game names a RANDOM visible hand on an Orbital tag when the blind is offered (the nine standard hands, plus a
+-- secret hand once played); levelling the engine's best hand put engine opinion into the rules layer (sim-rules audit
+-- #3). Rolled at offer time so the engine can SEE it (gs.blind.skip_tag_hand), as it does live.
+function Content.orbital_hand(run, rng)
+  local visible = { "High Card", "Pair", "Two Pair", "Three of a Kind", "Straight", "Flush", "Full House",
+                    "Four of a Kind", "Straight Flush" }
+  for _, h in ipairs({ "Five of a Kind", "Flush House", "Flush Five" }) do
+    if ((run.hand_type_plays or {})[h] or 0) > 0 then visible[#visible + 1] = h end
+  end
+  return pick_uniform(rng, visible)
+end
+
 function Content.apply_tag(run, key, rng)
   if key == "tag_investment" then
     run._pending_investment = (run._pending_investment or 0) + 25     -- +$25 after the next boss
   elseif key == "tag_economy" then
     run.economy.dollars = run.economy.dollars + math.min(run.economy.dollars, 40)
   elseif key == "tag_orbital" then
-    -- the game names a RANDOM visible hand on the tag (the nine standard hands, plus a secret hand once played);
-    -- levelling the engine's best hand put engine opinion into the rules layer (sim-rules audit #3, 52 tags / 160 runs)
-    local visible = { "High Card", "Pair", "Two Pair", "Three of a Kind", "Straight", "Flush", "Full House",
-                      "Four of a Kind", "Straight Flush" }
-    for _, h in ipairs({ "Five of a Kind", "Flush House", "Flush Five" }) do
-      if ((run.hand_type_plays or {})[h] or 0) > 0 then visible[#visible + 1] = h end
-    end
-    level_hand(run, pick_uniform(rng, visible), 3)
+    -- the hand the tag NAMED when it was offered (Content.orbital_hand, shown to the engine like the game shows it);
+    -- a random one if it was never rolled
+    level_hand(run, run._orbital_hand or Content.orbital_hand(run, rng), 3)
   elseif key == "tag_negative" then
     run.joker_slots = run.joker_slots + 1                            -- the negative joker's extra slot
   elseif key == "tag_charm"   then open_free_pack(run, "p_arcana_mega", rng)

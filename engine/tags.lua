@@ -37,7 +37,27 @@ local function orbital_dollars(gs, opts)
     if f <= 0 then return 0.01 end            -- a hand this deck (almost) never makes: worth ~nothing
     bp = { hand = th, freq = f }
   else
-    bp = ConsumableValue.best_planet(gs, opts)
+    -- the hand is not known yet (live: read before the blind-select screen rolled it -- UAPB3XY9 skipped a Small
+    -- blind for an Orbital priced as +3 Pair levels, ~$45): it is a RANDOM visible hand, so value the average over
+    -- them, not the best one
+    local freq = ConsumableValue.hand_frequencies(gs, opts)
+    if not freq then return nil end
+    local _, bctx0 = ConsumableValue.hand_frequencies(gs, opts)
+    local visible = { "High Card", "Pair", "Two Pair", "Three of a Kind", "Straight", "Flush", "Full House",
+                      "Four of a Kind", "Straight Flush" }
+    local tot = 0
+    for _, h in ipairs(visible) do
+      local f = freq[h] or 0
+      if f > 0 then tot = tot + f * ConsumableValue.level_gain(gs, h, 3, bctx0) end
+    end
+    local persist0 = ConsumableValue.level_scale(gs)
+    local frac0 = persist0 * (tot / #visible) / need(gs)
+    -- the leveling push (below) credits +3 levels of the COMMITTED hand: a random hand is that one 1 time in #visible
+    if BuildPlan.level_push_active(gs) then
+      local bp0 = gs.run and gs.run.build_plan
+      if bp0 and bp0.hand then frac0 = frac0 + BuildPlan.planet_credit(gs, bp0.hand) * 3 / #visible end
+    end
+    return VU.frac_to_dollars(gs, frac0)
   end
   if not bp then return nil end
   -- +3 levels PERSIST for the rest of the run (they raise every future play of that hand),

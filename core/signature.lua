@@ -54,7 +54,7 @@ function Sig.of(gs)
       tostring(gs.blind.name), tostring(gs.blind.target_chips),
       tostring(gs.blind.chips_scored),
       tostring(gs.blind.hands_left), tostring(gs.blind.discards_left),
-      tostring(gs.blind.blind_type), tostring(gs.blind.skip_tag),
+      tostring(gs.blind.blind_type), tostring(gs.blind.skip_tag), tostring(gs.blind.skip_tag_hand),
     }, ",")
   end
 
