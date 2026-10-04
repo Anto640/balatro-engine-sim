@@ -90,7 +90,7 @@ thing **headless-testable**. See the Layout section in `README.md` for the per-f
   code only at startup, and only the owner starts or restarts Balatro.
 - **Live logs** (save folder `%APPDATA%/Balatro/`): `bes_runs.jsonl` (run telemetry), `bes_fixtures.jsonl` (full `gs` per
   decision), `bes_autoplay.log` (self-player actions and failures). Crashes: the Lovely log in the profile's `mods/lovely/log/`.
-- **In-game debug keys:** `F5` FLAG A MISPLAY (saves the last 4 decisions to `bes_flagged.jsonl`); `F7` dump owned jokers' live `ability` tables (to the console
+- **In-game debug keys:** `F5` FLAG A MISPLAY (saves the last 4 decisions to `bes_flagged.jsonl`; a lost run also saves its last 12 there automatically, flag id `<date> death`); `F7` dump owned jokers' live `ability` tables (to the console
   and to `bes_joker_dump.txt` in the LÖVE save folder, each tagged
   `scored`/`value-only`/`UNCOVERED`); `F8` force a re-evaluation; `F9` toggle the overlay;
   `F10` capture-only toggle (log decisions, no eval); **`F11` AUTO-PLAY toggle** (the self-player,

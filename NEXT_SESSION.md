@@ -1,5 +1,17 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-04)
+**Deploy bug found + fixed (`40d78a0`):** r2modman restores the mod from `cache/Anto640-EngineSim/<registered version
+0.5.0>` at every launch, and deploy.sh only wrote the 0.5.1 cache -- so nothing deployed since 2026-10-02 ran live
+(F5 still kept 12; run NSWJJKK8 played the 10-02 code). deploy.sh now writes the registered version's cache too.
+**Overnight 10-03/04 (owner-confirmed F5 flags, NSWJJKK8):** Hologram picks use the scaler model (pack picks never
+called Eval.modeled_scoring_fraction) + card_add rate 0.06 -> 0.18 measured; Faceless income measured \$1.9/blind
+(\$0.2 with Ramen) not \$3; money dig keeps only scoring cards; Chaos / Overstock / Glass-5 pick checked, no change
+(see plan doc). Arm `fx` (3ed2be3) vs `cp`: see plan doc. Live: two-row panel kept (Panel.fit squeezes the bar
+first; verified in-game at 2560x1440 with the Multiplayer mod), real progress bar (util/progress), 'Working it
+out...' while thinking, GAME_OVER auto-saves the last 12 decisions as '<date> death' to bes_flagged.jsonl.
+Sim probe `faceless` (BES_PROBE, start_jokers) measures one joker's realised income.
+
 ## START HERE (2026-10-03)
 **Live install = 443f7a9** (bn2 + skip interest, money-joker trade-ins, Blueprint future value; arm `cp` neutral vs bn2; the money-by-ante weight measured n.s. and is opt-in BES_MONEY_ANTE=1) (deployed with `bash tools/deploy.sh`; r2modman package `Anto640-EngineSim`). Overnight F5-flag
 review (owner workflow: per flag, state what was wrong, ask, act only after confirmation -- memory f5-flag-review-workflow)
