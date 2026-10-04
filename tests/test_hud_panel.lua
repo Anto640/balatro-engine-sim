@@ -133,7 +133,7 @@ return function(t)
     body = c.nodes[2].nodes
     local htext = {}
     for i = 1, #body - 1 do htext[#htext + 1] = body[i].nodes[1].config.text end
-    t.eq(table.concat(htext, " "), "Working out the best move...", "says it is working, not the previous move greyed")
+    t.eq(table.concat(htext, " "), "Working it out...", "says it is working, not the previous move greyed")
     local bar = body[#body].nodes[1].config.progress_bar
     t.ok(bar and bar.ref_table == Overlay.state and bar.ref_value == "progress", "progress bar bound to the live progress")
     Panel.tick_pulse(1.0)
@@ -195,9 +195,9 @@ return function(t)
     local e1, h1 = fit_case(1.0)
     t.ok(e1.config.bes_fit > 2 and e1.config.bes_fit < #Panel.FIT_STEPS, "a taller bar: buttons, spacing, boxes ...")
     t.ok(not e1.config.bes_compact, "... keeping the two-row panel (compact is the last resort)")
-    t.ok(h1 <= 12.9 - 0.16 + 1e-9, "... and it now fits (" .. string.format("%.2f", h1) .. ")")
+    t.ok(h1 <= 12.9 - 0.08 + 1e-9, "... and it now fits (" .. string.format("%.2f", h1) .. ")")
     t.eq(e1.config.align, "cm", "... with no last-resort push")
-    local e2 = fit_case(2.0)
+    local e2 = fit_case(2.4)
     t.eq(e2.config.bes_fit, #Panel.FIT_STEPS, "a very tall bar uses every step")
     t.eq(e2.config.align, "bm", "... then keeps the top on screen (content pinned to the bottom of a taller first row)")
     t.ok(e2.config.bes_push and e2.config.bes_push > 0, "... by exactly the remaining overflow")

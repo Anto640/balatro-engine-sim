@@ -153,7 +153,7 @@ function Panel.label_row()
 end
 
 -- The panel's single child (rebuilt whenever the advice changes).
-function Panel.content(compact)
+function Panel.content(compact, tight)
   if not Overlay.visible then
     return { n = G.UIT.B, config = { w = 0.1, h = 0.3 } }   -- hidden: same height as the spacer it replaced
   end
@@ -164,7 +164,7 @@ function Panel.content(compact)
   -- no move yet: show the status line ("Waiting for the next hand…") greyed in the headline slot.
   -- Thinking: say so, with the progress bar under it (owner 2026-10-04: the greyed PREVIOUS move read as the answer).
   local head = has_move and st.headline or clip(st.reason ~= "" and st.reason or "No recommendation.", 44)
-  if think then head = "Working out the best move..." end
+  if think then head = "Working it out..." end
   local tags = think and {} or Panel.tags()
   local note = Overlay.active_notice(Panel.now())
   if note then   -- a confirmation (F5 flag) leads the tag row
@@ -209,12 +209,12 @@ function Panel.content(compact)
         { n = G.UIT.R, config = { align = "cm", maxw = 3.5 }, nodes = line } } },
     } }
   end
-  return { n = G.UIT.C, config = { align = "cm", padding = 0.1 }, nodes = {
+  return { n = G.UIT.C, config = { align = "cm", padding = tight and 0.04 or 0.1 }, nodes = {
     { n = G.UIT.C, config = { align = "cm", minw = 1.3 }, nodes = {
       { n = G.UIT.R, config = { align = "cm", maxw = 1.3 }, nodes = Panel.label_row() },
       { n = G.UIT.R, config = { align = "cm", maxw = 1.3 }, nodes = { text(mode, 0.42, mode_col) } },
     } },
-    { n = G.UIT.C, config = { align = "cm", minw = 3.3, minh = 0.7, r = 0.1, padding = 0.05,
+    { n = G.UIT.C, config = { align = "cm", minw = 3.3, minh = tight and 0.6 or 0.7, r = 0.1, padding = tight and 0.03 or 0.05,
         colour = G.C.DYN_UI.BOSS_DARK }, nodes = body },
   } }
 end
@@ -383,7 +383,11 @@ end
 -- languages or Steamodded versions can make it taller -- a friend's install overflowed top AND bottom (the bar is
 -- centred). Panel.fit measures the real bar against the real visible height and applies the gentlest changes
 -- first, re-measuring after each, until it fits. Steps stay applied for that HUD (a new run rebuilds it).
-local FIT_MARGIN = 0.08   -- game units kept clear above and below
+local FIT_MARGIN = 0.04   -- game units kept clear above and below
+-- the one-line panel is only worth its unreadable text for a REAL overflow: a bar a hair too tall (the hand-name
+-- row grows a little once a hand is played -- live 2026-10-04, 12.78 vs 12.74 flipped it to one line mid-run) keeps
+-- the two rows and lets the last-resort push trim that sliver off the bottom instead
+Panel.COMPACT_MIN_OVER = 0.25
 
 -- Visible screen height in game units (the game scales the room to fit and centres it on the bar's centre).
 function Panel.visible_h()
@@ -395,7 +399,7 @@ end
 
 local function rebuild_children(e)
   if e.children[1] then e.children[1]:remove(); e.children[1] = nil end
-  e.UIBox:add_child(Panel.content(e.config.bes_compact), e)   -- add_child recalculates the HUD box
+  e.UIBox:add_child(Panel.content(e.config.bes_compact, e.config.bes_tight), e)   -- add_child recalculates the HUD box
 end
 
 Panel.FIT_STEPS = {
@@ -413,8 +417,10 @@ Panel.FIT_STEPS = {
       for _, c in ipairs(f.gaps or {}) do c.minh = 0.05 end
       if f.score_pad and (f.score_pad.padding or 0) > 0.05 then f.score_pad.padding = 0.05 end end },
   { name = "shorter hands / money / ante boxes", apply = function(e, f)
-      for _, c in ipairs(f.boxes) do c.minh = c.minh * 0.82 end
+      for _, c in ipairs(f.boxes) do c.minh = c.minh * 0.75 end
       for _, c in ipairs(f.buttons) do c.minh = 1.0 end end },
+  { name = "tighter two-row panel", apply = function(e, f)
+      e.config.bes_tight = true; rebuild_children(e) end },
   -- LAST resort only (owner 2026-10-04: the one-line panel's text is too small to read)
   { name = "compact one-line panel", apply = function(e, f)
       e.config.bes_compact = true; rebuild_children(e) end },
@@ -433,6 +439,8 @@ function Panel.fit(e)
   local h0 = bar_h()
   local step, applied = e.config.bes_fit or 0, {}
   while bar_h() - avail > 0.005 and step < #Panel.FIT_STEPS do
+    local nxt = Panel.FIT_STEPS[step + 1]
+    if nxt.name == "compact one-line panel" and bar_h() - avail <= Panel.COMPACT_MIN_OVER then break end
     step = step + 1
     Panel.FIT_STEPS[step].apply(e, f)
     hud:recalculate()
