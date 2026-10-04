@@ -262,17 +262,37 @@ local ECON = {
   -- raises the interest cap: the extra interest your CURRENT bank would earn each round
   v_seed_money  = function(gs) return interest(dollars(gs), 10) - interest(dollars(gs), cap_int(gs)) end,
   v_money_tree  = function(gs) return interest(dollars(gs), 20) - interest(dollars(gs), math.max(cap_int(gs), 10)) end,
-  -- a discount on what you spend; at steady state you spend what you earn each round
-  v_clearance_sale = function(gs) return 0.25 * income_per_round(gs) end,
-  v_liquidation    = function(gs) return 0.25 * income_per_round(gs) end,   -- 25% -> 50%: another 25%
-  -- $2 off every reroll, at the rate the engine actually rerolls
-  v_reroll_surplus = function() return 2 * V.REROLLS_PER_SHOP * V.SHOPS_PER_ROUND end,
-  v_reroll_glut    = function() return 2 * V.REROLLS_PER_SHOP * V.SHOPS_PER_ROUND end,
+  -- the DISCOUNT vouchers (Clearance Sale, Liquidation, Reroll Surplus/Glut) are not a \$/round stream here: they are
+  -- priced as TOTAL dollars saved over the rest of the run (V.savings_dollars), against their price, in shop_advisor
 }
 -- Overstock is priced in shop_advisor (SA.overstock_value) from the shop's OWN measured card value -- the gross
 -- value a reroll's new cards are expected to add -- because it IS free card views: the only measurement of what a
 -- card view is worth to this engine lives in the reroll valuation.
 V.OVERSTOCK = { v_overstock_norm = true, v_overstock_plus = true }
+
+-- DISCOUNT VOUCHERS (2026-10-04, owner on live UAPB3XY9: "didn't buy clearance sale despite having loads of money and
+-- spending"). They were a \$/round stream (25% of blind reward + interest), and the shop prices a \$/round stream like
+-- a few one-off dollars, so a \$10 Clearance Sale read -1.5 at ante 5 with \$33. A discount is worth the dollars it
+-- SAVES over the rounds the run has left, MEASURED: what the engine spends per round by ante, and how likely a run
+-- is to reach each later ante (arm fx, 160 runs, 2697 rounds). Clearance then saves ~\$28 bought at ante 1, \$19 at
+-- ante 4, \$12 at ante 6, \$9 at ante 7, \$4 at ante 8.
+V.SPEND_PER_ROUND = { 4.15, 3.65, 5.43, 6.94, 7.79, 8.20, 9.50, 10.21 }
+V.REACH = { 1.0, 0.97, 0.96, 0.93, 0.84, 0.68, 0.50, 0.37 }
+V.SAVINGS = {
+  v_clearance_sale = function(ante) return 0.25 * V.SPEND_PER_ROUND[ante] end,
+  v_liquidation    = function(ante) return 0.25 * V.SPEND_PER_ROUND[ante] end,   -- 25% -> 50% off: another 25%
+  v_reroll_surplus = function(ante, gs) return 2 * V.rerolls_per_visit(gs) * V.SHOPS_PER_ROUND end,
+  v_reroll_glut    = function(ante, gs) return 2 * V.rerolls_per_visit(gs) * V.SHOPS_PER_ROUND end,
+}
+-- expected dollars a discount voucher saves from now to the end of the run (half the current ante still to play)
+function V.savings_dollars(gs, key)
+  local f = V.SAVINGS[key]
+  if not f then return nil end
+  local a = math.max(1, math.min(8, math.floor((gs and gs.meta and gs.meta.ante) or 1)))
+  local total = 1.5 * f(a, gs)
+  for k = a + 1, 8 do total = total + (V.REACH[k] / V.REACH[a]) * 3 * f(k, gs) end
+  return total
+end
 -- shop views per blind (each visit, plus its rerolls at this bankroll)
 function V.views_per_blind(gs) return V.SHOPS_PER_ROUND * (1 + V.rerolls_per_visit(gs)) end
 

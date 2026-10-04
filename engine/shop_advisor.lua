@@ -1170,6 +1170,13 @@ function SA.recommend(gs, opts)
     local vval, vecon, vname, vnote = Vouchers.value(gs, v.key,
       { rng = rng, cache = mopts.cache, samples = 6, at_risk = not secure })
     local value = w_score * vval + w_econ * vecon - net_cost_c(cost)
+    -- a DISCOUNT voucher: the dollars it saves over the rest of the run, priced like the dollars it costs
+    -- (SA.COST_WEIGHT per dollar, w_econ for the situation), see Vouchers.savings_dollars
+    local saved = Vouchers.savings_dollars(gs, v.key)
+    if saved then
+      value = w_score * vval + w_econ * SA.COST_WEIGHT * saved - net_cost_c(cost)
+      vnote = string.format("%s -- saves ~$%d over the rest of the run", vnote or "discount", math.floor(saved + 0.5))
+    end
     local entry = {
       type = "BUY_VOUCHER", target = v, cost = cost, value = value, name = vname,
       reason = string.format("Buy %s ($%d) — %s.", vname, cost, vnote or "permanent upgrade"),

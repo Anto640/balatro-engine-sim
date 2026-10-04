@@ -245,7 +245,7 @@ function JV.score_delta(gs, joker, opts)
   return result
 end
 
--- PAIRED TRADE (2026-10-03): the per-hand score change of REPLACING owned joker `idx` with `joker` (in its slot),
+-- PAIRED TRADE (2026-10-03): the per-hand score change of SELLING owned joker `idx` and adding `joker` (at the end),
 -- both boards scored on the SAME sampled hands. Returns mean, standard error (nil if unmeasurable). The swap bar
 -- compared two separately-floored FVs: at ante 6 (live NUJ9ENYU) Swashbuckler measured 2351 a hand, the offered
 -- Abstract Joker 3966, and both read the 1.80 tier floor, so no trade could ever clear the margin. Measuring the
@@ -262,8 +262,12 @@ function JV.swap_delta(gs, idx, joker, opts)
   local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
   if not deck or #deck < JV.MIN_DECK then return nil end
   local hs = math.min((gs.run and gs.run.hand_size) or 8, #deck)
+  -- the new joker goes where the GAME puts it: a bought or picked joker lands at the RIGHT end of the board, not
+  -- in the sold joker's slot. Jokers score left to right, so an xmult measured in a left slot multiplies a Mult
+  -- that is not built yet (live UAPB3XY9: Ramen in Gros Michel's slot measured -1531 a hand; at the end it is +1201).
   local swapped = {}
-  for i, j in ipairs(jokers) do swapped[i] = (i == idx) and joker or j end
+  for i, j in ipairs(jokers) do if i ~= idx then swapped[#swapped + 1] = j end end
+  swapped[#swapped + 1] = joker
   local cur = clone_with_jokers(gs, jokers)
   local new = clone_with_jokers(gs, swapped)
   local sum, sumsq = 0, 0

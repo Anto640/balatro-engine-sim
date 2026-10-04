@@ -728,10 +728,45 @@ function CV.cryptid_value(gs, need, opts)
   opts = opts or {}
   local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
   if not deck or #deck < CV.MIN_DECK then return CV.SPECTRAL_BASE.c_cryptid or 0.4 end
-  local best = best_copy_card(deck)
+  local best = CV.best_copy_target(gs, deck, need, opts)
   if not best then return CV.SPECTRAL_BASE.c_cryptid or 0.4 end
-  local cav = CV.card_add_value(gs, best, { need = need, samples = opts.samples, rng = opts.rng }) or 0
-  return math.max(math.max(0, cav) * 2, CV.CRYPTID_FLOOR)
+  return math.max(CV.copy_value(gs, best, need, opts), CV.CRYPTID_FLOOR)
+end
+
+-- What two copies of `card` are worth: its measured score as an added card AND its money (a Gold card's \$3 held, a
+-- Gold seal's \$3 scored, a Lucky card's \$20 chance), each twice. 2026-10-04 (owner, live UAPB3XY9 flag 5: "it had
+-- the devil... could've generated one gold card using the devil and 2 more by using cryptid on that"): the copy
+-- target was a fixed heuristic that ranked a Gold card +1 (below any Glass/Steel/high card) and the value never
+-- counted the copies' money.
+function CV.copy_value(gs, card, need, opts)
+  opts = opts or {}
+  local copy = {}; for k, v in pairs(card) do copy[k] = v end; copy.id = -913
+  local cav = CV.card_add_value(gs, copy, { need = need, samples = opts.samples, rng = opts.rng }) or 0
+  return 2 * (math.max(0, cav) + CV.card_econ_value(gs, copy, opts.rng))
+end
+
+-- The card Cryptid should copy, by CV.copy_value: in a drawn hand every card is measured; over a whole deck, the
+-- heuristic's top few plus every money card (Gold / Gold seal / Lucky) form the shortlist that is measured.
+function CV.best_copy_target(gs, pool, need, opts)
+  local cand = {}
+  if #pool <= 10 then
+    for _, c in ipairs(pool) do if not Cards.is_stone(c) then cand[#cand + 1] = c end end
+  else
+    local h = best_copy_card(pool)
+    if h then cand[#cand + 1] = h end
+    local seen = 0
+    for _, c in ipairs(pool) do
+      if (c.enhancement == "m_gold" or c.enhancement == "m_lucky" or c.seal == "Gold") and seen < 4 then
+        cand[#cand + 1] = c; seen = seen + 1
+      end
+    end
+  end
+  local best, bv
+  for _, c in ipairs(cand) do
+    local v = CV.copy_value(gs, c, need, opts)
+    if not bv or v > bv or (v == bv and (c.id or 0) < (best.id or 0)) then best, bv = c, v end
+  end
+  return best
 end
 
 -- AURA: a random edition (foil/holo/poly) on one card in hand. Like the Red seal, the value is the edition on
@@ -870,6 +905,20 @@ function CV.wheel_value(gs, need, rng)
   return 0.25 * (total / n) / (need or 1)
 end
 
+-- Share of the run's hands a card changed by a tarot is in: `n` changed cards of the deck, each drawn into a hand
+-- with probability hand size / deck size, plus the one hand it is used in spread over the hands left (CV.card_value).
+-- BES_TAROT_PER_HAND=0 restores the one-hand reading (A/B).
+CV.TAROT_PER_HAND = not (os.getenv and os.getenv("BES_TAROT_PER_HAND") == "0")
+CV.HANDS_PER_BLIND = 2.5
+function CV.tarot_presence(gs, n)
+  local deck = math.max(1, #(gs.deck or {}))
+  local hs = (gs.run and gs.run.hand_size) or 8
+  local p = math.min(1, (n or 1) * hs / deck)
+  local okE, Eval = pcall(require, "engine.eval_function")
+  local hands = (okE and Eval.blinds_remaining) and math.max(1, Eval.blinds_remaining(gs) * CV.HANDS_PER_BLIND) or 20
+  return math.min(1, p + 1 / hands)
+end
+
 function CV.card_value(gs, set, key, freq, need, rng, samples, hand_ctx)
   need = need or 1
   -- The Fool with nothing to copy is worth ZERO, not its prior (see CV.fool_target).
@@ -945,7 +994,14 @@ function CV.card_value(gs, set, key, freq, need, rng, samples, hand_ctx)
       local econ = 0
       local spec = Tarot.ENH[key]
       if spec then econ = spec.n * CV.card_econ_value(gs, { enhancement = spec.enh }, rng) end
-      return math.max(0, sv) / need + econ, 0, string.format("enhance ~+%d score", math.floor(math.max(0, sv)))
+      -- PER-HAND, like a joker (2026-10-04, owner on live UAPB3XY9: "it seems to take tower very often despite it
+      -- doing very very little"). `sv` is the gain on the hand the card is USED in -- the changed card is in that hand
+      -- by construction. A joker's fraction counts on EVERY hand; a changed card counts only on the hands it is drawn
+      -- into (hand size / deck size per card) plus that one use spread over the hands left. Without this a one-hand
+      -- gain sat on the joker scale ~5x too high: The Tower read 0.61 of a boss hand and out-ranked jokers and money.
+      local frac = math.max(0, sv) / need
+      if CV.TAROT_PER_HAND then frac = frac * CV.tarot_presence(gs, (spec and spec.n) or (Tarot.RANK[key] and 2) or 1) end
+      return frac + econ, 0, string.format("enhance ~+%d score", math.floor(math.max(0, sv)))
     end
     return CV.TAROT_BASE[key] or 0.15, 0, "tarot"
   elseif set == "Spectral" then

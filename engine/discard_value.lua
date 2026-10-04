@@ -16,6 +16,14 @@ local DV = {}
 local function mc(n) local c = rawget(_G, "BES_MC_CAP"); if c and n > c then return c end; return n end
 
 DV.MIN_DECK = 5
+-- RAMEN (2026-10-04, owner-confirmed death UAPB3XY9: four digs threw 18 cards and destroyed Ramen mid-blind). Ramen
+-- loses x0.01 per discarded card for good and is destroyed at x1; the money dig already refuses to bleed it
+-- (DiscardFuel), but this dig scored the redraw as if Ramen were untouched. The redraw is now scored at the reduced
+-- (or destroyed) Ramen, and the permanent loss on the run's later hands is charged at the weight DiscardFuel uses
+-- for a scaler's future harm (a later hand may not need it).
+DV.RAMEN_DECAY = 0.01
+DV.RAMEN_FUTURE_WEIGHT = 0.15
+DV.HANDS_PER_BLIND = 2.5
 
 -- How much we want to KEEP a card (high = keep, low = discard). Editions and
 -- enhancements dominate, then rank. A DEBUFFED card (boss face/suit debuff, or the per-card
@@ -104,6 +112,29 @@ function DV.measured(gs, discard, opts)
   -- opts.filter: a boss play-legality filter (Mouth single-type / Eye no-repeat). When present, the
   -- redraw is scored by its best LEGAL hand -- so under the Mouth the dig correctly values drawing the
   -- LOCKED type, not a bigger off-type hand that would score 0 (owner 2026-09-20 Mouth death).
+  -- Ramen after this discard (see DV.RAMEN_DECAY)
+  local ramen_frac = 0
+  for ri, j in ipairs(gs.jokers or {}) do
+    if j.key == "j_ramen" and ndraw > 0 then
+      local x = (type(j.ability) == "table" and type(j.ability.x_mult) == "number") and j.ability.x_mult or 2
+      local nx = x - DV.RAMEN_DECAY * ndraw
+      local js = {}
+      for k, jj in ipairs(gs.jokers) do
+        if k ~= ri then js[#js + 1] = jj
+        elseif nx > 1 then
+          local ab = {}; for kk, vv in pairs(type(jj.ability) == "table" and jj.ability or {}) do ab[kk] = vv end
+          ab.x_mult = nx
+          local nj = {}; for kk, vv in pairs(jj) do nj[kk] = vv end
+          nj.ability = ab
+          js[#js + 1] = nj
+        end
+      end
+      if gs_after == gs then gs_after = {}; for k, v in pairs(gs) do gs_after[k] = v end end
+      gs_after.jokers = js
+      ramen_frac = (x - math.max(1, nx)) / x     -- share of every later hand's score this discard gives up
+      break
+    end
+  end
   local filter = opts.filter
   local total = 0
   for _ = 1, samples do
@@ -116,7 +147,13 @@ function DV.measured(gs, discard, opts)
     else ev = HandEval.best_play(gs_after, nh) end
     total = total + (ev and ev.score or 0)
   end
-  return total / samples
+  local mean = total / samples
+  if ramen_frac > 0 then
+    local okE, Eval = pcall(require, "engine.eval_function")
+    local blinds = (okE and Eval.blinds_remaining) and math.max(0, Eval.blinds_remaining(gs)) or 0
+    mean = mean - mean * ramen_frac * blinds * DV.HANDS_PER_BLIND * DV.RAMEN_FUTURE_WEIGHT
+  end
+  return mean
 end
 
 -- Identity signature of a discard set (order-independent) so we don't re-measure

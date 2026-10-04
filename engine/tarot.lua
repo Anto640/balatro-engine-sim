@@ -416,6 +416,17 @@ function T.best_targets(gs, key, pool)
   end
   -- SPECTRAL — a seal/edition on 1 card: the highest-value card that doesn't already have one.
   local sp = T.SPECTRAL_TARGET[key]
+  if sp and sp.kind == "copy" and gs then   -- Cryptid: the card whose two copies are worth most, money included
+    local okC, CV = pcall(require, "engine.consumable_value")
+    if okC and CV.best_copy_target then
+      local Mech = require("engine.mechanics")
+      local s0 = 0; for _, c in ipairs(pool) do s0 = (s0 * 31 + (c.id or 0)) % 2147483647 end
+      local st = s0 > 0 and s0 or 1
+      local rng = function() st = (st * 16807) % 2147483647; return st / 2147483647 end
+      local b = CV.best_copy_target(gs, pool, Mech.boss_per_hand_need(gs), { rng = rng, samples = 8 })
+      if b then return { b } end
+    end
+  end
   if sp then
     local out = top_n(function(c)
       return not ((sp.kind == "seal" and c.seal ~= nil) or (sp.kind == "edition" and c.edition ~= nil))
@@ -492,6 +503,19 @@ end
 -- `filter` (optional): a boss play-legality filter (Mouth single-type / Eye no-repeat) so a "use
 -- tarot then play" proposal can't recommend an OFF-TYPE follow-up that scores 0 under the Mouth --
 -- which corrupts the locked-type set and defeats the play chooser's own filter (owner 2026-09-20).
+-- \$ a money enhancement (The Devil -> Gold: \$3 when held at round end) earns over the rest of the run, at the
+-- measured hold rate (ConsumableValue.card_round_rates). 0 for everything else. Lazy requires: consumable_value and
+-- eval_function both load this module.
+function T.money_enh_dollars(gs, key)
+  local spec = T.ENH[key]
+  if not (spec and spec.enh == "m_gold") then return 0 end
+  local okC, CV = pcall(require, "engine.consumable_value")
+  local okE, Eval = pcall(require, "engine.eval_function")
+  if not (okC and okE and CV.card_round_rates and Eval.blinds_remaining) then return 0 end
+  local rr = CV.card_round_rates(gs)
+  return 3 * (rr.held_end or 0) * math.max(1, Eval.blinds_remaining(gs)) * (spec.n or 1)
+end
+
 function T.best_use(gs, base_ev, remaining, dollar_value, filter)
   dollar_value = dollar_value or 12
   local hand = gs.hand or {}
@@ -548,7 +572,14 @@ function T.best_use(gs, base_ev, remaining, dollar_value, filter)
           local card_tarot = T.ENH[c.key] or T.SUIT[c.key] or T.RANK[c.key]
           local need = Mechanics.boss_per_hand_need(gs)
           local material = (not card_tarot) or gain >= need * T.CARD_USE_MIN_FRAC
-          if ev2 and gain > 0 and material then
+          -- MONEY ENHANCEMENT (2026-10-04, owner on live UAPB3XY9: "held a devil for a long time rather than using it
+          -- and getting the 3 dollars"). A Gold card scores nothing -- it pays \$3 when HELD at round end -- so the
+          -- score-only test above read The Devil as worthless and it sat in the tray from ante 4 to the death. Credit
+          -- the money at the measured hold rate over the rounds left; best_targets already puts Gold on a spare card
+          -- outside the play, so the play is unchanged (gain 0) and the use is free.
+          local money = T.money_enh_dollars(gs, c.key)
+          if money > 0 and ev2 and gain >= 0 then material = true end
+          if ev2 and (gain > 0 or money > 0) and material then
             local tn = T.target_note(gs, c.key, hand)   -- name the hand card(s) to target
             -- machine-readable target card ids (for the auto-play actuator to select), from the SAME
             -- best_targets that produced the note. nil for non-targeting tarots.
@@ -558,12 +589,15 @@ function T.best_use(gs, base_ev, remaining, dollar_value, filter)
             -- Death converts the LEFT selected card into the RIGHT one: tcards is {target, source}, in that order
             local torder = (c.key == "c_death") or nil
             local credit = card_tarot and need * T.CARD_PERM_CREDIT or 0
-            consider({ type = "USE_CONSUMABLE", target = { name = name, key = c.key }, kind = "score",
-              play_cards = cards2, hand_type = ev2.hand_type, score = ev2.score,
-              value = ev2.score + credit, permanence_credit = credit,
+            consider({ type = "USE_CONSUMABLE", target = { name = name, key = c.key }, kind = (money > 0 and gain <= 0) and "income" or "score",
+              play_cards = cards2, hand_type = ev2.hand_type, score = ev2.score, gain = money > 0 and money or nil,
+              value = ev2.score + credit + money * dollar_value, permanence_credit = credit,
               target_note = tn, target_cards = tcards, target_order = torder, use_keys = { c.key },
-              reason = string.format("Use %s%s, then play %s — %d vs %d.",
-                name, tn and (" (" .. tn .. ")") or "", ev2.hand_type, ev2.score, base) })
+              reason = (money > 0 and gain <= 0)
+                and string.format("Use %s%s — $3 each round it is held at round end (~$%d over the run).",
+                  name, tn and (" (" .. tn .. ")") or "", math.floor(money + 0.5))
+                or string.format("Use %s%s, then play %s — %d vs %d.",
+                  name, tn and (" (" .. tn .. ")") or "", ev2.hand_type, ev2.score, base) })
           end
         end
       end
