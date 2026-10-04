@@ -34,7 +34,15 @@ fi
 if [ -d "$PROFILE/mods/Anto640-EngineSim" ]; then R2_NAME="Anto640-EngineSim"; PACKAGED=1
 else R2_NAME="balatroenginesim"; PACKAGED=0; fi
 R2_DEST="$PROFILE/mods/$R2_NAME"
-R2_CACHE="${BES_R2_CACHE:-$APPDATA/r2modmanPlus-local/Balatro/cache/$R2_NAME/$VERSION}"
+# r2modman RESTORES a mod from cache/<name>/<registered version> on every launch -- the version in the installed
+# manifest.json (what was imported), NOT your_mod.json's. Writing only to cache/<repo version> was silently undone at
+# launch (2026-10-04: install back at the imported 0.5.0, so F5 still kept 12 and two days of fixes never ran live).
+R2_VER="$VERSION"
+if [ "$PACKAGED" = 1 ] && [ -f "$R2_DEST/manifest.json" ]; then
+  R2_VER=$(sed -n 's/.*"version_number"[^"]*"\([^"]*\)".*/\1/p' "$R2_DEST/manifest.json" | head -1)
+  R2_VER="${R2_VER:-$VERSION}"
+fi
+R2_CACHE="${BES_R2_CACHE:-$APPDATA/r2modmanPlus-local/Balatro/cache/$R2_NAME/$R2_VER}"
 LEGACY_DEST="${BES_LEGACY_DEST:-$APPDATA/Balatro/Mods/balatroenginesim}"
 
 CHECK=0; LEGACY=1
@@ -69,10 +77,13 @@ sync_into() {
     # compare reports false differences (noted in CLAUDE.md).
     if ! diff -q --strip-trailing-cr "$f" "$dest/$f" >/dev/null 2>&1; then
       echo "  DRIFT  $label  $f"; n=$((n + 1))
-      if [ "$CHECK" = 0 ]; then
-        mkdir -p "$dest/$(dirname "$f")"; cp -p "$f" "$dest/$f"
-        [ -n "$cache" ] && { mkdir -p "$cache/$(dirname "$f")"; cp -p "$f" "$cache/$f"; }
-      fi
+      if [ "$CHECK" = 0 ]; then mkdir -p "$dest/$(dirname "$f")"; cp -p "$f" "$dest/$f"; fi
+    fi
+    # the cache is checked on its own: r2modman restores the install FROM it at launch, so a stale cache undoes a
+    # deploy even when the install itself is current
+    if [ -n "$cache" ] && ! diff -q --strip-trailing-cr "$f" "$cache/$f" >/dev/null 2>&1; then
+      echo "  DRIFT  $label-cache  $f"; n=$((n + 1))
+      if [ "$CHECK" = 0 ]; then mkdir -p "$cache/$(dirname "$f")"; cp -p "$f" "$cache/$f"; fi
     fi
   done < <(mod_files)
 

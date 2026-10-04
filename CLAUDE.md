@@ -72,7 +72,7 @@ thing **headless-testable**. See the Layout section in `README.md` for the per-f
   1. `%APPDATA%/r2modmanPlus-local/Balatro/profiles/Default/mods/Anto640-EngineSim/` — what an
      r2modman launch loads (`steam.exe -applaunch 2379780 --mod-dir "<profile>/mods"`). Imported
      2026-10-02 from `python tools/package_r2.py`'s zip via r2modman's Import local mod, so r2modman
-     lists it; `deploy.sh` keeps that package's own files (`manifest.json`, `icon.png`,
+     lists it. ⚠ r2modman RESTORES the mod from `cache/Anto640-EngineSim/<registered version>` (the installed `manifest.json`'s, still 0.5.0) at every launch -- `deploy.sh` now writes that cache too (2026-10-04: until then every deploy since the import was undone at launch). `deploy.sh` keeps that package's own files (`manifest.json`, `icon.png`,
      `mm_v2_manifest.json`) and falls back to the older `mods/balatroenginesim/` only when the
      package folder is absent. **Never leave a second copy of the mod inside `mods/`.**
   2. `%APPDATA%/Balatro/Mods/balatroenginesim/` — the OLD folder Lovely falls back to on a plain
