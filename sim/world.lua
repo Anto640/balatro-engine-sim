@@ -152,7 +152,7 @@ end
 -- A fresh run state. `opts` can override deck/start values (for tests / deck variants).
 function World.new_run(seed, opts)
   opts = opts or {}
-  return {
+  local run = {
     seed = seed,
     rng = opts.rng or lcg(seed or 1),
     deck = opts.deck or World.standard_deck(),
@@ -175,6 +175,14 @@ function World.new_run(seed, opts)
     won = false,
     build_plan = nil,
   }
+  -- probe: start the run already owning these jokers (sim/probe.lua `start_jokers`), to measure one joker's
+  -- realised behaviour over whole runs. nil on every normal run.
+  for _, k in ipairs((opts.probe and opts.probe.start_jokers) or {}) do
+    local d = JokerData.resolve(k)
+    run.jokers[#run.jokers + 1] = GS.joker{ key = k, name = d.name or k, cost = d.cost or 4,
+      sell_value = math.max(1, math.floor((d.cost or 4) / 2)), rarity = d.rarity, ability = { extra = {} } }
+  end
+  return run
 end
 
 -- ---- in-blind helpers -------------------------------------------------------

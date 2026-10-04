@@ -342,7 +342,11 @@ local function event_rate(gs, e)
   elseif fuel == "lucky_trigger" then
     return SCORED_PER_HAND * deck_enh_frac(gs, "m_lucky") * 0.20    -- lucky card scored, ~1/5 mult trigger
   elseif fuel == "card_add" then
-    return 0.06                                                     -- Standard/tarot deck additions, rare
+    -- MEASURED (2026-10-04, live NSWJJKK8 flag 1: Hologram lost a Buffoon pick to Splash): sim runs that OWN the
+    -- card-add scaler (only Hologram uses this fuel) add 1.35 cards an ante (n=334 ante-steps over 29 arms; net of
+    -- destroys, so a floor) = 0.18 per scoring hand at 7.5 hands an ante -- it buys Standard packs for it. 0.06 was a
+    -- guess below even the UNconditional rate (0.072).
+    return 0.18
   elseif fuel == "reroll" then
     return is_rich(gs) and 0.30 or 0.12                             -- money-gated
   elseif fuel == "skip" then
@@ -1649,6 +1653,12 @@ function Eval.joker_pick_frac(gs, sj, need, opts)
     local uf = Eval.utility_fraction(gs, key, opts, false)
     if uf then return uf, true end
   end
+  -- MODELLED SCALERS / DECK-MODIFIERS (2026-10-04, live NSWJJKK8 flag 1, owner-confirmed: Splash taken over Hologram):
+  -- the shop prices these through Eval.modeled_scoring_fraction (their projected growth), but a pack pick measured
+  -- the joker's score TODAY -- 0 for a Hologram with nothing added yet -- and fell to the tier floor, so every
+  -- scaling joker in a Buffoon pack was valued as if it never grew. Same basis as the shop buy (scoring_gain).
+  local modeled = Eval.modeled_scoring_fraction(gs, key, opts)
+  if modeled then return modeled, true end
   local m = JokerValue.score_delta(gs, sj, { samples = opts.samples or 6, rng = opts.rng, cache = opts.cache })
   if not m then return floor, false end
   m = Eval.forward_measure(gs, sj, m, opts)
@@ -1783,6 +1793,18 @@ local CONDITIONAL_ECON = {
   j_mail = function(gs, base, measured) return measured and mail_income(gs) or base end,
   j_todo_list = function(gs, base, measured) return measured and todo_income(gs) or base end,
   j_delayed_grat = function(gs, base, measured) return measured and delayed_grat_income(gs) or base end,
+  -- Faceless Joker: \$5 per discard of 3+ face cards. MEASURED, not the catalogue's \$3 (2026-10-04, live NSWJJKK8 flags 3/8,
+  -- owner-confirmed: Faceless sat unsold beside Ramen while full-board picks were skipped). What the engine actually
+  -- earns with it, over whole runs that start owning it (sim probe `faceless`, 44 seeds, 199 blinds): \$1.93 a blind;
+  -- with Ramen on the board \$0 (its discards are blocked, DiscardFuel.bleeds_scaler; pooled arms \$0.19); with Green
+  -- Joker ~\$0.2 (pooled \$0.35, probe \$0). The farm needs a one-hand clear in hand, so it pays mostly early.
+  j_faceless = function(gs, base)
+    for _, j in ipairs(gs.jokers or {}) do
+      if j.key == "j_ramen" then return 0.2 end
+      if j.key == "j_green_joker" then return 0.2 end
+    end
+    return 1.9
+  end,
   -- Rough Gem: $1 per Diamond scored. Baseline 13/52 = 25% diamonds.
   j_rough_gem = function(gs, base)
     local n, dia = deck_counts(gs)

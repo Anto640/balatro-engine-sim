@@ -620,6 +620,8 @@ Probe.CONFIGS = {
   -- prices as free (OwnedSynergy.reroll_free, the Chaos the Clown path) and takes only when it judges it worth it.
   ostock       = { free_voucher = "v_overstock_norm" },
   reroll1      = { free_rerolls = 1, free_rerolls_until = 3 },
+  -- start owning one joker (World.new_run), to measure its realised income/behaviour over whole runs
+  faceless     = { start_jokers = { "j_faceless" } },
 }
 
 -- Resolve a config name to the opts overlay Driver.run consumes. Returns nil for the

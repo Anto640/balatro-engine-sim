@@ -240,6 +240,7 @@ DE.AGGRO_MIN_HANDS = 3      -- require this many hands left (>= 2 spare after th
 DE.AGGRO_SAMPLES = 120      -- sharper survival estimate for the aggressive gate (2x the normal rollout)
 DE.DIG_MIN_HANDS = 1        -- require at least this many hands left (a discard costs no hand)
 DE.DIG_KEEP_GUARANTEE = true -- only pitch cards OUTSIDE the guaranteed play, so it stays guaranteed
+DE.DIG_KEEP_SCORING = os.getenv == nil or os.getenv("BES_DIG_KEEP_ALL") ~= "1"   -- money dig protects only the scoring cards (2026-10-04)
 -- Pitch only cards whose DiscardValue.keep_value is below this. Ordering alone is not enough:
 -- a dig may legally throw 5 cards, so "cheapest first" still ends up discarding a Gold card
 -- once the chaff runs out. Any enhancement or edition adds >= 25 and any non-Purple seal >= 15,
@@ -780,7 +781,18 @@ function DE.decide(gs, opts)
      and hands_left >= DE.DIG_MIN_HANDS and #hand > 0 then
     local keep = {}
     if DE.DIG_KEEP_GUARANTEE then
-      for _, c in ipairs(play_cards or {}) do keep[c] = true end
+      -- MONEY DIG KEEPS ONLY THE CARDS THAT CLEAR (2026-10-04, owner on live NSWJJKK8: "it had 4 discards to find 1 or
+      -- 2 sets of [faces] while keeping the winning hand"). Protecting the whole play -- its non-scoring kickers too --
+      -- left ~3 spare slots, so a Faceless search needed all 3 redraws to be faces (sim: Faceless paid \$0.72 a blind).
+      -- When the play's SCORING cards alone still guarantee the clear, only they are protected; the kickers become
+      -- spare and can be pitched or collect faces. The guarantee holds by construction (re-scored on those cards).
+      local protect = play_cards or {}
+      local sc = play_ev and play_ev.scoring_cards
+      if DE.DIG_KEEP_SCORING and want_money_dig and sc and #sc > 0 and #sc < #protect then
+        local ok, ev = pcall(HandEval.score, gs, sc)
+        if ok and ev and (ev.score_min or ev.score or 0) >= remaining then protect = sc end
+      end
+      for _, c in ipairs(protect) do keep[c] = true end
     end
     -- DiscardValue.keep_value prices held value (a plain card <= ~11, any enhancement/edition >= 25, a
     -- debuffed card < 0), so pitching by it never throws a Gold/Steel/Glass card.
