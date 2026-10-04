@@ -60,6 +60,7 @@ local suites = {
   "tests.test_paired_trade",
   "tests.test_econ_jokers",
   "tests.test_money_weight",
+  "tests.test_progress",
   "tests.test_purple_slot",
   "tests.test_telemetry",
   "tests.test_probe",

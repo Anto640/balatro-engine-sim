@@ -117,7 +117,7 @@ end
 -- the thinking row: the game's own progress bar (UIT progress_bar, drawn live from Overlay.state.progress)
 local function progress_bar()
   return { n = G.UIT.R, config = { align = "cm", padding = 0.04 }, nodes = {
-    { n = G.UIT.C, config = { align = "cm", minw = 3.0, minh = 0.14, r = 0.05, colour = G.C.BLACK,
+    { n = G.UIT.C, config = { align = "cm", minw = 3.1, minh = 0.09, r = 0.04, colour = G.C.BLACK,
         progress_bar = { max = 1, ref_table = Overlay.state, ref_value = "progress",
           empty_col = G.C.BLACK, filled_col = G.C.FILTER } }, nodes = {} },
   } }
@@ -162,20 +162,24 @@ function Panel.content(compact)
   local think = thinking()
   local has_move = st.headline and st.headline ~= "" and st.headline ~= "-"
   -- no move yet: show the status line ("Waiting for the next hand…") greyed in the headline slot.
-  -- Thinking: the previous move stays, greyed, so the panel doesn't jump; the bar replaces the tags.
+  -- Thinking: say so, with the progress bar under it (owner 2026-10-04: the greyed PREVIOUS move read as the answer).
   local head = has_move and st.headline or clip(st.reason ~= "" and st.reason or "No recommendation.", 44)
-  if think and not has_move then head = "Working it out..." end
+  if think then head = "Working out the best move..." end
   local tags = think and {} or Panel.tags()
   local note = Overlay.active_notice(Panel.now())
   if note then   -- a confirmation (F5 flag) leads the tag row
     if #tags > 0 then table.insert(tags, 1, { n = G.UIT.B, config = { w = 0.08, h = 0.1 } }) end
     table.insert(tags, 1, tag(note, G.C.GREEN))
   end
-  local body = {
-    { n = G.UIT.R, config = { align = "cm", maxw = 3.2 }, nodes = {
-      text(head, has_move and 0.36 or 0.3, (has_move and not think) and G.C.WHITE or G.C.UI.TEXT_INACTIVE),
-    } },
-  }
+  -- a long move WRAPS onto a second line instead of being squeezed (maxw) until it can't be read (owner 2026-10-04)
+  local hscale = (has_move and not think) and 0.36 or 0.32
+  local hcol = think and G.C.UI.TEXT_LIGHT or (has_move and G.C.WHITE or G.C.UI.TEXT_INACTIVE)
+  local hlines = Panel.wrap(Panel.plain(head), hscale, 3.2)
+  if #hlines > 2 then hlines = { hlines[1], table.concat(hlines, " ", 2) } end
+  local body = {}
+  for _, l in ipairs(hlines) do
+    body[#body + 1] = { n = G.UIT.R, config = { align = "cm", maxw = 3.2 }, nodes = { text(l, hscale, hcol) } }
+  end
   if think and not note then
     body[#body + 1] = progress_bar()
   elseif #tags > 0 then
@@ -191,8 +195,8 @@ function Panel.content(compact)
       label[#label + 1] = { n = G.UIT.B, config = { w = 0.05, h = 0.1 } }
       label[#label + 1] = tag("!", G.C.RED, 0.28)
     end
-    local line = { text(head, 0.3, (has_move and not think) and G.C.WHITE or G.C.UI.TEXT_INACTIVE) }
-    local tail = (think and not note) and { { n = G.UIT.C, config = { align = "cm", minw = 0.9, minh = 0.12, r = 0.05,
+    local line = { text(head, 0.32, (has_move and not think) and G.C.WHITE or G.C.UI.TEXT_LIGHT) }
+    local tail = (think and not note) and { { n = G.UIT.C, config = { align = "cm", minw = 1.4, minh = 0.08, r = 0.04,
       colour = G.C.BLACK, progress_bar = { max = 1, ref_table = Overlay.state, ref_value = "progress",
         empty_col = G.C.BLACK, filled_col = G.C.FILTER } }, nodes = {} } } or tags
     if #tail > 0 then line[#line + 1] = { n = G.UIT.B, config = { w = 0.1, h = 0.1 } } end
@@ -235,8 +239,7 @@ function Panel.tooltip()
     end
   end
   if thinking() then
-    para("Working out the best move for what's on screen now - wait for it before acting. "
-      .. "The move below is the previous one.", G.C.FILTER)
+    para("Working out the best move for what's on screen now - wait for it before acting.", G.C.FILTER)
   end
   para(st.reason)
   if st.score_pred and st.score_need then
@@ -330,6 +333,33 @@ function Panel.inject(def)
       if c and not c.button and (c.minh == 1 or c.minh == 1.15) then fitcfg.boxes[#fitcfg.boxes + 1] = c end
     end)
   end
+  -- more slack the bar has (owner 2026-10-04: keep the two-row panel readable and squeeze the rest instead):
+  --   the Run Info / Options stack's padding, the hand-name row above chips x mult (minh 1.1) and that row's padding,
+  --   the empty gaps between the hands / money / ante boxes, and the Round score row's padding
+  walk(def, function(n)
+    local c = n.config
+    if not c then return end
+    if c.id == "button_area" then fitcfg.button_area = c end
+    if c.id == "row_dollars_chips" and n.nodes and n.nodes[1] and n.nodes[1].config then fitcfg.score_pad = n.nodes[1].config end
+    if c.id == "hand_text_area" then
+      fitcfg.hand_rows = {}
+      walk(n, function(m)
+        local mc = m.config
+        if m ~= n and m.n == G.UIT.R and mc and (mc.minh == 1.1 or (mc.minh == 1 and (mc.padding or 0) >= 0.1)) then
+          fitcfg.hand_rows[#fitcfg.hand_rows + 1] = mc
+        end
+      end)
+    end
+  end)
+  if rparent then
+    fitcfg.gaps = {}
+    walk(rparent.nodes[ri], function(m)
+      local mc = m.config
+      if m.n == G.UIT.R and mc and mc.minh and mc.minh > 0.1 and mc.minh < 0.2 and (not m.nodes or #m.nodes == 0) then
+        fitcfg.gaps[#fitcfg.gaps + 1] = mc
+      end
+    end)
+  end
   row.config.bes_fitcfg = fitcfg
   return def
 end
@@ -373,11 +403,21 @@ Panel.FIT_STEPS = {
       for _, c in ipairs(f.buttons) do c.minh = math.min(c.minh or MIN_BTN_H, MIN_BTN_H) end end },
   { name = "tighter bar spacing", apply = function(e, f)
       if f.bar and (f.bar.padding or 0) > 0.04 then f.bar.padding = 0.04 end end },
-  { name = "compact one-line panel", apply = function(e, f)
-      e.config.bes_compact = true; rebuild_children(e) end },
+  { name = "tighter Run Info / Options stack", apply = function(e, f)
+      if f.button_area and (f.button_area.padding or 0) > 0.08 then f.button_area.padding = 0.08 end end },
+  { name = "shorter hand-name row", apply = function(e, f)
+      for _, c in ipairs(f.hand_rows or {}) do
+        if c.minh == 1.1 then c.minh = 0.8 elseif (c.padding or 0) > 0.05 then c.padding = 0.05 end
+      end end },
+  { name = "tighter money / ante gaps and Round score row", apply = function(e, f)
+      for _, c in ipairs(f.gaps or {}) do c.minh = 0.05 end
+      if f.score_pad and (f.score_pad.padding or 0) > 0.05 then f.score_pad.padding = 0.05 end end },
   { name = "shorter hands / money / ante boxes", apply = function(e, f)
       for _, c in ipairs(f.boxes) do c.minh = c.minh * 0.82 end
       for _, c in ipairs(f.buttons) do c.minh = 1.0 end end },
+  -- LAST resort only (owner 2026-10-04: the one-line panel's text is too small to read)
+  { name = "compact one-line panel", apply = function(e, f)
+      e.config.bes_compact = true; rebuild_children(e) end },
 }
 
 function Panel.fit(e)

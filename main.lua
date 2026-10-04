@@ -414,6 +414,8 @@ local function clock() return (love and love.timer and love.timer.getTime()) or 
 
 function BES.think_begin(kind)
   BES.thinking = { kind = kind, t0 = clock(), units0 = BES.work_units }
+  local okp, Progress = pcall(require, "util.progress")
+  if okp then Progress.begin() end
   if Overlay and Overlay.set_thinking then Overlay.set_thinking(true, clock()) end
 end
 -- `learn`: a decision that ran to completion updates the expected-work estimate for its kind
@@ -423,6 +425,8 @@ function BES.think_end(learn)
   local used = BES.work_units - th.units0
   if learn and used > 0 then BES.EXPECT[th.kind] = 0.7 * (BES.EXPECT[th.kind] or used) + 0.3 * used end
   BES.thinking = nil
+  local okp, Progress = pcall(require, "util.progress")
+  if okp then Progress.stop() end
   if Overlay and Overlay.set_thinking then Overlay.set_thinking(false, clock()) end
 end
 -- per frame: the progress bar fills toward the learned expectation (capped below full until the answer lands)
@@ -432,6 +436,13 @@ function BES.think_progress()
   -- safety valve: the self-player waits on BES.thinking, so a flag left set with no job must never stall it
   if not BES.job and clock() - th.t0 > 2 then BES.think_end(false); return end
   if not Overlay then return end
+  -- the ENGINE's own report (util/progress: shop items / discard candidates / pack cards done) when it has one --
+  -- real progress, owner 2026-10-04 -- else work done against the learned typical amount for this kind
+  local okp, Progress = pcall(require, "util.progress")
+  if okp and Progress.frac and Progress.frac > 0 then
+    Overlay.state.progress = math.min(0.98, Progress.frac)
+    return
+  end
   local exp = BES.EXPECT[th.kind] or 1000
   Overlay.state.progress = math.min(0.97, (BES.work_units - th.units0) / math.max(1, exp))
 end
@@ -789,6 +800,11 @@ end
 BES_FLAGLOG = "bes_flagged.jsonl"
 BES_FLAG_KEEP = 4      -- owner 2026-10-03: F5 is pressed right after the misplay; 12 diluted the flag (was 12)
 BES.recent = {}            -- ring of { gs, best, move, reason, kind, t, clock, auto }
+-- A LOST RUN SAVES ITSELF (owner 2026-10-04: "i also forgot to flag that in the blind where it died"). A longer ring
+-- of the last BES_DEATH_KEEP decisions -- a whole death blind plus the shop before it -- is written to the same file
+-- automatically at GAME_OVER, as flag "<date> death", so every death can be replayed without an F5.
+BES_DEATH_KEEP = 12
+BES.recent_long = {}
 
 local function flag_choice(best)
   return best and { type = best.type, target = best.target and (best.target.name or best.target.key),
@@ -803,9 +819,11 @@ function BES.remember(last)
     move = Overlay and Overlay.state.move, reason = best and best.reason,
     cards = best and best.cards, t = clock(), clock = os.date("%H:%M:%S"),
     auto = (Autoplay and Autoplay.enabled) or false }
-  local r = BES.recent
-  if r[#r] and r[#r].gs == last.gs then r[#r] = entry else r[#r + 1] = entry end
-  while #r > BES_FLAG_KEEP do table.remove(r, 1) end
+  for _, ring in ipairs({ { BES.recent, BES_FLAG_KEEP }, { BES.recent_long, BES_DEATH_KEEP } }) do
+    local r, keep = ring[1], ring[2]
+    if r[#r] and r[#r].gs == last.gs then r[#r] = entry else r[#r + 1] = entry end
+    while #r > keep do table.remove(r, 1) end
+  end
 end
 
 -- build the flag records (pure apart from the clock; exposed for tests)
@@ -813,9 +831,10 @@ end
 -- flags were saved, none with an error logged -- the whole flag ran under one pcall, so one state that failed to
 -- serialise dropped every state of that press silently). A state that fails is still written as a minimal record
 -- (advice, time, the error) and the failure is logged, so a press is never lost.
-function BES.flag_records(flag_id)
-  local out, n = {}, #BES.recent
-  for i, e in ipairs(BES.recent) do
+function BES.flag_records(flag_id, ring)
+  ring = ring or BES.recent
+  local out, n = {}, #ring
+  for i, e in ipairs(ring) do
     local ok_fx, fx = pcall(ReplayFixture.fixture_of, e.gs, flag_choice(e.best), i, e.kind)
     if not ok_fx or type(fx) ~= "table" then
       Log.error("F5: could not save decision " .. i .. " (" .. tostring(e.kind) .. "): " .. tostring(fx))
@@ -831,10 +850,10 @@ function BES.flag_records(flag_id)
   return out
 end
 
-function BES.flag()
+function BES.flag(ring, suffix)
   if not (ReplayFixture and Json) then return 0 end
-  local flag_id = os.date("%Y-%m-%d %H:%M:%S")
-  local ok_r, recs = pcall(BES.flag_records, flag_id)
+  local flag_id = os.date("%Y-%m-%d %H:%M:%S") .. (suffix or "")
+  local ok_r, recs = pcall(BES.flag_records, flag_id, ring)
   if not ok_r then
     Log.error("F5: flag failed: " .. tostring(recs))
     recs = { { kind = "state", v = 2, flag_id = flag_id, steps_before = 0, error = tostring(recs) } }
@@ -855,7 +874,7 @@ function BES.flag()
     pcall(love.filesystem.append, BES_FLAGLOG, table.concat(lines, "\n") .. "\n")
   end
   Log.info(string.format("FLAGGED %s: saved the last %d decision(s) to %s", flag_id, #lines, BES_FLAGLOG))
-  if Overlay and Overlay.notify then
+  if Overlay and Overlay.notify and not suffix then
     Overlay.notify(string.format("Flagged (%d)", #lines), clock(), 4)
   end
   return #lines
@@ -990,6 +1009,13 @@ function BES.observe(gs)
   pcall(function() tel:trace(BES.scene_of(gs)) end)
   pcall(function() BES.emit_fixture(gs) end)
   pcall(function() BES.track_play(gs) end)
+  local over = gs and gs.meta and gs.meta.state == "GAME_OVER"
+  if over and not BES._death_saved and #BES.recent_long > 0 then
+    BES._death_saved = true
+    pcall(BES.flag, BES.recent_long, " death")
+  elseif not over and BES._death_saved and gs and gs.meta and gs.meta.state ~= "GAME_OVER" and gs.hand and #gs.hand > 0 then
+    BES._death_saved = nil; BES.recent_long = {}     -- a new run is being played
+  end
 end
 
 -- Gate: only re-evaluate when something relevant changed. Runs the CHEAP engine

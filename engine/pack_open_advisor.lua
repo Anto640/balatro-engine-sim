@@ -16,6 +16,7 @@ local Mechanics = require("engine.mechanics")
 local Tarot = require("engine.tarot")
 local VU = require("engine.value_units")
 local Cards = require("util.cards")
+local Progress = require("util.progress")   -- the live Thinking bar (inert unless armed)
 local BuildPlan = require("engine.build_plan")
 
 local PO = {}
@@ -248,7 +249,9 @@ function PO.recommend(gs, opts)
   end
 
   local valued = {}
+  Progress.span(#p.items + 1)   -- each card, then the swap / ordering work after
   for _, it in ipairs(p.items) do
+    Progress.step()
     -- A Standard-pack card's ability.name is only its enhancement/center label ("Gold
     -- Card") -- it drops the rank and suit. Name it by the SPECIFIC card so the advice
     -- says "take the Gold King of Hearts", not a vague "take Gold Card".

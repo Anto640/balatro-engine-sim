@@ -27,6 +27,7 @@ local Cards = require("util.cards")
 local BuildPlan = require("engine.build_plan")
 local Generators = require("engine.generators")
 local VU = require("engine.value_units")
+local Progress = require("util.progress")   -- the live Thinking bar (inert unless armed)
 
 local SA = {}
 
@@ -988,6 +989,8 @@ function SA.recommend(gs, opts)
   -- "that category skipped" instead of crashing the whole shop recommendation.
   local warns = {}
   local function try(fn) local ok, e = pcall(fn); if not ok then warns[#warns + 1] = tostring(e) end end
+  -- progress for the live Thinking bar: one step per shop item, then the reroll / sell / sell-to-buy passes
+  Progress.span(#(shop.jokers or {}) + #(shop.consumables or {}) + #(shop.vouchers or {}) + #(shop.boosters or {}) + 3)
 
   -- Every priced shop item (affordable OR not), so the SELL_TO_BUY pass can fund a
   -- wanted-but-unaffordable buy by selling a low-value owned item. Affordable ones are
@@ -1014,7 +1017,7 @@ function SA.recommend(gs, opts)
   local best_offer = 0
   -- per-ITEM pcall: a single odd joker can't drop the whole buy list (which is
   -- what made Abstract/Acrobat vanish when one shop joker threw).
-  for _, sj in ipairs(shop.jokers or {}) do try(function()
+  for _, sj in ipairs(shop.jokers or {}) do Progress.step(); try(function()
     -- UNMODELLED joker: the engine can't value it or tell you how to use it, so never recommend
     -- SPENDING to acquire it (skip it entirely -- not even as a SELL_TO_BUY funding target). Owner
     -- directive 2026-08-30; currently only Matador (JokerData.UNMODELLED).
@@ -1087,7 +1090,7 @@ function SA.recommend(gs, opts)
   -- planet is priced against the hand's bare base and understates 1.4-19x (CV.level_gain).
   local cfreq, cctx = nil, nil
   try(function() for _, it in ipairs(shop.consumables or {}) do if it.set == "Planet" then cfreq, cctx = ConsumableValue.hand_frequencies(gs, { samples = 8, rng = rng }); break end end end)
-  for _, it in ipairs(shop.consumables or {}) do try(function()
+  for _, it in ipairs(shop.consumables or {}) do Progress.step(); try(function()
     local cost = OwnedSynergy.consumable_free(gs, it.set) and 0 or (it.cost or 3) -- Astronomer: planets free
     local vfrac, gain, note = ConsumableValue.card_value(gs, it.set, it.key, cfreq, cneed, rng, nil, cctx)
     -- B1 leveling axis: a hand level raises the base the board's xmult multiply, so amplify a
@@ -1162,7 +1165,7 @@ function SA.recommend(gs, opts)
   end) end
 
   -- BUY_VOUCHER (permanent meta-upgrade; valued by engine/vouchers)
-  for _, v in ipairs(shop.vouchers or {}) do try(function()
+  for _, v in ipairs(shop.vouchers or {}) do Progress.step(); try(function()
     local cost = v.cost or 10
     local vval, vecon, vname, vnote = Vouchers.value(gs, v.key,
       { rng = rng, cache = mopts.cache, samples = 6, at_risk = not secure })
@@ -1181,7 +1184,7 @@ function SA.recommend(gs, opts)
   -- BUY_PACK (booster packs). Valued by what the pack grants, calculated where
   -- possible: Celestial uses the measured best-hand level gain; Buffoon is a
   -- joker pick (weighted by whether we need scoring); others are estimated.
-  for _, pk in ipairs(shop.boosters or {}) do try(function()
+  for _, pk in ipairs(shop.boosters or {}) do Progress.step(); try(function()
     local kind = Packs.size_of(pk.key or pk.name)             -- joker/tarot/planet/...
     local sbonus, snote = OwnedSynergy.pack_bonus(gs, kind)   -- jokers you own that fire on opening
     local cost = OwnedSynergy.pack_free(gs, kind) and 0 or (pk.cost or 4) -- Astronomer: Celestial free
@@ -1238,6 +1241,7 @@ function SA.recommend(gs, opts)
     end
   end) end
 
+  Progress.step()
   -- REROLL: pay to replace the shop's offerings. Worth its price only when (a)
   -- you can still afford to BUY the joker it surfaces (rerolling your last $5 to
   -- $0 buys nothing), and (b) the expected new joker beats what's already here.
@@ -1317,6 +1321,7 @@ function SA.recommend(gs, opts)
   end
   end)
 
+  Progress.step()
   -- SELL_JOKER. Value the weakest sellable joker against the three circumstances
   -- that justify a sale, all in the future-value currency (W_FV-weighted):
   --   (1) UPGRADE  -- slots are full and the shop has a better joker that the
@@ -1682,6 +1687,7 @@ function SA.recommend(gs, opts)
     end
   end)
 
+  Progress.step()
   -- SELL_TO_BUY -- fund a wanted-but-unaffordable shop item by selling a low-value
   -- owned joker / held consumable. For each priced item we can't afford, find the
   -- funder whose sale (a) covers the gap (cash + frees the right slot) and (b) gives

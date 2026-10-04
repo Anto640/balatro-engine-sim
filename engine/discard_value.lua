@@ -8,6 +8,7 @@
 
 local HandEval = require("engine.hand_eval")
 local Cards = require("util.cards")
+local Progress = require("util.progress")   -- the live Thinking bar (inert unless armed)
 
 local DV = {}
 
@@ -224,8 +225,10 @@ function DV.best(gs, opts)
   end
 
   local best
+  Progress.span(#candidates)
   for _, discard in ipairs(candidates) do
     local v = DV.measured(gs, discard, opts)
+    Progress.step()
     if v and (not best or v > best.value) then
       local drop = {}
       for _, c in ipairs(discard) do drop[c] = true end
@@ -234,6 +237,7 @@ function DV.best(gs, opts)
       best = { cards = discard, keep = keep, value = v, measured = true }
     end
   end
+  Progress.close()
   return best
 end
 

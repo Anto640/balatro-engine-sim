@@ -120,7 +120,7 @@ return function(t)
     t.ok(all:find("Copies your best joker %- big gain%."), "tooltip carries the reason (dash made plain)")
     t.ok(not all:find("\226\128\148"), "no em dash reaches the pixel font")
 
-    -- thinking: pulsing label, the old move greyed, the game's progress bar instead of the tags
+    -- thinking: pulsing label, a "working it out" line (not the old move greyed), the progress bar instead of the tags
     local saved_love = _G.love
     local now = 50
     _G.love = { timer = { getTime = function() return now end } }
@@ -131,9 +131,10 @@ return function(t)
     c = Panel.content()
     t.eq(c.nodes[1].nodes[2].nodes[1].config.text, "Thinking", "label reads Thinking once it lasts")
     body = c.nodes[2].nodes
-    t.eq(body[1].nodes[1].config.text, "Buy Blueprint", "the previous move stays in place")
-    t.eq(body[1].nodes[1].config.colour, G.C.UI.TEXT_INACTIVE, "... greyed")
-    local bar = body[2].nodes[1].config.progress_bar
+    local htext = {}
+    for i = 1, #body - 1 do htext[#htext + 1] = body[i].nodes[1].config.text end
+    t.eq(table.concat(htext, " "), "Working out the best move...", "says it is working, not the previous move greyed")
+    local bar = body[#body].nodes[1].config.progress_bar
     t.ok(bar and bar.ref_table == Overlay.state and bar.ref_value == "progress", "progress bar bound to the live progress")
     Panel.tick_pulse(1.0)
     t.ok(Panel.pulse and Panel.pulse[1] ~= nil, "pulse colour animates in place")
@@ -192,8 +193,8 @@ return function(t)
     local e0, h0 = fit_case(0)
     t.eq(e0.config.bes_fit or 0, 0, "a bar that fits is left alone")
     local e1, h1 = fit_case(1.0)
-    t.eq(e1.config.bes_fit, 3, "a taller bar: buttons, spacing, then the compact panel")
-    t.ok(e1.config.bes_compact, "... compact one-line panel")
+    t.ok(e1.config.bes_fit > 2 and e1.config.bes_fit < #Panel.FIT_STEPS, "a taller bar: buttons, spacing, boxes ...")
+    t.ok(not e1.config.bes_compact, "... keeping the two-row panel (compact is the last resort)")
     t.ok(h1 <= 12.9 - 0.16 + 1e-9, "... and it now fits (" .. string.format("%.2f", h1) .. ")")
     t.eq(e1.config.align, "cm", "... with no last-resort push")
     local e2 = fit_case(2.0)
