@@ -162,7 +162,8 @@ return function(t)
     _G.love = saved_love
 
     -- ---- fitting the left bar on screen: gentlest steps first, re-measured after each ----
-    local function fit_case(extra)
+    local function fit_case(extra, box)
+      box = box or { v = extra }
       local f = { bar = { padding = 0.08 }, buttons = { { minh = 1.75 }, { minh = 1.75 } },
         boxes = { { minh = 1.15 }, { minh = 1 }, { minh = 1 } } }
       local last = { T = { y = 0, h = 0 } }
@@ -175,7 +176,7 @@ return function(t)
         local btn = f.buttons[1].minh + f.buttons[2].minh + 0.6
         local col = f.boxes[1].minh + f.boxes[2].minh + f.boxes[3].minh + 0.6
         local rr = math.max(btn, col)
-        local bar = panel + extra + 7.05 + rr + 6 * f.bar.padding
+        local bar = panel + box.v + 7.05 + rr + 6 * f.bar.padding
         e.T.h = panel
         last.T.y, last.T.h = e.T.y + bar - rr, rr
       end
@@ -185,7 +186,7 @@ return function(t)
       hud.recalculate()
       Panel.fit(e)
       local h = (last.T.y + last.T.h) - e.T.y
-      return e, h
+      return e, h, box
     end
     local saved_love2 = _G.love
     _G.love = { graphics = { getHeight = function() return 258 end }, timer = { getTime = function() return 0 end } }
@@ -201,6 +202,13 @@ return function(t)
     t.eq(e2.config.bes_fit, #Panel.FIT_STEPS, "a very tall bar uses every step")
     t.eq(e2.config.align, "bm", "... then keeps the top on screen (content pinned to the bottom of a taller first row)")
     t.ok(e2.config.bes_push and e2.config.bes_push > 0, "... by exactly the remaining overflow")
+    -- the one-line panel is reversible: once the long content is gone, the next fit goes back to two rows
+    local box = { v = 2.4 }
+    local e3 = fit_case(nil, box)
+    t.ok(e3.config.bes_compact, "a big overflow uses the one-line panel")
+    box.v = 1.0
+    e3.UIBox.recalculate(); Panel.fit(e3)
+    t.ok(not e3.config.bes_compact, "... and drops it again once two rows fit")
     _G.love = saved_love2
 
     -- hidden (F9): a spacer-sized blank

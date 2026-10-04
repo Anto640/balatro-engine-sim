@@ -387,7 +387,9 @@ local FIT_MARGIN = 0.04   -- game units kept clear above and below
 -- the one-line panel is only worth its unreadable text for a REAL overflow: a bar a hair too tall (the hand-name
 -- row grows a little once a hand is played -- live 2026-10-04, 12.78 vs 12.74 flipped it to one line mid-run) keeps
 -- the two rows and lets the last-resort push trim that sliver off the bottom instead
-Panel.COMPACT_MIN_OVER = 0.25
+-- 0.5 (2026-10-04 evening, owner's screen: a move wrapping to two lines put the bar 0.28 over and the old 0.25 threw
+-- the rest of the run onto one line; a push of that size only trims the bar's bottom padding)
+Panel.COMPACT_MIN_OVER = 0.5
 
 -- Visible screen height in game units (the game scales the room to fit and centres it on the bar's centre).
 function Panel.visible_h()
@@ -436,6 +438,15 @@ function Panel.fit(e)
   -- measure the bar WITHOUT any last-resort push (minh / align are restored first)
   if e.config.bes_push then e.config.minh, e.config.align, e.config.bes_push = nil, "cm", nil; hud:recalculate() end
   local function bar_h() return (last.T.y + last.T.h) - e.T.y end
+  -- the one-line panel is REVERSIBLE: it was applied for a long move (a two-line headline) and then kept for the rest
+  -- of the run, leaving space above and below a one-line panel (owner 2026-10-04). Try two rows again on every fit.
+  if e.config.bes_compact then
+    local ci
+    for i, st in ipairs(Panel.FIT_STEPS) do if st.name == "compact one-line panel" then ci = i end end
+    e.config.bes_compact = nil
+    rebuild_children(e)
+    if ci then e.config.bes_fit = math.min(e.config.bes_fit or 0, ci - 1) end
+  end
   local h0 = bar_h()
   local step, applied = e.config.bes_fit or 0, {}
   while bar_h() - avail > 0.005 and step < #Panel.FIT_STEPS do
