@@ -1,5 +1,12 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-05)
+**Live = c85e745+ (deployed).** Overnight F5 review of UAPB3XY9 (+ the run's auto-saved death): arm `fz` vs `ob` (the Orbital
+fidelity baseline) +0.126 n.s., wins 48 -> 43, reach-7 81 -> 93 -> shipped as correctness; split `fzt` (tarot per-hand off)
+pending. **Baseline for new arms: `sim_out/fz.jsonl`.** Owner raised (10-05) that the F5 loop is slow for small gains;
+proposed next: a valuation UNIT-CONSISTENCY audit by the assistant (one-hand vs per-hand, \$/round vs lump, board position,
+guessed vs measured inputs) -- the class that produced most real finds -- before more F5 sessions.
+
 ## START HERE (2026-10-04)
 **Deploy bug found + fixed (`40d78a0`):** r2modman restores the mod from `cache/Anto640-EngineSim/<registered version
 0.5.0>` at every launch, and deploy.sh only wrote the 0.5.1 cache -- so nothing deployed since 2026-10-02 ran live
