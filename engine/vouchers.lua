@@ -285,22 +285,19 @@ V.SAVINGS = {
   v_reroll_glut    = function(ante, gs) return 2 * V.rerolls_per_visit(gs) * V.SHOPS_PER_ROUND end,
 }
 -- expected dollars a discount voucher saves from now to the end of the run (half the current ante still to play)
--- EARLY-ANTE GATE for the shop DISCOUNTS (owner 2026-10-05: "not great to buy antes 1 and 2 maybe 3 cause money is
--- low and need for scoring and econ is high"; arm fzt: runs that bought Clearance, 21 of 31 at antes 1-2, won 12 -> 8).
--- The savings arrive over the whole run while the \$10 comes out of the antes where money buys the most power. No credit
--- before V.DISCOUNT_MIN_ANTE; at that ante only when the purchase still leaves the bank at the interest cap.
-V.DISCOUNT_MIN_ANTE = 3
-V.DISCOUNT_KEYS = { v_clearance_sale = true, v_liquidation = true }
+-- TIME VALUE (owner 2026-10-05: a hard "not before ante 3" rule is against the spirit of the engine). A dollar SAVED
+-- at a later ante is worth less than a dollar PAID now -- early money buys power that compounds, a late dollar buys
+-- a late reroll -- so each ante's saving is converted to today's dollars by the engine's own ante-aware dollar value
+-- (VU.dollar_frac: higher early, lower late; one rate used everywhere). Whether the \$10 itself can be spared now (the
+-- interest it costs, being short of money early) is priced on the cost side as for every buy.
 function V.savings_dollars(gs, key)
   local f = V.SAVINGS[key]
   if not f then return nil end
   local a = math.max(1, math.min(8, math.floor((gs and gs.meta and gs.meta.ante) or 1)))
-  if V.DISCOUNT_KEYS[key] then
-    if a < V.DISCOUNT_MIN_ANTE then return 0 end
-    if a == V.DISCOUNT_MIN_ANTE and dollars(gs) - 10 < cap_int(gs) * 5 then return 0 end
-  end
+  local now = VU.dollar_frac({ meta = { ante = a } })
+  local function today(k) return VU.dollar_frac({ meta = { ante = k } }) / now end
   local total = 1.5 * f(a, gs)
-  for k = a + 1, 8 do total = total + (V.REACH[k] / V.REACH[a]) * 3 * f(k, gs) end
+  for k = a + 1, 8 do total = total + (V.REACH[k] / V.REACH[a]) * 3 * f(k, gs) * today(k) end
   return total
 end
 -- shop views per blind (each visit, plus its rerolls at this bankroll)

@@ -48,11 +48,13 @@ return function(t)
   -- discount vouchers: total measured dollars saved over the rest of the run (owner: "didn't buy clearance sale")
   local V = require("engine.vouchers")
   local function at(a, d) return V.savings_dollars({ meta = { ante = a }, economy = { dollars = d or 20 } }, "v_clearance_sale") end
-  t.ok(at(4) > at(6) and at(6) > at(8), "Clearance Sale saves less the later it is bought")
+  t.ok(at(1) > at(4) and at(4) > at(6) and at(6) > at(8), "Clearance Sale saves less the later it is bought")
   t.ok(at(4) > 10 and at(6) > 10, "... and more than its $10 price through ante 6")
-  t.eq(at(1, 60), 0, "never credited at antes 1-2 (owner: money is short and scoring/econ need is high)")
-  t.eq(at(3, 20), 0, "at ante 3 only when the buy still leaves the bank at the interest cap")
-  t.ok(at(3, 40) > 10, "... which $40 does")
+  -- no hard ante rule (owner): later savings are converted to today's dollars (VU.dollar_frac)
+  local undiscounted = 0
+  for k = 2, 8 do undiscounted = undiscounted + (V.REACH[k] / V.REACH[1]) * 3 * 0.25 * V.SPEND_PER_ROUND[k] end
+  t.ok(at(1) < undiscounted, "savings at ante 1 are discounted to today's dollars (early money is worth more)")
+  t.eq(at(3, 20), at(3, 60), "no bank-size rule inside the savings (the interest cost is priced on the cost side)")
   t.ok(at(8) < 10, "... but not at ante 8")
   t.eq(V.savings_dollars({ meta = { ante = 3 } }, "v_telescope"), nil, "only discount vouchers are priced by savings")
 
