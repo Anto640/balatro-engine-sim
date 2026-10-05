@@ -304,7 +304,9 @@ NOTE: `xmult_scaling` jokers ARE xmult — use `JokerData.is_xmult()`.
 - **Toolchain on this machine:** `lua`/`luajit` need
   `export PATH="$PATH:/c/Users/Anto/AppData/Local/Programs/LuaJIT/bin:/c/Users/Anto/AppData/Local/Programs/Lua/bin"` in
   every Bash call. From PowerShell, `bash` resolves to WSL; launch a detached batch with
-  `Start-Process "C:\Program Files\Git\bin\bash.exe" -ArgumentList "-l","<script>" -WindowStyle Hidden` so a memory reap of
+  `cmd /c start "" /min /belownormal "C:\Program Files\Git\bin\bash.exe" -l <script>` -- BELOW-NORMAL priority, inherited
+  by every worker (11 normal-priority workers on this 6-core/12-thread CPU made the Claude Code CLI crawl; owner
+  2026-10-05) -- so a memory reap of
   the session shell can't stop it.
 
 ## Git
