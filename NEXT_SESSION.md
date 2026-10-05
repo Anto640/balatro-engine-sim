@@ -2,8 +2,8 @@
 
 ## START HERE (2026-10-05)
 **Live = c85e745+ (deployed).** Overnight F5 review of UAPB3XY9 (+ the run's auto-saved death): arm `fz` vs `ob` (the Orbital
-fidelity baseline) +0.126 n.s., wins 48 -> 43, reach-7 81 -> 93 -> shipped as correctness; split `fzt` (tarot per-hand off)
-pending. **Baseline for new arms: `sim_out/fz.jsonl`.** Owner raised (10-05) that the F5 loop is slow for small gains;
+fidelity baseline) +0.126 n.s., wins 48 -> 43, reach-7 81 -> 93 -> shipped as correctness; split `fzt`: tarot per-hand alone +0.234
+(p 0.14, wins +4); the other fixes alone -0.108 n.s., wins -9 (Clearance-buying runs 12->8, rest 36->31) -- watch early Clearance buys. **Baseline for new arms: `sim_out/fz.jsonl`.** Owner raised (10-05) that the F5 loop is slow for small gains;
 proposed next: a valuation UNIT-CONSISTENCY audit by the assistant (one-hand vs per-hand, \$/round vs lump, board position,
 guessed vs measured inputs) -- the class that produced most real finds -- before more F5 sessions.
 
