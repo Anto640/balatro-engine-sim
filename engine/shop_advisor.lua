@@ -922,7 +922,7 @@ function SA.recommend(gs, opts)
   -- floor hid a ~450-a-hand Walkie Talkie behind a ~1900-a-hand Gros Michel -- live UAPB3XY9 flag 4b)
   local trade_mopts = {}
   for k, v in pairs(swap_mopts) do trade_mopts[k] = v end
-  trade_mopts.plain_unfloored = true
+  trade_mopts.plain_unfloored = not (os.getenv and os.getenv("BES_TRADE_FLOORED") == "1")   -- A/B switch
   local swap_bar_memo
   local function swap_bar()   -- lazy + memoised: only the full-board reroll / Buffoon paths need it
     if swap_bar_memo == nil then swap_bar_memo = full_board_swap_bar(gs, mopts) or false end
