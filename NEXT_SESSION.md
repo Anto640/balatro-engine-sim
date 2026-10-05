@@ -1,5 +1,13 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-05 evening)
+**Live = 1f44bff (deployed).** Owner follow-ups shipped (arms ga/gb/gc/gd, all n.s. vs fz; the B1 level-amplifier
+double-count fix alone +0.089, reach-8 +8). **Baseline for new arms: `sim_out/gc.jsonl`** -- `fz` (6.21) looks like a lucky
+high, every arm around it sits at 6.08-6.09. **Next (owner-agreed direction): common random numbers in the sim** -- one RNG
+stream per purpose (shop/pack/deal/boss) derived from seed + position, so a changed decision no longer re-rolls the rest
+of the run (divergence noise is what keeps most fixes below the MDE); then the valuation unit-consistency audit.
+Parked: trade-away v2 patch (measured SELECTION, floored threshold) in the job tmp (not in repo).
+
 ## START HERE (2026-10-05)
 **Live = c85e745+ (deployed).** Overnight F5 review of UAPB3XY9 (+ the run's auto-saved death): arm `fz` vs `ob` (the Orbital
 fidelity baseline) +0.126 n.s., wins 48 -> 43, reach-7 81 -> 93 -> shipped as correctness; split `fzt`: tarot per-hand alone +0.234
