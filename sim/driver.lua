@@ -237,12 +237,14 @@ function Driver.run(seed, opts)
       emit(r)
     end
 
+    World.checkpoint(run, "ante", ante)        -- common random numbers (World.stream): the boss roll
     local blinds = World.ante_blinds(run)
     for _, blind in ipairs(blinds) do
       run.round = run.round + 1
       -- SKIP decision (Small/Big only): offer a tag, ask the engine, and if it skips,
       -- take the tag's effect and move to the next blind (no play, no income, NO shop).
       if blind.type ~= "Boss" and content.gen_tag then
+        World.checkpoint(run, "tag", ante, run.round)       -- the tag, its Orbital hand, a skipped tag's pack
         blind.skip_tag = content.gen_tag(run.rng, run.ante)   -- E-11: 9 tags are ante-gated (min_ante 2)
         -- the Orbital tag names its hand when offered; the engine sees it (live: G.GAME.orbital_choices)
         run._orbital_hand = (blind.skip_tag == "tag_orbital" and content.orbital_hand) and content.orbital_hand(run, run.rng) or nil
@@ -277,6 +279,7 @@ function Driver.run(seed, opts)
         end
       end
 
+      World.checkpoint(run, "blind", ante, run.round)     -- the deal and every in-blind roll
       local result = World.play_blind(run, blind)
       -- Mr Bones: prevents death if you scored >= 25% of the requirement, then is
       -- destroyed. -- VERIFY (works on any blind). Models a real death-prevention joker.
@@ -345,6 +348,7 @@ function Driver.run(seed, opts)
       -- SHOP: generate offerings + let the engine spend (injected; no-op stub by default).
       -- emit forwards the action trace (shop offers/advice, buys, sells, packs) into the
       -- run's records, so analyze_runs surfaces what it bought AND what it SKIPPED.
+      World.checkpoint(run, "shop", ante, run.round)      -- the shop's first offers
       content.shop_phase(run, { rng = run.rng, emit = emit })
       ::next_blind::
     end

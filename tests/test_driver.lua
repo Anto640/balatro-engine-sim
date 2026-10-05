@@ -32,11 +32,21 @@ return function(t)
   -- W4: a pending Hieroglyph -1 ante (run._ante_back, set by apply_voucher) REPLAYS the
   -- ante -- one extra ante of blinds/shops -- instead of advancing or winning for free.
   do
-    local applied = false
-    local stub = { shop_phase = function(run)
-      if not applied then applied = true; run._ante_back = (run._ante_back or 0) + 1 end
-    end }
-    local res = Driver.run(2, { max_ante = 1, content = stub })
+    -- the first of a few seeds whose ante-1 boss is cleared (which seed clears depends on the deals -- common random
+    -- numbers changed them, 2026-10-05); the assertion is about the REPLAY, not about a particular seed winning
+    local res
+    for _, sd in ipairs({ 2, 3, 4, 5, 6, 7, 8, 9 }) do
+      local applied = false
+      local stub = { shop_phase = function(run)
+        if not applied then applied = true; run._ante_back = (run._ante_back or 0) + 1 end
+      end }
+      res = Driver.run(sd, { max_ante = 1, content = stub })
+      local cleared = false
+      for _, r in ipairs(res.records) do
+        if r.kind == "blind_result" and r.blind_type == "Boss" and r.cleared then cleared = true; break end
+      end
+      if cleared then break end
+    end
     -- Assert the MECHANISM: after the ante-1 boss is cleared once, the pending -1
     -- ante REPLAYS ante 1 (more ante-1 blinds follow the cleared boss) instead of
     -- advancing or winning for free. (The old assertion -- the engine also CLEARS

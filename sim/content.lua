@@ -1020,6 +1020,7 @@ end
 -- opts.emit (optional) collects the action trace (shop offers/advice, buys, sells, packs).
 function Content.shop_phase(run, opts)
   local rng = run.rng
+  local crn_n = {}   -- per-visit action counters for the common-random-number streams (see the action loop)
   run._emit = opts and opts.emit
   local base_reroll = math.max(0, Content.BASE_REROLL - (run._reroll_discount or 0))  -- A4: Reroll Surplus -$2
   if run._free_reroll then base_reroll = 0; run._free_reroll = nil end                -- A5: D6 tag -> $0 reroll base (one shop)
@@ -1114,7 +1115,19 @@ function Content.shop_phase(run, opts)
     local sig = offer_sig(shop)
     if sig ~= last_sig then emit_shop(run, shop, ranked); last_sig = sig end
     if ranked.best.type == "SAVE" then break end
-    if not apply_action(run, shop, ranked.best, rng) then break end
+    -- common random numbers: the k-th reroll / pack / sale of this visit draws its own stream, so one more or one
+    -- fewer action earlier in the visit does not change what a later one turns up (World.stream)
+    local arng = rng
+    local W = require("sim.world")
+    if W.CRN then
+      local tp = ranked.best.type
+      local kind = (tp == "REROLL" and "reroll") or (tp == "BUY_PACK" and "pack") or (tp == "SELL_JOKER" and "sell") or nil
+      if kind then
+        crn_n[kind] = (crn_n[kind] or 0) + 1
+        arng = W.stream(run, kind, run.ante, run.round, crn_n[kind])
+      end
+    end
+    if not apply_action(run, shop, ranked.best, arng) then break end
   end
   run._pending_swap = nil   -- a trade not completed in its shop lapses (the offer is gone)
   -- Perkeo (JOKER_FIDELITY P2): on shop exit, create a Negative copy of a random held consumable.
@@ -1123,7 +1136,8 @@ function Content.shop_phase(run, opts)
     local has_perkeo = false
     for _, j in ipairs(run.jokers or {}) do if j.key == "j_perkeo" then has_perkeo = true; break end end
     if has_perkeo and #(run.consumables or {}) > 0 then
-      local pick = run.consumables[1 + math.floor(rng() * #run.consumables)]
+      local prng = require("sim.world").CRN and require("sim.world").stream(run, "perkeo", run.ante, run.round) or rng
+      local pick = run.consumables[1 + math.floor(prng() * #run.consumables)]
       local copy = {}
       for k, v in pairs(pick) do copy[k] = v end
       copy.edition = "negative"

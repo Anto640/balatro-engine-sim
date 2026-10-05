@@ -113,6 +113,30 @@ local function lcg(seed)
 end
 World.lcg = lcg
 
+-- COMMON RANDOM NUMBERS (2026-10-05, owner: "how come there is noise if we compare the same seeds"). One run.rng
+-- stream fed everything -- deals, shops, packs, tags, bosses -- so the FIRST decision a change altered shifted every
+-- later draw and the two arms of a paired A/B diverged into unrelated runs: the outcome gap on those seeds was mostly
+-- which different cards each got, not the change (arm fz read 6.21 against 6.08-6.09 for every neighbour). A STREAM
+-- derived from (seed, purpose, position) is the same in both arms whatever was drawn before: the deck for blind r,
+-- the shop for visit r, the k-th reroll / pack / sale of that visit. A changed decision now only changes what it
+-- touches. BES_CRN=0 restores the single stream (to reproduce pre-CRN arms).
+World.CRN = not (os.getenv and os.getenv("BES_CRN") == "0")
+World.STREAM = { ante = 1, tag = 2, blind = 3, shop = 4, reroll = 5, pack = 6, perkeo = 7, sell = 8 }
+function World.stream(run, purpose, a, b, c)
+  local h = tonumber(run.seed) or 0
+  if h == 0 and run.seed then
+    for i = 1, #tostring(run.seed) do h = (h * 31 + tostring(run.seed):byte(i)) % 2147483647 end
+  end
+  for _, x in ipairs({ World.STREAM[purpose] or 0, a or 0, b or 0, c or 0 }) do
+    h = (h * 1000003 + math.floor(x) * 7919 + 17) % 2147483647
+  end
+  return lcg(h + 1)
+end
+-- re-seed the run's main stream at a checkpoint (no-op with CRN off)
+function World.checkpoint(run, purpose, a, b, c)
+  if World.CRN then run.rng = World.stream(run, purpose, a, b, c) end
+end
+
 -- Fisher-Yates, uniform (matches the game's uniform shuffle distribution).
 local function shuffle(list, rng)
   local a = {}
