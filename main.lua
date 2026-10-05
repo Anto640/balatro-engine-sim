@@ -488,11 +488,18 @@ function BES.apply_pack(gs, po, provisional)
   if po.use_first and po.use_first.key and not po.skip then
     -- MAKE ROOM IN THE TRAY: a card-making tarot from the pack needs a free consumable slot to be usable, so use
     -- the held planet first (its own step, like the make-room sell), then the pick.
+    local chain = po.use_first.chain
+    local tcards
+    if po.use_first.cards then tcards = {}; for _, c in ipairs(po.use_first.cards) do tcards[#tcards + 1] = { id = c.id } end end
     action = {
       type = "USE_CONSUMABLE",
       target = { name = po.use_first.name, key = po.use_first.key }, use_keys = { po.use_first.key },
-      reason = string.format("Use %s first to free a consumable slot for %s, then take it.",
-        po.use_first.name, po.use_first.for_name or "the pick"),
+      cards = po.use_first.cards, target_cards = tcards,
+      reason = chain
+        and string.format("Use %s on %s first, then take %s and copy that Gold card (three Gold cards).",
+          po.use_first.name, Cards and Cards.label and Cards.label(po.use_first.cards[1]) or "a spare card", po.use_first.for_name or "the pick")
+        or string.format("Use %s first to free a consumable slot for %s, then take it.",
+          po.use_first.name, po.use_first.for_name or "the pick"),
       confidence = 0.7,
     }
   elseif po.sell and po.sell.key and not po.skip then

@@ -1643,7 +1643,11 @@ return function(t)
     local s = 17
     local r = SA.recommend(gs, { rng = function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end })
     local farm
-    for _, a in ipairs({ r.best, table.unpack and table.unpack(r.alternatives) or unpack(r.alternatives) }) do
+    -- every action (an `x and table.unpack(t) or ...` expression keeps only ONE value, so this used to check just
+    -- the first alternative and broke when the farm sale ranked third)
+    local all = { r.best }
+    for _, a in ipairs(r.alternatives or {}) do all[#all + 1] = a end
+    for _, a in ipairs(all) do
       if a.type == "SELL_JOKER" and a.target and a.target.key ~= "j_riff_raff" and (a.reason or ""):find("spawner") then farm = a end
     end
     t.ok(farm ~= nil, "a full board with Riff-Raff offers a farm sale of a NON-spawner joker")

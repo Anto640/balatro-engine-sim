@@ -25,6 +25,22 @@ end
 
 -- $ value of leveling your most-leveled-worthwhile hand by 3 (the Orbital tag).
 -- Measured: freq(you make it) x the real 3-level score gain, in dollar terms.
+-- Share of the run's LATER plays a hand gets, given its share of plays now. MEASURED (2026-10-05, arms fz+ob, 1481
+-- ante-steps: the modal hand of an ante vs its share of every later ante's plays): the engine's main hand drifts, so
+-- today's share overstates it ~2x -- 0.33 -> 0.17, 0.50 -> 0.28, 0.67 -> 0.32, 0.77 -> 0.51, 1.00 -> 0.55.
+Tags.LATER_SHARE = { { 0, 0 }, { 0.33, 0.17 }, { 0.50, 0.28 }, { 0.67, 0.32 }, { 0.77, 0.51 }, { 1.0, 0.55 } }
+function Tags.later_share(s)
+  local t = Tags.LATER_SHARE
+  s = math.max(0, math.min(1, s or 0))
+  for i = 2, #t do
+    if s <= t[i][1] then
+      local a, b = t[i - 1], t[i]
+      return a[2] + (b[2] - a[2]) * (s - a[1]) / (b[1] - a[1])
+    end
+  end
+  return t[#t][2]
+end
+
 local function orbital_dollars(gs, opts)
   if not has_deck(gs) then return nil end
   -- The tag levels a SPECIFIC hand (gs.blind.skip_tag_hand, read live from G.GAME.orbital_choices). Value
@@ -48,7 +64,7 @@ local function orbital_dollars(gs, opts)
     local tot = 0
     for _, h in ipairs(visible) do
       local f = freq[h] or 0
-      if f > 0 then tot = tot + f * ConsumableValue.level_gain(gs, h, 3, bctx0) end
+      if f > 0 then tot = tot + Tags.later_share(f) * ConsumableValue.level_gain(gs, h, 3, bctx0) end   -- persistence (below)
     end
     local persist0 = ConsumableValue.level_scale(gs)
     local frac0 = persist0 * (tot / #visible) / need(gs)
@@ -68,7 +84,10 @@ local function orbital_dollars(gs, opts)
   -- board context, so +3 levels are priced against the board that multiplies them rather
   -- than against the hand's bare base (CV.level_gain: understates by 1.4-19x without it)
   local _, bctx = ConsumableValue.hand_frequencies(gs, opts)
-  local frac = persist * (bp.freq * ConsumableValue.level_gain(gs, bp.hand, 3, bctx)) / need(gs)
+  -- PERSISTENCE (owner 2026-10-05: "almost never worth taking unless you know you are almost exclusively playing that
+  -- one hand ... while the engine seems to constantly change what it plays every blind"). The levels pay on the hand's
+  -- LATER plays, not today's share: Tags.later_share.
+  local frac = persist * (Tags.later_share(bp.freq) * ConsumableValue.level_gain(gs, bp.hand, 3, bctx)) / need(gs)
   -- V2c finishing move (BuildPlan.LEVEL_PUSH): Orbital is a +3-level delivery channel for
   -- the committed hand, but its MAGNITUDE never consumed the commitment's planet_credit
   -- (only its hand CHOICE did, via best_planet) -- so under the leveling push the tag

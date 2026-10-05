@@ -47,9 +47,20 @@ return function(t)
 
   -- discount vouchers: total measured dollars saved over the rest of the run (owner: "didn't buy clearance sale")
   local V = require("engine.vouchers")
-  local function at(a) return V.savings_dollars({ meta = { ante = a }, economy = { dollars = 20 } }, "v_clearance_sale") end
-  t.ok(at(1) > at(4) and at(4) > at(6) and at(6) > at(8), "Clearance Sale saves less the later it is bought")
+  local function at(a, d) return V.savings_dollars({ meta = { ante = a }, economy = { dollars = d or 20 } }, "v_clearance_sale") end
+  t.ok(at(4) > at(6) and at(6) > at(8), "Clearance Sale saves less the later it is bought")
   t.ok(at(4) > 10 and at(6) > 10, "... and more than its $10 price through ante 6")
+  t.eq(at(1, 60), 0, "never credited at antes 1-2 (owner: money is short and scoring/econ need is high)")
+  t.eq(at(3, 20), 0, "at ante 3 only when the buy still leaves the bank at the interest cap")
+  t.ok(at(3, 40) > 10, "... which $40 does")
   t.ok(at(8) < 10, "... but not at ante 8")
   t.eq(V.savings_dollars({ meta = { ante = 3 } }, "v_telescope"), nil, "only discount vouchers are priced by savings")
+
+  -- 2026-10-05 follow-ups (owner on UAPB3XY9)
+  local Tags = require("engine.tags")
+  t.ok(Tags.later_share(0.63) < 0.63 and Tags.later_share(1.0) < 1, "a hand's later share is below its share now (measured drift)")
+  t.ok(Tags.later_share(0.8) > Tags.later_share(0.4), "... and rises with it")
+  local Eval = require("engine.eval_function")
+  t.ok(Eval.is_plain_flat("j_walkie_talkie"), "Walkie Talkie is a plain flat scorer (measured, unfloored when traded away)")
+  t.ok(not Eval.is_plain_flat("j_gros_michel"), "... Gros Michel is not (extinction downside)")
 end

@@ -1049,6 +1049,13 @@ end
 
 Eval.conditional_xmult_marginal = conditional_xmult_marginal
 
+-- A plain flat scorer: its whole value is the +Mult/+Chips it scores now (no scaling, no money, no downside).
+function Eval.is_plain_flat(key)
+  local d = JokerData.resolve(key)
+  return (d.cat == "flat_mult" or d.cat == "flat_chips") and not JokerData.is_scaling(key)
+    and not JokerData.is_unmodelled(key) and (d.econ or 0) == 0 and not Downside.has_downside(key)
+end
+
 local function jp_from_measure(gs, key, edition, m, opts, owned)
   local e = JokerData.resolve(key)
   -- DECK-BUFF scaler (Hiker): no joker counter, no scoring model, so m is always nil -- value it MEASURED
@@ -1130,7 +1137,12 @@ local function jp_from_measure(gs, key, edition, m, opts, owned)
   local an = conditional_xmult_marginal(gs, key, opts, owned)
   if an and an > m then m = an end
   local frac = m / Mechanics.boss_per_hand_need(gs)
-  if not Eval.is_inert(key, m, gs) then frac = math.max(frac, Eval.tier_floor_frac(key)) end
+  -- the floor protects jokers whose value a sampled delta under-reads (held / conditional / growing ones). A PLAIN
+  -- flat scorer is measured completely, so when the caller is choosing WHICH owned joker to give up in a trade
+  -- (opts.plain_unfloored) its measured score stands (2026-10-05, owner on live UAPB3XY9 flag 4b: Walkie Talkie,
+  -- measured ~450 a hand, was floored to 1.80 FV and kept while Gros Michel, ~1900 a hand, was sold).
+  local unfloored = owned and opts and opts.plain_unfloored and Eval.is_plain_flat(key)
+  if not unfloored and not Eval.is_inert(key, m, gs) then frac = math.max(frac, Eval.tier_floor_frac(key)) end
   -- measured path: foil/holo/poly already in the delta, add only the slot
   return frac * JP_PER_FRAC * proj + edition_jp(edition, false), true
 end

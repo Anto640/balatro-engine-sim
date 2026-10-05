@@ -293,6 +293,18 @@ function PO.recommend(gs, opts)
     for _, c in ipairs(held_cons) do
       if (c.set == "Planet" or c.key == "c_black_hole") and not use_first then use_first = c end
     end
+    -- ...or a held TAROT that is worth using right now (owner 2026-10-05: "emperor shouldn't be priced at 0 if
+    -- consumables are full, it should consider using or selling them to make room"): a money tarot (Hermit /
+    -- Temperance) or the Devil (Gold on a spare card, Tarot.money_enh_dollars). Selling a consumable is not an
+    -- action the self-player has yet.
+    if not use_first then
+      for _, c in ipairs(held_cons) do
+        if not use_first and (c.key == "c_hermit" or c.key == "c_temperance"
+            or (gs.hand and #gs.hand > 0 and Tarot.money_enh_dollars(gs, c.key) > 0)) then
+          use_first = c
+        end
+      end
+    end
     if not use_first then
       for _, e in ipairs(valued) do
         if GEN[e.key] and GEN[e.key].out == "consumable" then e.v = 0 end
@@ -639,6 +651,36 @@ function PO.recommend(gs, opts)
   local first = ordered[1] and ordered[1].it
   local use_first_item = (use_first and first and GEN[first.key] and GEN[first.key].out == "consumable")
     and { key = use_first.key, name = use_first.name or use_first.key, for_name = ordered[1].name } or nil
+  if use_first_item and Tarot.ENH[use_first_item.key] and gs.hand and #gs.hand > 0 then   -- a targeting tarot (Devil)
+    local tg = Tarot.best_targets(gs, use_first_item.key, gs.hand)
+    if tg and #tg > 0 then use_first_item.cards = tg end
+  end
+  -- DEVIL INTO CRYPTID (owner 2026-10-05, live UAPB3XY9 flag 5: "it had the devil which if it used in that pack it
+  -- could've generated one gold card using the devil and 2 more by using cryptid on that"). A held Devil can be used
+  -- while the pack is open (its hand is drawn): Gold a spare card first, then Cryptid copies the Gold card -- three
+  -- Gold cards. Worth it when the two Gold copies beat copying the best card in hand as it is (CV.copy_value, money
+  -- included). After the use the pack is re-read, and Cryptid's money-aware target picks the new Gold card.
+  if not use_first_item and not skip_full and ordered[1] and ordered[1].key == "c_cryptid" and gs.hand and #gs.hand > 0 then
+    for _, c in ipairs(held_cons) do
+      if c.key == "c_devil" then
+        local tg = Tarot.best_targets(gs, "c_devil", gs.hand)
+        local x = tg and tg[1]
+        if x and x.enhancement ~= "m_gold" then
+          local gold = {}; for k, v in pairs(x) do gold[k] = v end
+          gold.enhancement = "m_gold"
+          local need = per_hand_need(gs)
+          local o = { rng = rng, samples = 8 }
+          local now = ConsumableValue.best_copy_target(gs, gs.hand, need, o)
+          local now_v = now and ConsumableValue.copy_value(gs, now, need, o) or 0
+          if ConsumableValue.copy_value(gs, gold, need, o) > now_v then
+            use_first_item = { key = "c_devil", name = c.name or "The Devil", for_name = ordered[1].name,
+              cards = { x }, chain = true }
+          end
+        end
+        break
+      end
+    end
+  end
   return { ranked = valued, picks = ordered, best = ordered[1].it, reason = reason, sell = sell, use_first = use_first_item,
            skip = skip_full or nil,   -- full board + no worthwhile joker swap -> skip, don't recommend "take"
            target_note = best_target_note, target_cards = best_target_cards,

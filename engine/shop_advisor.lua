@@ -175,6 +175,9 @@ SA.SWAP_SAMPLES = tonumber(os.getenv and os.getenv("BES_SWAP_SAMPLES") or "")   
 -- money joker's \$/round (0.8 FV per \$) swamp a real score value of ~0.2-0.6 FV (sold Ice Cream for Mail-In Rebate,
 -- Shoot the Moon for Trading Card) and bought decaying jokers on a today-only measurement (Popcorn, Ice Cream).
 -- OUT: plain flat scorers (scalers, xmult/retrigger cores and utility keep their own protections).
+-- BES_LEVEL_AMP_ALWAYS=1 restores the B1 level amplifier on top of the measured board context (A/B of the 2026-10-05
+-- double-count fix).
+SA.LEVEL_AMP_ALWAYS = os.getenv and os.getenv("BES_LEVEL_AMP_ALWAYS") == "1"
 SA.PAIRED_SAMPLES = 12
 SA.PAIRED_MIN_SHARE = 0.25   -- the trade must add >= this share of what the sold joker itself scores
 local PLAIN_OUT = { flat_mult = true, flat_chips = true }
@@ -915,6 +918,11 @@ function SA.recommend(gs, opts)
   -- full-board swaps compare two noisy 6-deal measurements; BES_SWAP_SAMPLES re-measures both sides of a swap with
   -- more deals (A/B switch, default off). sb1 (a lower bar alone) swapped +20% more without better outcomes.
   local swap_mopts = SA.SWAP_SAMPLES and { rng = rng, cache = mopts.cache, samples = SA.SWAP_SAMPLES } or mopts
+  -- what a joker given up IN A TRADE is worth: a plain flat scorer at its measured score (Eval.is_plain_flat; the tier
+  -- floor hid a ~450-a-hand Walkie Talkie behind a ~1900-a-hand Gros Michel -- live UAPB3XY9 flag 4b)
+  local trade_mopts = {}
+  for k, v in pairs(swap_mopts) do trade_mopts[k] = v end
+  trade_mopts.plain_unfloored = true
   local swap_bar_memo
   local function swap_bar()   -- lazy + memoised: only the full-board reroll / Buffoon paths need it
     if swap_bar_memo == nil then swap_bar_memo = full_board_swap_bar(gs, mopts) or false end
@@ -1104,7 +1112,10 @@ function SA.recommend(gs, opts)
       -- gates to the committed hand (the "building toward it" case); vfrac is already freq-based.
       local hfreq = (cfreq and cfreq[hand]) or 0
       local freq_gate = math.min(1, hfreq / SA.PLANET_LEVEL_FREQ)
-      vfrac = vfrac * BuildPlan.level_amplifier(gs) + BuildPlan.level_need(gs) * freq_gate
+      -- the B1 amplifier is an ESTIMATE of the board's xmult; with the measured board context (cctx) CV.level_gain
+      -- already rides the real xmult (exact to <1%), so amplifying again double-counted it (2026-10-05)
+      local amp = (cctx and not SA.LEVEL_AMP_ALWAYS) and 1.0 or BuildPlan.level_amplifier(gs)
+      vfrac = vfrac * amp + BuildPlan.level_need(gs) * freq_gate
         + BuildPlan.planet_credit(gs, hand)
     end
     -- a consumable that CREATES a joker (Judgement) has its OUTPUT measured deck-aware
@@ -1197,7 +1208,14 @@ function SA.recommend(gs, opts)
     local cost = OwnedSynergy.pack_free(gs, kind) and 0 or (pk.cost or 4) -- Astronomer: Celestial free
     local pv, pnote = pack_value(gs, pk, rng, kind == "joker" and swap_bar() or nil)
     -- B1: a Celestial pack is leveling -> amplify by the board's core (see BUY_CONSUMABLE).
-    if kind == "planet" then pv = pv * BuildPlan.level_amplifier(gs) + BuildPlan.level_need(gs) end
+    -- (2026-10-05, live UAPB3XY9 flag 7) the Celestial POOL is already valued against the measured board context
+    -- (Packs planet_pool -> CV.level_gain with bctx: the board's real xmult), so the B1 estimate x1.9 per xmult joker
+    -- counted the board twice (Celestial 0.43 -> 0.85, out-ranking an Arcana at 0.52). Only the no-deck path, which
+    -- has no board context, still takes it.
+    if kind == "planet" then
+      local amp = (gs.deck and #gs.deck >= 5 and not SA.LEVEL_AMP_ALWAYS) and 1.0 or BuildPlan.level_amplifier(gs)
+      pv = pv * amp + BuildPlan.level_need(gs)
+    end
     -- pv is in "fraction of a boss hand" units, the SAME scale as a joker's
     -- scoring_gain and the reroll's expected joker -- so it must use the same
     -- x5 weighting those do, otherwise packs are valued at 1/5 their worth and
@@ -1464,7 +1482,7 @@ function SA.recommend(gs, opts)
         -- STRENGTH-PROPORTIONAL keep (see SA.SWAP_KEEP_SLOPE): the keystone must beat the sold
         -- joker by C*(1 + SLOPE*C) -- weak filler swaps ~freely, a strong joker demands a much
         -- better replacement. Charged ONCE here (was the flat 2*C); pure sales charge it once below.
-        local keep_c = (swap_mopts ~= mopts) and joker_contribution(gs, worst_i, swap_mopts) or worst_c
+        local keep_c = joker_contribution(gs, worst_i, trade_mopts)
         local keep = keep_c * (1 + SA.SWAP_KEEP_SLOPE * keep_c)
         if _G.BES_SWAP_TRACE then for _, t in ipairs(_G.BES_SWAP_TRACE) do
           if t.worst and not t.keep then t.keep = keep + sell_margin end end end
@@ -1509,7 +1527,7 @@ function SA.recommend(gs, opts)
         local ex = (type(ab) == "table" and type(ab.extra) == "table") and ab.extra or nil
         local eternal = type(ab) == "table" and (ab.eternal or (ex and ex.eternal))
         if not eternal and i ~= worst_i then
-          local ci = joker_contribution(gs, i, swap_mopts)
+          local ci = joker_contribution(gs, i, trade_mopts)
           local kb = BuildPlan.keep_bias(jk.key, gs, Eval.joker_fires(gs, i, mopts))
           local keep = ci * (1 + SA.SWAP_KEEP_SLOPE * ci) + math.max(SA.UPGRADE_MARGIN, kb)
           local cash_i = jk.sell_value or 1
