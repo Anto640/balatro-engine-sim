@@ -159,6 +159,10 @@ lua  tools/analyze_runs.lua sim_out/<baseline>.jsonl compare sim_out/<name>.json
 - **n matters:** at n≈16 the death-ante is pure noise; verdicts use paired n ≥ 160 (below). A re-run of the
   same seeds and engine is byte-identical, so every A/B is paired. The current baseline arm is named in
   `NEXT_SESSION.md` START HERE.
+- **Common random numbers (2026-10-06):** shops, packs, deals, tags and bosses each draw from their own stream keyed by
+  (seed, purpose, position) (`World.stream` / `checkpoint` / `keyed_shuffle`; `BES_CRN=0` = the old single stream), so a
+  changed decision no longer re-rolls the rest of the run. Arms from before `1653688` are a different world and do not
+  pair with newer ones. The remaining per-seed spread is mostly the change's real consequences, so power comes from n.
 
 
 ## Research history

@@ -1,5 +1,26 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-06)
+**The sim now uses COMMON RANDOM NUMBERS (`1653688`, sim only -- live unchanged at 1f44bff).** Shops, packs, deals, tags
+and bosses each draw from their own stream keyed by (seed, purpose, position): `World.stream`/`checkpoint`/`keyed_shuffle`
+in `sim/world.lua`, per-slot shop sub-streams + pack contents keyed by shop slot in `sim/content.lua`; `BES_CRN=0` restores
+the old single stream. **New baseline: `sim_out/crn3.jsonl`** (progress 6.076, 44 wins -- the old world's `gc` was 6.085,
+so no bias; the deal was checked uniform). **Old-sim arms do NOT pair with CRN arms** (different world): re-run any
+comparison on the new sim. What CRN did and did not do (same change = `BES_TRADE_FLOORED=1` in every pair):
+
+| pair | paired sd | seeds unchanged | swings > 3 antes | shops identical after the first divergence |
+|---|---|---|---|---|
+| old gc/gd | 0.698 | 120 | 4 | 1% |
+| v2 crn2/crn2_tf | 0.577 | 125 | 0 | 57% |
+| v3 crn3/crn3_tf | 0.788 | 122 | 3 | 54% |
+
+The WORLD now stays aligned (1% -> ~55% of later shops identical; the rest differ through owned-joker pool exclusion /
+Overstock / the persisting voucher), but the OUTCOME spread did not fall: the big remaining swings are genuine
+consequences of the changed decision (seed 30003: a different sale -> a skipped Small blind -> death at the ante-3 boss,
+same shops and deals). So the per-seed sd (~0.6-0.8 for a shop-level change) is mostly real effect heterogeneity, and
+more seeds -- not more RNG work -- is what buys power now. v1 (`94c9c8a`, `crn`) had correlated first draws; ignore it.
+Next: the valuation unit-consistency audit (owner-agreed).
+
 ## START HERE (2026-10-05 evening)
 **Live = 1f44bff (deployed).** Owner follow-ups shipped (arms ga/gb/gc/gd, all n.s. vs fz; the B1 level-amplifier
 double-count fix alone +0.089, reach-8 +8). **Baseline for new arms: `sim_out/gc.jsonl`** -- `fz` (6.21) looks like a lucky
