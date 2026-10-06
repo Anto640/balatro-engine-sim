@@ -87,6 +87,7 @@ end
 -- cap (P2: at the cap a dollar is just spendable, so sell econ / don't over-generate).
 VU.INTEREST_LOOKAHEAD_MAX = 12   -- rounds of interest an early gain is credited for (bounded)
 VU.INTEREST_DISCOUNT      = 0.5  -- interest isn't guaranteed (may be spent, may die) -> halve it
+VU.INTEREST_UNITS = os.getenv and os.getenv("BES_INTEREST_UNITS") == "1"   -- see income_frac
 function VU.income_frac(gs, d)
   d = d or 0
   local base = VU.dollars_to_frac(gs, d)
@@ -100,6 +101,12 @@ function VU.income_frac(gs, d)
   local extra = int1 - int0                         -- $/round newly earned, forever (until spent)
   if extra <= 0 then return base end                -- already at/above cap -> face value only
   local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
+  if VU.INTEREST_UNITS then
+    -- the interest a gain unlocks is a \$/round stream: priced at the stream rate, fading over the last antes as the
+    -- shop's interest cost does (shop_advisor SA.interest_weight; A/B switch BES_INTEREST_UNITS=1)
+    local fade = math.max(0.4 / 3, math.min(1, (8 - ante) / 3))
+    return base + VU.round_income_frac(gs, extra) * fade
+  end
   local rounds_left = math.min((math.max(0, 8 - ante)) * 3, VU.INTEREST_LOOKAHEAD_MAX)
   local yield = extra * rounds_left * VU.INTEREST_DISCOUNT   -- forward interest dollars
   return base + VU.dollars_to_frac(gs, yield)

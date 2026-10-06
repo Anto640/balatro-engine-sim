@@ -378,11 +378,21 @@ end
 -- Opportunity cost (in FV-comparable units) of the INTEREST forgone by spending
 -- `spend` now: the exact step loss over the horizon. Spending the interest-free
 -- zone (see free_spend) costs 0 here; each $5 past a boundary costs the horizon.
+-- INTEREST IN THE \$/ROUND UNIT (2026-10-06 unit audit; A/B switch BES_INTEREST_UNITS=1, default off). The penalty
+-- is \$/round of interest lost x the horizon (3 rounds) and was added to the cost AS utility -- so one lost interest
+-- dollar cost 3 utility, the price of \$10 of goods (COST_WEIGHT 0.3), and three times what the shop pays for a money
+-- joker's \$1/round (VU.ROUND_INCOME_UTIL). The switch prices it as the \$/round stream it is: ROUND_INCOME_UTIL per
+-- \$/round, keeping the horizon's end-of-run fade (interest_horizon / INTEREST_HORIZON).
+SA.INTEREST_UNITS = os.getenv and os.getenv("BES_INTEREST_UNITS") == "1"
+function SA.interest_weight(gs)
+  if not SA.INTEREST_UNITS then return SA.interest_horizon(gs) end
+  return VU.ROUND_INCOME_UTIL * SA.interest_horizon(gs) / SA.INTEREST_HORIZON
+end
 local function interest_penalty(gs, spend)
   local cap = interest_cap(gs)
   local before = interest_at(dollars(gs), cap)
   local after = interest_at(dollars(gs) - spend, cap)
-  return (before - after) * SA.interest_horizon(gs)
+  return (before - after) * SA.interest_weight(gs)
 end
 
 -- Purchasing-power cost of a spend, drawn against the shop's planned free budget.
@@ -404,11 +414,22 @@ local function free_discount(budget)
 end
 SA.free_discount = free_discount
 
-local function spend_power_cost(spend, budget)
+-- ONE PRICE FOR A DOLLAR (2026-10-06 unit audit; A/B switch BES_DOLLAR_ANTE=1, default off). Money GAINED through
+-- packs, tarots, tags and the skip advisor is converted at the ante-aware VU.dollar_frac (x1.33 at ante 1 .. x0.62 at
+-- ante 8 of the ante-3 rate), but the shop charged and paid every other dollar at the flat ante-3 rate -- in one
+-- expression a Hermit's \$20 gain was ante-aware and its \$3 price was not. The switch puts the shop's dollar on the
+-- same curve.
+SA.DOLLAR_ANTE = os.getenv and os.getenv("BES_DOLLAR_ANTE") == "1"
+function SA.dollar_scale(gs)
+  if not SA.DOLLAR_ANTE then return 1 end
+  return VU.dollar_frac(gs) / VU.BASE_FRAC
+end
+
+local function spend_power_cost(spend, budget, w)
   spend = math.max(0, spend)
   local free = math.min(spend, math.max(0, budget or 0))
   local working = spend - free
-  return (working + free * free_discount(budget)) * SA.COST_WEIGHT
+  return (working + free * free_discount(budget)) * (w or SA.COST_WEIGHT)
 end
 
 -- SAVE is the "do nothing" baseline: value 0. Every other action is scored as a
@@ -960,6 +981,8 @@ function SA.recommend(gs, opts)
   -- at risk you also weight scoring more (handled by w_score above), so you spend
   -- down harder. net_cost() is used by every purchase below.
   local cap = interest_cap(gs)
+  local dscale = SA.dollar_scale(gs)                -- 1 unless BES_DOLLAR_ANTE (one price for a dollar)
+  local cost_w, dollar_u = SA.COST_WEIGHT * dscale, SA.DOLLAR_UTIL * dscale
   local reserve_target = cap * 5                    -- $ that maxes interest (25/50/100)
   -- BUILD-PLANNING (engine/build_plan): value jokers toward the compounding core you're
   -- building, but only INVEST in weak-now core pieces when survival is assured (not urgent).
@@ -976,7 +999,7 @@ function SA.recommend(gs, opts)
   -- interest forgone (exact $5-step) + purchasing power drawn against the shop's
   -- planned free budget (the budget portion is discounted), scaled by the income
   -- you earn back this blind.
-  local function net_cost(c) return income_factor * (interest_penalty(gs, c) + spend_power_cost(c, plan.budget)) end
+  local function net_cost(c) return income_factor * (interest_penalty(gs, c) + spend_power_cost(c, plan.budget, cost_w)) end
 
   -- CORRECTED interest cost for DIRECTED VALUE-BUYS (jokers / consumables / vouchers), using the
   -- NORMALIZED cap so genuine SURPLUS above the true interest cap ($25/50/100) is free to spend on
@@ -989,12 +1012,12 @@ function SA.recommend(gs, opts)
   local cap_int = cap_int_of(gs)
   local real_cap_d = cap_int * 5                       -- the true max-interest bankroll, in dollars
   local function interest_penalty_c(c)
-    return (interest_at(dollars(gs), cap_int) - interest_at(dollars(gs) - c, cap_int)) * SA.interest_horizon(gs)
+    return (interest_at(dollars(gs), cap_int) - interest_at(dollars(gs) - c, cap_int)) * SA.interest_weight(gs)
   end
   -- free budget = surplus above the true cap (never below the survival reserve). Telescopes across a
   -- multi-buy visit because recommend() re-runs with fewer dollars after each buy.
   local budget_c = math.max(0, dollars(gs) - math.max(real_cap_d, math.min(reserve, dollars(gs))))
-  local function net_cost_c(c) return income_factor * (interest_penalty_c(c) + spend_power_cost(c, budget_c)) end
+  local function net_cost_c(c) return income_factor * (interest_penalty_c(c) + spend_power_cost(c, budget_c, cost_w)) end
 
   -- Real shop data is messier than test fixtures (modded items, unexpected nils).
   -- Run each candidate category in its own pcall so one bad item degrades to
@@ -1155,7 +1178,7 @@ function SA.recommend(gs, opts)
       -- human-economy-policy P4) x the frac->utility bridge; COST stays in raw dollar utility so
       -- the cost side is unchanged (the §28 guard -- don't make buys look pricier when poor).
       value = w_score * SA.JOKER_SCORE_WEIGHT * (vfrac + sbonus)
-        + VU.income_frac(gs, gain) * SA.JOKER_SCORE_WEIGHT - cost * SA.DOLLAR_UTIL  -- net money
+        + VU.income_frac(gs, gain) * SA.JOKER_SCORE_WEIGHT - cost * dollar_u  -- net money
       verb = "Buy & use"
     else
       value = w_score * SA.JOKER_SCORE_WEIGHT * (vfrac + sbonus) - net_cost_c(cost)
@@ -1191,7 +1214,7 @@ function SA.recommend(gs, opts)
     -- (SA.COST_WEIGHT per dollar, w_econ for the situation), see Vouchers.savings_dollars
     local saved = Vouchers.savings_dollars(gs, v.key)
     if saved then
-      value = w_score * vval + w_econ * SA.COST_WEIGHT * saved - net_cost_c(cost)
+      value = w_score * vval + w_econ * cost_w * saved - net_cost_c(cost)
       vnote = string.format("%s -- saves ~$%d over the rest of the run", vnote or "discount", math.floor(saved + 0.5))
     end
     local entry = {
@@ -1418,7 +1441,7 @@ function SA.recommend(gs, opts)
       local dead = worst_c <= 0.1 and not funder_is_live(gs, j)
       local cash_matters = dead
       -- cash is worth more when at risk or nearly broke (can't score your way out)
-      local money_w = cash_matters and (SA.DOLLAR_UTIL * (secure and 0.6 or 1.2)) or 0
+      local money_w = cash_matters and (dollar_u * (secure and 0.6 or 1.2)) or 0
       if cash_matters and dollars(gs) < SA.TYPICAL_JOKER_COST then money_w = money_w * 1.5 end
       -- B1: cash that pushes you ABOVE the interest cap is overflow -- it earns nothing,
       -- so a sale that only climbs over the cap is near-worthless. Count cash that keeps
@@ -1623,7 +1646,7 @@ function SA.recommend(gs, opts)
         if fi and spawned then
           local fj = gs.jokers[fi]
           local fcash = fj.sell_value or 1
-          local fmoney = SA.DOLLAR_UTIL * (secure and 0.6 or 1.2) * fcash
+          local fmoney = dollar_u * (secure and 0.6 or 1.2) * fcash
           local fvalue = fmoney + SA.W_FV * (Eval.FV_JOKER_WEIGHT * spawned - (feff - fc) - fc)
           actions[#actions + 1] = {
             type = "SELL_JOKER", target = fj, cost = 0, value = fvalue,
@@ -1665,7 +1688,7 @@ function SA.recommend(gs, opts)
           local slot_ok = (not p.need_jslot or jfree > 0) and (not p.need_cslot or cfree > 0)
           local final = dollars(gs) + gain - p.cost
           if not affordable_now and slot_ok and final >= reserve - credit then
-            local option_cost = math.max(0, future_gain - gain) * SA.DOLLAR_UTIL
+            local option_cost = math.max(0, future_gain - gain) * dollar_u
             local funded = p.value - option_cost
             if (not best) or funded > best.value then
               best = { value = funded, c = c, p = p, gain = gain, option_cost = option_cost }
@@ -1709,7 +1732,7 @@ function SA.recommend(gs, opts)
       if gain and gain > 0 and gain >= future_gain - 1e-9 then
         actions[#actions + 1] = {
           type = "USE_CONSUMABLE", target = c, use_names = { c.key }, kind = "income",
-          gain = gain, value = gain * SA.DOLLAR_UTIL,
+          gain = gain, value = gain * dollar_u,
           reason = string.format(
             "Use %s now (+$%d, free) -- its payout is maxed, so holding it only risks the slot; use it BEFORE you spend.",
             c.name or c.key, gain),
@@ -1776,7 +1799,7 @@ function SA.recommend(gs, opts)
         -- NOT the cheapest funder any more (it used to be valued at 1/5 and got churned to fund
         -- a pack -- dismantling the leveling fuel the run was accruing).
         funders[#funders + 1] = { kind = "consumable", name = c.name or c.key, target = c,
-          cash = c.sell_cost or 1, loss = w_score * SA.JOKER_SCORE_WEIGHT * (vfrac or 0) + SA.DOLLAR_UTIL * (gain or 0) }
+          cash = c.sell_cost or 1, loss = w_score * SA.JOKER_SCORE_WEIGHT * (vfrac or 0) + dollar_u * (gain or 0) }
       end
     end
 
@@ -1835,7 +1858,7 @@ function SA.recommend(gs, opts)
                  and (((gs.meta or {}).ante) or 1) < SA.ENDGAME_ANTE then
                 net_cash = f.cash - SA.TYPICAL_JOKER_COST
               end
-              local funded = p.value + SA.DOLLAR_UTIL * net_cash - f.loss
+              local funded = p.value + dollar_u * net_cash - f.loss
               if (not best) or funded > best.value then best = { value = funded, f = f, p = p } end
             end
           end
