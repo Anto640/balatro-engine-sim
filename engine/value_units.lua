@@ -105,6 +105,14 @@ function VU.income_frac(gs, d)
   return base + VU.dollars_to_frac(gs, yield)
 end
 
+-- ---- a $/round income stream ------------------------------------------------
+-- Utility of earning $1 EVERY round from now on. The shop prices a money joker's income at this rate (x its w_econ
+-- situation weight), so every other $/round stream must too: a Gold card paying $0.75/round is worth what a money
+-- joker paying $0.75/round is. (Until 2026-10-06 card money -- Gold, Lucky, Gold seal -- was priced as ONE round's
+-- dollars, about a third of this, while the Blue/Purple seals beside it were valued over the run.)
+VU.ROUND_INCOME_UTIL = 1.0
+function VU.round_income_frac(gs, d) return (d or 0) * VU.ROUND_INCOME_UTIL / VU.FRAC_UTIL end
+
 -- ---- fraction of a boss hand <-> future-value points ------------------------
 -- Pinned ONCE here (see calibration note above) so the sell-side rework and the
 -- buy-side scoring_gain agree on what a boss-hand fraction is worth in FV points.

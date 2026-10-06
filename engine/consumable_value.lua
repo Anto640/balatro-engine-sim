@@ -444,10 +444,11 @@ function CV.card_econ_value(gs, card, rng)
   -- $ per round at the measured rates (2026-09-26: were guesses -- Gold held 60% of rounds, Gold seal played 35%,
   -- Lucky scored EVERY round; measured ~25% / ~13% / ~13% on a 52-card red-deck game)
   local rr = CV.card_round_rates(gs)
-  if enh == "m_gold" then v = v + VU.dollars_to_frac(gs, 3 * rr.held_end) end     -- $3 if held at round end
+  -- \$ PER ROUND, so priced as an income stream (VU.round_income_frac), not as one round's lump of dollars
+  if enh == "m_gold" then v = v + VU.round_income_frac(gs, 3 * rr.held_end) end     -- $3 if held at round end
   local trig = 1 + CV.expected_retriggers(gs, card)                               -- each retrigger pays again
-  if enh == "m_lucky" then v = v + VU.dollars_to_frac(gs, 20 / 15 * rr.scored * trig) end -- 1 in 15 -> $20, when scored
-  if seal == "Gold" then v = v + VU.dollars_to_frac(gs, 3 * rr.scored * trig) end        -- $3 when scored
+  if enh == "m_lucky" then v = v + VU.round_income_frac(gs, 20 / 15 * rr.scored * trig) end -- 1 in 15 -> $20, when scored
+  if seal == "Gold" then v = v + VU.round_income_frac(gs, 3 * rr.scored * trig) end        -- $3 when scored
   if seal == "Blue" or seal == "Purple" then v = v + CV.seal_generator_value(gs, seal, rng) end
   return v
 end

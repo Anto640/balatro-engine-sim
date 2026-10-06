@@ -145,7 +145,9 @@ local TAG = {
   tag_voucher    = { name = "Voucher",    val = function() return 10 end },         -- adds a voucher
   tag_d6         = { name = "D6",         val = function() return 4 end },          -- $0 rerolls
   tag_speed      = { name = "Speed",      val = function() return 5 end },          -- $5/skip this run
-  tag_handy      = { name = "Handy",      val = function() return 6 end },          -- $1/hand played
+  tag_handy      = { name = "Handy",      val = function(gs)                         -- $1 per hand played THIS RUN
+    local n = gs and gs.run and gs.run.hands_played
+    return (type(n) == "number" and n > 0) and n or 6 end },
   tag_garbage    = { name = "Garbage",    val = function() return 4 end },          -- $1/unused discard
   -- joker tags: a free joker is valued by the MEASURED joker it grants (deck-aware),
   -- like the pack tags -- not a flat prior that's always declined.

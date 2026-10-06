@@ -27,11 +27,18 @@ local function need(gs) return Mechanics.boss_per_hand_need(gs) end
 
 -- ---- measured situational helpers (all return 0 when not measurable) --------
 
--- Scoring (FV points) one extra hand per round buys you = one average best play.
+-- UNITS (2026-10-06 audit). Every `sit` value below is in FV points of a PER-HAND boss-hand fraction -- the unit a
+-- joker's value is in (it adds its fraction to every hand) -- and the shop converts FV to its utility with the same
+-- bridge a joker buy uses (SA.VOUCHER_FV_UTIL). An effect that happens ONCE PER ROUND (one more hand, one more discard)
+-- is spread over the plays a round actually has (CV.PLAYS_PER_BLIND, measured) to be on that per-hand scale; an effect
+-- that already acts on every hand (+1 hand size) is not multiplied by the hands per round.
+local function per_round_to_per_hand(x) return x / CV.PLAYS_PER_BLIND end
+
+-- Scoring (FV points) one extra hand per round buys you = one average best play, once a round.
 local function extra_hand_fv(gs, opts)
   local a = JV.avg_score(gs, opts)
   if not a then return 0 end
-  return VU.frac_to_fv(a / need(gs))
+  return VU.frac_to_fv(per_round_to_per_hand(a / need(gs)))
 end
 
 -- Scoring (FV points) gained from +1 hand size, MEASURED: re-sample the deck with
@@ -139,9 +146,9 @@ function V.pool_after_blank(gs)
   return math.max(1, n)
 end
 
--- Antimatter (+1 joker slot) is worth the joker the extra slot will hold, on the SAME scale as buying that
--- joker: a joker buy is priced at 5 x its boss-hand fraction, frac_to_fv gives 2.5 x -> the 2 x bridge.
-function V.antimatter_fv(gs, opts) return 2 * expected_joker_fv(gs, opts) end
+-- Antimatter (+1 joker slot) is worth the joker the extra slot will hold. (It carried its own x2 FV->utility bridge
+-- until 2026-10-06; the shop now applies that bridge to every voucher, SA.VOUCHER_FV_UTIL.)
+function V.antimatter_fv(gs, opts) return expected_joker_fv(gs, opts) end
 
 -- Blank does nothing by itself; its worth is the option on Antimatter:
 --   P(Antimatter is offered in the antes left) x P(you can afford its $10 then) x Antimatter's value.
@@ -182,7 +189,7 @@ local function extra_discard_fv(gs, opts)
     local dv = DiscardValue.best(g, { samples = 2, rng = rng })
     if b and dv and dv.value then total = total + math.max(0, dv.value - b.score) end
   end
-  return VU.frac_to_fv(total / n / need(gs))
+  return VU.frac_to_fv(per_round_to_per_hand(total / n / need(gs)))
 end
 
 local function entry(name, value, econ, note, sit)
@@ -213,11 +220,12 @@ local DATA = {
     function(gs, opts) return extra_discard_fv(gs, opts) end),
   v_recyclomancy   = entry("Recyclomancy", 0, 0, "+1 discard per round",
     function(gs, opts) return extra_discard_fv(gs, opts) end),
-  -- +1 hand size: the measured per-hand lift, over the hands you play each round
+  -- +1 hand size: the measured per-hand lift -- already per hand, like a joker (it was multiplied by the hands per
+  -- round, counting every hand twice over)
   v_paint_brush    = entry("Paint Brush", 0, 0, "+1 hand size",
-    function(gs, opts) return ((gs.blind and gs.blind.base_hands) or 4) * hand_size_gain_fv(gs, opts) end),
+    function(gs, opts) return hand_size_gain_fv(gs, opts) end),
   v_palette        = entry("Palette", 0, 0, "+1 hand size",
-    function(gs, opts) return ((gs.blind and gs.blind.base_hands) or 4) * hand_size_gain_fv(gs, opts) end),
+    function(gs, opts) return hand_size_gain_fv(gs, opts) end),
   -- ---- modelled: joker slot ----
   v_antimatter     = entry("Antimatter", 0, 0, "+1 joker slot",
     function(gs, opts) return V.antimatter_fv(gs, opts) end),

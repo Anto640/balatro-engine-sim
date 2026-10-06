@@ -65,4 +65,18 @@ return function(t)
   local Eval = require("engine.eval_function")
   t.ok(Eval.is_plain_flat("j_walkie_talkie"), "Walkie Talkie is a plain flat scorer (measured, unfloored when traded away)")
   t.ok(not Eval.is_plain_flat("j_gros_michel"), "... Gros Michel is not (extinction downside)")
+
+  -- 2026-10-06 unit-consistency audit
+  local VU = require("engine.value_units")
+  local SA = require("engine.shop_advisor")
+  local CV = require("engine.consumable_value")
+  t.eq(SA.VOUCHER_FV_UTIL, VU.FRAC_UTIL / VU.FV_PER_FRAC, "a voucher's FV reaches the shop on the joker buy's scale (x2)")
+  local g = state(1.0)
+  local rr = CV.card_round_rates(g)
+  local gold = CV.card_econ_value(g, { enhancement = "m_gold" })
+  t.ok(math.abs(gold - VU.round_income_frac(g, 3 * rr.held_end)) < 1e-9, "a Gold card's $3/round is priced as an income stream")
+  t.ok(gold > VU.dollars_to_frac(g, 3 * rr.held_end) * 2, "... well above one round's lump of dollars")
+  local Tags = require("engine.tags")
+  local hg = state(1.0); hg.run.hands_played = 23
+  t.eq((Tags.value(hg, "tag_handy")), 23, "Handy pays $1 per hand played this run (counted, not a flat $6)")
 end

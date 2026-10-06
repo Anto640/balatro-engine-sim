@@ -83,6 +83,10 @@ SA.REROLL_ESCALATION_FLOOR = 0.25  -- never fully zero a reroll's appetite on co
 -- A planet for a hand the deck rarely makes (Mars/Four-of-a-Kind on a standard deck) should NOT get the
 -- nudge -- owner 2026-09-01: leveled Four of a Kind to level 5 (freq 0.000) and never played it.
 SA.PLANET_LEVEL_FREQ = 0.30
+SA.VOUCHER_FV_UTIL = VU.FRAC_UTIL / VU.FV_PER_FRAC   -- a voucher's FV points -> shop utility, on the joker buy's scale:
+                          -- vouchers.lua values in FV (2.5 per boss-hand fraction), a joker buy is 5 per fraction.
+                          -- Until 2026-10-06 the shop added FV as utility, so every measured voucher counted half
+                          -- (only Antimatter carried its own x2).
 SA.JOKER_SCORE_WEIGHT = VU.FRAC_UTIL -- the ONE frac->utility bridge: jokers, packs, reroll
                           -- AND (B1) standalone consumables all weight a boss-hand fraction
                           -- by this. Defined in value_units beside DOLLAR_UTIL, because the
@@ -1034,6 +1038,7 @@ function SA.recommend(gs, opts)
     local sgain = scoring_gain(gs, sj, rng, pace)       -- measured (or prior); pace damps scaler projection
     local econ = Eval.joker_money(gs, sj.key, (slots_free or 0) > 0)   -- $/round, DECK-AWARE (+ Chaos's reroll saving); measured income only into a free slot
       * Eval.money_weight(gs)   -- worth less as fewer rounds remain (Eval.money_weight)
+      * VU.ROUND_INCOME_UTIL    -- utility per \$/round (the one rate every \$/round stream uses)
     -- first-scorer priority: a board with no scorer NEEDS one that scores NOW (flat); a
     -- board with only ONE still wants a second (survivors carry ~2 flat scorers, deaths ~1),
     -- so graduate the bonus -- strong at 0, smaller at 1, gone at 2+.
@@ -1180,7 +1185,8 @@ function SA.recommend(gs, opts)
     local cost = v.cost or 10
     local vval, vecon, vname, vnote = Vouchers.value(gs, v.key,
       { rng = rng, cache = mopts.cache, samples = 6, at_risk = not secure })
-    local value = w_score * vval + w_econ * vecon - net_cost_c(cost)
+    vval = vval * SA.VOUCHER_FV_UTIL   -- FV points -> utility (the joker buy's scale)
+    local value = w_score * vval + w_econ * vecon * VU.ROUND_INCOME_UTIL - net_cost_c(cost)
     -- a DISCOUNT voucher: the dollars it saves over the rest of the run, priced like the dollars it costs
     -- (SA.COST_WEIGHT per dollar, w_econ for the situation), see Vouchers.savings_dollars
     local saved = Vouchers.savings_dollars(gs, v.key)
