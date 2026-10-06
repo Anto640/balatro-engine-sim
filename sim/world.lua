@@ -979,6 +979,7 @@ function World.play_blind(run, blind)
   local hands, discards, hand_size = World.blind_resources(run, eff)
 
   -- fresh shuffled draw pile from the full owned deck; deal the opening hand
+  local dollars_start = (run.economy and run.economy.dollars) or 0   -- telemetry: money earned in this blind (money_gap)
   local draw_pile = (World.CRN and run._deal_seed) and World.keyed_shuffle(run.deck, run._deal_seed) or shuffle(run.deck, rng)
   local hand = {}
   refill(hand, draw_pile, hand_size)
@@ -1286,7 +1287,32 @@ function World.play_blind(run, blind)
   -- `hand` at blind end are exactly the ones held. -- VERIFY $3 (wiki, Gold enhancement).
   local held_gold = 0
   for _, c in ipairs(hand) do if c.enhancement == "m_gold" then held_gold = held_gold + 1 end end
+  -- MONEY-GAP TELEMETRY (docs/PLAN_2026-10-07_money_farming.md; never read by a decision). The money cards still in
+  -- the draw pile that the blind's UNUSED discards would have drawn (up to 5 cards a discard, in the pile's fixed
+  -- draw order -- cards come off the END of draw_pile), and where the deck's Gold cards ended up.
+  local function is_money(c, what)
+    if what == "gold" then return c.enhancement == "m_gold" end
+    if what == "gseal" then return c.seal == "Gold" end
+    if what == "lucky" then return c.enhancement == "m_lucky" end
+    if what == "steel" then return c.enhancement == "m_steel" end
+  end
+  local mg = { spare_discards = b.discards_left or 0, spare_hands = b.hands_left or 0,
+               money = ((run.economy and run.economy.dollars) or 0) - dollars_start,
+               held_gold = held_gold, pile = #draw_pile }
+  local reach = math.min(#draw_pile, math.max(0, b.discards_left or 0) * 5)
+  for _, what in ipairs({ "gold", "gseal", "lucky", "steel" }) do
+    local deck_n, pile_n, reach_n = 0, 0, 0
+    for _, c in ipairs(run.deck) do if is_money(c, what) then deck_n = deck_n + 1 end end
+    for i, c in ipairs(draw_pile) do
+      if is_money(c, what) then
+        pile_n = pile_n + 1
+        if i > #draw_pile - reach then reach_n = reach_n + 1 end
+      end
+    end
+    mg["deck_" .. what], mg["pile_" .. what], mg["reach_" .. what] = deck_n, pile_n, reach_n
+  end
   return {
+    money_gap = mg,                                       -- telemetry only (tools/money_gap.lua)
     cleared = cleared, scored = b.scored, target = b.target, mr_bones_saved = mr_bones_saved,
     hands_used = plays, hands_left = b.hands_left, discards_left = b.discards_left,
     discards_start = discards,                            -- for Delayed Gratification (no discards used)

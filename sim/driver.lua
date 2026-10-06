@@ -307,7 +307,8 @@ function Driver.run(seed, opts)
         emit({ kind = "blind_result", ante = ante, blind_type = result.blind_type, boss_key = result.boss_key,
                cleared = result.cleared, scored = result.scored, target = result.target,
                hands_used = result.hands_used, hands_left = result.hands_left,
-               discards_left = result.discards_left, plays = Json.array(plays) })
+               discards_left = result.discards_left, plays = Json.array(plays),
+               money_gap = result.money_gap })   -- telemetry only (tools/money_gap.lua)
       end
       -- P4: consumable USE records (key, target cards, realized effect) applied in-blind.
       for _, u in ipairs(result.consumable_uses or {}) do
