@@ -1,5 +1,11 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-06 evening) -- unit audit arms + the queued next lever
+Unit audit (`docs/UNIT_AUDIT_2026-10-06.md`): `u1` (fixes 1-5) shipped + deployed (neutral, -0.112 n.s.). Switches: `u2`
+BES_DOLLAR_ANTE +0.087 n.s., reach-8 +6 -> fresh-seed confirmation `u1_7`/`u2_7` queued; `u3` BES_INTEREST_UNITS, `u4`
+BES_ECON_FV + owner voucher changes (`0dfe5aa`), `u5` voucher changes alone. **Owner-approved next lever (runs without
+confirmation): `docs/PLAN_2026-10-07_money_farming.md`** -- joint money-farming + scoring in-blind.
+
 ## START HERE (2026-10-06)
 **The sim now uses COMMON RANDOM NUMBERS (`1653688`, sim only -- live unchanged at 1f44bff).** Shops, packs, deals, tags
 and bosses each draw from their own stream keyed by (seed, purpose, position): `World.stream`/`checkpoint`/`keyed_shuffle`
