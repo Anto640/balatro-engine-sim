@@ -122,19 +122,53 @@ World.lcg = lcg
 -- touches. BES_CRN=0 restores the single stream (to reproduce pre-CRN arms).
 World.CRN = not (os.getenv and os.getenv("BES_CRN") == "0")
 World.STREAM = { ante = 1, tag = 2, blind = 3, shop = 4, reroll = 5, pack = 6, perkeo = 7, sell = 8 }
-function World.stream(run, purpose, a, b, c)
+-- (a * b) mod m without losing precision in a double (a, b < 2^31): split b into 16-bit halves
+local function mulmod(a, b, m)
+  local hi, lo = math.floor(b / 65536), b % 65536
+  return ((a * hi) % m * 65536 + a * lo) % m
+end
+-- NONLINEAR mix (a quadratic step per input): a LINEAR mix gave neighbouring rounds seeds a constant apart, and a
+-- Park-Miller stream's first draws then move in lockstep (the first-dealt card repeated 194 times in 4000 seeds
+-- against ~77 expected) -- correlating consecutive shops / deals.
+function World.stream_seed(run, purpose, a, b, c)
+  local P = 2147483647
   local h = tonumber(run.seed) or 0
   if h == 0 and run.seed then
-    for i = 1, #tostring(run.seed) do h = (h * 31 + tostring(run.seed):byte(i)) % 2147483647 end
+    for i = 1, #tostring(run.seed) do h = (h * 31 + tostring(run.seed):byte(i)) % P end
   end
+  h = h % P
   for _, x in ipairs({ World.STREAM[purpose] or 0, a or 0, b or 0, c or 0 }) do
-    h = (h * 1000003 + math.floor(x) * 7919 + 17) % 2147483647
+    h = (mulmod(h + 7, h + 13, P) + mulmod(math.floor(x) + 101, 1000003, P)) % P
+    h = mulmod(h, 48271, P)
   end
-  return lcg(h + 1)
+  return (h % (P - 1)) + 1
 end
--- re-seed the run's main stream at a checkpoint (no-op with CRN off)
+function World.stream(run, purpose, a, b, c) return lcg(World.stream_seed(run, purpose, a, b, c)) end
+-- re-seed the run's main stream at a checkpoint (no-op with CRN off); a blind's seed also keys its deal
 function World.checkpoint(run, purpose, a, b, c)
-  if World.CRN then run.rng = World.stream(run, purpose, a, b, c) end
+  if World.CRN then
+    local h = World.stream_seed(run, purpose, a, b, c)
+    run.rng = lcg(h)
+    if purpose == "blind" then run._deal_seed = h end
+  end
+end
+
+-- COMPOSITION-ROBUST SHUFFLE (CRN part 2). One card more or less re-orders a Fisher-Yates shuffle completely, so two
+-- arms whose decks differ by a single bought card were dealt unrelated hands for the rest of the run (the first CRN arm
+-- left the paired spread at 0.720 vs 0.698 before). Each card gets its own key -- card id n's key is the n-th draw of
+-- this blind's stream, random and independent of which other cards exist -- and the deck is dealt in key order: an
+-- extra card slots in, every other card keeps its place. Uniform (i.i.d. keys).
+function World.keyed_shuffle(list, seed)
+  local maxid = 0
+  for i, c in ipairs(list) do local id = c.id or i; if id > maxid then maxid = id end end
+  local r, keys = lcg(seed), {}
+  for id = 1, maxid do keys[id] = r() end
+  local keyed = {}
+  for i, c in ipairs(list) do keyed[i] = { k = keys[c.id or i] or 0, c = c, i = i } end
+  table.sort(keyed, function(x, y) if x.k ~= y.k then return x.k < y.k end return x.i < y.i end)
+  local out = {}
+  for i, e in ipairs(keyed) do out[i] = e.c end
+  return out
 end
 
 -- Fisher-Yates, uniform (matches the game's uniform shuffle distribution).
@@ -945,7 +979,7 @@ function World.play_blind(run, blind)
   local hands, discards, hand_size = World.blind_resources(run, eff)
 
   -- fresh shuffled draw pile from the full owned deck; deal the opening hand
-  local draw_pile = shuffle(run.deck, rng)
+  local draw_pile = (World.CRN and run._deal_seed) and World.keyed_shuffle(run.deck, run._deal_seed) or shuffle(run.deck, rng)
   local hand = {}
   refill(hand, draw_pile, hand_size)
 
