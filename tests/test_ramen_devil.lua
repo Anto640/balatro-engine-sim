@@ -79,4 +79,20 @@ return function(t)
   local Tags = require("engine.tags")
   local hg = state(1.0); hg.run.hands_played = 23
   t.eq((Tags.value(hg, "tag_handy")), 23, "Handy pays $1 per hand played this run (counted, not a flat $6)")
+
+  -- owner 2026-10-06: Telescope less, Paint Brush / Grabber more; extra resources feed money / scaling
+  local V = require("engine.vouchers")
+  local tg = state(1.0); tg.jokers = {}
+  local gain = V.telescope_gain_per_pack(tg, { rng = lcg(5), samples = 6 })
+  local bp = CV.best_planet(tg, { rng = lcg(5), samples = 6 })
+  local Mech = require("engine.mechanics")
+  t.ok(gain >= 0 and bp and gain < bp.value / Mech.boss_per_hand_need(tg),
+    "Telescope adds the main hand's level OVER the best planet a pack shows anyway, not the whole level")
+  t.ok(math.abs(Eval.discard_budget_scale({ blind = { base_discards = 4 } }) - 4 / 3) < 1e-9,
+    "discard-fed scalers' fuel scales with the discard budget (Wasteful feeds Castle / Yorick)")
+  local pg = state(1.0); pg.jokers = {}
+  pg.deck = {}
+  for k, c in ipairs(deck) do pg.deck[k] = c end
+  for k = 1, 8 do pg.deck[k] = GS.card{ id = 500 + k, rank = "Ace", suit = "Spades", enhancement = "m_gold" } end
+  t.ok(V.resource_side_fv(pg, "hand_size", {}) > 0, "+1 hand size holds more Gold cards at round end (side money)")
 end

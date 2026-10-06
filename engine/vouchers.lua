@@ -56,13 +56,42 @@ local function hand_size_gain_fv(gs, opts)
   return VU.frac_to_fv(math.max(0, a1 - a0) / need(gs))
 end
 
--- Value (FV points) of the planet hand you most rely on (freq x one level's gain).
--- This is what Observatory's x1.5 mult and Telescope's targeting actually act on.
-local function planet_payoff_fv(gs, opts)
-  local bp = CV.best_planet(gs, opts)
-  if not bp then return 0 end
-  -- a level persists like any planet's: the same CV.level_scale every planet channel (shop, packs, Orbital) applies
-  return VU.frac_to_fv(CV.level_scale(gs) * bp.value / need(gs))
+-- TELESCOPE (2026-10-06, owner: "telescope would be quite a lot less bought"). It makes every Celestial pack hold
+-- the planet of your most-played hand. Without it you still take the BEST planet a pack shows (3 of the pool), so
+-- what it adds per pack is your main hand's level MINUS the best planet you'd have taken anyway -- not the main
+-- hand's whole level (which also counted the packs that already held it). Exact: with the pool's planet values
+-- sorted v1 >= v2 >= ..., a 3-card pack's best is v_i with probability C(N-i, 2) / C(N, 3). In per-hand boss-hand
+-- fractions, per pack. (No CV.level_scale: the packs it improves are spread over the runway the caller multiplies by.)
+local VISIBLE_HANDS = { "High Card", "Pair", "Two Pair", "Three of a Kind", "Straight", "Flush", "Full House",
+                        "Four of a Kind", "Straight Flush" }
+local SECRET_HANDS = { "Five of a Kind", "Flush House", "Flush Five" }
+local function choose(n, k)
+  if k < 0 or n < k then return 0 end
+  local r = 1
+  for i = 1, k do r = r * (n - k + i) / i end
+  return r
+end
+function V.telescope_gain_per_pack(gs, opts)
+  local freq, bctx = CV.hand_frequencies(gs, opts)
+  if not freq then return 0 end
+  local okB, BuildPlan = pcall(require, "engine.build_plan")
+  local plays = (gs.run and gs.run.hand_type_plays) or {}
+  local n0 = need(gs)
+  local vals = {}
+  local function add(h)
+    local f = freq[h] or 0
+    local v = (f > 0) and (f * CV.level_gain(gs, h, 1, bctx)) or 0
+    if okB and BuildPlan.planet_credit then v = v + BuildPlan.planet_credit(gs, h) * n0 end
+    vals[#vals + 1] = v / n0
+  end
+  for _, h in ipairs(VISIBLE_HANDS) do add(h) end
+  for _, h in ipairs(SECRET_HANDS) do if (plays[h] or 0) > 0 or (freq[h] or 0) > 0 then add(h) end end
+  table.sort(vals, function(a, b) return a > b end)
+  local N = #vals
+  if N < 3 then return 0 end
+  local e_best, tot = 0, choose(N, 3)
+  for i = 1, N do e_best = e_best + vals[i] * choose(N - i, 2) / tot end
+  return math.max(0, vals[1] - e_best)
 end
 
 -- How concentrated your play is on a single hand (max best-play frequency). A high
@@ -193,6 +222,59 @@ local function extra_discard_fv(gs, opts)
   return VU.frac_to_fv(per_round_to_per_hand(total / n / need(gs)))
 end
 
+-- a copy of gs with one more of a resource (the run / blind tables copied, the rest shared)
+local function with_more(gs, what)
+  local g = {}
+  for k, v in pairs(gs) do g[k] = v end
+  g.run, g.blind = {}, {}
+  for k, v in pairs(gs.run or {}) do g.run[k] = v end
+  for k, v in pairs(gs.blind or {}) do g.blind[k] = v end
+  if what == "hand_size" then
+    g.run.hand_size = ((gs.run and gs.run.hand_size) or 8) + 1
+  elseif what == "discard" then
+    g.blind.base_discards = ((gs.blind and gs.blind.base_discards) or 3) + 1
+    g.blind.discards_left = ((gs.blind and gs.blind.discards_left) or 3) + 1
+  elseif what == "hand" then
+    g.blind.base_hands = ((gs.blind and gs.blind.base_hands) or 4) + 1
+    g.blind.hands_left = ((gs.blind and gs.blind.hands_left) or 4) + 1
+  end
+  return g
+end
+-- What the extra resource earns THROUGH the board and deck (money jokers, discard-fed scalers, Gold / seal cards),
+-- in FV points (Eval.resource_side_frac). Owner 2026-10-06: these vouchers "can help make more money/tarots/scaling".
+function V.resource_side_fv(gs, what, opts)
+  local ok, Eval = pcall(require, "engine.eval_function")
+  if not (ok and Eval.resource_side_frac) then return 0 end
+  local ok2, f = pcall(Eval.resource_side_frac, gs, with_more(gs, what), opts or {})
+  return (ok2 and type(f) == "number") and VU.frac_to_fv(math.max(0, f)) or 0
+end
+
+-- +1 HAND SIZE, measured on PAIRED deals (owner 2026-10-06: "especially paint brush would be much more bought"). The old
+-- measure averaged a hs-card deal and a (hs+1)-card deal drawn INDEPENDENTLY, 6 of each: the noise dwarfs one card's
+-- effect, and the max(0, .) turned it into ~0 -- late shops priced Paint Brush at -0.5 with \$60 in the bank. Here both
+-- sides see the SAME shuffle, the bigger hand holding one more card off the top. (Digging measured the same lift on
+-- live fixtures -- 0.35-0.76 vs 0.42-0.97 of a boss hand -- at many times the cost, so the plain deal is used.)
+local function hand_size_gain_paired_fv(gs, opts)
+  opts = opts or {}
+  local deck = gs.deck
+  if not deck or #deck < 10 then return 0 end
+  local rng = opts.rng or math.random
+  local n = 24   -- one card can swing a deal a lot (a flush, or a held card breaking Blackboard), so 24 deals
+  local hs = (gs.run and gs.run.hand_size) or 8
+  local total = 0
+  for _ = 1, n do
+    local d = {}
+    for i, c in ipairs(deck) do d[i] = c end
+    for i = #d, 2, -1 do local j = math.floor(rng() * i) + 1; d[i], d[j] = d[j], d[i] end
+    local small, big = {}, {}
+    for i = 1, math.min(hs + 1, #d) do big[i] = d[i]; if i <= hs then small[i] = d[i] end end
+    local b0 = HandEval.best_play(gs, small)
+    local b1 = HandEval.best_play(gs, big)
+    total = total + ((b1 and b1.score) or 0) - ((b0 and b0.score) or 0)
+  end
+  return VU.frac_to_fv(math.max(0, total / n) / need(gs))
+end
+
 local function entry(name, value, econ, note, sit)
   return { name = name, value = value, econ = econ or 0, note = note, sit = sit }
 end
@@ -213,20 +295,23 @@ local DATA = {
   v_reroll_glut    = entry("Reroll Glut", 0, 0, "rerolls cost $2 less"),
   -- ---- modelled: resources (measured on your deck) ----
   -- +1 hand: one more average best play per round; an unneeded hand also pays $1 at round end (game rule).
+  -- (+ what the extra resource earns through the board / deck: V.resource_side_fv)
   v_grabber        = entry("Grabber", 0, 1, "+1 hand per round",
-    function(gs, opts) return clamp(extra_hand_fv(gs, opts) * ((opts and opts.at_risk) and 1.5 or 1.0), 0, 4) end),
+    function(gs, opts) return clamp(extra_hand_fv(gs, opts) * ((opts and opts.at_risk) and 1.5 or 1.0), 0, 4)
+      + V.resource_side_fv(gs, "hand", opts) end),
   v_nacho_tong     = entry("Nacho Tong", 0, 1, "+1 hand per round",
-    function(gs, opts) return clamp(extra_hand_fv(gs, opts) * ((opts and opts.at_risk) and 1.5 or 1.0), 0, 4) end),
+    function(gs, opts) return clamp(extra_hand_fv(gs, opts) * ((opts and opts.at_risk) and 1.5 or 1.0), 0, 4)
+      + V.resource_side_fv(gs, "hand", opts) end),
   v_wasteful       = entry("Wasteful", 0, 0, "+1 discard per round",
-    function(gs, opts) return extra_discard_fv(gs, opts) end),
+    function(gs, opts) return extra_discard_fv(gs, opts) + V.resource_side_fv(gs, "discard", opts) end),
   v_recyclomancy   = entry("Recyclomancy", 0, 0, "+1 discard per round",
-    function(gs, opts) return extra_discard_fv(gs, opts) end),
+    function(gs, opts) return extra_discard_fv(gs, opts) + V.resource_side_fv(gs, "discard", opts) end),
   -- +1 hand size: the measured per-hand lift -- already per hand, like a joker (it was multiplied by the hands per
   -- round, counting every hand twice over)
   v_paint_brush    = entry("Paint Brush", 0, 0, "+1 hand size",
-    function(gs, opts) return hand_size_gain_fv(gs, opts) end),
+    function(gs, opts) return hand_size_gain_paired_fv(gs, opts) + V.resource_side_fv(gs, "hand_size", opts) end),
   v_palette        = entry("Palette", 0, 0, "+1 hand size",
-    function(gs, opts) return hand_size_gain_fv(gs, opts) end),
+    function(gs, opts) return hand_size_gain_paired_fv(gs, opts) + V.resource_side_fv(gs, "hand_size", opts) end),
   -- ---- modelled: joker slot ----
   v_antimatter     = entry("Antimatter", 0, 0, "+1 joker slot",
     function(gs, opts) return V.antimatter_fv(gs, opts) end),
@@ -237,7 +322,7 @@ local DATA = {
   -- that hand for each pack that would otherwise have lacked it, over the packs you'll open.
   v_telescope      = entry("Telescope", 0, 0, "celestial packs always hold your hand's planet",
     function(gs, opts)
-      return planet_payoff_fv(gs, opts) * V.CELESTIAL_MISS * V.CELESTIAL_PACKS_PER_ANTE * runway(gs)
+      return VU.frac_to_fv(V.telescope_gain_per_pack(gs, opts)) * V.CELESTIAL_PACKS_PER_ANTE * runway(gs)
     end),
   -- Observatory: x1.5 mult per planet HELD for the hand you play. The engine uses planets on sight and
   -- never holds them, so the effect never fires for it.

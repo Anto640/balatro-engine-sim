@@ -320,6 +320,14 @@ local DISCARDS_PER_HAND = 1.0
 local TAROT_MAKERS = { j_cartomancer = true, j_vagabond = true, j_hallucination = true }
 
 -- Events of a scaler's fuel per SCORING HAND (deck/resource-aware), OWNER-CALIBRATABLE per fuel.
+-- Discards a round allows, relative to the standard 3: the discard-fed scalers' fuel scales with it (an extra discard
+-- a round -- Wasteful -- feeds Castle / Yorick / Hit the Road more; Burglar's none feeds nothing). 2026-10-06.
+function Eval.discard_budget_scale(gs)
+  local b = gs and gs.blind
+  local d = b and (b.base_discards or ((b.discards_left or 3) + (b.discards_used or 0))) or 3
+  return math.max(0, d) / 3
+end
+
 local function event_rate(gs, e)
   local fuel = e.feed_fuel
   if fuel == "planet" then
@@ -332,11 +340,11 @@ local function event_rate(gs, e)
     if is_rich(gs) then return 0.05 end
     return 0.03
   elseif fuel == "discard_any" then
-    return DISCARDS_PER_HAND
+    return DISCARDS_PER_HAND * Eval.discard_budget_scale(gs)
   elseif fuel == "discard_suit" then
-    return DISCARDS_PER_HAND * 0.25                                 -- a random suit each round ~ 1/4 of discards
+    return DISCARDS_PER_HAND * Eval.discard_budget_scale(gs) * 0.25 -- a random suit each round ~ 1/4 of discards
   elseif fuel == "discard_rank" then
-    return DISCARDS_PER_HAND * deck_rank_frac(gs, e.feed_rank)
+    return DISCARDS_PER_HAND * Eval.discard_budget_scale(gs) * deck_rank_frac(gs, e.feed_rank)
   elseif fuel == "scored_rank" then
     return SCORED_PER_HAND * deck_rank_frac(gs, e.feed_rank)
   elseif fuel == "lucky_trigger" then
@@ -406,6 +414,53 @@ local function event_fed_forward(gs, key, opts)
   local spu = unit_spu(gs, key, scaler_kind(e), opts)
   local ramp = e.feed_once and 1 or 0.5   -- a one-shot gain is at full from hand 1 (no linear ramp)
   return total * ramp * spu * (e.feed_damp or 1)
+end
+
+-- What MORE RESOURCES (a hand, a discard, a card of hand size: gs2 vs gs) earn through the board and the deck beyond
+-- the score of the extra play itself, as a boss-hand fraction (owner 2026-10-06: "wasteful or paint brush etc. can
+-- help make more money/tarots/scaling"):
+--   * discard-fed scalers accrue faster (Castle / Yorick / Hit the Road: event_rate scales with the discard budget);
+--   * money jokers whose income depends on resources earn more (Mail-In Rebate sees more cards, Delayed
+--     Gratification pays \$2 per unused discard, To Do List has more hands to make its hand) -- at the \$/round stream
+--     rate (VU.round_income_frac);
+--   * the deck's money and generator cards pay more often (Gold held at round end, Purple seals discarded, Blue seals
+--     held: CV.card_round_rates reads hand size and the discard budget).
+-- Each card type is valued once and multiplied (same enhancement / seal / face / low rank -> same value), with the SAME
+-- seeded draws on both sides so the difference is the resource, not sampling noise.
+function Eval.resource_side_frac(gs, gs2, opts)
+  local need = Mechanics.boss_per_hand_need(gs)
+  if not need or need <= 0 then return 0 end
+  local total = 0
+  for _, j in ipairs(gs.jokers or {}) do
+    local e = JokerData.resolve(j.key)
+    if e and e.feed_fuel and string.sub(e.feed_fuel, 1, 7) == "discard" then
+      local d = total_counter_gain(gs2, e) - total_counter_gain(gs, e)
+      if d ~= 0 then
+        local ramp = e.feed_once and 1 or 0.5
+        total = total + d * ramp * unit_spu(gs, j.key, scaler_kind(e), opts) * (e.feed_damp or 1) / need
+      end
+    end
+    local m = (Eval.econ_value(gs2, j.key, true) or 0) - (Eval.econ_value(gs, j.key, true) or 0)
+    if m ~= 0 then total = total + VU.round_income_frac(gs, m) end
+  end
+  local groups, order = {}, {}
+  for _, c in ipairs(gs.deck or {}) do
+    if c.enhancement == "m_gold" or c.enhancement == "m_lucky" or c.seal then
+      local rk = Cards.rank_id(c) or 0
+      local k = table.concat({ c.enhancement or "-", c.seal or "-", Cards.is_face(c) and "f" or "-",
+        (rk >= 2 and rk <= 5) and "l" or "-" }, "|")
+      if not groups[k] then groups[k] = { card = c, n = 0 }; order[#order + 1] = k end
+      groups[k].n = groups[k].n + 1
+    end
+  end
+  table.sort(order)
+  for i, k in ipairs(order) do
+    local g = groups[k]
+    local function r() local x = 7919 * i; return function() x = (x * 16807) % 2147483647; return (x - 1) / 2147483646 end end
+    local d = ConsumableValue.card_econ_value(gs2, g.card, r()) - ConsumableValue.card_econ_value(gs, g.card, r())
+    total = total + g.n * d
+  end
+  return total
 end
 
 -- Mean best-play score of the CURRENT board (the base a conditional xmult multiplies),
