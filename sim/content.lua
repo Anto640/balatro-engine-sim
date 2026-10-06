@@ -394,15 +394,21 @@ end
 -- Generate a full shop (shop_state shape). Reroll cost comes from the run's per-shop counter.
 function Content.gen_shop(run, rng)
   local jokers, consumables = {}, {}
+  -- common random numbers: every slot (card / pack / voucher) rolls from its own sub-stream of this shop's stream, so
+  -- a slot that re-draws (the duplicate-avoidance retry, which depends on the board) cannot shift what the next slot
+  -- turns up. One draw of `rng` keys the shop; without CRN every slot shares `rng` as before.
+  local W = require("sim.world")
+  local base = W.CRN and math.floor(rng() * 2147483646) or nil
+  local function sub(i) return base and W.stream(run, "slot", base, i) or rng end
   local nslots = run.shop_slots or Content.SHOP_SLOTS        -- A4: Overstock adds a card slot
-  for _ = 1, nslots do
-    local slot = gen_shop_slot(run, rng)
+  for si = 1, nslots do
+    local slot = gen_shop_slot(run, sub(si))
     if slot and slot.kind == "joker" then jokers[#jokers + 1] = slot.joker
     elseif slot and slot.kind == "consumable" then consumables[#consumables + 1] = slot.item end
   end
   Probe.extra_jokers(run, jokers)   -- `wide` ceiling probe; inert without a config
   local boosters = {}
-  for _ = 1, Content.PACK_SLOTS do boosters[#boosters + 1] = Content.gen_pack(rng, run) end
+  for pi = 1, Content.PACK_SLOTS do boosters[#boosters + 1] = Content.gen_pack(sub(50 + pi), run) end
   -- The run's FIRST shop always has a (normal) Buffoon Pack in its first booster slot (the game's first_shop_buffoon);
   -- the sim never guaranteed it (sim-rules audit #9, pessimistic: fewer early jokers).
   if not run._first_shop_buffoon and boosters[1] then
@@ -410,12 +416,13 @@ function Content.gen_shop(run, rng)
     local key = "p_buffoon_normal"
     boosters[1] = { key = key, name = Packs.display_name(key, "buffoon"), cost = priced(run, Content.PACK_COST.normal or 4) }
   end
+  for i, b in ipairs(boosters) do b._slot = i end   -- the pack's identity for its content stream (shop_phase)
   -- A4: ONE voucher per ANTE (not per shop). Generate at the ante's first shop and persist the
   -- SAME offer across that ante's shops (real Balatro restocks the voucher slot once per ante);
   -- cleared on purchase (apply_action). Fixes the ~3x over-exposure the audit flagged.
   if run._voucher_ante ~= run.ante then
     run._voucher_ante = run.ante
-    run._voucher = Content.gen_voucher(run, rng)
+    run._voucher = Content.gen_voucher(run, sub(90))
   end
   local vouchers = {}
   if run._voucher then vouchers[1] = run._voucher end
@@ -829,8 +836,10 @@ local function apply_action(run, shop, a, rng)
     -- Overstock's +1 slot applies here too (was the fixed SHOP_SLOTS constant, so the bought
     -- slot silently VANISHED on every reroll -- the voucher's exposure benefit half-broken).
     shop.jokers, shop.consumables = {}, {}
-    for _ = 1, (run.shop_slots or Content.SHOP_SLOTS) do
-      local slot = gen_shop_slot(run, rng)
+    local W = require("sim.world")   -- per-slot sub-streams, as in gen_shop
+    local base = W.CRN and math.floor(rng() * 2147483646) or nil
+    for si = 1, (run.shop_slots or Content.SHOP_SLOTS) do
+      local slot = gen_shop_slot(run, base and W.stream(run, "slot", base, si) or rng)
       if slot and slot.kind == "joker" then shop.jokers[#shop.jokers + 1] = slot.joker
       elseif slot and slot.kind == "consumable" then shop.consumables[#shop.consumables + 1] = slot.item end
     end
@@ -1124,7 +1133,10 @@ function Content.shop_phase(run, opts)
       local kind = (tp == "REROLL" and "reroll") or (tp == "BUY_PACK" and "pack") or (tp == "SELL_JOKER" and "sell") or nil
       if kind then
         crn_n[kind] = (crn_n[kind] or 0) + 1
-        arng = W.stream(run, kind, run.ante, run.round, crn_n[kind])
+        -- a pack's contents follow the PACK (its shop slot), not the order packs are opened in: opening the Planet
+        -- pack before the Arcana pack must not swap what each one holds
+        local slot = kind == "pack" and ranked.best.target and ranked.best.target._slot
+        arng = W.stream(run, kind, run.ante, run.round, slot and (100 + slot) or crn_n[kind])
       end
     end
     if not apply_action(run, shop, ranked.best, arng) then break end
