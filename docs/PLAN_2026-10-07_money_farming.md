@@ -19,7 +19,13 @@ owner named on 2026-09-19 (NEXT_SESSION.md "THE OPEN FRONTIER"): milk money WHIL
    (a) a guaranteed blind cleared with discards left while a money discard was available (Mail-In rank,
    Faceless 3 faces, Trading Card first discard, Purple seal, Delayed Gratification needs NONE used);
    (b) Gold cards played instead of held; (c) econ-joker conditions left unfired (To Do List hand, Business Card
-   faces, Rough Gem diamonds, Golden Ticket golds); (d) a clear that used more hands than needed.
+   faces, Rough Gem diamonds, Golden Ticket golds); (d) a clear that used more hands than needed;
+   (e) (owner 2026-10-06) MONEY CARDS LEFT IN THE DECK -- Gold (pays only if HELD at round end), Gold-seal / Lucky
+   (pay when scored), Steel and other held-value cards -- that the blind's UNUSED discards would have drawn. This
+   measures how strongly the engine digs FOR money cards, not just whether it uses the ones it is dealt. With the
+   CRN sim the draw pile's order is fixed per blind (World.keyed_shuffle of the deal seed), so "within reach" is
+   exact: replay the pile order and count the money cards among the next (spare discards x cards per discard).
+   Report it per blind and as $ missed (Gold $3 each held; Gold seal $3 / Lucky EV per scored trigger).
    Needs per-blind telemetry already in the trace (blind_result: plays, discards, hands_used, discards_left) +
    the board; add fields to the sim's blind_result only if missing (sim-only, never changes decisions).
 2. A loosened-MILK probe arm (env overrides of DE.MILK_SURV_TOL / DE.MILK_MONEY_MARGIN / the hands_left gate,
