@@ -144,10 +144,10 @@ local function value_item(gs, it, need, freq, base, rng, cheap, hctx)
         for _, j in ipairs(gs.jokers or {}) do gain = gain + (j.sell_value or 0) end
         gain = math.min(gain, 50)
       end
-      return base_v + VU.dollars_to_frac(gs, gain), false
+      return base_v + VU.income_frac(gs, gain), false
     end
     local vfrac, gain = ConsumableValue.card_value(gs, it.set, it.key, freq, need, rng, nil, hctx)
-    return vfrac + VU.dollars_to_frac(gs, gain or 0), false   -- money tarots: $ -> fraction (ante-aware)
+    return vfrac + VU.income_frac(gs, gain or 0), false   -- money tarots: the rate the pack's PRICE was set at (packs.lua)
   elseif it.card then
     if cheap then return 0.05, false end
     local cv = ConsumableValue.card_add_value(gs, it.card, { need = need, base = base, samples = 12, rng = rng })
@@ -398,7 +398,7 @@ function PO.recommend(gs, opts)
       if set == "Planet" then
         vfrac = (vfrac or 0) + BuildPlan.planet_credit(gs, ConsumableValue.PLANET_KEY_HAND[key])
       end
-      return (vfrac or 0) + VU.dollars_to_frac(gs, gain or 0)
+      return (vfrac or 0) + VU.income_frac(gs, gain or 0)
     end
     -- candidate copy targets: best in-pack tarot/planet (use it then Fool); your
     -- last-used tarot/planet (Fool first copies it); held tarot/planet in a slot.

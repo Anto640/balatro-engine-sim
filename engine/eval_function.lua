@@ -1535,6 +1535,12 @@ end
 -- ⚠ OPT-IN (sim verdict 2026-10-03, arm mw vs bn2, n=160): progress +0.070 (p 0.40), sign 39/37, reach-8 60 -> 62,
 -- wins 43 -> 38 -- no positive evidence for a magnitude change, so the flat rate stays the default. BES_MONEY_ANTE=1.
 Eval.MONEY_LAST_ANTE = 8
+-- FV points per \$/round of joker income. 0.8 FV = 0.32 boss-hand fraction = 1.6 shop utility, while the shop BUYS that
+-- same income at VU.ROUND_INCOME_UTIL = 1.0 utility (2026-10-06 unit audit) -- so a money joker was worth 1.6x more to keep
+-- than to buy, and in a trade its income outweighed a scorer at that rate (memory: paired trades went 35 -> 17 wins on
+-- this scale). A/B switch BES_ECON_FV=1 prices it at the buy rate (0.5 FV).
+Eval.ECON_FV = (os.getenv and os.getenv("BES_ECON_FV") == "1")
+  and (VU.ROUND_INCOME_UTIL / VU.FRAC_UTIL * VU.FV_PER_FRAC) or 0.8
 function Eval.money_weight(gs)
   if not (_G.BES_MONEY_ANTE or (os.getenv and os.getenv("BES_MONEY_ANTE") == "1")) then return 1 end
   local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
@@ -1559,7 +1565,7 @@ local function jp_to_fv(gs, j, jp, idx, measured)
   -- a MEASURED resource joker already has its hands/discards/hand-size trade-off inside jp (Eval.utility_fraction);
   -- don't charge the flat resource downside a second time (the anti-synergies it can't see are still charged)
   local dopts = (measured and Eval.UTILITY_MODELLED[j.key]) and { resource_measured = true } or nil
-  return FV_JOKER_WEIGHT * jp + 0.8 * econ * Eval.money_weight(gs) - Downside.penalty(gs, j, idx, dopts)
+  return FV_JOKER_WEIGHT * jp + Eval.ECON_FV * econ * Eval.money_weight(gs) - Downside.penalty(gs, j, idx, dopts)
 end
 
 -- FV-point marginal of OWNING joker idx (what selling it gives up). Measuring this
@@ -1949,7 +1955,7 @@ function Eval.future_value(gs, opts)
   return FV_JOKER_WEIGHT * Eval.joker_power(gs, opts)
        + 0.1 * Eval.economy_power(gs)
        + 0.5 * Eval.handlevel_power(gs)
-       + 0.8 * Eval.econ_power(gs) * Eval.money_weight(gs)
+       + Eval.ECON_FV * Eval.econ_power(gs) * Eval.money_weight(gs)
        - Eval.downside_total(gs)
 end
 

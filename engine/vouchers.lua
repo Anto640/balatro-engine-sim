@@ -61,7 +61,8 @@ end
 local function planet_payoff_fv(gs, opts)
   local bp = CV.best_planet(gs, opts)
   if not bp then return 0 end
-  return VU.frac_to_fv(bp.value / need(gs))
+  -- a level persists like any planet's: the same CV.level_scale every planet channel (shop, packs, Orbital) applies
+  return VU.frac_to_fv(CV.level_scale(gs) * bp.value / need(gs))
 end
 
 -- How concentrated your play is on a single hand (max best-play frequency). A high
