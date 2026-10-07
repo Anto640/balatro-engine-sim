@@ -1593,9 +1593,10 @@ Eval.MONEY_LAST_ANTE = 8
 -- FV points per \$/round of joker income. 0.8 FV = 0.32 boss-hand fraction = 1.6 shop utility, while the shop BUYS that
 -- same income at VU.ROUND_INCOME_UTIL = 1.0 utility (2026-10-06 unit audit) -- so a money joker was worth 1.6x more to keep
 -- than to buy, and in a trade its income outweighed a scorer at that rate (memory: paired trades went 35 -> 17 wins on
--- this scale). A/B switch BES_ECON_FV=1 prices it at the buy rate (0.5 FV).
-Eval.ECON_FV = (os.getenv and os.getenv("BES_ECON_FV") == "1")
-  and (VU.ROUND_INCOME_UTIL / VU.FRAC_UTIL * VU.FV_PER_FRAC) or 0.8
+-- this scale). Priced at the buy rate (0.5 FV) since 2026-10-07: arms u4 vs u1 +0.206 (p 0.008), fresh seeds +0.033,
+-- pooled n=320 +0.119 (p 0.075), wins 88 -> 90, reach-8 118 -> 127. BES_ECON_FV=0 restores the old 0.8.
+Eval.ECON_FV = (os.getenv and os.getenv("BES_ECON_FV") == "0") and 0.8
+  or (VU.ROUND_INCOME_UTIL / VU.FRAC_UTIL * VU.FV_PER_FRAC)
 function Eval.money_weight(gs)
   if not (_G.BES_MONEY_ANTE or (os.getenv and os.getenv("BES_MONEY_ANTE") == "1")) then return 1 end
   local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
