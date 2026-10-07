@@ -46,3 +46,12 @@ advice.
 
 ## Status
 - 2026-10-06: queued; starts when arms u3/u4/u5 + u1_7/u2_7 finish.
+- 2026-10-07 PHASE 0 RESULT (baseline `mf0` = `ae51526`, byte-identical to u4 -> the telemetry is decision-neutral):
+  in-blind money $1.04/blind (a1 $0.05 .. a8 $3.74); cleared blinds end with 2.62 spare discards / 2.67 spare hands
+  (unused hands already pay $1). Money LEFT: Gold within reach of the spare discards 0.07/blind (<= $0.21); Gold cards
+  in the deck 0.35/blind -- 0.07 held, 0.19 never drawn, ~0.09 played or discarded (~$0.27); spare discards while
+  owning Mail-In 2.2% of cleared blinds (Delayed Gratification 1.5%, where sparing them is correct). TOTAL headroom
+  ~$0.2-0.5 a blind (~$5-10 a run) across rare situations -- below the frequency ceiling, and small next to what the
+  shop probe showed moves outcomes. The engine already farms in-blind (MILK, the active money dig, HoldFuel); the sim's
+  decks simply hold little to farm. Phase 1 (a fix for the biggest category) is NOT justified by the data.
+  Pending: probe `mf1` (BES_MILK_TOL=0.05, BES_MILK_MARGIN=0) -- does farming HARDER convert?
