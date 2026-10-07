@@ -10,10 +10,14 @@ real hands, scored by a faithful re-implementation of Balatro's scoring), not fr
 
 ## Status
 
-- **Autonomous win rate:** about **25–30%** in the headless simulator (red deck, white stake; 160-seed paired
-  batches, confirmed on a fresh seed pool). For scale: it was ~6% in late September 2026 and ~1% in August.
-- **Live:** the in-game self-player regularly reaches antes 5–8; its runs are reviewed to find live-only bugs.
-- **Tests:** 1278 headless unit tests + 605 simulator tests, all green.
+- **Autonomous win rate:** about **28%** in the headless simulator (red deck, white stake; 90 of 320 runs over two
+  160-seed pools, October 2026). For scale: it was ~6% in late September 2026 and ~1% in August.
+- **Live:** the in-game self-player regularly reaches antes 5–8; its runs are reviewed to find live-only bugs
+  (press F5 at a misplay to save the decision for review).
+- **Recent:** a valuation unit-consistency audit (every value now converted the same way wherever it meets another
+  channel), common-random-number simulation (paired comparisons share shops, packs and deals), and a measured
+  answer on in-blind money farming (`docs/`).
+- **Tests:** 1604 headless unit tests + 624 simulator tests, all green.
 - The full, current handoff (what shipped, what was measured, what's next) is in **`NEXT_SESSION.md`**.
 
 ## What it advises
@@ -36,6 +40,7 @@ real hands, scored by a faithful re-implementation of Balatro's scoring), not fr
 
 | Key | Action |
 |---|---|
+| F5 | Flag a misplay: saves the last 4 decisions to `bes_flagged.jsonl` for review (a lost run saves its last 12 automatically) |
 | F6 | Auto-restart on/off (with self-play on, a finished run restarts after 4 s via the game's hold-R path) |
 | F7 | Dump owned jokers' live `ability` tables (`bes_joker_dump.txt`), tagged scored / value-only / UNCOVERED |
 | F8 | Force a re-evaluation |
@@ -50,9 +55,10 @@ until the measured decision is ready.
 
 1. Install [Lovely](https://github.com/ethangreen-dev/lovely-injector), then
    [Steamodded](https://github.com/Steamodded/smods).
-2. Copy the mod files (`main.lua`, `your_mod.json`, `core/`, `engine/`, `model/`, `ui/`, `util/`) into
-   your mod folder: with r2modman, `%APPDATA%/r2modmanPlus-local/Balatro/profiles/<profile>/mods/balatroenginesim/`;
-   with a plain Lovely install, `%APPDATA%/Balatro/Mods/balatroenginesim/`.
+2. **r2modman (recommended):** build the package with `python tools/package_r2.py` and add
+   `dist/Anto640-EngineSim-<version>.zip` through r2modman's *Import local mod*. **Plain Lovely install:** copy the
+   mod files (`main.lua`, `your_mod.json`, `config.lua`, `core/`, `engine/`, `model/`, `ui/`, `util/`) into
+   `%APPDATA%/Balatro/Mods/balatroenginesim/`.
 3. Start a run; the panel appears in the HUD.
 
 Telemetry is written to the LÖVE save folder (`%APPDATA%/Balatro/`): `bes_runs.jsonl` (the run),
