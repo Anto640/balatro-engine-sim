@@ -42,4 +42,16 @@ in, and is it converted the same way everywhere it meets another channel?
 
 ## Measurement
 
-Baseline `crn3` (CRN sim). `u1` = fixes 1-5. `u2` / `u3` = u1 + switch 6 / 7. Results: see NEXT_SESSION.md.
+Baseline `crn3` (CRN sim), paired n=160, seed pool 3:
+
+| arm | vs | change | progress delta | p | wins | reach-8 | verdict |
+|---|---|---|---|---|---|---|---|
+| u1 | crn3 | fixes 1-5 | -0.112 | 0.30 | 44 -> 42 | 57 -> 55 | correctness, shipped + deployed |
+| u2 | u1 | switch 6 (one price for a dollar) | +0.087 | 0.26 | 42 -> 43 | 55 -> 61 | promising -> fresh-seed check u2_7 vs u1_7 |
+| u3 | u1 | switch 7 (interest units) | +0.094 | 0.50 | 42 -> 39 | 55 -> 55 | wins down -> stays OFF |
+| u5 | u1 | owner voucher changes (`0dfe5aa`: Telescope counterfactual, paired Paint Brush, resource side value) + fixes 9 | +0.120 | 0.087 | 42 -> 38 | 55 -> 58 | see u4 |
+| u4 | u5 | switch 8 (money-joker income at the buy rate) | +0.086 | 0.065 | 38 -> 45 | 58 -> 64 | see u4 |
+| u4 | u1 | vouchers + switch 8 | **+0.206** | **0.008** | 42 -> 45 | 55 -> 64 | promising -> fresh-seed check u4_7 vs u1_7 |
+
+Voucher buys u1 -> u5: Telescope 35 -> 23, Grabber 44 -> 48, Wasteful 37 -> 36, Paint Brush 28 -> 21 (paired measure
+~0.4 of a boss hand per hand on average, often below its $10 price; negative with held-card jokers such as Blackboard).
