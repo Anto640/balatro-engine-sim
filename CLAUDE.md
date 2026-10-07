@@ -163,6 +163,10 @@ lua  tools/analyze_runs.lua sim_out/<baseline>.jsonl compare sim_out/<name>.json
   (seed, purpose, position) (`World.stream` / `checkpoint` / `keyed_shuffle`; `BES_CRN=0` = the old single stream), so a
   changed decision no longer re-rolls the rest of the run. Arms from before `1653688` are a different world and do not
   pair with newer ones. The remaining per-seed spread is mostly the change's real consequences, so power comes from n.
+- **Money telemetry (2026-10-07):** every sim `blind_result` carries `money_gap` (money earned in the blind, spare
+  discards / hands, money cards within reach of the spare discards) -- recorded after the blind, never read by a
+  decision; `lua tools/money_gap.lua <arm>.jsonl` reports it. Ceiling probes `BES_PROBE=gold6` / `gseal6` start runs with
+  6 Gold / Gold-seal cards (`sim/probe.lua` start_money).
 
 
 ## Research history
@@ -316,7 +320,7 @@ NOTE: `xmult_scaling` jokers ARE xmult — use `JokerData.is_xmult()`.
 ## Git
 
 Active work is on branch `winrate-v4-bundle`; `main` is synced to the validated/live state (fast-forward/merge it when a
-batch of changes is confirmed -- last synced 2026-10-04 (F5 review NSWJJKK8 fixes + deploy cache fix + two-row panel / real progress bar / auto death save; latest arm fx). **Commit and push whenever you (the AI
+batch of changes is confirmed -- last synced 2026-10-07 (unit-consistency audit shipped + CRN sim + money-farming telemetry/probes; baseline arm mf0). **Commit and push whenever you (the AI
 assistant) judge it appropriate — you do NOT need to wait to be asked** (owner directive, 2026-08-28).
 Use judgement: commit at coherent checkpoints with a clear message, keep the tree green, and don't
 bundle unrelated changes. Run the test suite before committing.

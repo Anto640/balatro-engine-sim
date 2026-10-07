@@ -1,5 +1,14 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-07 night)
+**Live = main = this checkout's HEAD (deployed).** Engine decisions unchanged since `ae51526` (later commits: sim telemetry,
+off-by-default probe switches, docs). **In-blind money farming CLOSED as a measured null** (`docs/PLAN_2026-10-07_money_farming.md`,
+memory money-farming-null): ~$0.2-0.5/blind headroom in sim AND live; loosened MILK (`mf1`) -0.009, 143/160 tied.
+**Running: money-DECK ceiling** -- `gold6` / `gseal6` (6 Gold / Gold-seal cards from the start) vs `mf0`. Decision rule:
+a clear gain (progress up >= ~0.2, wins not down) -> find where acquisition undervalues money cards (Devil/Magician
+tarots, Standard-pack Gold/Gold-seal cards, Midas / money jokers), fix, arm vs mf0, fresh-seed confirm, ship; a small
+or no gain -> money density does not convert even free; write it up and close. **Baseline for arms: `sim_out/mf0.jsonl`.**
+
 ## START HERE (2026-10-07)
 **Live = `ae51526` (deployed, main synced).** Unit audit CLOSED (`docs/UNIT_AUDIT_2026-10-06.md`): shipped fixes 1-5/9, owner
 voucher changes, money-joker income at the buy rate (pooled n=320 +0.119, wins 88 -> 90, reach-8 118 -> 127); dollar-price

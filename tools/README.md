@@ -73,6 +73,8 @@ Almost everything here reads **existing** telemetry and costs nothing to run. On
 | `line_oracle.lua` | was a winning line available in this run? |
 | `envelope.lua` | the reachability envelope over several policies — ⚠ read it as a **noise** measure, never as an oracle |
 | `replay_states.lua` / `replay_lib.lua` / `extract_states.lua` | replay a fixed corpus of in-blind decision states under the current engine |
+| **`money_gap.lua`** | how much in-blind money does the engine leave on the table? Reads the sim's `blind_result.money_gap` telemetry (2026-10-07+, decision-neutral): money per blind, spare discards / hands, money cards within reach of the spare discards (exact under CRN), discard-to-money jokers owned. Result: ~$0.2-0.5/blind -- docs/PLAN_2026-10-07_money_farming.md |
+| **`money_gap_live.py`** | the same on LIVE runs (`bes_runs` + `bes_fixtures`; within-reach is an expectation, live has no pile order) |
 
 ## Live smoothness (the time-sliced evaluation)
 
