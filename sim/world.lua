@@ -240,6 +240,25 @@ function World.new_run(seed, opts)
     run.jokers[#run.jokers + 1] = GS.joker{ key = k, name = d.name or k, cost = d.cost or 4,
       sell_value = math.max(1, math.floor((d.cost or 4) / 2)), rarity = d.rarity, ability = { extra = {} } }
   end
+  -- probe: start with N money cards in the deck (sim/probe.lua `start_money`), to measure whether a money-dense deck
+  -- converts into progress -- the ceiling for valuing money cards when acquiring them. The LOWEST cards (2s, then 3s,
+  -- suit order) take the enhancement / seal, so the deck's scoring is disturbed as little as possible.
+  local sm = opts.probe and opts.probe.start_money
+  if sm and (sm.n or 0) > 0 then
+    local order = {}
+    for i, c in ipairs(run.deck) do order[i] = c end
+    local SUIT = { Spades = 1, Hearts = 2, Clubs = 3, Diamonds = 4 }
+    local Cards = require("util.cards")
+    table.sort(order, function(x, y)
+      local rx, ry = Cards.rank_id(x) or 99, Cards.rank_id(y) or 99
+      if rx ~= ry then return rx < ry end
+      return (SUIT[x.suit] or 9) < (SUIT[y.suit] or 9)
+    end)
+    for i = 1, math.min(sm.n, #order) do
+      if sm.enhancement then order[i].enhancement = sm.enhancement end
+      if sm.seal then order[i].seal = sm.seal end
+    end
+  end
   return run
 end
 

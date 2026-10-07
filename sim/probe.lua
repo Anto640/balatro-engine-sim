@@ -622,6 +622,9 @@ Probe.CONFIGS = {
   reroll1      = { free_rerolls = 1, free_rerolls_until = 3 },
   -- start owning one joker (World.new_run), to measure its realised income/behaviour over whole runs
   faceless     = { start_jokers = { "j_faceless" } },
+  -- money-deck ceiling (docs/PLAN_2026-10-07_money_farming.md follow-up): start with 6 Gold cards / 6 Gold-seal cards
+  gold6        = { start_money = { n = 6, enhancement = "m_gold" } },
+  gseal6       = { start_money = { n = 6, seal = "Gold" } },
 }
 
 -- Resolve a config name to the opts overlay Driver.run consumes. Returns nil for the
