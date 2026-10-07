@@ -54,4 +54,11 @@ advice.
   ~$0.2-0.5 a blind (~$5-10 a run) across rare situations -- below the frequency ceiling, and small next to what the
   shop probe showed moves outcomes. The engine already farms in-blind (MILK, the active money dig, HoldFuel); the sim's
   decks simply hold little to farm. Phase 1 (a fix for the biggest category) is NOT justified by the data.
-  Pending: probe `mf1` (BES_MILK_TOL=0.05, BES_MILK_MARGIN=0) -- does farming HARDER convert?
+  Probe `mf1` (BES_MILK_TOL=0.05, BES_MILK_MARGIN=0) vs mf0: -0.009 (p 0.68), wins 45 -> 46, 143/160 seeds unchanged,
+  in-blind money $0.96 vs $1.04 -- farming HARDER does not fire more or convert.
+  LIVE check (`tools/money_gap_live.py`, 1648 cleared live blinds): same picture -- spare discards 2.02 / hands 2.50,
+  money-card density as low as the sim's (gold 0.27, lucky 0.53, steel 0.24 per blind), Gold within reach ~0.02/blind.
+- **CLOSED 2026-10-07: measured null.** The engine already farms what its decks hold; the decks hold little. Follow-up
+  (running): the money-DECK ceiling -- probes `gold6` / `gseal6` (runs that start with 6 Gold / Gold-seal cards) vs
+  mf0. Large gain -> the engine undervalues money cards when ACQUIRING them (fix that); small -> money density does
+  not convert even free, and the question is settled.
