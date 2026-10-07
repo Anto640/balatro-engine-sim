@@ -52,6 +52,11 @@ Baseline `crn3` (CRN sim), paired n=160, seed pool 3:
 | u5 | u1 | owner voucher changes (`0dfe5aa`: Telescope counterfactual, paired Paint Brush, resource side value) + fixes 9 | +0.120 | 0.087 | 42 -> 38 | 55 -> 58 | see u4 |
 | u4 | u5 | switch 8 (money-joker income at the buy rate) | +0.086 | 0.065 | 38 -> 45 | 58 -> 64 | see u4 |
 | u4 | u1 | vouchers + switch 8 | **+0.206** | **0.008** | 42 -> 45 | 55 -> 64 | promising -> fresh-seed check u4_7 vs u1_7 |
+| u2_7 | u1_7 | switch 6, fresh seeds | -0.043 | 0.57 | 46 -> 42 | 63 -> 63 | did not replicate (pooled +0.022) -> stays OFF |
+| u4_7 | u1_7 | vouchers + switch 8, fresh seeds | +0.033 | 0.76 | 46 -> 45 | 63 -> 63 | pooled n=320 +0.119 (p 0.075), wins 88 -> 90, reach-8 118 -> 127 -> SHIPPED `ae51526`, deployed, main synced |
+
+**Closed 2026-10-07.** Shipped: fixes 1-5, 9, the owner voucher changes, switch 8 (on by default, `BES_ECON_FV=0` = old).
+Off (measured neutral, kept as switches): 6 `BES_DOLLAR_ANTE`, 7 `BES_INTEREST_UNITS`. Open (rare): 11, 12.
 
 Voucher buys u1 -> u5: Telescope 35 -> 23, Grabber 44 -> 48, Wasteful 37 -> 36, Paint Brush 28 -> 21 (paired measure
 ~0.4 of a boss hand per hand on average, often below its $10 price; negative with held-card jokers such as Blackboard).

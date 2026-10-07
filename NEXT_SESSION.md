@@ -1,5 +1,12 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-07)
+**Live = `ae51526` (deployed, main synced).** Unit audit CLOSED (`docs/UNIT_AUDIT_2026-10-06.md`): shipped fixes 1-5/9, owner
+voucher changes, money-joker income at the buy rate (pooled n=320 +0.119, wins 88 -> 90, reach-8 118 -> 127); dollar-price
+and interest switches stay off (neutral). **Now running: money-farming plan phase 0** (`docs/PLAN_2026-10-07_money_farming.md`):
+baseline arm `mf0` on `ae51526` with the money_gap telemetry -> `lua tools/money_gap.lua sim_out/mf0.jsonl`. **New baseline
+for arms: `sim_out/mf0.jsonl`** (fresh-seed pool: none yet on this commit).
+
 ## START HERE (2026-10-06 evening) -- unit audit arms + the queued next lever
 Unit audit (`docs/UNIT_AUDIT_2026-10-06.md`): `u1` (fixes 1-5) shipped + deployed (neutral, -0.112 n.s.). Switches: `u2`
 BES_DOLLAR_ANTE +0.087 n.s., reach-8 +6 -> fresh-seed confirmation `u1_7`/`u2_7` queued; `u3` BES_INTEREST_UNITS, `u4`
