@@ -13,8 +13,21 @@ if not path then print("usage: lua tools/money_gap.lua <arm.jsonl>"); os.exit(1)
 local by_ante, tot = {}, { n = 0 }
 local function acc(t, k, v) t[k] = (t[k] or 0) + (v or 0) end
 local runs = {}
+-- the board at each blind (joker_gain / joker_loss records, in run order): which discard-to-money jokers were owned
+local DISCARD_MONEY = { j_mail = "Mail-In", j_faceless = "Faceless", j_trading = "Trading Card",
+                        j_delayed_grat = "Delayed Grat" }
+local board = {}
+local spare_with = {}   -- joker name -> cleared blinds with spare discards while it was owned
 for line in io.lines(path) do
-  if line:find('"money_gap"', 1, true) then
+  if line:find('"joker_gain"', 1, true) or line:find('"joker_loss"', 1, true) then
+    local ok, r = pcall(Json.decode, line)
+    if ok and r and r.seed and r.key then
+      board[r.seed] = board[r.seed] or {}
+      local b = board[r.seed]
+      if r.kind == "joker_gain" then b[r.key] = (b[r.key] or 0) + 1
+      elseif r.kind == "joker_loss" then b[r.key] = math.max(0, (b[r.key] or 0) - 1) end
+    end
+  elseif line:find('"money_gap"', 1, true) then
     local ok, r = pcall(Json.decode, line)
     if ok and r and r.kind == "blind_result" and r.money_gap then
       local m, a = r.money_gap, r.ante or 0
@@ -23,6 +36,12 @@ for line in io.lines(path) do
       for _, t in ipairs({ by_ante[a], tot }) do
         t.n = t.n + 1
         acc(t, "money", m.money)
+        if r.cleared and t == tot and (r.money_gap.spare_discards or 0) > 0 then
+          local b = board[r.seed] or {}
+          for k, name in pairs(DISCARD_MONEY) do
+            if (b[k] or 0) > 0 then spare_with[name] = (spare_with[name] or 0) + 1 end
+          end
+        end
         if r.cleared then
           acc(t, "cleared", 1)
           acc(t, "spare_d", m.spare_discards); acc(t, "spare_h", m.spare_hands)
@@ -61,3 +80,11 @@ print(string.format("\nGold within reach: %.2f per cleared blind -> up to $%.2f/
   (tot.reach_gold or 0) / c, 3 * (tot.reach_gold or 0) / c, (tot.reach_gold or 0) / math.max(1, nruns)))
 print(string.format("Gold in deck held at round end: %.0f%% (the rest were played, discarded or never drawn).",
   100 * (tot.held_gold or 0) / math.max(1, tot.deck_gold or 0)))
+print("\nCleared blinds that ended with spare discards while a discard-to-money joker was owned:")
+local names = {}
+for n in pairs(spare_with) do names[#names + 1] = n end
+table.sort(names)
+for _, n in ipairs(names) do
+  print(string.format("  %-14s %4d blinds (%.1f%% of cleared blinds)", n, spare_with[n], 100 * spare_with[n] / c))
+end
+if #names == 0 then print("  none") end

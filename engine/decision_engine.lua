@@ -264,6 +264,14 @@ DE.MILK_MONEY = true        -- SHIPPED ON (2026-08-21): correct play (milk a loc
                             -- `nomilk` sim probe disables it for A/B. §30d.
 DE.MILK_SURV_TOL = 0.02     -- max survival-frac the milk play may cost vs the straight clear
 DE.MILK_MONEY_MARGIN = 2    -- min extra $ (E[money]) the milk must farm to justify deferring
+-- MONEY-FARMING PROBE (docs/PLAN_2026-10-07_money_farming.md phase 0 step 2; off unless set): loosen the milk gate to
+-- ask whether farming HARDER converts. BES_MILK_TOL / BES_MILK_MARGIN override the two constants above.
+do
+  local tol = os.getenv and tonumber(os.getenv("BES_MILK_TOL") or "")
+  local margin = os.getenv and tonumber(os.getenv("BES_MILK_MARGIN") or "")
+  if tol then DE.MILK_SURV_TOL = tol end
+  if margin then DE.MILK_MONEY_MARGIN = margin end
+end
 
 -- ATOMIC single-planet recommendation. Using held planets is free permanent value, so the engine
 -- proposes it before playing -- but ONE at a time: after this planet is used the engine re-evaluates
