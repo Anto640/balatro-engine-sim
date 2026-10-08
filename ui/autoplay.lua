@@ -867,6 +867,21 @@ function Autoplay.tick(last, logger)
       Autoplay.locked_until = now() + 0.5; return
     end
     if tgt and #tgt > 0 and not highlighted_matches(G, tgt) then
+      -- An exact target selection can be IMPOSSIBLE: Cerulean Bell keeps a card force-selected, so a 3-card Star
+      -- never matches and the game would refuse 4 anyway (live 2026-10-08 looped "target 3 card(s) for The Star"
+      -- from 01:45 to 03:54 at the ante-8 Bell). After MAX_WAIT on this state, act on the engine's next choice,
+      -- exactly as a refused Use does below.
+      if forced and ch == "hand" then
+        local alt = last.ranked and last.ranked.alternatives and last.ranked.alternatives[1]
+        if not (alt and (alt.type == "PLAY" or alt.type == "DISCARD")) and best.play_cards and #best.play_cards > 0 then
+          alt = { type = "PLAY", cards = best.play_cards, hand_type = best.hand_type }   -- the play the tarot preceded
+        end
+        if alt and (alt.type == "PLAY" or alt.type == "DISCARD") then
+          Autoplay._use_fallback = { sig = s, action = alt }
+          log(logger, "tarot targets can't be selected -> engine's next choice: " .. alt.type)
+          return
+        end
+      end
       local n = highlight(G, tgt)
       log(logger, "target " .. n .. " card(s) for " .. tostring(best.target and best.target.name))
       Autoplay.locked_until = now() + 0.4
