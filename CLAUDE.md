@@ -140,7 +140,9 @@ lua  tools/analyze_runs.lua sim_out/<baseline>.jsonl compare sim_out/<name>.json
 - **Speed:** ~95 s/run single-core; batches run in parallel (one LuaJIT process per worker, interleaved seeds).
   Merged parallel output is byte-identical to sequential because the sim is cross-process deterministic
   (sorted-key sampling + stable tie-breaks).
-- **Worker count (owner rule):** 11 when the owner is away, 4–6 while they use the PC. When memory runs low the
+- **Worker count (owner rule, updated 2026-10-08):** always **11**, whether or not the owner is using the PC -- batches run at
+  BELOW-NORMAL priority (see the launch line under Toolchain), which keeps the PC and the CLI responsive, so do not drop
+  to 4–6 workers. When memory runs low the
   shell gets killed but the workers usually survive: merge or resume their output with the resumable runner. If a
   batch was actually killed, rerun it (resuming from the finished seeds) without asking the owner first. The same goes
   for ANY job stopped for low memory or similar (probe, replay, watcher, a Claude Code background command killed by the
