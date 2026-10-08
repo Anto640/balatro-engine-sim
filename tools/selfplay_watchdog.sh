@@ -55,8 +55,10 @@ while true; do
   if [ $age -gt $STALL ]; then relaunch "no self-play activity for ${age}s"; continue; fi
   N=$(wc -l < "$APLOG")
   if [ $((N - BASE)) -gt 300 ]; then
-    distinct=$(tail -n 300 "$APLOG" | cut -c10- | sort -u | wc -l)
-    if [ $distinct -le 4 ]; then relaunch "self-play looping (last 300 log lines: $distinct distinct messages)"; continue; fi
+    # LC_ALL=C: in the hidden launch the locale makes sort fail on the log's multibyte "—" (cut can split it) -> 0 lines -> a false
+    # "loop" (2026-10-09 00:52 restarted a healthy game). 0 distinct = the check itself failed, never a loop.
+    distinct=$(/usr/bin/tail -n 300 "$APLOG" | /usr/bin/cut -c10- | LC_ALL=C /usr/bin/sort -u | /usr/bin/wc -l)
+    if [ "$distinct" -ge 1 ] && [ "$distinct" -le 4 ]; then relaunch "self-play looping (last 300 log lines: $distinct distinct messages)"; continue; fi
   fi
   [ $((N - BASE)) -gt 50 ] && FAILS=0   # the game is playing again: reset the failure count
   sleep 60
