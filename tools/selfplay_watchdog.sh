@@ -13,7 +13,14 @@ relaunch() {
   FAILS=$((FAILS + 1))
   if [ $FAILS -gt 3 ]; then   # 3 relaunches in a row without the game coming back: stop (2026-10-08: retrying every
     # 100 s for 2 hours while the PC was out of memory made it worse and filled the screen with error popups)
-    echo "$(date +%H:%M:%S) GIVING UP after 3 failed relaunches ($1)" >> $LOG; echo done > /tmp/bes/selfplay_done; exit 1
+    echo "$(date +%H:%M:%S) NEEDS MANUAL: 3 relaunches in a row failed ($1) -- handing over to the assistant" >> $LOG
+    echo done > /tmp/bes/selfplay_done; exit 1
+  fi
+  # never relaunch into a memory shortage (2026-10-08: relaunching while SteelSeries capture held ~48 GB fed the spiral)
+  free_mb=$(powershell -NoProfile -Command "[int]((Get-CimInstance Win32_OperatingSystem).FreeVirtualMemory/1024)" 2>/dev/null | tr -d '')
+  if [ -n "$free_mb" ] && [ "$free_mb" -lt 4000 ]; then
+    echo "$(date +%H:%M:%S) NEEDS MANUAL: only ${free_mb} MB of memory free -- not relaunching ($1)" >> $LOG
+    echo done > /tmp/bes/selfplay_done; exit 1
   fi
   echo "$(date +%H:%M:%S) RELAUNCH ($1)" >> $LOG
   taskkill //IM Balatro.exe //F >/dev/null 2>&1; sleep 8
