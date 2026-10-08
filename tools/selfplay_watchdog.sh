@@ -7,6 +7,8 @@ LOG=/tmp/bes/watchdog.log
 APLOG="$APPDATA/Balatro/bes_autoplay.log"
 MODS="$APPDATA/r2modmanPlus-local/Balatro/profiles/Default/mods"
 STALL=360
+STOP="${BES_SELFPLAY_STOP:-07:00}"   # HH:MM to close the game and stop
+mem_free_mb() { powershell -NoProfile -Command "[int]((Get-CimInstance Win32_OperatingSystem).FreeVirtualMemory/1024)" 2>/dev/null | tr -d ''; }
 BASE=$(wc -l < "$APLOG")
 FAILS=0
 relaunch() {
@@ -17,7 +19,7 @@ relaunch() {
     echo done > /tmp/bes/selfplay_done; exit 1
   fi
   # never relaunch into a memory shortage (2026-10-08: relaunching while SteelSeries capture held ~48 GB fed the spiral)
-  free_mb=$(powershell -NoProfile -Command "[int]((Get-CimInstance Win32_OperatingSystem).FreeVirtualMemory/1024)" 2>/dev/null | tr -d '')
+  free_mb=$(mem_free_mb)
   if [ -n "$free_mb" ] && [ "$free_mb" -lt 4000 ]; then
     echo "$(date +%H:%M:%S) NEEDS MANUAL: only ${free_mb} MB of memory free -- not relaunching ($1)" >> $LOG
     echo done > /tmp/bes/selfplay_done; exit 1
@@ -31,10 +33,22 @@ relaunch() {
 }
 echo "$(date +%H:%M:%S) watchdog v2 start" >> $LOG
 while true; do
-  if [ "$(date +%H)" = "07" ]; then
-    echo "$(date +%H:%M:%S) 07:00 reached -- closing Balatro, watchdog done" >> $LOG
+  now=$(date +%H:%M)
+  if [[ "$now" > "$STOP" || "$now" == "$STOP" ]] && [[ "$now" < "12:00" ]]; then
+    echo "$(date +%H:%M:%S) $STOP reached -- closing Balatro, watchdog done" >> $LOG
     taskkill //IM Balatro.exe >/dev/null 2>&1; sleep 10; taskkill //IM Balatro.exe //F >/dev/null 2>&1
     echo done > /tmp/bes/selfplay_done; exit 0
+  fi
+  # MEMORY GUARD (2026-10-08: SteelSeries GG's capture service grew to ~48 GB over a night and starved everything)
+  fm=$(mem_free_mb)
+  if [ -n "$fm" ] && [ "$fm" -lt 6000 ]; then
+    for p in SteelSeriesCaptureSvc SteelSeriesMoments; do taskkill //IM $p.exe //F >/dev/null 2>&1 && echo "$(date +%H:%M:%S) LOW MEMORY ${fm} MB -- closed $p" >> $LOG; done
+    echo "$(date +%H:%M:%S) LOW MEMORY ${fm} MB free" >> $LOG
+    if [ "$fm" -lt 4000 ]; then
+      taskkill //IM Balatro.exe >/dev/null 2>&1
+      echo "$(date +%H:%M:%S) NEEDS MANUAL: only ${fm} MB of memory free -- closed Balatro to protect the PC" >> $LOG
+      echo done > /tmp/bes/selfplay_done; exit 1
+    fi
   fi
   if ! tasklist 2>/dev/null | grep -qi "Balatro.exe"; then relaunch "game not running"; continue; fi
   age=$(( $(date +%s) - $(stat -c %Y "$APLOG") ))
