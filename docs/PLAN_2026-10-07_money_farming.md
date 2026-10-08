@@ -69,3 +69,5 @@ advice.
   gold6's held Gold paid) queued after gseal6. If rich4 ~ gold6: money binds and the engine under-prices income
   everywhere; if rich4 << gold6: Gold cards specifically (hold value, deck thinning of 2s/3s?) -- and acquisition of
   Gold (Devil, Standard packs) is under-valued.
+- **gseal6 (6 Gold-seal cards) vs mf0: +0.598 (p 0.0012), wins 45 -> 70, reach-8 64 -> 90, sign 89/45.** Same picture:
+  money cards in the deck are a large lever. rich4 (+$4/round, no cards) decides cards vs money.
