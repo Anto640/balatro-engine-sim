@@ -107,11 +107,23 @@ local function run_ended(G)
   if G.GAME and G.GAME.won and G.OVERLAY_MENU then return "win" end
   return nil
 end
+-- The deck self-play runs on (owner 2026-10-09: an autostart continued a Plasma Deck save and every auto-restart then
+-- reused Plasma -- the engine is tuned and measured on the Red Deck). New runs started by the self-player use this
+-- deck; nil = keep whatever deck the game has selected.
+Autoplay.FORCE_DECK = "b_red"
+local function force_deck(G)
+  if not Autoplay.FORCE_DECK then return end
+  pcall(function()
+    local c = G.P_CENTERS and G.P_CENTERS[Autoplay.FORCE_DECK]
+    if c and Back then G.GAME.viewed_back = Back(c); G.GAME.selected_back = G.GAME.viewed_back end
+  end)
+end
 local function restart_run(G)
   return pcall(function()
     if G.save_settings then G:save_settings() end
     G.SETTINGS.current_setup = "New Run"
     G.GAME.viewed_back = nil
+    force_deck(G)
     G.run_setup_seed = G.GAME.seeded
     G.challenge_tab = G.GAME and G.GAME.challenge and G.GAME.challenge_tab or nil
     G.forced_seed, G.setup_seed = nil, nil
@@ -172,12 +184,16 @@ local function maybe_autostart(G)
       local raw = get_compressed(G.SETTINGS.profile .. "/" .. "save.jkr")
       if raw ~= nil then G.SAVED_GAME = STR_UNPACK(raw) end
     end
-    if G.SAVED_GAME ~= nil and not (G.SAVED_GAME.GAME and G.SAVED_GAME.GAME.won) then
+    local saved_deck = G.SAVED_GAME and G.SAVED_GAME.BACK and G.SAVED_GAME.BACK.key
+    local deck_ok = (not Autoplay.FORCE_DECK) or saved_deck == nil or saved_deck == Autoplay.FORCE_DECK
+    if not deck_ok then flog("autostart: the saved run is on " .. tostring(saved_deck) .. " -- starting a new " .. Autoplay.FORCE_DECK .. " run instead") end
+    if deck_ok and G.SAVED_GAME ~= nil and not (G.SAVED_GAME.GAME and G.SAVED_GAME.GAME.won) then
       flog("autostart: continuing the saved run")
       G.FUNCS.start_run(nil, { savetext = G.SAVED_GAME })
     else
       flog("autostart: no saved run -- starting a new run")
       G.SETTINGS.current_setup = "New Run"
+      force_deck(G)
       G.FUNCS.start_run(nil, { stake = G.PROFILES[G.SETTINGS.profile].MEMORY.stake or 1 })
     end
   end)
