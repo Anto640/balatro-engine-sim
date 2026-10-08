@@ -62,3 +62,10 @@ advice.
   (running): the money-DECK ceiling -- probes `gold6` / `gseal6` (runs that start with 6 Gold / Gold-seal cards) vs
   mf0. Large gain -> the engine undervalues money cards when ACQUIRING them (fix that); small -> money density does
   not convert even free, and the question is settled.
+- **2026-10-08 04:14 -- gold6 (6 Gold cards from the start) vs mf0: +0.673 progress (p 0.0003), wins 45 -> 86, reach-8
+  64 -> 100, sign 89/45.** A money-dense deck nearly DOUBLES the win rate. With Gold in the deck the in-blind gap is
+  real again: 6.13 Gold per blind but only 1.22 held at round end; 1.68 within reach of the spare discards per
+  cleared blind (~$5/blind). Open questions: is it the cards or just the money? -> control `rich4` (+$4/round, ~what
+  gold6's held Gold paid) queued after gseal6. If rich4 ~ gold6: money binds and the engine under-prices income
+  everywhere; if rich4 << gold6: Gold cards specifically (hold value, deck thinning of 2s/3s?) -- and acquisition of
+  Gold (Devil, Standard packs) is under-valued.
