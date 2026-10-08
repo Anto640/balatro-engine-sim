@@ -17,15 +17,22 @@ local BossEffect = require("engine.boss_effect")
 
 local RF = {}
 
--- deep copy of a POD subtree (skips functions/userdata/threads; gs PODs have no cycles)
-local function deep(v)
+-- deep copy of a POD subtree (skips functions/userdata/threads). CYCLE-SAFE: a live joker's `ability` table can hold a
+-- reference back into itself or the game (live 2026-10-09: the auto death-save hit "stack overflow" here and kept 2
+-- of 12 decisions), so a table already being copied is skipped and the depth is capped.
+local DEEP_MAX = 12
+local function deep(v, seen, depth)
   if type(v) ~= "table" then return v end
+  seen, depth = seen or {}, depth or 0
+  if seen[v] or depth >= DEEP_MAX then return nil end
+  seen[v] = true
   local out = {}
   for k, x in pairs(v) do
     local tx = type(x)
-    if tx == "table" then out[k] = deep(x)
+    if tx == "table" then out[k] = deep(x, seen, depth + 1)
     elseif tx ~= "function" and tx ~= "userdata" and tx ~= "thread" then out[k] = x end
   end
+  seen[v] = nil   -- a table shared by two branches (not a cycle) is copied in both
   return out
 end
 RF.deep = deep
