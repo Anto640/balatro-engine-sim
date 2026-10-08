@@ -71,3 +71,10 @@ advice.
   Gold (Devil, Standard packs) is under-valued.
 - **gseal6 (6 Gold-seal cards) vs mf0: +0.598 (p 0.0012), wins 45 -> 70, reach-8 64 -> 90, sign 89/45.** Same picture:
   money cards in the deck are a large lever. rich4 (+$4/round, no cards) decides cards vs money.
+- **rich4 (+$4/round, NO cards) vs mf0: +0.952 (p < 0.0001), wins 45 -> 86, reach-8 64 -> 107, sign 92/35.** vs gold6:
+  +0.278 n.s., wins equal. **It is the MONEY, not the cards: income is the binding resource and the engine under-weights
+  it.** Shop replay (live ante-3 fixture, $17): Midas Mask = +2.50 income (2.0 $/round prior) vs -4.24 net cost
+  (mostly forgone interest) - 3.50 econ-floor penalty = -4.48; Golden Ticket +3.60 vs -6.24. Midas offered 34x in mf0,
+  bought 0x. NEXT: dose-response rich1 / rich2 (queued), then calibrate the $/round income weight and the
+  spending penalties to the measured exchange rate, starting with income bought into FREE slots (the 35 -> 17 paired-trade
+  failure came from money jokers displacing scorers). Arm vs mf0, fresh-seed confirm, ship.
