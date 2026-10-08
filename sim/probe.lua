@@ -626,6 +626,8 @@ Probe.CONFIGS = {
   gold6        = { start_money = { n = 6, enhancement = "m_gold" } },
   gseal6       = { start_money = { n = 6, seal = "Gold" } },
   rich4        = { income_bonus = 4 },   -- control for gold6: its held Gold paid ~$3.7/round (1.22 held x $3)
+  rich1        = { income_bonus = 1 },   -- dose-response for the value of $/round income
+  rich2        = { income_bonus = 2 },
 }
 
 -- Resolve a config name to the opts overlay Driver.run consumes. Returns nil for the
