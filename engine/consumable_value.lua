@@ -439,16 +439,31 @@ function CV.expected_retriggers(gs, card)
   return r
 end
 
+-- SLOT-FREE MONEY CARDS AS THE MONEY THEY PAY (2026-10-08; A/B switch BES_CARD_INCOME=1, default off). Ceiling probes:
+-- 6 Gold cards from the start took wins 45 -> 86 / 160, 6 Gold seals 45 -> 70, and +$4/round with nothing else 45 -> 86
+-- -- money binds, and a money CARD costs no joker slot (buying money JOKERS, arm `inc`, bought 2.5x more of them and
+-- gained nothing: each took a scorer's slot). Under the switch a card's $/round is priced as the dollars it pays over
+-- the rounds left at the shop's dollar rate, weighted by the chance of reaching each ante (the money-joker stream,
+-- shop_advisor SA.income_stream_util), instead of a one-joker-income rate. Reaches Devil, Talisman, Magician and
+-- Standard-pack cards through this one function.
+CV.CARD_INCOME = os.getenv and os.getenv("BES_CARD_INCOME") == "1"
+local function card_income_frac(gs, d)
+  if not CV.CARD_INCOME then return VU.round_income_frac(gs, d) end
+  local ok, SA = pcall(require, "engine.shop_advisor")
+  if not (ok and SA.income_stream_util) then return VU.round_income_frac(gs, d) end
+  return SA.income_stream_util(gs, d) / VU.FRAC_UTIL
+end
+
 function CV.card_econ_value(gs, card, rng)
   local v, enh, seal = 0, card.enhancement, card.seal
   -- $ per round at the measured rates (2026-09-26: were guesses -- Gold held 60% of rounds, Gold seal played 35%,
   -- Lucky scored EVERY round; measured ~25% / ~13% / ~13% on a 52-card red-deck game)
   local rr = CV.card_round_rates(gs)
   -- \$ PER ROUND, so priced as an income stream (VU.round_income_frac), not as one round's lump of dollars
-  if enh == "m_gold" then v = v + VU.round_income_frac(gs, 3 * rr.held_end) end     -- $3 if held at round end
+  if enh == "m_gold" then v = v + card_income_frac(gs, 3 * rr.held_end) end     -- $3 if held at round end
   local trig = 1 + CV.expected_retriggers(gs, card)                               -- each retrigger pays again
-  if enh == "m_lucky" then v = v + VU.round_income_frac(gs, 20 / 15 * rr.scored * trig) end -- 1 in 15 -> $20, when scored
-  if seal == "Gold" then v = v + VU.round_income_frac(gs, 3 * rr.scored * trig) end        -- $3 when scored
+  if enh == "m_lucky" then v = v + card_income_frac(gs, 20 / 15 * rr.scored * trig) end -- 1 in 15 -> $20, when scored
+  if seal == "Gold" then v = v + card_income_frac(gs, 3 * rr.scored * trig) end        -- $3 when scored
   if seal == "Blue" or seal == "Purple" then v = v + CV.seal_generator_value(gs, seal, rng) end
   return v
 end
