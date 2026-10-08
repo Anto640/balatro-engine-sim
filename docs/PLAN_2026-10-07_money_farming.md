@@ -78,3 +78,6 @@ advice.
   bought 0x. NEXT: dose-response rich1 / rich2 (queued), then calibrate the $/round income weight and the
   spending penalties to the measured exchange rate, starting with income bought into FREE slots (the 35 -> 17 paired-trade
   failure came from money jokers displacing scorers). Arm vs mf0, fresh-seed confirm, ship.
+- **Dose-response vs mf0 (45 wins):** rich1 (+$1/round) +0.412 p 0.006, wins 62, reach-8 76; rich2 (+$2) +0.461 p 0.007,
+  wins 65, reach-8 83; rich4 (+$4) +0.952, wins 86, reach-8 107. Even $1/round is worth ~17 wins / 160.
+  Switch BES_INCOME_STREAM (`45efb18`, off): arms `inc` (scale 1.0) and `inch` (0.5) vs mf0 running.
