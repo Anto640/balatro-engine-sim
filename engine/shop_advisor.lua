@@ -335,6 +335,25 @@ local function econ_floor_penalty(gs, cost)
 end
 SA.econ_floor_penalty = econ_floor_penalty
 
+-- INCOME AS THE MONEY IT DELIVERS (2026-10-08; A/B switch BES_INCOME_STREAM=1, default off). Ceiling probes: +$4/round
+-- with no other change took wins 45 -> 86 / 160 (rich4 vs mf0, p < 0.0001) -- money binds. Yet a Golden Joker's
+-- $4/round was credited ~1.6 utility (w_econ x $/round x 1.0) against ~8.5 of price + forgone interest + econ-floor
+-- penalty, so the engine bought income only once already rich (Midas Mask 0 of 34 offers). Under the switch a joker's
+-- $/round is worth the dollars it pays over the rounds left, each at the shop's own dollar rate (DOLLAR_UTIL), weighted
+-- by the measured chance of reaching that ante (Vouchers.REACH); and an income buy is not charged the econ-floor
+-- penalty, whose purpose (keep a reserve) an income source serves. FREE-SLOT buys only: money jokers displacing scorers
+-- in trades is the shape that failed before (paired trades, wins 35 -> 17).
+SA.INCOME_STREAM = os.getenv and os.getenv("BES_INCOME_STREAM") == "1"
+SA.INCOME_STREAM_SCALE = tonumber(os.getenv and os.getenv("BES_INCOME_SCALE") or "") or 1.0   -- bracket the size (arm inch = 0.5)
+function SA.income_stream_util(gs, per_round)
+  if not per_round or per_round <= 0 then return 0 end
+  local a = math.max(1, math.min(8, math.floor((gs and gs.meta and gs.meta.ante) or 1)))
+  local R = Vouchers.REACH
+  local rounds = 1.5                                          -- the rest of this ante (half its blinds, on average)
+  for k = a + 1, 8 do rounds = rounds + 3 * (R[k] or 0) / (R[a] or 1) end
+  return per_round * rounds * SA.DOLLAR_UTIL * SA.INCOME_STREAM_SCALE
+end
+
 -- Plan the bankroll you intend to END the shop holding, and the budget that is
 -- "free" to spend getting there. Ending AT the interest cap maxes next round's
 -- interest and ending ABOVE it just sits idle, so the interest-optimal end
@@ -1079,8 +1098,13 @@ function SA.recommend(gs, opts)
     -- bought when its scoring/economy gain outweighs the cost.
     local down = Eval.joker_downside(gs, sj)
     local fit, fnote = BuildPlan.fit(gs, sj, build, invest)  -- planning: build the core / avoid dilution
-    local value = w_score * (sgain * 5 + syn + fit + first_scorer) + w_econ * econ - w_score * down
-      - net_cost_c(cost) - econ_floor_penalty(gs, cost)
+    local econ_term, floor_term = w_econ * econ, econ_floor_penalty(gs, cost)
+    if SA.INCOME_STREAM and econ > 0 and (slots_free or 0) > 0 then
+      econ_term = SA.income_stream_util(gs, econ / VU.ROUND_INCOME_UTIL)   -- econ carries ROUND_INCOME_UTIL; undo it
+      floor_term = 0
+    end
+    local value = w_score * (sgain * 5 + syn + fit + first_scorer) + econ_term - w_score * down
+      - net_cost_c(cost) - floor_term
     -- the second half of a PAIRED TRADE whose sale was already made (SA.paired_trade): the slot was emptied FOR this
     -- joker, so buying it is worth what the trade measured (the sold joker's value + the measured gain), not the
     -- floored, dilution-damped value of a fresh buy -- which would leave the engine having sold a joker for nothing.
@@ -1103,8 +1127,8 @@ function SA.recommend(gs, opts)
     if _G.BES_VALUE_DEBUG then
       entry.dbg = { key = sj.key, ante = (gs.meta and gs.meta.ante) or 1, cat = JokerData.resolve(sj.key).cat,
         sgain = sgain, sgain_w = w_score * sgain * 5, syn = w_score * syn, fit = w_score * fit,
-        first = w_score * first_scorer, econ_w = w_econ * econ,
-        down = w_score * down, net_cost = net_cost_c(cost), floor = econ_floor_penalty(gs, cost), value = value }
+        first = w_score * first_scorer, econ_w = econ_term,
+        down = w_score * down, net_cost = net_cost_c(cost), floor = floor_term, value = value }
     end
     priced[#priced + 1] = entry
     local leaves = dollars(gs) - cost
