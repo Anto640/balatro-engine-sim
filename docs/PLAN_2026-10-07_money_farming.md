@@ -89,3 +89,4 @@ advice.
 - **Conclusion so far:** money binds (free +$1/round = +17 wins), but the buyable money channels (jokers, cards) cost slots
   or are too scarce. Next question: spending EFFICIENCY -- what the engine buys per dollar -- since a free $4/round is
   only valuable because the engine converts it into power.
+- **inch (money jokers at half strength) vs mf0: -0.002, wins 45 -> 45, 101/160 tied.** Neutral; both income switches stay off.
