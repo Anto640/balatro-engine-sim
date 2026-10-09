@@ -140,10 +140,20 @@ SA.ENDGAME_SPEND = 0.25      -- income_factor multiplier when endgame-urgent (sp
 -- A/B switch BES_FINAL_SHOP=0 restores the old pricing.
 SA.WIN_ANTE = 8
 SA.FINAL_SHOP = not (os.getenv and os.getenv("BES_FINAL_SHOP") == "0")
+-- Two exceptions keep the old pricing: a joker that SCORES from the money held (Bull +2 Chips per $1, Bootstraps +2 Mult
+-- per $5 -- arm fs seed 35003 spent \$25 -> \$4 under Bootstraps and fell from 0.97 to 0.37 of the boss), and a pending
+-- Hieroglyph/Petroglyph replay in the sim (run.ante_back: the ante is played again, so this is not the last shop; live
+-- the game has already lowered the ante).
+SA.HELD_MONEY_SCORERS = { j_bull = true, j_bootstraps = true }
 function SA.final_shop(gs)
   if not SA.FINAL_SHOP then return false end
   local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
-  return ante >= SA.WIN_ANTE and ((gs.blind or {}).next_blind == "Boss")
+  if not (ante >= SA.WIN_ANTE and ((gs.blind or {}).next_blind == "Boss")) then return false end
+  if ((gs.run or {}).ante_back or 0) > 0 then return false end
+  for _, j in ipairs(gs.jokers or {}) do
+    if SA.HELD_MONEY_SCORERS[j.key] and not j.debuffed then return false end
+  end
+  return true
 end
 SA.ECON_FLOOR = 10        -- keep ~2 interest dollars working (early-game base; see SA.econ_floor)
 SA.ECON_FLOOR_RATE = 0.5  -- FV charged per dollar pushed below the floor (tunable:

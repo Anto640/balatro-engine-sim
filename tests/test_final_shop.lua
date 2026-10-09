@@ -46,6 +46,11 @@ return function(t)
   t.ok(not SA.final_shop(gs_at(8, "Big", 25)), "ante 8, Big next -> not final (one more shop)")
   t.ok(not SA.final_shop(gs_at(7, "Boss", 25)), "ante 7 boss next -> not final")
   t.ok(not SA.final_shop(gs_at(8, nil, 25)), "unknown next blind -> not final (old pricing)")
+  -- money held still SCORES with Bull / Bootstraps (arm fs seed 35003), and a pending sim ante replay means another ante
+  local boot = gs_at(8, "Boss", 25); boot.jokers = { GS.joker{ id = 1, key = "j_bootstraps", name = "Bootstraps" } }
+  t.ok(not SA.final_shop(boot), "Bootstraps on the board: held money scores -> keep the old pricing")
+  local replay = gs_at(8, "Boss", 25); replay.run.ante_back = 1
+  t.ok(not SA.final_shop(replay), "a pending ante replay (Hieroglyph) -> not the last shop")
 
   -- no reserve to protect: the econ floor charges nothing in the final shop, and still does one shop earlier
   t.eq(SA.econ_floor_penalty(gs_at(8, "Boss", 12), 10), 0, "final shop: no econ-floor penalty")

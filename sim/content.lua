@@ -558,7 +558,8 @@ local function shop_gs(run, shop, pack)
             joker_slots = run.joker_slots, boss_key = run._next_boss,
             hand_type_plays = run.hand_type_plays, hands_played = run.hands_played,
             build_plan = run.build_plan,    -- K1/K2 + Phase 5 persistent archetype
-            pending_swap = run._pending_swap },  -- a paired trade's sale was made; its buy is due (SA.paired_trade)
+            pending_swap = run._pending_swap,   -- a paired trade's sale was made; its buy is due (SA.paired_trade)
+            ante_back = run._ante_back },       -- a pending Hieroglyph/Petroglyph replay (SA.final_shop)
     shop = shop, pack = pack,
   }
 end
