@@ -81,3 +81,11 @@ advice.
 - **Dose-response vs mf0 (45 wins):** rich1 (+$1/round) +0.412 p 0.006, wins 62, reach-8 76; rich2 (+$2) +0.461 p 0.007,
   wins 65, reach-8 83; rich4 (+$4) +0.952, wins 86, reach-8 107. Even $1/round is worth ~17 wins / 160.
   Switch BES_INCOME_STREAM (`45efb18`, off): arms `inc` (scale 1.0) and `inch` (0.5) vs mf0 running.
+- **inc (money jokers as income streams) vs mf0: +0.082 n.s., wins 45 -> 40.** It bought 2.5x more income jokers (230 vs
+  90) and sold most again (160 vs 71); bankroll entering antes unchanged ($22-26). A money joker costs a scorer's slot.
+- **cinc (BES_CARD_INCOME, `99bab1d`: Gold / Gold-seal / Lucky cards as income streams) vs mf0: -0.011 n.s., wins 45 -> 44.**
+  Gold in the deck rose 0.35 -> 0.59 per blind -- still ~1/10 of gold6's six. SUPPLY limits it: money cards are offered
+  too rarely to build a money deck.
+- **Conclusion so far:** money binds (free +$1/round = +17 wins), but the buyable money channels (jokers, cards) cost slots
+  or are too scarce. Next question: spending EFFICIENCY -- what the engine buys per dollar -- since a free $4/round is
+  only valuable because the engine converts it into power.
