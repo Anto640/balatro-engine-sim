@@ -14,8 +14,8 @@ single wasteful channel found. Two correctness fixes shipped instead:
    decisions, 12 of 24 death saves). DE.generator_use now uses them when positive; sim Wheel picks only editionless jokers
    (game rule). Arm `hu` vs mf0: +0.041 n.s., wins 45 -> 48, reach-7 +2, sign 27/19. Switch BES_HELD_USE=0.
 (`fs2` is INVALID: it re-ran the 50 ante-8 seeds on a commit that also had the held-use change -- a biased subset.)
-**Batch speed: ~2 h 45 min per 160-seed arm at 11 workers** (CLAUDE.md updated). **Baseline for new arms:** the full arm of HEAD, baseline: **`sim_out/fsh.jsonl`** (both fixes, HEAD; vs mf0 +0.040 n.s., wins 45 -> 48, reach-7 +2 / reach-8 +1; vs hu
--0.001, 148/160 tied; `sim_out/hf.jsonl` is an unrelated 09-26 arm), then the live-vs-sim gap (live reach rates match the sim's: a6 0.67/0.68, a7 0.50/0.50 --
+**Batch speed: ~2 h 45 min per 160-seed arm at 11 workers** (CLAUDE.md updated). **Baseline for new arms: `sim_out/fsh.jsonl`** (both fixes, HEAD; vs mf0 +0.040 n.s., wins 45 -> 48, reach-7 +2 / reach-8 +1; vs hu
+-0.001, 148/160 tied; `sim_out/hf.jsonl` is an unrelated 09-26 arm). **Next:** the live-vs-sim gap (live reach rates match the sim's: a6 0.67/0.68, a7 0.50/0.50 --
 the 3/24 live wins are mostly small-sample) or live think-time lag.
 
 ## START HERE (2026-10-09)
