@@ -1,5 +1,23 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-09 evening)
+**Live = main = `91a8f6f`+ (deployed).** Spending-efficiency look at the money series: extra money goes mostly to REROLLS
+(\$38 -> \$92/run at rich4; 72% of rerolls buy nothing from the new slots) and packs; the bankroll stays ~\$25 -- no
+single wasteful channel found. Two correctness fixes shipped instead:
+1. **Final shop** (`SA.final_shop`, `de40d96` + `91a8f6f`): the shop after ante 8's Big blind is the last one, but it priced
+   money as if it had a future (59 runs left it holding a median \$25; live: 5 ante-8 boss deaths held \$29-64). Money costs
+   are zero there, except with Bull/Bootstraps (held money scores) or a pending sim ante replay. `next_blind`: live from
+   `round_resets.blind_states` (`Extract.next_blind_of`), sim from the blind just played. Arm `fs3` (50 changed seeds
+   re-run, rest identical) vs mf0: +0.002, wins 45 -> 45, 6/4/150. Switch BES_FINAL_SHOP=0. Lesson from arm `fs`: extra
+   final-shop rerolls mostly buy noisy lateral swaps; the boss outcome barely moves.
+2. **Held Wheel of Fortune / Fool** (`8c94b6e`): nothing used them once in the tray (live: held in 18% / 14% of blind
+   decisions, 12 of 24 death saves). DE.generator_use now uses them when positive; sim Wheel picks only editionless jokers
+   (game rule). Arm `hu` vs mf0: +0.041 n.s., wins 45 -> 48, reach-7 +2, sign 27/19. Switch BES_HELD_USE=0.
+(`fs2` is INVALID: it re-ran the 50 ante-8 seeds on a commit that also had the held-use change -- a biased subset.)
+**Batch speed: ~2 h 45 min per 160-seed arm at 11 workers** (CLAUDE.md updated). **Next:** a full arm of HEAD as the new
+baseline (`hf`, both fixes), then the live-vs-sim gap (live reach rates match the sim's: a6 0.67/0.68, a7 0.50/0.50 --
+the 3/24 live wins are mostly small-sample) or live think-time lag.
+
 ## START HERE (2026-10-09)
 **Money series (docs/PLAN_2026-10-07_money_farming.md):** FREE money binds (vs mf0, 45 wins: +$1/round 62 wins, +$2 65, +$4 86;
 6 Gold cards 86, 6 Gold seals 70) but the BUYABLE channels do not reach it: money jokers priced as income streams (`inc`

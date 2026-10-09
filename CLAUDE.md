@@ -149,9 +149,12 @@ lua  tools/analyze_runs.lua sim_out/<baseline>.jsonl compare sim_out/<name>.json
   memory-pressure reap): restart it without asking -- this standing owner permission overrides the reap notice's default.
   Restart it so the pressure doesn't repeat (run a probe after the batch, or drop a worker) and say what was done.
 - **Say how long a batch will take.** When starting a batch or probe, tell the owner the estimated duration and
-  the clock time it should finish, and update it when checking progress. Observed rates (160-seed arm, 2026-09-28,
-  with Balatro running): ~1 h at 9 workers, ~50 min at 11, ~1.5–2 h at 4–6. Estimate from the live rate
-  (finished seeds / elapsed) once a run is under way; late seeds are slower, as runs that reach ante 8 last longest.
+  the clock time it should finish, and update it when checking progress. **Measured 2026-10-09: a 160-seed arm takes
+  ~2 h 45 min at 11 workers** (fs 08:01-10:45, hu 10:46-13:33; 50 ante-8 seeds alone ~80 min) -- ~3x the 2026-09-28
+  figure (~50 min), which is stale. Estimate from the live rate (finished seeds / elapsed) once a run is under way; late
+  seeds are slower, as runs that reach ante 8 last longest. **Always arm a completion watcher** (a background
+  `until [ -f sim_out/<name>.jsonl ]` command) when a batch starts, and report the result as soon as it lands -- an arm
+  that finished unreported for 2 h (2026-10-09) is the failure this prevents.
 - **What to read in `analyze_runs`:** the **death-ante histogram** (push the mode later);
   **per-ante trajectory** ($ / jokers / **hand-lv** / pace_margin / run_str); **ENGINE ACTION
   SUMMARY** (what it bought / SOLD / **SKIPPED** = offered-but-not-taken, packs, rerolls,
@@ -324,7 +327,7 @@ NOTE: `xmult_scaling` jokers ARE xmult — use `JokerData.is_xmult()`.
 ## Git
 
 Active work is on branch `winrate-v4-bundle`; `main` is synced to the validated/live state (fast-forward/merge it when a
-batch of changes is confirmed -- last synced 2026-10-09 (money series: probes + off-by-default income switches; live self-play fixes -- Red Deck, cycle-safe death saves, watchdog; baseline arm mf0). **Commit and push whenever you (the AI
+batch of changes is confirmed -- last synced 2026-10-09 evening (final shop: no money costs in the win ante's last shop; held Wheel of Fortune / Fool used in-blind; baseline arm mf0 until a full arm of the new HEAD exists). **Commit and push whenever you (the AI
 assistant) judge it appropriate — you do NOT need to wait to be asked** (owner directive, 2026-08-28).
 Use judgement: commit at coherent checkpoints with a clear message, keep the tree green, and don't
 bundle unrelated changes. Run the test suite before committing.
