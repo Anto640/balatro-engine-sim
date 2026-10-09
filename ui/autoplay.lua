@@ -557,9 +557,11 @@ local function fresh(G, gs, ch)
   return true
 end
 local function sig(G, ch)
-  -- include consumable + joker COUNTS so an in-place action that consumes one (use a held planet, sell a
-  -- joker) changes the signature and the NEXT decision on the same hand/shop isn't blocked.
-  local nc = (G.consumeables and G.consumeables.cards and #G.consumeables.cards) or 0
+  -- include the consumables (by card id) + the joker count so an in-place action that consumes one (use a held planet,
+  -- sell a joker) changes the signature and the NEXT decision on the same hand/shop isn't blocked. IDs, not the count:
+  -- The Fool is replaced by its copy (live 2026-10-10: Fool -> Saturn kept the count, the signature did not change, and
+  -- self-play froze on the unchanged hand until the watchdog restarted the game).
+  local nc = ids_of_area(G.consumeables)
   local nj = (G.jokers and G.jokers.cards and #G.jokers.cards) or 0
   if ch == "hand" then
     local cr = (G.GAME and G.GAME.current_round) or {}
@@ -578,6 +580,7 @@ local function sig(G, ch)
   return tostring(ch)
 end
 Autoplay._channel, Autoplay._type_ok, Autoplay._fresh = channel, type_ok, fresh
+Autoplay._sig = sig
 
 -- ---- executors (return true if an action was ISSUED) ------------------------
 -- NOTE: cards are already highlighted by the tick's phase-1 (a frame earlier), so Balatro's

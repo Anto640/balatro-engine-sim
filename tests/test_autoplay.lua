@@ -326,4 +326,14 @@ return function(t)
     t.eq(Autoplay.in_transition(g(S.SHOP, { pack_cards = open_pack })), false,
       "transition: leftover pack cards outside a pack screen do not hold the shop")
   end
+  -- SIGNATURE: consumables by id, not count (live 2026-10-10: The Fool -> its Saturn copy kept the count, the
+  -- hand signature did not change, and self-play froze on the next decision until the watchdog restarted the game)
+  do
+    local function mk(cons) return { hand = { cards = { { sort_id = 1 }, { sort_id = 2 } } },
+      consumeables = { cards = cons }, jokers = { cards = {} },
+      GAME = { current_round = { hands_left = 3, discards_left = 2 } } } end
+    local before = Autoplay._sig(mk({ { sort_id = 50 }, { sort_id = 51 } }), "hand")
+    local after = Autoplay._sig(mk({ { sort_id = 51 }, { sort_id = 52 } }), "hand")   -- Fool (50) used -> Saturn (52)
+    t.ok(before ~= after, "using The Fool (same consumable count) changes the hand signature")
+  end
 end
