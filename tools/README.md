@@ -93,6 +93,14 @@ Almost everything here reads **existing** telemetry and costs nothing to run. On
 
 ---
 
+## Unattended live self-play
+
+| tool | question |
+|---|---|
+| **`selfplay_watchdog.sh`** | keep the in-game self-player running overnight: relaunches Balatro with the one-shot `bes_autostart` file on a crash / stall / loop, closes SteelSeries capture and protects memory, stops at `BES_SELFPLAY_STOP` (default 07:00), hands over ("NEEDS MANUAL") after 3 failed relaunches. Launch it HIDDEN (CLAUDE.md) |
+| **`game_click.ps1`** | take manual control of the live game: screenshot + click at 1280x720 coordinates (F-keys sent as keys do not reach LOVE) |
+| **`selfplay_night.py`** | summary of a session: runs, deaths, boards, buys, self-player actions, think-time gaps, failures (`python tools/selfplay_night.py <runs_line_offset> <autoplay_line_offset>`) |
+
 ## Two habits worth keeping
 
 **Measure the firing rate before batching a change.** A change that touches one joker fires in ~5%

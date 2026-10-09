@@ -168,7 +168,9 @@ lua  tools/analyze_runs.lua sim_out/<baseline>.jsonl compare sim_out/<name>.json
 - **Money telemetry (2026-10-07):** every sim `blind_result` carries `money_gap` (money earned in the blind, spare
   discards / hands, money cards within reach of the spare discards) -- recorded after the blind, never read by a
   decision; `lua tools/money_gap.lua <arm>.jsonl` reports it. Ceiling probes `BES_PROBE=gold6` / `gseal6` start runs with
-  6 Gold / Gold-seal cards (`sim/probe.lua` start_money).
+  6 Gold / Gold-seal cards (`sim/probe.lua` start_money); `rich1` / `rich2` / `rich4` add $1 / $2 / $4 a round.
+- **Unattended live self-play:** `tools/selfplay_watchdog.sh` (launch hidden) + an empty `%APPDATA%/Balatro/bes_autostart` file
+  (one-shot: turns on F11 + F6 and starts a Red Deck run). The owner authorises each session; see NEXT_SESSION / memory.
 
 
 ## Research history
@@ -322,7 +324,7 @@ NOTE: `xmult_scaling` jokers ARE xmult — use `JokerData.is_xmult()`.
 ## Git
 
 Active work is on branch `winrate-v4-bundle`; `main` is synced to the validated/live state (fast-forward/merge it when a
-batch of changes is confirmed -- last synced 2026-10-07 (unit-consistency audit shipped + CRN sim + money-farming telemetry/probes; baseline arm mf0). **Commit and push whenever you (the AI
+batch of changes is confirmed -- last synced 2026-10-09 (money series: probes + off-by-default income switches; live self-play fixes -- Red Deck, cycle-safe death saves, watchdog; baseline arm mf0). **Commit and push whenever you (the AI
 assistant) judge it appropriate — you do NOT need to wait to be asked** (owner directive, 2026-08-28).
 Use judgement: commit at coherent checkpoints with a clear message, keep the tree green, and don't
 bundle unrelated changes. Run the test suite before committing.
