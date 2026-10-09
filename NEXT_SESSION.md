@@ -1,5 +1,15 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-09)
+**Money series (docs/PLAN_2026-10-07_money_farming.md):** FREE money binds (vs mf0, 45 wins: +$1/round 62 wins, +$2 65, +$4 86;
+6 Gold cards 86, 6 Gold seals 70) but the BUYABLE channels do not reach it: money jokers priced as income streams (`inc`
++0.082, `inch` -0.002 -- they cost a scorer's slot) and money cards priced as income (`cinc` -0.011 -- Gold in deck only
+0.35 -> 0.59/blind, offered too rarely). All three switches stay OFF (BES_INCOME_STREAM, BES_CARD_INCOME). Open question:
+spending EFFICIENCY (what the engine buys per $). **Live self-play night 2 (Red Deck, 00:55-07:20, watchdog
+`tools/selfplay_watchdog.sh`):** 24 finished runs, 3 wins (12.5%), 0 restarts, memory steady; deaths spread over bosses
+(The Water x3, ante-8 finishers x5); 7 thinking pauses of 44-127 s. Fixed live: self-play forces the Red Deck (`903b578`),
+cycle-safe death saves (`7242a66`), watchdog locale bug (`7ab85ad`). Baseline arm still `sim_out/mf0.jsonl`.
+
 ## START HERE (2026-10-07 night)
 **Live = main = this checkout's HEAD (deployed).** Engine decisions unchanged since `ae51526` (later commits: sim telemetry,
 off-by-default probe switches, docs). **In-blind money farming CLOSED as a measured null** (`docs/PLAN_2026-10-07_money_farming.md`,
