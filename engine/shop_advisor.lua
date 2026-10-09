@@ -131,6 +131,20 @@ SA.TIER_FUNDER_FLOOR = 0.4   -- anti-churn: per tier-above-3, the min "loss" of 
 SA.ENDGAME_ANTE = 7
 SA.ENDGAME_ECON_DAMP = 0.1   -- econ weight multiplier when endgame-urgent (~worthless)
 SA.ENDGAME_SPEND = 0.25      -- income_factor multiplier when endgame-urgent (spend, don't bank)
+-- THE FINAL SHOP (2026-10-09). The shop after the win ante's Big blind is the last one: the run ends at the next blind
+-- (the boss) whether it is won or lost, so a dollar still held when the shop closes buys nothing -- no interest, no
+-- later shop. Every money term here priced it as if it did: the interest step (horizon floor 0.4), the purchasing-power
+-- cost, the econ floor, the pack poverty damp, the reroll appetite. In mf0 the engine left 59 final shops holding a
+-- median $25 (36 of them a plain SAVE; one at $49 valued a Celestial pack -2.2). In the final shop money only buys
+-- power, so its costs and gains are zero; the spend is decided by what each item adds for the boss.
+-- A/B switch BES_FINAL_SHOP=0 restores the old pricing.
+SA.WIN_ANTE = 8
+SA.FINAL_SHOP = not (os.getenv and os.getenv("BES_FINAL_SHOP") == "0")
+function SA.final_shop(gs)
+  if not SA.FINAL_SHOP then return false end
+  local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
+  return ante >= SA.WIN_ANTE and ((gs.blind or {}).next_blind == "Boss")
+end
 SA.ECON_FLOOR = 10        -- keep ~2 interest dollars working (early-game base; see SA.econ_floor)
 SA.ECON_FLOOR_RATE = 0.5  -- FV charged per dollar pushed below the floor (tunable:
                           -- raise to curb the spend-to-$0 spiral harder, lower if it
@@ -327,6 +341,7 @@ SA.free_spend = free_spend
 -- a buy that still ends at/above the floor -- which is every healthy-bankroll buy, so
 -- this never touches a strong buy from a full wallet, only the spend-to-$0 churn.
 local function econ_floor_penalty(gs, cost)
+  if SA.final_shop(gs) then return 0 end   -- no reserve to keep: the run ends at the next blind
   local d = math.max(0, dollars(gs))
   local floor = SA.econ_floor(gs)   -- ante-aware: low early, up to the interest cap mid/late
   local before = math.max(0, floor - d)
@@ -944,7 +959,9 @@ function SA.recommend(gs, opts)
   -- play is visible.
   actions[#actions + 1] = {
     type = "SAVE", cost = 0, value = 0,
-    reason = string.format("Bank $%d for interest (+$%d/round).%s",
+    reason = SA.final_shop(gs)
+      and "Leave the shop -- nothing left here helps the final boss (money left over is worth nothing now)."
+      or string.format("Bank $%d for interest (+$%d/round).%s",
       dollars(gs), interest_at(dollars(gs), cap_int_of(gs)),   -- true cap, not the 5x-over-stated live value
       plan.budget > 0 and string.format(" $%d is interest-free — free to spend.", plan.budget) or ""),
   }
@@ -993,6 +1010,9 @@ function SA.recommend(gs, opts)
   local endgame_urgent = (pace ~= nil) and (not pace.on_pace)
     and (math.floor((gs.meta and gs.meta.ante) or 1) >= SA.ENDGAME_ANTE)
   if endgame_urgent then w_econ = w_econ * SA.ENDGAME_ECON_DAMP end
+  -- the final shop: money left after it is worth nothing (SA.final_shop), so economy and every money cost are zero
+  local final = SA.final_shop(gs)
+  if final then w_econ = 0 end
 
   -- Spending model: the real cost of spending $C is the interest it forgoes
   -- (voucher-scaled cap, via gs.economy.interest_cap) + its purchasing power,
@@ -1000,7 +1020,7 @@ function SA.recommend(gs, opts)
   -- at risk you also weight scoring more (handled by w_score above), so you spend
   -- down harder. net_cost() is used by every purchase below.
   local cap = interest_cap(gs)
-  local dscale = SA.dollar_scale(gs)                -- 1 unless BES_DOLLAR_ANTE (one price for a dollar)
+  local dscale = final and 0 or SA.dollar_scale(gs) -- 1 unless BES_DOLLAR_ANTE (one price for a dollar); 0 in the final shop
   local cost_w, dollar_u = SA.COST_WEIGHT * dscale, SA.DOLLAR_UTIL * dscale
   local reserve_target = cap * 5                    -- $ that maxes interest (25/50/100)
   -- BUILD-PLANNING (engine/build_plan): value jokers toward the compounding core you're
@@ -1015,6 +1035,7 @@ function SA.recommend(gs, opts)
   if not secure then income_factor = income_factor * 0.7 end
   -- E-13: endgame + behind -> spend cash on power, don't bank it (interest can't score in time)
   if endgame_urgent then income_factor = income_factor * SA.ENDGAME_SPEND end
+  if final then income_factor = 0 end   -- no interest and no later shop to spend in
   -- interest forgone (exact $5-step) + purchasing power drawn against the shop's
   -- planned free budget (the budget portion is discounted), scaled by the income
   -- you earn back this blind.
@@ -1202,7 +1223,7 @@ function SA.recommend(gs, opts)
       -- human-economy-policy P4) x the frac->utility bridge; COST stays in raw dollar utility so
       -- the cost side is unchanged (the §28 guard -- don't make buys look pricier when poor).
       value = w_score * SA.JOKER_SCORE_WEIGHT * (vfrac + sbonus)
-        + VU.income_frac(gs, gain) * SA.JOKER_SCORE_WEIGHT - cost * dollar_u  -- net money
+        + (final and 0 or VU.income_frac(gs, gain)) * SA.JOKER_SCORE_WEIGHT - cost * dollar_u  -- net money (none in the final shop)
       verb = "Buy & use"
     else
       value = w_score * SA.JOKER_SCORE_WEIGHT * (vfrac + sbonus) - net_cost_c(cost)
@@ -1296,7 +1317,7 @@ function SA.recommend(gs, opts)
     -- is exactly the winners' play -- and the damp there is only mild anyway (0.69-1.0), so this is a
     -- safe, narrow correctness gate, not a licence to gamble when broke.
     local directed_level = (kind == "planet") and BuildPlan.level_push_active(gs)
-    if not directed_level and not (pace and pace.urgent) and dollars(gs) < dollar_cap and dollar_cap > 0 then
+    if not final and not directed_level and not (pace and pace.urgent) and dollars(gs) < dollar_cap and dollar_cap > 0 then
       -- steeper than linear (^1.6): the human buys few packs until NEAR the cap, then ramps up
       -- (measured 6% poor -> ~20% rich), so the damp must bite hardest well below the cap and
       -- fade only as the bankroll approaches it.
@@ -1342,7 +1363,8 @@ function SA.recommend(gs, opts)
     local improvement = math.max(0, e_best - best_offer)   -- over the current best buy
     local above_cap = (dollars(gs) - rcost) >= reserve_target
     -- free reroll -> always willing; rich (above cap) -> willing but not maximal; else low
-    local appetite = (rcost == 0 and 1.0) or (above_cap and SA.REROLL_APPETITE_RICH) or 0.35
+    -- the final shop: the roll's price buys nothing else later, so it is judged like a free one
+    local appetite = ((rcost == 0 or final) and 1.0) or (above_cap and SA.REROLL_APPETITE_RICH) or 0.35
     -- At risk we'll reroll harder to find help -- but ONLY when we can spend on the
     -- roll AND still buy what it surfaces AND stay above the economy floor. Otherwise
     -- "behind pace" (which is EVERY early shop) cranked the appetite and the engine
@@ -1356,14 +1378,15 @@ function SA.recommend(gs, opts)
     -- 5-6x (a fresh shop is free next round, and the money could open a Celestial pack or
     -- buy a scorer). A FREE reroll keeps any positive edge. rbonus (Flash Card) always applies.
     local eff_improvement = improvement
-    if rcost > 0 and improvement < SA.REROLL_MIN_IMPROVEMENT then eff_improvement = 0 end
+    if rcost > 0 and not final and improvement < SA.REROLL_MIN_IMPROVEMENT then eff_improvement = 0 end
     -- escalation damp: discourage a DEEP reroll spree (rcost climbs +$1/roll) -- 1x at the base,
     -- decaying toward the floor as the cost rises. A free reroll (rcost 0) is exempt (appetite 1).
-    local escalation = (rcost <= 0) and 1
+    local escalation = (rcost <= 0 or final) and 1
       or clamp(SA.REROLL_BASE_COST / rcost, SA.REROLL_ESCALATION_FLOOR, 1)
     local value = appetite * escalation * realizable * SA.REROLL_DISCOUNT * w_score * 5 * eff_improvement
       + w_score * 5 * rbonus - net_cost(rcost) - econ_floor_penalty(gs, rcost)
-    local gate = (rcost == 0 and "free reroll") or (above_cap and "above interest cap")
+    local gate = (rcost == 0 and "free reroll") or (final and "final shop -- spare money buys nothing later")
+      or (above_cap and "above interest cap")
       or (not secure and "at risk -- need a better joker") or "below cap & safe -- hold"
     if rnote ~= "" and rnote then gate = gate .. ", " .. rnote end
     local rentry = {

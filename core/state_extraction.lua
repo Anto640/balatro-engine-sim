@@ -14,6 +14,15 @@ local Extract = {}
 
 -- ---- low-level readers (defensive: tolerate nils so we never crash the game)
 
+-- The blind the next blind-select offers, from G.GAME.round_resets.blind_states: the first of Small/Big/Boss not yet
+-- Defeated/Skipped (the game's rule in create_UIBox_blind_select); all three done (just after the boss) -> "Small".
+-- Pure (takes the states table), so it is unit-tested headless.
+function Extract.next_blind_of(st)
+  if type(st) ~= "table" then return nil end
+  local function done(v) return v == "Defeated" or v == "Skipped" or v == "Hide" end
+  return (not done(st.Small) and "Small") or (not done(st.Big) and "Big") or (not done(st.Boss) and "Boss") or "Small"
+end
+
 local function read_card(c)
   if not c then return nil end
   local base = c.base or {}
@@ -156,6 +165,12 @@ function Extract.snapshot()
     if type(skip_tag_hand) ~= "string" then skip_tag_hand = nil end
   end
 
+  -- The blind the next blind-select offers: the first of Small/Big/Boss not yet Defeated/Skipped (the game's own rule,
+  -- functions/UI_definitions.lua create_UIBox_blind_select). blind_on_deck still names the blind JUST played while the
+  -- shop is open, so the shop reads this instead: after the Big blind it is "Boss" (the final shop of the win ante, see
+  -- SA.final_shop); after the boss all three stay Defeated until the next select resets them -> "Small".
+  local next_blind = Extract.next_blind_of(resets.blind_states)
+
   -- opened booster pack: read the revealed choices so we can value each one
   -- (jokers get measured). G.pack_cards holds the options while a pack is open.
   local pack = nil
@@ -255,6 +270,7 @@ function Extract.snapshot()
       chips_scored = GAME.chips or 0,        -- running chips this round  -- VERIFY
       boss = blind.boss or false,
       blind_type = GAME.blind_on_deck,       -- "Small"|"Big"|"Boss"  -- VERIFY
+      next_blind = next_blind,               -- the blind the next select offers (in the shop: the one after this)
       skip_tag = skip_tag,                    -- offered skip tag key  -- VERIFY
       skip_tag_hand = skip_tag_hand,          -- the hand an Orbital tag would level (nil if unknown)
       boss_effect_key = blind.config and blind.config.blind and blind.config.blind.key,

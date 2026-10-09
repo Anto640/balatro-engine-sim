@@ -127,7 +127,7 @@ function RF.fixture_of(gs, choice, idx, kind)
                 discards_left = b.discards_left, discards_used = b.discards_used, base_hands = b.base_hands,
                 base_discards = b.base_discards, played_hand_types = deep(b.played_hand_types),
                 skip_tag = b.skip_tag, skip_tag_hand = b.skip_tag_hand,
-                first_hand_type = b.first_hand_type },   -- the Mouth lock (main.lua BES.run_state_for)   -- for the SKIP decision replay (blind-select)
+                first_hand_type = b.first_hand_type, next_blind = b.next_blind },   -- the Mouth lock (main.lua BES.run_state_for)   -- for the SKIP decision replay (blind-select)
       run = { hand_levels = deep(r.hand_levels), vouchers_owned = deep(r.vouchers_owned),
               tags = deep(r.tags), hand_size = r.hand_size, consumable_slots = r.consumable_slots,
               joker_slots = r.joker_slots, boss_key = r.boss_key,

@@ -551,7 +551,8 @@ local function shop_gs(run, shop, pack)
     -- valuation that reads the discard budget (Banner/Mystic Summit expected discards, Burnt, Burglar, the
     -- resource table, seals, hand frequencies) saw a ZERO-discard game in the sim but 4 live (2026-09-26).
     blind = { base_hands = run.base_hands, base_discards = run.base_discards,
-              hands_left = run.base_hands, discards_left = run.base_discards, discards_used = 0 },
+              hands_left = run.base_hands, discards_left = run.base_discards, discards_used = 0,
+              next_blind = run._next_blind },   -- the blind after this shop (live: state_extraction's next_blind)
     run = { hand_levels = run.hand_levels, vouchers_owned = run.vouchers_owned, tags = run.tags,
             hand_size = run.hand_size, consumable_slots = run.consumable_slots,
             joker_slots = run.joker_slots, boss_key = run._next_boss,

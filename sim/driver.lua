@@ -349,6 +349,7 @@ function Driver.run(seed, opts)
       -- SHOP: generate offerings + let the engine spend (injected; no-op stub by default).
       -- emit forwards the action trace (shop offers/advice, buys, sells, packs) into the
       -- run's records, so analyze_runs surfaces what it bought AND what it SKIPPED.
+      run._next_blind = (blind.type == "Small" and "Big") or (blind.type == "Big" and "Boss") or "Small"
       World.checkpoint(run, "shop", ante, run.round)      -- the shop's first offers
       content.shop_phase(run, { rng = run.rng, emit = emit })
       ::next_blind::
