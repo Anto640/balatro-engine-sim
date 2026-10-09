@@ -15,7 +15,7 @@ single wasteful channel found. Two correctness fixes shipped instead:
    (game rule). Arm `hu` vs mf0: +0.041 n.s., wins 45 -> 48, reach-7 +2, sign 27/19. Switch BES_HELD_USE=0.
 (`fs2` is INVALID: it re-ran the 50 ante-8 seeds on a commit that also had the held-use change -- a biased subset.)
 **Batch speed: ~2 h 45 min per 160-seed arm at 11 workers** (CLAUDE.md updated). **Next:** a full arm of HEAD as the new
-baseline (`hf`, both fixes), then the live-vs-sim gap (live reach rates match the sim's: a6 0.67/0.68, a7 0.50/0.50 --
+baseline (`fsh`, both fixes; running, started 19:13 -- `sim_out/hf.jsonl` is an unrelated 09-26 arm), then the live-vs-sim gap (live reach rates match the sim's: a6 0.67/0.68, a7 0.50/0.50 --
 the 3/24 live wins are mostly small-sample) or live think-time lag.
 
 ## START HERE (2026-10-09)
