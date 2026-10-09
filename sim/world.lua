@@ -543,9 +543,12 @@ local function use_consumable(run, action, uses, targets, hand, draw_pile)
             run.consumables[#run.consumables + 1] = { set = last.set, key = last.key, name = last.name }
           end
         elseif key == "c_wheel_of_fortune" then                  -- 1/4: add a random edition to a random joker
-          if rng() < oops_p(run, 0.25) and #(run.jokers or {}) > 0 then
-            local j = run.jokers[math.floor(rng() * #run.jokers) + 1]
-            if j and not j.edition then j.edition = wof_edition(rng) end
+          -- the game picks among the jokers WITHOUT an edition (card.lua: eligible_strength_jokers = jokers with no edition)
+          local elig = {}
+          for _, jj in ipairs(run.jokers or {}) do if not jj.edition then elig[#elig + 1] = jj end end
+          if rng() < oops_p(run, 0.25) and #elig > 0 then
+            local j = elig[math.floor(rng() * #elig) + 1]
+            j.edition = wof_edition(rng)
           end
 
         -- ---- spectrals that RESHAPE THE DECK (the archetype enablers) ----

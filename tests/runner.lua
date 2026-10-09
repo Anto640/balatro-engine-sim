@@ -61,6 +61,7 @@ local suites = {
   "tests.test_econ_jokers",
   "tests.test_money_weight",
   "tests.test_final_shop",
+  "tests.test_held_use",
   "tests.test_progress",
   "tests.test_ramen_devil",
   "tests.test_purple_slot",

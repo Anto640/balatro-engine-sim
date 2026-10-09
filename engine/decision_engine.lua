@@ -326,6 +326,32 @@ DE.GEN_USE = {
   c_high_priestess = { needs = "consumable", v = 0.3 },  -- up to 2 Planets (future leveling)
   c_emperor        = { needs = "consumable", v = 0.2 },  -- up to 2 Tarots
 }
+-- HELD WHEEL OF FORTUNE / FOOL (2026-10-09, live self-play: 12 of 24 death saves still held a Wheel or a Fool; in mf0
+-- both were only ever used straight from a pack -- 35/35 and 19/19). Nothing else uses them once they reach the tray,
+-- so they sat there for the rest of the run and blocked the slot. Neither grows by waiting: the Wheel's 1-in-4 edition
+-- (measured, CV.wheel_value) needs a joker without an edition; the Fool recreates the LAST Tarot/Planet used (never a
+-- Fool), priced as that card. Valued here, used when positive.
+DE.HELD_USE = not (os.getenv and os.getenv("BES_HELD_USE") == "0")   -- A/B switch
+local function held_card_use_value(gs, c, need)
+  if not DE.HELD_USE then return nil end
+  local seed = (#(gs.deck or {}) * 40503 + c.key:byte(3) * 131 + 29) % 2147483647
+  if seed <= 0 then seed = 1 end
+  local s = seed
+  local rng = function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end
+  if c.key == "c_wheel_of_fortune" then
+    local v = ConsumableValue.wheel_value(gs, need, rng) or 0
+    return v * need, "1 in 4: an edition on a joker without one"
+  elseif c.key == "c_fool" then
+    local lt = gs.last_tarot_planet
+    local k = lt and lt.key
+    if not k or k == "c_fool" then return nil end
+    local set = ConsumableValue.PLANET_KEY_HAND[k] and "Planet" or "Tarot"
+    local v, money = ConsumableValue.card_value(gs, set, k, nil, need, rng, 6)
+    local val = (v or 0) * need + (money or 0) * Heuristics.DOLLAR_VALUE
+    return val, "a copy of " .. k:gsub("^c_", "")
+  end
+  return nil
+end
 local function generator_use(gs)
   local jfree = ((gs.run and gs.run.joker_slots) or 5) - #(gs.jokers or {})
   local cfree = ((gs.run and gs.run.consumable_slots) or 2) - #(gs.consumables or {})
@@ -333,6 +359,13 @@ local function generator_use(gs)
   local best
   for _, c in ipairs(gs.consumables or {}) do
     local spec = DE.GEN_USE[c.key]
+    local hv, hnote = held_card_use_value(gs, c, need)
+    if hv and hv > 0 and (not best or hv > best.value) then
+      local name = c.name or c.key
+      best = { type = "USE_CONSUMABLE", target = { name = name, key = c.key }, use_names = { c.key }, use_keys = { c.key },
+        kind = "generate", value = hv, score = hv,
+        reason = string.format("Use %s — %s; holding it gains nothing.", name, hnote) }
+    end
     if spec then
       local ok = (spec.needs == nil)
         or (spec.needs == "joker" and jfree >= 1)
