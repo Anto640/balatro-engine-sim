@@ -907,7 +907,7 @@ function Content.grant_free_levels(run, n)
 end
 
 local function grant_joker(run, rng, rarity_w, edition)
-  if #run.jokers >= run.joker_slots then return end
+  if #run.jokers >= run.joker_slots and edition ~= "negative" then return end   -- a negative joker brings its own slot
   local saved = Content.RARITY_W; if rarity_w then Content.RARITY_W = rarity_w end
   local j = Content.gen_joker(run, rng)
   Content.RARITY_W = saved
@@ -946,7 +946,9 @@ function Content.apply_tag(run, key, rng)
     -- a random one if it was never rolled
     level_hand(run, run._orbital_hand or Content.orbital_hand(run, rng), 3)
   elseif key == "tag_negative" then
-    run.joker_slots = run.joker_slots + 1                            -- the negative joker's extra slot
+    -- the game makes the next shop's first base-edition joker FREE and Negative: a free joker that carries its own
+    -- slot (note_negative_gain). Was only the empty slot, with no joker (fidelity fix 2026-10-10).
+    grant_joker(run, rng, nil, "negative")
   elseif key == "tag_charm"   then open_free_pack(run, "p_arcana_mega", rng)
   elseif key == "tag_buffoon" then open_free_pack(run, "p_buffoon_mega", rng)
   elseif key == "tag_meteor"  then open_free_pack(run, "p_celestial_mega", rng)

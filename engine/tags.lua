@@ -13,6 +13,7 @@ local ConsumableValue = require("engine.consumable_value")
 local Packs = require("engine.packs")
 local BuildPlan = require("engine.build_plan")
 local VU = require("engine.value_units")
+local Eval = require("engine.eval_function")
 
 local Tags = {}
 
@@ -129,6 +130,30 @@ local function joker_dollars(gs, rarity, n, opts)
   return VU.frac_to_dollars(gs, frac) * math.min(n or 1, free)
 end
 
+-- $ value of an EDITION tag (Foil / Holographic / Polychrome / Negative). The game makes the next shop's first
+-- base-edition joker FREE and gives it the edition, so the tag is a free shop joker (a shop-rarity draw, measured
+-- against the deck like the rarity tags) plus its edition. A Negative joker brings its own slot: it is not lost on a
+-- full board, and the permanent extra slot is priced by Eval.negative_slot_fv. The others need a free slot.
+-- (Was a flat $16 / $5 / $7 / $9; audit 2026-10-10: the Negative tag was taken 1 time in 65 offers.)
+Tags.SHOP_RARITY = { { "Common", 0.70 }, { "Uncommon", 0.25 }, { "Rare", 0.05 } }   -- sim Content.RARITY_W
+local function edition_joker_dollars(gs, edition, opts)
+  if not has_deck(gs) then return nil end
+  local neg = edition == "negative"
+  if not neg then
+    local slots = (gs.run and gs.run.joker_slots) or 5
+    if slots - #(gs.jokers or {}) <= 0 then return 2 end
+  end
+  local o = { rng = opts and opts.rng, cache = opts and opts.cache, samples = 3, measure_count = 4 }
+  local frac = 0
+  for _, rw in ipairs(Tags.SHOP_RARITY) do
+    local f = Packs.expected_joker_of_rarity(gs, rw[1], o)
+    if not f then return nil end
+    frac = frac + rw[2] * f
+  end
+  frac = frac + (neg and Eval.negative_slot_fv(gs) or Eval.edition_score_bonus(edition, true))
+  return VU.frac_to_dollars(gs, frac)
+end
+
 -- A measured tag value, falling back to its flat prior when not measurable.
 local function measured(fn, base)
   return function(gs, opts)
@@ -153,10 +178,11 @@ local TAG = {
   -- like the pack tags -- not a flat prior that's always declined.
   tag_uncommon   = { name = "Uncommon",   val = measured(function(gs, o) return joker_dollars(gs, "Uncommon", 1, o) end, 8) },
   tag_rare       = { name = "Rare",       val = measured(function(gs, o) return joker_dollars(gs, "Rare", 1, o) end, 14) },
-  tag_negative   = { name = "Negative",   val = function() return 16 end },         -- +1 joker slot
-  tag_foil       = { name = "Foil",       val = function() return 5 end },
-  tag_holo       = { name = "Holographic", val = function() return 7 end },
-  tag_polychrome = { name = "Polychrome", val = function() return 9 end },
+  -- edition tags: a FREE shop joker with that edition (Negative: slot-free), measured; $ fallback prior
+  tag_negative   = { name = "Negative",   val = measured(function(gs, o) return edition_joker_dollars(gs, "negative", o) end, 16) },
+  tag_foil       = { name = "Foil",       val = measured(function(gs, o) return edition_joker_dollars(gs, "foil", o) end, 5) },
+  tag_holo       = { name = "Holographic", val = measured(function(gs, o) return edition_joker_dollars(gs, "holo", o) end, 7) },
+  tag_polychrome = { name = "Polychrome", val = measured(function(gs, o) return edition_joker_dollars(gs, "polychrome", o) end, 9) },
   tag_double     = { name = "Double",     val = function() return 11 end },         -- copies next tag
   -- pack tags: reuse the measured MEGA-pack valuation (deck-aware), $ fallback prior
   tag_buffoon    = { name = "Buffoon",    val = measured(function(gs, o) return pack_dollars(gs, "p_buffoon_mega", o) end, 9) },

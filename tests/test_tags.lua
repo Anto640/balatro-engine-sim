@@ -112,4 +112,38 @@ return function(t)
     for _ = 1, 150 do if gated[Content.gen_tag(rng3)] then saw3 = true end end
     t.ok(not saw3, "gen_tag without an ante defaults to the ante-1 pool")
   end
+
+  -- ---- edition tags (2026-10-10): the game makes the next shop's first base-edition joker FREE with the edition ----
+  do  -- sim: the Negative tag grants a negative joker that carries its own slot, even on a full board
+    local r = fresh()
+    local slots0 = r.joker_slots
+    while #r.jokers < r.joker_slots do r.jokers[#r.jokers + 1] = Content.gen_joker(r, r.rng) end
+    local n0 = #r.jokers
+    Content.apply_tag(r, "tag_negative", r.rng)
+    t.eq(#r.jokers, n0 + 1, "Negative Tag: a free joker lands on a full board")
+    t.eq(r.jokers[#r.jokers].edition, "negative", "...with the Negative edition")
+    t.eq(r.joker_slots, slots0 + 1, "...and its own slot (one, not two)")
+    Content.apply_tag(r, "tag_polychrome", r.rng)
+    t.eq(#r.jokers, n0 + 1, "Polychrome Tag: no joker without a free slot")
+  end
+  do  -- engine: valued as the measured free joker plus its edition; Negative is not lost on a full board
+    local Tags = require("engine.tags")
+    local GS = require("model.game_state")
+    local deck = {}
+    for _, su in ipairs({ "Spades", "Hearts", "Clubs", "Diamonds" }) do
+      for rk = 2, 14 do deck[#deck + 1] = GS.card{ id = #deck + 1, rank_id = rk, suit = su } end
+    end
+    local function gs_with(nj)
+      local jk = {}
+      for i = 1, nj do jk[i] = GS.joker{ id = i, key = "j_joker", name = "Joker" } end
+      return GS.new{ deck = deck, jokers = jk, run = { hand_levels = {}, hand_size = 8, joker_slots = 5 },
+        economy = { dollars = 10 }, meta = { ante = 3 }, blind = { base_hands = 4, base_discards = 3 } }
+    end
+    local function v(gs, k) return (Tags.value(gs, k, { rng = World.lcg(7), samples = 8 })) end
+    local open, full = gs_with(1), gs_with(5)
+    t.ok(v(open, "tag_polychrome") > v(open, "tag_foil"), "a free Polychrome joker beats a free Foil one")
+    t.ok(v(full, "tag_foil") <= 2, "Foil Tag on a full board: the joker has nowhere to go")
+    t.ok(v(full, "tag_negative") > v(full, "tag_foil") + 10, "Negative Tag on a full board: still a whole joker + slot")
+    t.ok(v(open, "tag_negative") > v(open, "tag_foil"), "Negative beats Foil (the slot)")
+  end
 end
