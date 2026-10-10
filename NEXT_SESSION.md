@@ -10,8 +10,8 @@ to ~20x (event rates guessed 0.03-0.15 vs 0.37-0.41 realized); build planner ~in
 (`noboss40` 9 -> 25 of 40). **Shipped:** last hand dig by P(clear) (`ec08796`, audit_lastclear wins 48 -> 50, 5 deaths
 later / 0 earlier). **HEAD-equivalent baseline: `sim_out/audit_lastclear.jsonl`** (fsh + BES_LAST_CLEAR=1, 50 wins).
 Running: `audit_scalerfix` (BES_SCALER_TIME=1 BES_EVENT_RATES=1, worktree bes_wt_audit_er, vs fsh) then `bossrr` (free reroll
-of Wall/Heart/Leaf/Vessel, vs audit_lastclear). If bossrr is large: build the boss-reroll channel (sim: Director's Cut /
-Retcon / Boss tag; engine: reroll decision; self-player: the button).
+of Wall/Heart/Leaf/Vessel, vs audit_lastclear). **bossrr: +0.112 (p 0.12), wins 50 -> 54 with a FREE perfect reroll; all boss deaths only 85 -> 80 -> below the kill line,
+do NOT build the reroll channel** (see the audit doc).
 **audit_scalerfix** (measured event rates + time-consistent scaler ramp, BES_EVENT_RATES=1 BES_SCALER_TIME=1) vs fsh:
 +0.166 (p 0.13), wins 48 -> 52, reach-7 82 -> 91, reach-8 65 -> 71, sign 30/23 -> PROMISING. Fresh-seed confirmation queued
 after bossrr: `lc_7` (HEAD, seed_off 7) then `sf_7` (HEAD + cherry-picked 5b9280d/019b395, worktree bes_wt_sf7); ~19:45.

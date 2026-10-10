@@ -209,3 +209,13 @@ Vessel, vs `audit_lastclear` = HEAD) queued after `audit_scalerfix`.
 ## Status
 - The audit agent stopped at ~06:00 (API session limit) before finishing; this report is its 02:00 draft plus the table
   above. Worktrees kept: `%TEMP%/bes_wt_audit_{b,base,conc,er,lc,proto}`.
+
+## bossrr result (main session, 2026-10-10 14:46)
+`bossrr` (one FREE reroll of Wall / Crimson Heart / Verdant Leaf / Violet Vessel) vs `audit_lastclear` (HEAD-equivalent, 50 wins):
+**+0.112 (p 0.12), wins 50 -> 54, reach-7 +4, reach-8 +1, sign 30/17 (p 0.08), 113/160 tied.** Deadly-boss encounters
+91 -> 19 and their deaths 25 -> 7, but ALL boss deaths only 85 -> 80: most runs saved from a deadly boss die at the
+replacement boss or a later blind. That is a FREE, perfectly-targeted reroll; a real one costs \$10 and needs Director's
+Cut / Retcon / the Boss tag to be on offer, so a buildable channel captures well under half (~+1-2 wins).
+**Verdict: below the kill line (< +0.15 progress) -> do NOT build the boss-reroll channel now.** The no-boss ceiling (9 -> 25
+of 40) is mostly a tax on every board (the near-miss boards), so the lever behind it is general scoring power and preparing
+the build for the KNOWN upcoming boss, not dodging a few bosses.
