@@ -200,6 +200,12 @@ Vessel, vs `audit_lastclear` = HEAD) queued after `audit_scalerfix`.
 - `%TEMP%/bes_wt_audit_proto` (audit/2026-10-10-crn-deals): BES_CRN_DEALS; whole-run timing pair for seed 1003 was
   started at 11:00 (`%TEMP%/audit_crn_1003_{off,on}.log/.jsonl`), not read at hand-off.
 
+
+- CRN-deals whole-run pair (seed 1003, under the full 11-worker load): off 518.8 s CPU, died ante 6; on 474.2 s, died
+  ante 7 -- the run diverged (decisions change), so per ante: 86 s -> 68 s, **~1.27x**. Smaller than the 1.41x on cold
+  single shops because shop advisor time is only part of a run and the run lasted longer. Not adopt-ready without one
+  160-seed agreement arm.
+
 ## Status
 - The audit agent stopped at ~06:00 (API session limit) before finishing; this report is its 02:00 draft plus the table
   above. Worktrees kept: `%TEMP%/bes_wt_audit_{b,base,conc,er,lc,proto}`.
