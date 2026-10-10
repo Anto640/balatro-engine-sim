@@ -219,3 +219,8 @@ Cut / Retcon / the Boss tag to be on offer, so a buildable channel captures well
 **Verdict: below the kill line (< +0.15 progress) -> do NOT build the boss-reroll channel now.** The no-boss ceiling (9 -> 25
 of 40) is mostly a tax on every board (the near-miss boards), so the lever behind it is general scoring power and preparing
 the build for the KNOWN upcoming boss, not dodging a few bosses.
+
+## Scaler fix confirmed + shipped (main session, 2026-10-10 22:30)
+Fresh seeds (seed_off 7): `sf_7` (HEAD + BES_SCALER_TIME=1 BES_EVENT_RATES=1) vs `lc_7` (HEAD): +0.068 (p 0.44), wins 48 -> 54,
+reach-7 92 -> 96, reach-8 66 -> 70, sign 25/21. Pooled with audit_scalerfix (n=320): +0.117 (t 1.68), wins 96 -> 106,
+sign 55/44. **Shipped on by default as `ee6f71a`.**

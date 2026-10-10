@@ -1,5 +1,17 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-10 night)
+**Live = main = `ee6f71a` (deployed).** Shipped today: last hand dig by P(clear) (`ec08796`) and the scaler recalibration
+(`ee6f71a`: measured planet/tarot/sell event rates + time-consistent scaler ramp; pooled n=320 +0.117 (t 1.68), wins
+96 -> 106; fresh seeds sf_7 vs lc_7 +0.068, wins 48 -> 54). Boss reroll channel REJECTED (bossrr: free perfect reroll only
++0.112, all boss deaths 85 -> 80). **Baselines:** seed_off 7 = `sim_out/sf_7.jsonl` (== HEAD); seed_off 3 has no exact HEAD
+arm yet (`audit_scalerfix` lacks the last-hand fix, `audit_lastclear` lacks the scaler fix) -- run one before the next
+seed_off-3 comparison, or use seed_off 7. **Next candidates from the audit** (`docs/AUDIT_2026-10-10_next_lever.md`):
+(1) play-vs-dig by P(clear) with 2+ hands left (`BES_CLEAR_OBJ`, built in worktree bes_wt_audit_lc, needs one arm);
+(2) faster evaluation `BES_CRN_DEALS` (1.27x per ante; needs an agreement arm + the value_units test update);
+(3) Negative tag priced as a slot (flat \$16 today); (4) Joker Stencil over-valued; (5) telemetry: live death records
+carry no boss key. The sim's losses are mostly near misses at bosses -> general scoring power is the lever.
+
 ## START HERE (2026-10-10)
 **Live = main = `ec08796`+ (deployed).** Overnight self-play night 3 (00:31-09:30, Red Deck): **26 runs, 9 wins (35%)**
 (night 2: 3/24); the first live Fool use froze self-play (signature counted consumables, Fool -> copy kept the count) ->
