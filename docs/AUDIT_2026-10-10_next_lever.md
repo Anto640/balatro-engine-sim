@@ -1,6 +1,7 @@
 # AUDIT 2026-10-10 — what is the next BIG lever?
 
-(DRAFT — being filled in as the probe arms finish; the "Status" block at the end says what is still running.)
+(Final audit report, 2026-10-10 11:00. Two arms were still running at hand-off: `audit_scalerfix` (127/160 seeds,
+partial numbers below) and `bossrr`; the main session folds them in.)
 
 Baseline: `sim_out/fsh.jsonl` (engine == HEAD 46b0923 == a1ecd4c), **48/160 wins, reach-8 65/160, progress 6.210**.
 All experimental code lives in worktrees (listed at the end); nothing touches the engine on `winrate-v4-bundle` / `main`.
@@ -27,6 +28,67 @@ All experimental code lives in worktrees (listed at the end); nothing touches th
    (Constellation 0.06 vs 0.17-0.32; xmult_scaling class 0.13 predicted, 2.3x / 3.2x that realized at +1 / +2 antes).
    Root causes found: guessed event rates (planets 0.03-0.15 per scoring hand assumed vs 0.37 realized; tarots
    0.03 vs 0.41; sells 0.05 vs 0.15) and committed-build trigger rates (Runner 0.45 Straights/hand).
+
+## RANKED LEVERS (wins per 160 against the ~48-50 baseline)
+
+| # | lever | ceiling | firing rate | evidence | mechanism | confidence | build cost | cheapest confirming experiment |
+|---|---|---|---|---|---|---|---|---|
+| 1 | **Boss handling**: reroll the deadly bosses, prepare for the known one | `noboss40`: wins 9 -> 25 of 40, progress **+0.954 (p 0.0004)**, sign 27/6. As a lesion that is ~+60/160; how much of it is reachable is what `bossrr` measures | every run (87 of 112 deaths are at a boss) | the noboss screen; deaths per encounter: Heart .38, Leaf .37, Vessel .31, Wall .22, the rest .02-.13; the 16 flips spread over many bosses because the deaths are near misses | a boss effect costs a near-miss board 10-30% of its score; the boss-reroll channel (Director's Cut / Retcon / Boss tag) is not built in the sim, the engine or the self-player | ceiling high; reachable share medium | medium: sim voucher + Boss tag, engine value of a reroll, a self-player action | `bossrr` (running, vs `audit_lastclear`) |
+| 2 | **Recalibrate the scaler model**: time-consistent ramp + measured event rates | `audit_scalerfix` partial, 127 seeds vs fsh: wins 32 -> 37, reach-8 +8, **+0.188 (p 0.12)**, sign 26/18 | about half the runs buy an additive scaler; xmult scalers are offered in about 40% of runs | joker_realized: Runner priced 2.26 vs 0.11 realized; xmult scalers priced at 1/2 to 1/3 of what they realize; event rates guessed at 0.03-0.15 vs 0.37 / 0.41 measured | additive counters are valued against TODAY's need although they accrue late (a units error); the consumable-fed rates are guesses | medium-high (correctness class, positive lean) | done (worktree `bes_wt_audit_er`, two switches) | finish the arm; then a fresh-seed arm (seed_off 7) if wins hold |
+| 3 | **Dig on the last hand by P(clear)** | measured +2 wins (`audit_lastclear` 48 -> 50, +0.050 p 0.07, 5 deaths later / 0 earlier) | ~10% of runs (15/112 deaths ended on a last hand with discards left) | sim replays 102003 / 5003 / 117003; live death 2026-10-09 02:31 (P(clear) 0 when playing vs 1.0 when digging) | capped E[frac] + a 0.06 margin preferred a sure near miss to a likely clear | proven | **shipped `ec08796`** | -- |
+| 4 | **Play vs dig mid-blind by P(clear)** (the same objective bug with 2+ hands left) | unknown; same near-miss class | high: every multi-hand non-clearing decision | same compression argument as #3 | E[frac] capped at 1 hides P(clear) gaps between near-miss lines | medium | done (`BES_CLEAR_OBJ=1`, worktree `bes_wt_audit_lc`, off) | one paired n=160 arm vs `audit_lastclear` |
+| 5 | **Concentrated leveling** | lesion `lvredir40`: 9 -> 16 of 40 (+0.296 p 0.33, McNemar 9/2 p 0.065) | every run | planets spread over 4-5 hand types; 25-28% of levels on the main hand | a level is worth more on the hand you keep playing | ceiling medium; **reachable share small**: the realistic policy (`audit_conc`, 52 wins, -0.031, reach-8 -2) barely concentrated (levels on the main hand 0.28 -> 0.30), because the main hand's planet SUPPLY is ~4 offers per run | -- | only through supply (Telescope / Black Hole / Celestial volume); not worth an arm now |
+| 6 | **Faster evaluation: CRN deals + base-board cache** (speeds up every verdict; not a win lever) | -- | every decision | 1.41x less CPU per replayed live shop decision; top pick unchanged 18/20; seed flips 3 -> 2. score_delta is 67% of sim CPU, and half of that re-scores the unchanged base board | sample k = the k-th content-seeded deal; the base board's best play is cached by content | high for speed; it changes decisions slightly (needs one A/B) | done (worktree `bes_wt_audit_proto`, `BES_CRN_DEALS=1`) | whole-run timing pair (seed 1003, running at hand-off) + one n=160 agreement arm |
+| 7 | Buy multipliers when secure (`xsecure`) | unknown | ~45% of mid-game shops read "secure" | at ante 5, holding capacity fixed, multipliers ~double win odds on strong boards; the engine buys them LESS when secure (24% vs 32%) | the economy tilt in secure shops | low (forced xgreedy was null; the smoke run never fired it) | done (`bes_wt_audit_b`) | an n=160 arm only after #1 and #2 |
+| 8 | Price the Negative tag as a joker slot | ~+1-3 | 0.4 offers per run; taken 1 of 65 times | a flat $16 in `engine/tags.lua` | slots are the biggest resource lever ever measured | medium | small | n=160 arm |
+
+## #1 RECOMMENDATION: boss handling, starting with the boss-reroll channel
+Why: it is the only lesion in this audit with a large, significant ceiling at n=40 (`noboss40` 9 -> 25, p 0.0004),
+and it sits on the dominant way runs die (87/112 deaths at a boss, mostly near misses). The bosses that kill most often
+per encounter are exactly the ones a reroll removes (The Wall and the three bad finishers), and the channel does not
+exist anywhere today.
+
+Staged plan:
+1. **Probe** (running): `bossrr`, one FREE reroll of Wall / Heart / Leaf / Vessel. Kill if it gives < +0.15 progress
+   and wins do not move: that means the boss cost is diffuse (a tax on every boss), so the lever is general power, not
+   boss handling.
+2. **Sim fidelity**: put Director's Cut / Retcon into the voucher pool and model the Boss tag (both are excluded or
+   no-ops today).
+3. **Engine**: value a reroll as P(death | this boss) - E[P(death | rerolled boss)], from the per-boss death table (or
+   the boss_cost tool), against its $10 price; value Director's Cut / Retcon / the Boss tag by the rerolls they buy.
+   Self-player: a reroll-boss action on the blind-select screen.
+4. **Paired arm** vs `audit_lastclear` (= HEAD). Ship if progress goes up and wins do not go down.
+5. **Fresh-seed confirmation** (seed_off 7).
+
+Kill criteria: `bossrr` below +0.15 progress; or the realistic channel (step 4) fires in < 15% of runs (Director's Cut
+not offered or not affordable often enough). In that case, move the effort to boss PREPARATION: per-boss counter
+valuation in the shop.
+
+## Cheap correctness fixes found
+1. **Dig on the last hand by P(clear)**: SHIPPED `ec08796`.
+2. **Scaler ramp units** (future counters valued against today's need) + **measured event rates** (planets 0.37 /
+   tarots 0.41 / joker sells 0.15 per scoring hand): `bes_wt_audit_er`, arm finishing.
+3. **Play vs dig mid-blind by P(clear)**: `BES_CLEAR_OBJ=1` in `bes_wt_audit_lc`.
+4. **Negative tag**: a flat $16 -> its slot value (`Eval.negative_slot_fv` + the free joker).
+5. **Joker Stencil** is priced on today's empty slots (median offer value 30.5; P(win | owned at a4) 0.05, n=19).
+6. **Telemetry**: live death / blind_result records carry no boss key or cleared flag; sim shop records omit the
+   chosen action's value, so reroll / pack EV cannot be calibrated against realized buys. Both fixes are
+   decision-neutral.
+7. **Brittle test**: `tests/test_value_units.lua` detects a cache miss by counting rng draws, which fails under CRN
+   deals. The test needs updating; the behaviour is fine (a different joker still recomputes).
+
+## Checked and NOT promising (don't retry without a new mechanism)
+- The build planner as it stands: zeroing the BuildPlan terms changes 3/40 (8%) mid-game top picks, all on the sell side.
+- Concentration through planet choice alone (`audit_conc`): bound by supply; it does not concentrate.
+- Reroll EV noise: inflates the EV by only 11-18%; it is not why 72% of rerolls buy nothing.
+- In-blind discards: 97/112 failed blinds used every discard; the only waste was the last-hand rule (fixed).
+- Hand-type coherence as a win predictor within the engine's own runs: 0.5 for winners and losers alike.
+- Live vs sim: reach rates match through ante 7 (32 runs). The ante-8 gap (5/11 vs 48/65) rests on a tiny sample, and
+  the live records cannot name the finisher (telemetry fix 6).
+- `suit2` (two-suit deck ceiling): smoke run only (seed 2003 won where the baseline died at a6); no arm. Reachable suit
+  conversion needs ~9 suit tarots, so it ranks behind bosses.
+- `xsecure`: the smoke run (seed 5003) never fired it. A debug replay to confirm it fires was still running at hand-off
+  (`%TEMP%/audit_xs_debug.log`).
 
 ## Offline findings (free: existing arms, live fixtures)
 
@@ -121,13 +183,22 @@ All experimental code lives in worktrees (listed at the end); nothing touches th
 | `audit_conc` | realistic concentrated leveling | 160 | 48 -> 52 | +4 / -2 | -0.031 (0.82) | 54/51 | mixed; magnitude change -> not shipped |
 | `audit_lvredir40` | lesion: every level to the main hand | 40 | 9 -> 16 | +5 / +5 | +0.296 (0.33) | 19/12 | ceiling, n.s. at n=40 |
 | `audit_noboss40` | lesion: every boss a plain 2x blind | 40 | 9 -> **25** | +9 / +15 | **+0.954 (0.0004)** | 27/6 | **large ceiling** |
-| `audit_scalerfix` | measured event rates + time-consistent scaler ramp | 160 | running | | | | |
+| `audit_scalerfix` | measured event rates + time-consistent scaler ramp | 127/160 (partial, vs fsh) | 32 -> 37 | +8 / +8 | +0.188 (0.12) | 26/18 | promising -> finish, then fresh seeds |
 
 Boss deaths per encounter (640 sim runs): Crimson Heart 0.38, Verdant Leaf 0.37, Violet Vessel 0.31, **The Wall 0.22**
 (12% of all boss deaths), then Plant / Ox / Serpent / Needle / Manacle 0.11-0.13, most others 0.02-0.10. The boss-reroll
 channel (Director's Cut / Retcon vouchers, Boss tag) is unbuilt end to end: excluded from the sim's voucher pool, the Boss
 tag unmodelled, no engine or self-player action. Follow-up ceiling probe `bossrr` (one FREE reroll of Wall / Heart / Leaf /
 Vessel, vs `audit_lastclear` = HEAD) queued after `audit_scalerfix`.
+
+## Worktrees / branches (kept for inspection; none merged except the last-hand fix, shipped by the main session)
+- `%TEMP%/bes_wt_audit_base` (audit/2026-10-10-probes): probes lvredir / suit2 / noboss / telescope / seedmoney.
+- `%TEMP%/bes_wt_audit_b` (audit/2026-10-10-probes-b): spending-channel lesions (nostd/nocel/noarc/norr/norr3/noplanet), xsecure.
+- `%TEMP%/bes_wt_audit_conc` (audit/2026-10-10-concentrate): BES_CONCENTRATE.
+- `%TEMP%/bes_wt_audit_lc` (audit/2026-10-10-lastclear): BES_LAST_CLEAR (shipped as ec08796) + BES_CLEAR_OBJ (off).
+- `%TEMP%/bes_wt_audit_er` (audit/2026-10-10-event-rates): BES_EVENT_RATES + BES_SCALER_TIME.
+- `%TEMP%/bes_wt_audit_proto` (audit/2026-10-10-crn-deals): BES_CRN_DEALS; whole-run timing pair for seed 1003 was
+  started at 11:00 (`%TEMP%/audit_crn_1003_{off,on}.log/.jsonl`), not read at hand-off.
 
 ## Status
 - The audit agent stopped at ~06:00 (API session limit) before finishing; this report is its 02:00 draft plus the table
