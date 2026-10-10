@@ -12,6 +12,9 @@ later / 0 earlier). **HEAD-equivalent baseline: `sim_out/audit_lastclear.jsonl`*
 Running: `audit_scalerfix` (BES_SCALER_TIME=1 BES_EVENT_RATES=1, worktree bes_wt_audit_er, vs fsh) then `bossrr` (free reroll
 of Wall/Heart/Leaf/Vessel, vs audit_lastclear). If bossrr is large: build the boss-reroll channel (sim: Director's Cut /
 Retcon / Boss tag; engine: reroll decision; self-player: the button).
+**audit_scalerfix** (measured event rates + time-consistent scaler ramp, BES_EVENT_RATES=1 BES_SCALER_TIME=1) vs fsh:
++0.166 (p 0.13), wins 48 -> 52, reach-7 82 -> 91, reach-8 65 -> 71, sign 30/23 -> PROMISING. Fresh-seed confirmation queued
+after bossrr: `lc_7` (HEAD, seed_off 7) then `sf_7` (HEAD + cherry-picked 5b9280d/019b395, worktree bes_wt_sf7); ~19:45.
 
 ## START HERE (2026-10-09 evening)
 **Live = main = `91a8f6f`+ (deployed).** Spending-efficiency look at the money series: extra money goes mostly to REROLLS
