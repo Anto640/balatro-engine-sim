@@ -1,5 +1,18 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-10)
+**Live = main = `ec08796`+ (deployed).** Overnight self-play night 3 (00:31-09:30, Red Deck): **26 runs, 9 wins (35%)**
+(night 2: 3/24); the first live Fool use froze self-play (signature counted consumables, Fool -> copy kept the count) ->
+fixed `e099e85`, 2 watchdog restarts, none after. Live checks: Wheel/Fool used 24x, 0 death states holding one; 11 runs
+reached the final shop and spent \$22-64 down to \$0-10, 9 of them won. **Wide-scope audit** (background agent, stopped at
+the API session limit): `docs/AUDIT_2026-10-10_next_lever.md` -- losses are mostly near misses; scaler valuation off by up
+to ~20x (event rates guessed 0.03-0.15 vs 0.37-0.41 realized); build planner ~inert on buys (3/40); boss ceiling large
+(`noboss40` 9 -> 25 of 40). **Shipped:** last hand dig by P(clear) (`ec08796`, audit_lastclear wins 48 -> 50, 5 deaths
+later / 0 earlier). **HEAD-equivalent baseline: `sim_out/audit_lastclear.jsonl`** (fsh + BES_LAST_CLEAR=1, 50 wins).
+Running: `audit_scalerfix` (BES_SCALER_TIME=1 BES_EVENT_RATES=1, worktree bes_wt_audit_er, vs fsh) then `bossrr` (free reroll
+of Wall/Heart/Leaf/Vessel, vs audit_lastclear). If bossrr is large: build the boss-reroll channel (sim: Director's Cut /
+Retcon / Boss tag; engine: reroll decision; self-player: the button).
+
 ## START HERE (2026-10-09 evening)
 **Live = main = `91a8f6f`+ (deployed).** Spending-efficiency look at the money series: extra money goes mostly to REROLLS
 (\$38 -> \$92/run at rich4; 72% of rerolls buy nothing from the new slots) and packs; the bankroll stays ~\$25 -- no
