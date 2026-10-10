@@ -15,7 +15,7 @@
 --   run_start { kind, seed, t, ante, dollars }
 --   ante      { kind, seed, t, ante, dollars, njokers, jokers[], hand_level_sum,
 --               consumables, metrics? }            -- emitted when a new ante begins
---   death     { kind, seed, t, ante, blind_type, boss, target, scored, ratio,
+--   death     { kind, seed, t, ante, blind_type, boss, boss_key, target, scored, ratio,
 --               dollars, njokers, jokers[], hand_level_sum, metrics? }
 --   win       { kind, seed, t, ante, dollars, njokers, jokers[] }  -- cleared ante 8
 
@@ -84,6 +84,8 @@ function Telemetry.frame_of(gs)
     state = meta.state or "",
     blind_type = b.blind_type,
     boss = b.boss or false,
+    -- which boss (bl_wall, ...), as the sim records it: a live death could not name its finisher (audit 2026-10-10)
+    boss_key = (b.boss and b.boss_effect_key) or nil,
     target = b.target_chips or 0,
     scored = b.chips_scored or 0,
     dollars = econ.dollars or 0,
@@ -166,7 +168,7 @@ function Telemetry:_finalize_unended(reason)
   if not d then return end           -- never saw an active blind -> nothing to place
   self.emit({
     kind = "death", inferred = true, reason = reason, seed = run.seed, t = self:_now(),
-    ante = d.ante, blind_type = d.blind_type, boss = d.boss or false,
+    ante = d.ante, blind_type = d.blind_type, boss = d.boss or false, boss_key = d.boss_key,
     target = d.target, scored = d.scored,
     ratio = (d.target and d.target > 0) and (d.scored / d.target) or nil,
     dollars = d.dollars, njokers = d.njokers,
@@ -257,7 +259,7 @@ function Telemetry:observe(frame, ctx)
         and (was.base_discards - was.discards_left) or nil
       self.emit({
         kind = "blind_result", seed = frame.seed, t = self:_now(),
-        ante = was.ante, blind_type = was.blind_type, boss = was.boss or false,
+        ante = was.ante, blind_type = was.blind_type, boss = was.boss or false, boss_key = was.boss_key,
         target = was.target, scored = was.scored,
         ratio = (was.target and was.target > 0) and (was.scored / was.target) or nil,
         hands_left = was.hands_left, discards_left = was.discards_left,
@@ -275,7 +277,7 @@ function Telemetry:observe(frame, ctx)
     local ratio = (d.target and d.target > 0) and (d.scored / d.target) or nil
     local rec = {
       kind = "death", seed = frame.seed, t = self:_now(),
-      ante = d.ante, blind_type = d.blind_type, boss = d.boss or false,
+      ante = d.ante, blind_type = d.blind_type, boss = d.boss or false, boss_key = d.boss_key,
       target = d.target, scored = d.scored, ratio = ratio,
       dollars = frame.dollars, njokers = frame.njokers,
       jokers = Json.array(frame.joker_keys),

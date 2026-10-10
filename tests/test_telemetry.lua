@@ -24,7 +24,7 @@ local function frame(o)
   return {
     seed = o.seed or "SEEDA", ante = o.ante or 1, round = o.round or 1,
     state = o.state or "SELECTING_HAND", blind_type = o.blind_type or "Small",
-    boss = o.boss or false, target = o.target or 300, scored = o.scored or 0,
+    boss = o.boss or false, boss_key = o.boss_key, target = o.target or 300, scored = o.scored or 0,
     dollars = o.dollars or 4, hands_left = o.hands_left or 4, discards_left = o.discards_left or 3,
     njokers = o.njokers or 0, joker_keys = o.joker_keys or {},
     hand_level_sum = o.hand_level_sum or 0, consumables = o.consumables or 0,
@@ -97,7 +97,7 @@ return function(t)
       consumables = { GS.consumable{ key = "c_fool" } },
       economy = { dollars = 17 },
       blind = { target_chips = 1200, chips_scored = 400, blind_type = "Boss", boss = true,
-                hands_left = 2, discards_left = 1 },
+                hands_left = 2, discards_left = 1, boss_effect_key = "bl_wall" },
       run = { hand_levels = { Pair = { level = 3 }, Flush = { level = 1 } } },
       hand = { GS.card{ rank = "King", suit = "Spades" } },
     }
@@ -105,6 +105,7 @@ return function(t)
     t.eq(f.seed, "SEEDZ", "frame seed")
     t.eq(f.ante, 2, "frame ante")
     t.eq(f.dollars, 17, "frame dollars")
+    t.eq(f.boss_key, "bl_wall", "frame names the boss")
     t.eq(f.njokers, 2, "frame njokers")
     t.eq(f.joker_keys[1], "j_baron", "frame joker order preserved")
     t.eq(f.hand_level_sum, 2, "frame hand_level_sum = (3-1)+(1-1) = 2")
@@ -146,7 +147,7 @@ return function(t)
     local tel, recs = recorder()
     tel:observe(frame{ seed = "S3", ante = 1 })
     -- reach ante 3, fighting the boss, only 60% of target
-    tel:observe(frame{ seed = "S3", ante = 3, blind_type = "Boss", boss = true,
+    tel:observe(frame{ seed = "S3", ante = 3, blind_type = "Boss", boss = true, boss_key = "bl_needle",
       target = 4000, scored = 2400, dollars = 6, has_hand = true })
     -- now the run ends: a GAME_OVER snapshot with blind fields reset to 0
     tel:observe(frame{ seed = "S3", ante = 3, state = "GAME_OVER",
@@ -155,6 +156,7 @@ return function(t)
     t.ok(d ~= nil, "death record emitted on GAME_OVER")
     t.eq(d.ante, 3, "death ante taken from last active blind")
     t.eq(d.blind_type, "Boss", "death blind_type taken from last active blind")
+    t.eq(d.boss_key, "bl_needle", "death names the boss that ended the run")
     t.eq(d.target, 4000, "death target from last active blind, not the cleared death snapshot")
     t.near(d.ratio, 0.6, "death ratio = scored/target = 0.6")
     -- death only fires once even if more GAME_OVER frames arrive
