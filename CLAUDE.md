@@ -327,7 +327,7 @@ NOTE: `xmult_scaling` jokers ARE xmult — use `JokerData.is_xmult()`.
 ## Git
 
 Active work is on branch `winrate-v4-bundle`; `main` is synced to the validated/live state (fast-forward/merge it when a
-batch of changes is confirmed -- last synced 2026-10-09 evening (final shop: no money costs in the win ante's last shop; held Wheel of Fortune / Fool used in-blind; baseline arm mf0 until a full arm of the new HEAD exists). **Commit and push whenever you (the AI
+batch of changes is confirmed -- last synced 2026-10-10 night (audit: last-hand P(clear) dig + scaler recalibration shipped, boss reroll rejected; baselines in NEXT_SESSION). **Commit and push whenever you (the AI
 assistant) judge it appropriate — you do NOT need to wait to be asked** (owner directive, 2026-08-28).
 Use judgement: commit at coherent checkpoints with a clear message, keep the tree green, and don't
 bundle unrelated changes. Run the test suite before committing.
