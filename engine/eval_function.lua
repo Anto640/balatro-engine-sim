@@ -195,6 +195,25 @@ end
 -- mostly clear in 1-2, plus some farm/setup hands), across blinds_remaining. Principled, not tuned to
 -- any one joker.
 local ACC_HANDS_PER_BLIND = 2.5
+-- AUDIT 2026-10-10 (BES_SCALER_TIME=1): TIME-CONSISTENT scaler ramp. A scaler's counter is valued as its AVERAGE
+-- over the remaining run against TODAY's per-hand need (the /2 of a linear ramp) -- but the counter accrues LATE,
+-- when the need is ~2x larger per ante, while a flat joker is priced at its share NOW. Replayed live buys
+-- (tools/joker_realized.lua): flat jokers keep ~0.43 of their share per ante, xmult ~0.67; Runner was priced at 2.26
+-- of a boss hand and realized ~0.11 one and two antes later. So each ante's counter is weighted by the same decay a
+-- flat (additive) or xmult share shows: ramp = sum_k ((k+.5)/K) d^k / sum_k d^k instead of 0.5.
+-- shipped 2026-10-10 with BES_SCALER_TIME (audit_scalerfix +0.166 / sf_7 +0.068; pooled n=320 +0.117, wins 96 -> 106); =0 disables
+Eval.SCALER_TIME = not (os.getenv and os.getenv("BES_SCALER_TIME") == "0")
+Eval.SCALER_DECAY_ADD = 0.43
+Eval.SCALER_DECAY_X   = 0.67
+function Eval.time_ramp(gs, kind)
+  if not Eval.SCALER_TIME then return 0.5 end
+  local ante = math.floor((gs.meta and gs.meta.ante) or 1)
+  local K = math.max(1, 8 - ante + 1)
+  local d = (kind == "xmult") and Eval.SCALER_DECAY_X or Eval.SCALER_DECAY_ADD
+  local num, den, w = 0, 0, 1
+  for k = 0, K - 1 do num = num + ((k + 0.5) / K) * w; den = den + w; w = w * d end
+  return num / den
+end
 -- Measured value of an ACCUMULATING joker-counter scaler: (score per unit of counter, MEASURED deck-aware)
 -- x (average counter over the run). The counter ramps ~linearly to inc*rate*N, so its average is half of
 -- that. A hand-type scaler's trigger rate is the shaped scale_trigger_factor (floored, since play shapes
@@ -216,7 +235,8 @@ local function accumulating_scaler_marginal(gs, key, opts)
     end
   end
   local n = Eval.blinds_remaining(gs) * ACC_HANDS_PER_BLIND
-  local future = e.inc * rate * n / 2
+  local kind = (e.cat == "xmult_scaling") and "xmult" or "add"
+  local future = e.inc * rate * n * Eval.time_ramp(gs, kind)
   -- head start: Supernova's counter is the run's cumulative plays of your (most-played, most repeatable)
   -- hand type -- so buying it late already reads high, and it never ramps from 0.
   local head = 0
@@ -245,7 +265,7 @@ local function deck_buff_scaler_marginal(gs, key, opts)
   if not spu then return nil end
   local rate = e.buff_rate or 0.4
   local n = Eval.blinds_remaining(gs) * ACC_HANDS_PER_BLIND
-  return e.deck_buff * rate * n / 2 * spu
+  return e.deck_buff * rate * n * Eval.time_ramp(gs, "add") * spu
 end
 
 -- ===== EVENT-FED scaler valuation (the measured-scaler system, generalized). A large family of scalers
@@ -328,8 +348,21 @@ function Eval.discard_budget_scale(gs)
   return math.max(0, d) / 3
 end
 
+-- shipped 2026-10-10 together with Eval.SCALER_TIME (see there); BES_EVENT_RATES=0 disables
+Eval.MEASURED_EVENT_RATES = not (os.getenv and os.getenv("BES_EVENT_RATES") == "0")
 local function event_rate(gs, e)
   local fuel = e.feed_fuel
+  -- AUDIT 2026-10-10 (BES_EVENT_RATES=1): the planet / tarot / sell rates were guesses (0.03-0.15 per scoring hand);
+  -- the sim REALIZES 0.37 planets and 0.41 tarots per scoring hand (fsh, all antes; 0.26-0.55 / 0.10-0.61 by ante)
+  -- and 0.15 joker sales. Measured values, with the owned-generator boosts kept on top.
+  if Eval.MEASURED_EVENT_RATES and (fuel == "planet" or fuel == "tarot" or fuel == "sell") then
+    if fuel == "planet" then return owns_joker(gs, "j_astronomer") and 0.55 or 0.37 end
+    if fuel == "tarot" then
+      for k in pairs(TAROT_MAKERS) do if owns_joker(gs, k) then return 0.55 end end
+      return 0.41
+    end
+    return 0.15
+  end
   if fuel == "planet" then
     if owns_joker(gs, "j_astronomer") then return 0.30 end          -- free Celestials -> heavy throughput
     if is_leveling(gs) or owns_joker(gs, "j_satellite") then return 0.15 end
@@ -413,6 +446,10 @@ local function event_fed_forward(gs, key, opts)
   if total <= 0 then return 0 end
   local spu = unit_spu(gs, key, scaler_kind(e), opts)
   local ramp = e.feed_once and 1 or 0.5   -- a one-shot gain is at full from hand 1 (no linear ramp)
+  -- run-horizon accruals only (resetting fuels sit at an in-period equilibrium; deck-content fuels are bounded)
+  if not e.feed_once and not e.feed_reset and e.feed_fuel ~= "enh_scored" and e.feed_fuel ~= "glass_break" then
+    ramp = Eval.time_ramp(gs, scaler_kind(e) == "xmult" and "xmult" or "add")
+  end
   return total * ramp * spu * (e.feed_damp or 1)
 end
 
