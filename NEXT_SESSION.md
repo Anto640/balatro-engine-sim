@@ -1,5 +1,16 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-10 late night) -- running
+**Arms running (11 workers, hidden, below-normal; results land in `%CLAUDE_JOB_DIR%/tmp/*_result.txt` and `sim_out/`):**
+1. `cobj_7` (22:54, ~01:45-02:30): HEAD + cherry-picked `510a728` (play-vs-dig by P(clear) with 2+ hands left,
+   `BES_CLEAR_OBJ=1`, worktree `%TEMP%/bes_wt_cobj`) vs `sf_7` (seed_off 7).
+2. `etag_7` (chained after cobj_7, ~05:00): `4a21056` edition tags (Negative / Foil / Holo / Polychrome tag = a measured
+   free shop joker + its edition, Negative slot via `Eval.negative_slot_fv`; sim Negative tag now grants the negative
+   joker, was only an empty slot) vs `sf_7`. World change: only seeds where the baseline took a Negative tag differ.
+**Committed, not yet on main:** `0b04636` live telemetry names the boss (`boss_key` on death / blind_result), `4a21056`.
+Skipped for now: Joker Stencil (one joker, ~3% of runs -- below the frequency ceiling); CRN deals speedup (needs an
+agreement arm; deferred).
+
 ## START HERE (2026-10-10 night)
 **Live = main = `ee6f71a` (deployed).** Shipped today: last hand dig by P(clear) (`ec08796`) and the scaler recalibration
 (`ee6f71a`: measured planet/tarot/sell event rates + time-consistent scaler ramp; pooled n=320 +0.117 (t 1.68), wins
