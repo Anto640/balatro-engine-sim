@@ -184,6 +184,10 @@ DE.LEVEL_USE_CREDIT = 0.15   -- lasting-leveling credit, as a fraction of a boss
 -- choice (so we don't flip on Monte-Carlo noise, and defer to the rich heuristics on ~ties).
 DE.SURV_SAMPLES = 60
 DE.SURV_MARGIN  = 0.06
+-- LAST HAND, P(CLEAR) FIRST (audit 2026-10-10, arm audit_lastclear vs fsh: +0.050 p 0.07, wins 48 -> 50, death ante
+-- 5 later / 0 earlier, 149/160 identical). Switch BES_LAST_CLEAR=0 restores the capped-E[frac] arbitration.
+DE.LAST_CLEAR = not (os.getenv and os.getenv("BES_LAST_CLEAR") == "0")
+DE.LAST_CLEAR_MARGIN = 0.03
 -- DIG BIAS (2026-08-31): REFUTED + reverted (kept 0 for the audit trail). The human DISCARDS 57% of
 -- in-blind decisions vs the engine's 41%, but a uniform +0.05 dig credit moved the engine only to 42%
 -- AND lowered blind class-agreement (430->424 on the corpus) -- the ~8 switches it made dug where the
@@ -1220,7 +1224,16 @@ function DE.decide(gs, opts)
         DE.SURV_SAMPLES, lcg(seed))
       local vd = Simulation.survive_after(gs, { kind = "DISCARD", cards = discard_action.cards },
         DE.SURV_SAMPLES, lcg(seed))
-      if vd.frac > vp.frac + DE.SURV_MARGIN then
+      -- (2026-10-10 audit, see DE.LAST_CLEAR): on the LAST hand a failed blind ends the run, so partial credit is
+      -- worth nothing -- arbitrate by P(clear). E[frac] is capped at 1 and the sure play's frac sits near it on a
+      -- near miss, so the 0.06 frac margin refused digs with P(clear) 0.995 vs 0 (sim 102003 a4 Needle: played a
+      -- 4738/5000 High Card with 4 discards unused) and 0.225 vs 0 (117003 a6 Needle). frac stays the tie-break.
+      if DE.LAST_CLEAR then
+        if vd.clear > vp.clear + DE.LAST_CLEAR_MARGIN
+           or (vd.clear >= vp.clear and vd.frac > vp.frac + DE.SURV_MARGIN) then
+          best = discard_action; best.plan = true
+        end
+      elseif vd.frac > vp.frac + DE.SURV_MARGIN then
         best = discard_action; best.plan = true
       end
     end
