@@ -1064,6 +1064,7 @@ function Content.shop_phase(run, opts)
     run._coupon = nil
   end
   run._shop = shop
+  run._shop_visit = (run._shop_visit or 0) + 1   -- visit counter (decision audit); touches no rng
   local guard, last_sig = 0, nil
   while guard < 40 do
     guard = guard + 1
@@ -1123,6 +1124,34 @@ function Content.shop_phase(run, opts)
     if run.probe and run.probe.xgreedy_until then
       local xv = Probe.xgreedy(run, shop, ranked)
       if xv then ranked = xv end
+    end
+    -- DECISION AUDIT (tools/decision_audit.lua): replace the engine's FIRST action at one shop visit by its
+    -- runner-up / third choice / leaving the shop, then let the engine play on. Inert unless _G.BES_FORCE is set.
+    local F = _G.BES_FORCE
+    if F and not F.done and guard == 1 and run._shop_visit == F.visit then
+      F.done = true
+      local alts = {}
+      for _, a in ipairs(ranked.alternatives or {}) do
+        -- the alternatives worth testing are what it could have SPENT on (buys / packs / vouchers / rerolls), not sales
+        if a ~= ranked.best and type(a.value) == "number" and a.type ~= "SAVE"
+           and a.type ~= "SELL_JOKER" and a.type ~= "USE_CONSUMABLE"
+           and not (a.type == ranked.best.type and a.target == ranked.best.target) then alts[#alts + 1] = a end
+      end
+      table.sort(alts, function(a, b) return a.value > b.value end)
+      local pick
+      if F.alt == "save" and ranked.best.type ~= "SAVE" then
+        pick = { type = "SAVE", value = 0, reason = "audit: leave the shop" }
+      elseif F.alt == "save" then
+        F.alt = "3"; pick = alts[2]   -- the engine was leaving anyway: test its third choice instead
+      else
+        pick = alts[(tonumber(F.alt) or 2) - 1]
+      end
+      local function d(a) return a and { type = a.type, target = a.target and (a.target.key or a.target.name) or nil,
+        value = a.value } or nil end
+      F.record = { kind = "forced", visit = F.visit, alt = F.alt, ante = run.ante, round = run.round,
+        dollars = run.economy.dollars, njokers = #(run.jokers or {}), best = d(ranked.best), forced = d(pick),
+        second = d(alts[1]), n_alts = #alts }
+      if pick then ranked = { best = pick, alternatives = ranked.alternatives, pace = ranked.pace } end
     end
     -- record the offering whenever it changes (shop open + after each reroll)
     local sig = offer_sig(shop)
