@@ -7,6 +7,9 @@
 2. `etag_7` (chained after cobj_7, ~05:00): `4a21056` edition tags (Negative / Foil / Holo / Polychrome tag = a measured
    free shop joker + its edition, Negative slot via `Eval.negative_slot_fv`; sim Negative tag now grants the negative
    joker, was only an empty slot) vs `sf_7`. World change: only seeds where the baseline took a Negative tag differ.
+**cobj_7 RESULT (02:49): NOT shipped** -- vs sf_7: progress +0.029 (p 0.87), wins 54 -> 51, reach-7 96 -> 92, reach-8 70 -> 65,
+sign 65/69, sd 2.24 (a broad, cascading change; MDE ~0.5). Neutral mean, tail down -> no confirmation arm; `BES_CLEAR_OBJ`
+stays unbuilt on main (prototype `510a728` / worktree `bes_wt_cobj`). etag_7 started 02:49 (~06:00).
 **Committed, not yet on main:** `0b04636` live telemetry names the boss (`boss_key` on death / blind_result), `4a21056`.
 Skipped for now: Joker Stencil (one joker, ~3% of runs -- below the frequency ceiling); CRN deals speedup (needs an
 agreement arm; deferred).

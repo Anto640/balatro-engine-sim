@@ -224,3 +224,9 @@ the build for the KNOWN upcoming boss, not dodging a few bosses.
 Fresh seeds (seed_off 7): `sf_7` (HEAD + BES_SCALER_TIME=1 BES_EVENT_RATES=1) vs `lc_7` (HEAD): +0.068 (p 0.44), wins 48 -> 54,
 reach-7 92 -> 96, reach-8 66 -> 70, sign 25/21. Pooled with audit_scalerfix (n=320): +0.117 (t 1.68), wins 96 -> 106,
 sign 55/44. **Shipped on by default as `ee6f71a`.**
+
+## cobj_7 result (main session, 2026-10-11 02:49)
+`cobj_7` (HEAD + `BES_CLEAR_OBJ=1`: play vs dig by P(clear) with 2+ hands left) vs `sf_7` (HEAD, seed_off 7): **+0.029
+(p 0.87), wins 54 -> 51, reach-7 96 -> 92, reach-8 70 -> 65, sign 65/69**, paired sd 2.24. The last-hand version helps
+(no later hand to recover a capped-frac mistake); with 2+ hands left the greedy rollout's P(clear) is too noisy to beat
+E[frac]. **Not shipped.**
