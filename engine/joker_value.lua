@@ -80,6 +80,7 @@ JV.DISCARD_BUDGET_USED = 0.63     -- live-measured share of the discard budget u
 local DIG_CACHE, DIG_N = {}, 0
 local function card_key(c)
   return (c.rank_id or c.rank or "") .. (c.suit or "") .. (c.enhancement or "") .. (c.edition or "") .. (c.seal or "")
+    .. (c.debuffed and "d" or "")
 end
 local function deck_key(deck)
   local parts = {}
@@ -163,6 +164,70 @@ local function sample_hand(gs, deck, hs, rng)
 end
 JV._sample_hand = sample_hand
 
+-- CRN DEALS (audit 2026-10-10 prototype, BES_CRN_DEALS=1, off by default until its agreement arm): COMMON-RANDOM-NUMBER deals for every single-deal measurement.
+-- Sample k of a measurement is the k-th deal of the deck (seeded from the deck's CONTENT, like the DIG_HANDS path),
+-- so every candidate in a decision is compared on the SAME hands (lower relative noise), and the current board's
+-- best play on deal k is computed ONCE (content-keyed cache) instead of once per measured candidate -- the bulk of
+-- the shop's cost (score_delta is ~2/3 of sim runtime; half of it re-scores the unchanged base board).
+JV.CRN_DEALS = os.getenv("BES_CRN_DEALS") == "1"
+local CRN_BASE, CRN_N = {}, 0
+local CRN_HANDS = setmetatable({}, { __mode = "k" })
+local function crn_hand(deck, dkey, hs, k)
+  local per = CRN_HANDS[deck]
+  if not per or per.key ~= dkey then per = { key = dkey }; CRN_HANDS[deck] = per end
+  local hk = hs * 1000 + k
+  local h = per[hk]
+  if h then return h end
+  local st = deal_seed(deck, dkey, k)
+  local function rng() st = (st * 16807) % 2147483647; return (st - 1) / 2147483646 end
+  local sh = {}
+  for i = 1, #deck do sh[i] = deck[i] end
+  for i = #sh, 2, -1 do local r = math.floor(rng() * i) + 1; sh[i], sh[r] = sh[r], sh[i] end
+  h = {}
+  for i = 1, hs do h[i] = sh[i] end
+  per[hk] = h
+  return h
+end
+-- content signature of everything outside the hand that changes a board's score
+local function num_fields(t, out)
+  if type(t) ~= "table" then return end
+  local ks = {}
+  for k, v in pairs(t) do if type(v) == "number" or type(v) == "boolean" or type(v) == "string" then ks[#ks + 1] = k end end
+  table.sort(ks, function(a, b) return tostring(a) < tostring(b) end)
+  for _, k in ipairs(ks) do out[#out + 1] = tostring(k) .. "=" .. tostring(t[k]) end
+end
+local function ctx_sig(g, dkey, hs)
+  local p = { dkey, hs }
+  for _, j in ipairs(g.jokers or {}) do
+    p[#p + 1] = (j.key or "?") .. ":" .. (j.edition or "") .. ":" .. tostring(j.debuffed or "")
+    if type(j.ability) == "table" then num_fields(j.ability, p); num_fields(j.ability.extra, p) end
+  end
+  local hl = g.run and g.run.hand_levels
+  if hl then
+    local ks = {}
+    for k in pairs(hl) do ks[#ks + 1] = k end
+    table.sort(ks)
+    for _, k in ipairs(ks) do local v = hl[k]; p[#p + 1] = k .. (type(v) == "table" and ((v.level or "") .. "/" .. (v.chips or "") .. "/" .. (v.mult or "")) or tostring(v)) end
+  end
+  num_fields(g.blind, p); num_fields(g.economy, p); num_fields(g.run, p)
+  p[#p + 1] = tostring(g.boss_effect and (g.boss_effect.key or g.boss_effect.name) or "")
+  p[#p + 1] = "R" .. #(g.remaining or {}) .. "C" .. #(g.consumables or {}) .. "H" .. #(g.hand or {})
+  return table.concat(p, "|")
+end
+JV._crn_hand = crn_hand
+local function crn_base_score(g, deck, dkey, hs, k)
+  local key = ctx_sig(g, dkey, hs) .. "#" .. k
+  local v = CRN_BASE[key]
+  if v == nil then
+    local a = HandEval.best_play(g, crn_hand(deck, dkey, hs, k))
+    v = a and a.score or 0
+    if CRN_N >= 8000 then CRN_BASE, CRN_N = {}, 0 end   -- keys are long board signatures: keep the live heap small
+    CRN_BASE[key] = v; CRN_N = CRN_N + 1
+  end
+  return v
+end
+JV._crn_base_score = crn_base_score
+
 -- Can we measure on this state at all? (need a deck and a modelled joker)
 function JV.can_measure(gs, joker)
   local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
@@ -198,14 +263,20 @@ function JV.score_delta(gs, joker, opts)
   -- Determinism is unchanged for the common append path: the same `samples` shuffles are
   -- consumed, in the same order, whether or not the candidate is a copier.
   local hands, a_scores, seeds = {}, {}, {}
-  local dkey = JV.DIG_HANDS and deck_key(deck)
+  local dkey = (JV.DIG_HANDS or JV.CRN_DEALS) and deck_key(deck)
+  local off = (JV.CRN_DEALS and opts.crn_offset) or 0
   for k = 1, samples do
     local hand
     if JV.DIG_HANDS then seeds[k] = deal_seed(deck, dkey, k); hand = deal_dig(without, deck, dkey, hs, seeds[k])
+    elseif JV.CRN_DEALS then hand = crn_hand(deck, dkey, hs, k + off)
     else hand = sample_hand(gs, deck, hs, rng) end
     hands[k] = hand
-    local a = HandEval.best_play(without, hand)
-    a_scores[k] = a and a.score or 0
+    if JV.CRN_DEALS and not JV.DIG_HANDS then
+      a_scores[k] = crn_base_score(without, deck, dkey, hs, k + off)
+    else
+      local a = HandEval.best_play(without, hand)
+      a_scores[k] = a and a.score or 0
+    end
   end
   local function mean_delta(with_list)
     local withg = clone_with_jokers(gs, with_list)
@@ -306,16 +377,20 @@ function JV.remove_delta(gs, idx, opts)
   local withoutg = clone_with_jokers(gs, rest)
 
   local total = 0
-  local dkey = JV.DIG_HANDS and deck_key(deck)
+  local dkey = (JV.DIG_HANDS or JV.CRN_DEALS) and deck_key(deck)
   for k = 1, samples do
     local ha, hb
     if JV.DIG_HANDS then
       local sd = deal_seed(deck, dkey, k)
       ha, hb = deal_dig(withg, deck, dkey, hs, sd), deal_dig(withoutg, deck, dkey, hs, sd)
+    elseif JV.CRN_DEALS then
+      total = total + crn_base_score(withg, deck, dkey, hs, k) - crn_base_score(withoutg, deck, dkey, hs, k)
     else ha = sample_hand(gs, deck, hs, rng); hb = ha end
-    local a = HandEval.best_play(withg, ha)
-    local b = HandEval.best_play(withoutg, hb)
-    total = total + ((a and a.score or 0) - (b and b.score or 0))
+    if not (JV.CRN_DEALS and not JV.DIG_HANDS) then
+      local a = HandEval.best_play(withg, ha)
+      local b = HandEval.best_play(withoutg, hb)
+      total = total + ((a and a.score or 0) - (b and b.score or 0))
+    end
   end
   return total / samples
 end

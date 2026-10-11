@@ -235,8 +235,9 @@ local function joker_pool(gs, opts)
   if all then M = #keys end
   for i = 1, M do
     local it = all and keys[i] or draw()
+    local ns = (all and P.POOL_ALL_SAMPLES) or opts.samples or 3
     local m = JokerValue.score_delta(gs, { key = it.k, ability = { extra = {} } },
-                                     { samples = (all and P.POOL_ALL_SAMPLES) or opts.samples or 3, rng = rng })
+                                     { samples = ns, rng = rng, crn_offset = 100 + (i - 1) * ns })
     local v = m and (m / need) or ((it.e.tier or 3) * 0.3)
     -- B5: these M items are ALREADY a rarity-weighted SAMPLE (draw() above), so expected_pick
     -- must draw among them with EQUAL weight. Storing the rarity weight here re-applied it,
