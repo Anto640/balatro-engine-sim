@@ -1,5 +1,13 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-11 night) -- running
+**Self-play** (owner-authorised, watchdog, stop 07:20): new Red Deck run from 23:23 (autostart file text "new" now starts a
+fresh run; watchdog deletes the Multiplayer profile's version.dll before a relaunch). SteelSeries stays OPEN (owner).
+**Decision audit** (`daudit_7`, 23:37, ~04:30-05:30): 157 seeds of `etag_7`, one sampled shop visit each, the engine's
+first action replaced by (a) its best-ranked alternative purchase, (b) leaving the shop -> outcome vs the baseline seed.
+Tools: `tools/decision_audit{.lua,.sh,_plan.py,_report.py}`; hook `_G.BES_FORCE` in `sim/content.lua` shop_phase (inert).
+Report: `python tools/decision_audit_report.py sim_out/etag_7.jsonl sim_out/daudit_7.jsonl`.
+
 ## START HERE (2026-10-11 morning)
 **crnd_7 (BES_CRN_DEALS=1, the audit's speedup) REJECTED 2026-10-11:** vs etag_7 progress -0.302 (p 0.026), wins 59 -> 44,
 reach-8 71 -> 59. Content-seeded deals give a deck the SAME few hands in every decision, so an unlucky deal biases every
