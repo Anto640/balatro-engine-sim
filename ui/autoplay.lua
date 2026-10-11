@@ -159,11 +159,14 @@ end
 -- ONE-SHOT AUTOSTART (for restarting the game remotely, e.g. to load a fix while the owner is away): if the file
 -- `bes_autostart` exists in the save folder at launch, it is deleted, self-play + auto-restart turn ON, and from the
 -- main menu the saved run is CONTINUED (or a new run starts if there is none). Without the file nothing changes.
+-- A file whose text contains "new" starts a NEW run instead (a saved run from older code is abandoned; 2026-10-11).
 Autoplay.AUTOSTART_FILE = "bes_autostart"
 Autoplay.AUTOSTART_DELAY = 5.0
 function Autoplay.check_autostart()
   local ok, info = pcall(function() return love.filesystem.getInfo(Autoplay.AUTOSTART_FILE) end)
   if not (ok and info) then return false end
+  local okr, text = pcall(love.filesystem.read, Autoplay.AUTOSTART_FILE)
+  Autoplay._autostart_new = (okr and type(text) == "string" and text:find("new", 1, true)) and true or nil
   pcall(love.filesystem.remove, Autoplay.AUTOSTART_FILE)
   Autoplay.enabled, Autoplay.auto_restart, Autoplay._autostart = true, true, true
   flog("==== AUTOSTART: self-play + auto-restart ON; will continue the saved run from the menu ====")
@@ -187,7 +190,8 @@ local function maybe_autostart(G)
     local saved_deck = G.SAVED_GAME and G.SAVED_GAME.BACK and G.SAVED_GAME.BACK.key
     local deck_ok = (not Autoplay.FORCE_DECK) or saved_deck == nil or saved_deck == Autoplay.FORCE_DECK
     if not deck_ok then flog("autostart: the saved run is on " .. tostring(saved_deck) .. " -- starting a new " .. Autoplay.FORCE_DECK .. " run instead") end
-    if deck_ok and G.SAVED_GAME ~= nil and not (G.SAVED_GAME.GAME and G.SAVED_GAME.GAME.won) then
+    if Autoplay._autostart_new then flog("autostart: a NEW run was requested -- the saved run is abandoned") end
+    if deck_ok and not Autoplay._autostart_new and G.SAVED_GAME ~= nil and not (G.SAVED_GAME.GAME and G.SAVED_GAME.GAME.won) then
       flog("autostart: continuing the saved run")
       G.FUNCS.start_run(nil, { savetext = G.SAVED_GAME })
     else
@@ -198,6 +202,7 @@ local function maybe_autostart(G)
     end
   end)
   if not ok then flog("autostart FAILED: " .. tostring(err)) end
+  Autoplay._autostart_new = nil
   Autoplay.locked_until = now() + 4.0
   return true
 end

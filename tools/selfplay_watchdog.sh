@@ -6,6 +6,7 @@
 LOG=/tmp/bes/watchdog.log
 APLOG="$APPDATA/Balatro/bes_autoplay.log"
 MODS="$APPDATA/r2modmanPlus-local/Balatro/profiles/Default/mods"
+GAMEDIR="/d/All Transfered Stuff (Steam)/steamapps/common/Balatro"
 STALL=360
 STOP="${BES_SELFPLAY_STOP:-07:00}"   # HH:MM to close the game and stop
 mem_free_mb() { powershell -NoProfile -Command "[int]((Get-CimInstance Win32_OperatingSystem).FreeVirtualMemory/1024)" 2>/dev/null | tr -d ''; }
@@ -26,6 +27,8 @@ relaunch() {
   fi
   echo "$(date +%H:%M:%S) RELAUNCH ($1)" >> $LOG
   taskkill //IM Balatro.exe //F >/dev/null 2>&1; sleep 8
+  # the Multiplayer r2modman profile (lovely 0.9) leaves version.dll in the game dir; lovely 0.10 refuses to start with it
+  rm -f "$GAMEDIR/version.dll"
   touch "$APPDATA/Balatro/bes_autostart"
   "/c/Program Files (x86)/Steam/steam.exe" -applaunch 2379780 --mod-dir "$(cygpath -w "$MODS")" >/dev/null 2>&1 &
   sleep 90
