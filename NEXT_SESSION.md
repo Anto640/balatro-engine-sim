@@ -1,6 +1,9 @@
 # NEXT_SESSION.md — fresh-session handoff
 
 ## START HERE (2026-10-11 morning)
+**crnd_7 (BES_CRN_DEALS=1, the audit's speedup) REJECTED 2026-10-11:** vs etag_7 progress -0.302 (p 0.026), wins 59 -> 44,
+reach-8 71 -> 59. Content-seeded deals give a deck the SAME few hands in every decision, so an unlucky deal biases every
+valuation the whole run; fresh MC noise averages out. Do not retry deal-sharing across decisions. Switch stays off.
 **Live = main = `e13dda3` (deployed).** Shipped overnight: **edition tags** (`4a21056`: Negative / Foil / Holo / Polychrome
 tag = a measured free shop joker + its edition; sim Negative tag grants the negative joker) -- `etag_7` vs `sf_7`: progress
 +0.028 (p 0.74), **wins 54 -> 59**, reach-8 70 -> 71, reach-7 96 -> 95, sign 31/28, 101/160 tied, sd 1.05. The Negative tag

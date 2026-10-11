@@ -235,3 +235,9 @@ E[frac]. **Not shipped.**
 `etag_7` (edition tags valued as a measured free joker + edition; sim Negative tag grants the joker) vs `sf_7`: **+0.028
 (p 0.74), wins 54 -> 59, reach-8 70 -> 71, reach-7 96 -> 95, sign 31/28, 101/160 tied.** Negative tag taken 82/82 (was
 0/80). Correctness + fidelity fix, wins up -> **shipped** (`4a21056`, main `e13dda3`).
+
+## crnd_7 result (main session, 2026-10-11 14:29)
+`crnd_7` (`878e1ba` + `BES_CRN_DEALS=1`) vs `etag_7`: **-0.302 (p 0.026), wins 59 -> 44, reach-7 95 -> 79, reach-8 71 -> 59,
+sign 54/71. REJECTED.** Not a speed-only change: content-seeded deals hand a deck the same few hands in every decision,
+so an unrepresentative deal skews every valuation for that deck all run (fresh per-decision MC noise averages out).
+Timing was not measured (moot). Any speedup must keep fresh deals per decision (e.g. share deals only WITHIN one decision).
