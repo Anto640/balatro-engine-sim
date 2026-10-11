@@ -230,3 +230,8 @@ sign 55/44. **Shipped on by default as `ee6f71a`.**
 (p 0.87), wins 54 -> 51, reach-7 96 -> 92, reach-8 70 -> 65, sign 65/69**, paired sd 2.24. The last-hand version helps
 (no later hand to recover a capped-frac mistake); with 2+ hands left the greedy rollout's P(clear) is too noisy to beat
 E[frac]. **Not shipped.**
+
+## etag_7 result (main session, 2026-10-11 05:30)
+`etag_7` (edition tags valued as a measured free joker + edition; sim Negative tag grants the joker) vs `sf_7`: **+0.028
+(p 0.74), wins 54 -> 59, reach-8 70 -> 71, reach-7 96 -> 95, sign 31/28, 101/160 tied.** Negative tag taken 82/82 (was
+0/80). Correctness + fidelity fix, wins up -> **shipped** (`4a21056`, main `e13dda3`).

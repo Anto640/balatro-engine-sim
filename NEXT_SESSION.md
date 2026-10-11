@@ -1,5 +1,15 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-11 morning)
+**Live = main = `e13dda3` (deployed).** Shipped overnight: **edition tags** (`4a21056`: Negative / Foil / Holo / Polychrome
+tag = a measured free shop joker + its edition; sim Negative tag grants the negative joker) -- `etag_7` vs `sf_7`: progress
++0.028 (p 0.74), **wins 54 -> 59**, reach-8 70 -> 71, reach-7 96 -> 95, sign 31/28, 101/160 tied, sd 1.05. The Negative tag
+is now taken 82/82 offers (was 0/80; median value \$86, up to \$950 at ante 5 -- a big number, but the skip is right);
+Foil/Holo/Poly taken ~5% (worthless on a full board). Live telemetry now names the boss (`0b04636`). Not shipped:
+`cobj_7` (multi-hand P(clear), wins 54 -> 51). **Baseline for new arms: `sim_out/etag_7.jsonl` (seed_off 7, == HEAD in the
+sim).** seed_off 3 still has no HEAD arm. Next: the audit list is mostly worked through -- see the audit doc for what
+remains (CRN-deals speedup, Stencil, xsecure).
+
 ## START HERE (2026-10-10 late night) -- running
 **Arms running (11 workers, hidden, below-normal; results land in `%CLAUDE_JOB_DIR%/tmp/*_result.txt` and `sim_out/`):**
 1. `cobj_7` (22:54, ~01:45-02:30): HEAD + cherry-picked `510a728` (play-vs-dig by P(clear) with 2+ hands left,
