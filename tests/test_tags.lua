@@ -144,6 +144,8 @@ return function(t)
     t.ok(v(open, "tag_polychrome") > v(open, "tag_foil"), "a free Polychrome joker beats a free Foil one")
     t.ok(v(full, "tag_foil") <= 2, "Foil Tag on a full board: the joker has nowhere to go")
     t.ok(v(full, "tag_negative") > v(full, "tag_foil") + 10, "Negative Tag on a full board: still a whole joker + slot")
-    t.ok(v(open, "tag_negative") > v(open, "tag_foil"), "Negative beats Foil (the slot)")
+    -- owner 2026-10-12: a Negative joker rides in its OWN slot -- no extra slot credit; with room on the board a Foil
+    -- joker (same random joker + Foil) is worth at least as much
+    t.ok(v(open, "tag_negative") <= v(open, "tag_foil") + 0.01, "with room on the board Negative is no better than Foil")
   end
 end

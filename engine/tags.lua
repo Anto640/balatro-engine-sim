@@ -140,7 +140,9 @@ local function edition_joker_dollars(gs, edition, opts)
     if not f then return nil end
     frac = frac + rw[2] * f
   end
-  frac = frac + (neg and Eval.negative_slot_fv(gs) or Eval.edition_score_bonus(edition, true))
+  -- Negative: ONE random joker riding in its own slot -- no extra slot (owner 2026-10-12: "much worse than Antimatter
+  -- since it is one completely random joker"); it is only never lost on a full board. Others: + the edition's bonus.
+  if not neg then frac = frac + Eval.edition_score_bonus(edition, true) end
   return VU.frac_to_dollars(gs, frac)
 end
 

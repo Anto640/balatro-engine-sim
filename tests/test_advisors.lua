@@ -1179,10 +1179,10 @@ return function(t)
       "R6: Ectoplasm scales with how much of the board the plan intends to KEEP")
     t.ok(cores > 0, "R6: ...and is still strongly positive on a board of keepers")
 
-    -- runway: the same core board is worth far less at ante 8, where a new slot has no
-    -- time to be filled while the hand-size loss is still charged in full.
-    t.ok(ecto(ecto_gs({ CORE, CORE, CORE }, 8)) < cores,
-      "R6: the slot is runway-aware (ante 8 << ante 3), which the flat prior could not see")
+    -- the freed slot is static capacity (owner 2026-10-12: no time-left taper); it is worth MORE the fuller the board,
+    -- where the slot is binding (was: runway-tapered, ante 8 << ante 3)
+    t.ok(ecto(ecto_gs({ CORE, CORE, CORE, CORE, CORE })) > cores,
+      "R6: a freed slot is worth more on a full board (binding) than with room to spare")
 
     -- determinism: the branch samples the deck, so it must be stable under a seeded rng
     t.eq(ecto(ecto_gs({ JUNK, CORE })), ecto(ecto_gs({ JUNK, CORE })),

@@ -2087,7 +2087,37 @@ end
 -- and negatives are rare so the blast radius is tiny -- correctness over aggression).
 Eval.NEG_SLOT_FV    = 6.0    -- a +1 permanent slot ~ a future joker (Antimatter base is 8.0)
 Eval.NEG_SLOT_FLOOR = 0.5    -- late-game / no-runway residual (matches the old flat credit)
-function Eval.negative_slot_fv(gs)
+-- MEASURED SLOT (2026-10-12, owner review; BES_NEG_SLOT=0 restores the flat model below). The flat model priced the slot
+-- at 6 boss hands x antes-left -- 4-12x what the engine prices the same +1 slot as Antimatter (one measured shop joker),
+-- tapered by time left (a slot is static capacity: what it holds decides the deciding blinds, not how many blinds it
+-- exists for; docs/TIME_LEFT_AUDIT_2026-10-12.md), and it credited a slot a Negative joker never leaves free:
+--   mode "kept" (default): a Negative joker vs the same joker without the edition -- it leaves ONE more slot free than
+--     its normal twin would. Worth a future joker in that slot, scaled by how binding it is (free slots it would
+--     otherwise leave). On a FULL board there is no free slot left either way (its edge there -- no sale needed to fit
+--     it -- is already in the shop's buy-vs-sell-to-buy paths), so 0.
+--   mode "freed" (Ectoplasm): a joker you HOLD becomes negative -> a genuinely free slot appears; most binding when full.
+Eval.NEG_SLOT_MEASURED = not (os.getenv and os.getenv("BES_NEG_SLOT") == "0")
+local function slot_bind(free_otherwise) return math.max(0.2, 1 - 0.3 * math.max(0, free_otherwise)) end
+function Eval.negative_slot_fv(gs, opts)
+  if Eval.NEG_SLOT_MEASURED then
+    opts = opts or {}
+    local slots = (gs and gs.run and gs.run.joker_slots) or 5
+    local jfree = math.max(0, slots - #((gs and gs.jokers) or {}))
+    local bind
+    if opts.mode == "freed" then bind = slot_bind(jfree)
+    else
+      if jfree <= 0 then return 0 end
+      bind = slot_bind(jfree - 1)
+    end
+    local rng = opts.rng
+    if not rng then
+      local s = (math.floor((gs and gs.meta and gs.meta.ante) or 1) * 7919 + jfree * 104729 + #((gs and gs.deck) or {})) % 2147483646 + 1
+      rng = function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end
+    end
+    local Packs = require("engine.packs")
+    local ok, e = pcall(Packs.expected_shop_joker, gs, 2, { rng = rng, samples = 3, measure_count = 4 })
+    return (ok and e and e > 0) and (e * bind) or 0
+  end
   local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
   local runway = 8 - ante
   if runway < 1 then return Eval.NEG_SLOT_FLOOR end        -- ante 8: no time to collect on the slot

@@ -1148,7 +1148,7 @@ function CV.card_value(gs, set, key, freq, need, rng, samples, hand_ctx)
       if eligible == 0 then
         return -hcost, 0, "no joker can take Negative — pure -1 hand size (permanent)"
       end
-      local slot = Eval.negative_slot_fv(gs) * (stick / eligible)
+      local slot = Eval.negative_slot_fv(gs, { mode = "freed", rng = rng }) * (stick / eligible)
       local note = (stick > 0)
         and "Negative on a random joker (+1 slot) at a permanent -1 hand size"
         or "-1 hand size (permanent) for a slot on a joker you'd sell — the slot goes with it"
