@@ -1,5 +1,16 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-12 night)
+**Live = branch HEAD (deployed).** Owner review of live run W33433YS (a win; walkthrough tool: job tmp runthrough.py, reads
+bes_fixtures + bes_runs). Fixed + deployed: Voucher tag = affordable vouchers' net gain (\$0 when the next shop can't pay;
+was flat \$10) and the sim now ADDS a voucher to the next shop instead of a free one; Double tag \$0 (sim never modelled it).
+Checked, no change: the ante-5 "milk" play was right (a Gold SEAL pays \$3 when scored); the owner's own corpus discards
+1-2 cards in 59% of discards vs the engine's 29% (small discards are not an engine quirk). Rejected by the owner: pace
+tie-break (money; memory dig-ties-favour-digging). Yardstick check: late-board valuation tracks win lift 0.27 vs 0.17
+(n.s.), not a big lever. **Running (23:24, ~04:30-05:00):** `noskip_7` (never skip) and `invest1_7` (only the Investment
+tag at ante 1, `BES_PROBE=invest1`) vs `neg2_7` -- owner: "it takes many skips which are generally bad". Open idea: free
+value from discards when the clear is safe (Superposition tarot etc.; MILK only farms through plays).
+
 ## START HERE (2026-10-12 morning)
 **Live = branch HEAD `ddd94f9` (deployed; main not yet synced).** Overnight: self-play 26 runs / 4 wins (The Water x3 at
 0.20-0.49 = the clearest live weakness); decision audit `daudit_7` (`docs/DECISION_AUDIT_2026-10-12.md`): early packs and
