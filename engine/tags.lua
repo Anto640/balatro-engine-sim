@@ -29,18 +29,8 @@ end
 -- Share of the run's LATER plays a hand gets, given its share of plays now. MEASURED (2026-10-05, arms fz+ob, 1481
 -- ante-steps: the modal hand of an ante vs its share of every later ante's plays): the engine's main hand drifts, so
 -- today's share overstates it ~2x -- 0.33 -> 0.17, 0.50 -> 0.28, 0.67 -> 0.32, 0.77 -> 0.51, 1.00 -> 0.55.
-Tags.LATER_SHARE = { { 0, 0 }, { 0.33, 0.17 }, { 0.50, 0.28 }, { 0.67, 0.32 }, { 0.77, 0.51 }, { 1.0, 0.55 } }
-function Tags.later_share(s)
-  local t = Tags.LATER_SHARE
-  s = math.max(0, math.min(1, s or 0))
-  for i = 2, #t do
-    if s <= t[i][1] then
-      local a, b = t[i - 1], t[i]
-      return a[2] + (b[2] - a[2]) * (s - a[1]) / (b[1] - a[1])
-    end
-  end
-  return t[#t][2]
-end
+Tags.LATER_SHARE = ConsumableValue.LATER_SHARE   -- the curve lives in engine/consumable_value (shared)
+Tags.later_share = ConsumableValue.later_share
 
 local function orbital_dollars(gs, opts)
   if not has_deck(gs) then return nil end

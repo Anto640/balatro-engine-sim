@@ -53,6 +53,29 @@ local function mc(n) local c = rawget(_G, "BES_MC_CAP"); if c and n > c then ret
 --
 -- ⇒ **Do not re-derive this until `growth_factor` is calibrated (26c/26e).** The sum is still the
 -- right shape; it cannot be right while its growth input points the wrong way.
+-- LATER SHARE (moved here from engine/tags.lua, 2026-10-12). A hand level pays on the hand's LATER plays, and the
+-- engine's main hand drifts, so today's share of plays overstates the later share ~2x. MEASURED 2026-10-05 (arms fz+ob,
+-- 1481 ante-steps: the modal hand of an ante vs its share of every later ante's plays): 0.33 -> 0.17, 0.50 -> 0.28,
+-- 0.67 -> 0.32, 0.77 -> 0.51, 1.00 -> 0.55. Used by the Orbital tag since then; CV.LATER_SHARE_ALL (BES_LATER_SHARE=1)
+-- applies it to every persistent level price -- planet cards, Celestial-pack pools, Black Hole, the planet choice --
+-- which priced the same level at today's share (decision audit 2026-10-12: Celestial packs bought at antes 1-4 lost to
+-- the engine's own alternatives, 16 better / 6 worse).
+CV.LATER_SHARE = { { 0, 0 }, { 0.33, 0.17 }, { 0.50, 0.28 }, { 0.67, 0.32 }, { 0.77, 0.51 }, { 1.0, 0.55 } }
+CV.LATER_SHARE_ALL = os.getenv and os.getenv("BES_LATER_SHARE") == "1"
+function CV.later_share(s)
+  local t = CV.LATER_SHARE
+  s = math.max(0, math.min(1, s or 0))
+  for i = 2, #t do
+    if s <= t[i][1] then
+      local a, b = t[i - 1], t[i]
+      return a[2] + (b[2] - a[2]) * (s - a[1]) / (b[1] - a[1])
+    end
+  end
+  return t[#t][2]
+end
+-- the share a PERSISTENT level is priced at: later share under the switch, today's share otherwise
+function CV.level_share(f) return CV.LATER_SHARE_ALL and CV.later_share(f) or f end
+
 function CV.level_scale(gs)
   local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
   return math.max(1, math.min(4, 1 + (8 - ante) * 0.45))
@@ -957,7 +980,7 @@ function CV.card_value(gs, set, key, freq, need, rng, samples, hand_ctx)
         local hf; hf, bctx = CV.hand_frequencies(gs, { samples = 8, rng = rng })
         f = hf and (hf[hand] or 0) or 0.4
       end
-      return CV.level_scale(gs) * (f * CV.level_gain(gs, hand, 1, bctx)) / need, 0, "level " .. hand
+      return CV.level_scale(gs) * (CV.level_share(f) * CV.level_gain(gs, hand, 1, bctx)) / need, 0, "level " .. hand
     end
     return 0.3, 0, "planet"
   elseif set == "Tarot" then
@@ -1182,7 +1205,7 @@ function CV.best_planet(gs, opts)
   for _, hand in ipairs(names) do
     local f = freq[hand]
     if f > 0 and Mechanics.HAND_PLANET[hand] then
-      local v = f * CV.level_gain(gs, hand, 1, bctx)
+      local v = CV.level_share(f) * CV.level_gain(gs, hand, 1, bctx)
         + BuildPlan.planet_credit(gs, hand) * Mechanics.boss_per_hand_need(gs)
       if not best or v > best.value then best = { hand = hand, freq = f, value = v } end
     end
