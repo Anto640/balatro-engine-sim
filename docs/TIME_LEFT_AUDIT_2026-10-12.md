@@ -39,3 +39,15 @@ that; levels and the slot never got it (they use the runway multipliers in A ins
 2. Hand levels: drop the `level_scale` runway multiplier; price a level the way jokers are priced (forward measure).
 3. Then the rest of section A, one at a time; section B's double counts (seal generators, Telescope).
 4. Optional ceiling probe: +1 joker slot granted at ante 2 / 4 / 6 -> what a slot is worth by stage, in P(win).
+
+## Results
+| arm | vs | progress (p) | wins | reach-8 | verdict |
+|---|---|---|---|---|---|
+| `lshare_7` later-share level pricing | etag_7 | -0.040 (0.76) | 59 -> 54 | 71 -> 70 | off (early Celestial packs -25%, no gain) |
+| `neg2_7` Negative tag / slot fix | etag_7 | -0.075 (0.35) | 59 -> 56 | 71 -> 69 | kept (correctness; Negative taken 41/80 vs 82/82) |
+| `lvflat_7` flat level price 2.67 | neg2_7 | +0.138 (0.16) | 56 -> 61 | 69 -> 76 | promising -> confirmed? |
+| `lvflat_3` same, fresh seeds | head_3 | -0.085 (0.47) | 63 -> 51 | 77 -> 70 | **not confirmed**; pooled +0.027, wins 119 -> 112 -> off |
+
+Level TIMING alone (same average price, planets moved from antes 1-2 to 7-8) does not move outcomes. Remaining
+section-A items are smaller (Telescope, seal generators, Marble, hand size); the measuring-stick question (D) is the
+larger open one.

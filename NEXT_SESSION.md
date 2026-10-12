@@ -14,6 +14,9 @@ price flat 2.67 = the ramp's average, no time-left ramp) vs neg2_7 (~14:30-15:00
 **lvflat_7 vs neg2_7 (14:57): +0.138 (p 0.16), wins 56 -> 61, reach-8 69 -> 76, reach-7 93 -> 97, sign 38/38** -- planets
 moved later (a1 160 -> 121, a8 97 -> 150; hand levels at a8 12.8 -> 14.3). PROMISING -> fresh-seed confirmation running
 (14:58, ~20:00): `head_3` (HEAD, seed_off 3, new baseline) + `lvflat_3` (BES_LEVEL_FLAT=1), worktree bes_wt_lvflat.
+**lvflat_3 vs head_3 (21:03): NOT CONFIRMED** -- -0.085 (p 0.47), wins 63 -> 51, reach-8 77 -> 70, sign 37/39. Pooled n=320
++0.027 (t 0.35), wins 119 -> 112 -> BES_LEVEL_FLAT stays OFF (the seed_off-7 gain was noise). **New seed_off-3 baseline:
+`sim_out/head_3.jsonl` (== HEAD, 63 wins); seed_off 7: `neg2_7` (56 wins).**
 Next from the time-left audit: Telescope / seal-generator double time counts, Marble, hand-size x level_scale.
 
 ## START HERE (2026-10-11 night) -- running
