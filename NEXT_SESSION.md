@@ -1,5 +1,17 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-12 morning)
+**Live = branch HEAD `ddd94f9` (deployed; main not yet synced).** Overnight: self-play 26 runs / 4 wins (The Water x3 at
+0.20-0.49 = the clearest live weakness); decision audit `daudit_7` (`docs/DECISION_AUDIT_2026-10-12.md`): early packs and
+close calls are where the engine's first choice loses. `lshare_7` (later-share level pricing, BES_LATER_SHARE=1) vs etag_7:
+-0.040, wins 59 -> 54, early Celestial packs -25% -> neutral, switch stays OFF. Owner principle (memory time-left-principle,
+`docs/TIME_LEFT_AUDIT_2026-10-12.md`): static power must not be multiplied by time left; early hand-specific buys worth less.
+**Shipped + deployed (`1988d73`, `ddd94f9`):** Negative tag = one random joker (no slot credit); Negative slot = one measured
+future joker, no flat 6, no runway taper, no fill discount (0 only for a Negative joker onto a full board).
+**Running:** `neg2_7` (09:34, ~12:00) vs etag_7 = confirmation of the Negative fix; then `lvflat_7` (BES_LEVEL_FLAT=1: level
+price flat 2.67 = the ramp's average, no time-left ramp) vs neg2_7 (~14:30-15:00). (`neg_7` = aborted partial run, ignore.)
+Next from the time-left audit: Telescope / seal-generator double time counts, Marble, hand-size x level_scale.
+
 ## START HERE (2026-10-11 night) -- running
 **Self-play** (owner-authorised, watchdog, stop 07:20): new Red Deck run from 23:23 (autostart file text "new" now starts a
 fresh run; watchdog deletes the Multiplayer profile's version.dll before a relaunch). SteelSeries stays OPEN (owner).
