@@ -51,3 +51,16 @@ that; levels and the slot never got it (they use the runway multipliers in A ins
 Level TIMING alone (same average price, planets moved from antes 1-2 to 7-8) does not move outcomes. Remaining
 section-A items are smaller (Telescope, seal generators, Marble, hand size); the measuring-stick question (D) is the
 larger open one.
+
+## Yardstick check (section D), 2026-10-12 night
+Win lift per joker (P(win | owned at ante 5) - P(win), 971 sim runs reaching a5, 75 jokers with n >= 12) vs three
+valuations of the same jokers, Spearman: engine's early shop price **0.211**; plain marginal on 40 real ante-3 boards
+**0.174**; plain marginal on 40 real ante-7 boards against the ante-8 boss **0.269**. Late - early = +0.094 (bootstrap 95%
+CI -0.017 .. +0.241). Measuring against the deciding (late) requirement ranks jokers somewhat better, but not
+significantly, and every scoring-only valuation explains little of who wins (money / utility jokers measure 0 in score;
+win lift is itself noisy and confounded by when a joker is bought). Not a big lever on its own.
+
+## Pace tie-break: rejected by the owner (money)
+`BES_PACE_PLAY` (`685ba38`, off): play an on-pace hand when the rollouts tie. Owner: discards are free and each unused
+hand pays \$1, so ties go to the DIG; a decent player finds the clearing hand within the discards or one dig-hand later.
+The arm (pace_7) was stopped unfinished. Live ZS97X4YC's ante-1 death was mostly bad luck (P(clear) 0.98 at the start).
