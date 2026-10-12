@@ -1179,10 +1179,10 @@ return function(t)
       "R6: Ectoplasm scales with how much of the board the plan intends to KEEP")
     t.ok(cores > 0, "R6: ...and is still strongly positive on a board of keepers")
 
-    -- the freed slot is static capacity (owner 2026-10-12: no time-left taper); it is worth MORE the fuller the board,
-    -- where the slot is binding (was: runway-tapered, ante 8 << ante 3)
-    t.ok(ecto(ecto_gs({ CORE, CORE, CORE, CORE, CORE })) > cores,
-      "R6: a freed slot is worth more on a full board (binding) than with room to spare")
+    -- the freed slot is static capacity: no time-left taper and no discount for room on the board today (owner
+    -- 2026-10-12: boards fill; was runway-tapered, ante 8 << ante 3) -- one future joker, positive at ante 8 too
+    t.ok(require("engine.eval_function").negative_slot_fv(ecto_gs({ CORE, CORE, CORE }, 8), { mode = "freed", rng = lcg(3) }) > 0,
+      "R6: a freed slot is still worth a joker at ante 8 (no runway taper)")
 
     -- determinism: the branch samples the deck, so it must be stable under a seeded rng
     t.eq(ecto(ecto_gs({ JUNK, CORE })), ecto(ecto_gs({ JUNK, CORE })),

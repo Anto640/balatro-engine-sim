@@ -2092,23 +2092,18 @@ Eval.NEG_SLOT_FLOOR = 0.5    -- late-game / no-runway residual (matches the old 
 -- tapered by time left (a slot is static capacity: what it holds decides the deciding blinds, not how many blinds it
 -- exists for; docs/TIME_LEFT_AUDIT_2026-10-12.md), and it credited a slot a Negative joker never leaves free:
 --   mode "kept" (default): a Negative joker vs the same joker without the edition -- it leaves ONE more slot free than
---     its normal twin would. Worth a future joker in that slot, scaled by how binding it is (free slots it would
---     otherwise leave). On a FULL board there is no free slot left either way (its edge there -- no sale needed to fit
---     it -- is already in the shop's buy-vs-sell-to-buy paths), so 0.
---   mode "freed" (Ectoplasm): a joker you HOLD becomes negative -> a genuinely free slot appears; most binding when full.
+--     its normal twin would: worth a future joker. On a FULL board there is no free slot left either way (its edge there
+--     -- no sale needed to fit it -- is already in the shop's buy-vs-sell-to-buy paths), so 0.
+--   mode "freed" (Ectoplasm): a joker you HOLD becomes negative -> a genuinely free slot appears: a future joker.
+-- The current fill does NOT scale it (owner 2026-10-12: "you will basically always have the slots full at some point
+-- soon" -- engine boards average 5+ jokers by ante 4 in won and lost runs alike), so a slot = one future joker.
 Eval.NEG_SLOT_MEASURED = not (os.getenv and os.getenv("BES_NEG_SLOT") == "0")
-local function slot_bind(free_otherwise) return math.max(0.2, 1 - 0.3 * math.max(0, free_otherwise)) end
 function Eval.negative_slot_fv(gs, opts)
   if Eval.NEG_SLOT_MEASURED then
     opts = opts or {}
     local slots = (gs and gs.run and gs.run.joker_slots) or 5
     local jfree = math.max(0, slots - #((gs and gs.jokers) or {}))
-    local bind
-    if opts.mode == "freed" then bind = slot_bind(jfree)
-    else
-      if jfree <= 0 then return 0 end
-      bind = slot_bind(jfree - 1)
-    end
+    if opts.mode ~= "freed" and jfree <= 0 then return 0 end
     local rng = opts.rng
     if not rng then
       local s = (math.floor((gs and gs.meta and gs.meta.ante) or 1) * 7919 + jfree * 104729 + #((gs and gs.deck) or {})) % 2147483646 + 1
@@ -2116,7 +2111,7 @@ function Eval.negative_slot_fv(gs, opts)
     end
     local Packs = require("engine.packs")
     local ok, e = pcall(Packs.expected_shop_joker, gs, 2, { rng = rng, samples = 3, measure_count = 4 })
-    return (ok and e and e > 0) and (e * bind) or 0
+    return (ok and e and e > 0) and e or 0
   end
   local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
   local runway = 8 - ante
