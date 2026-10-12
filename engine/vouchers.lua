@@ -399,6 +399,31 @@ function V.views_per_blind(gs) return V.SHOPS_PER_ROUND * (1 + V.rerolls_per_vis
 
 function V.get(key) return key and DATA[key] or nil end
 
+-- THE VOUCHER TAG (2026-10-12, owner: "why did it skip for the voucher tag, i doubt it had the money"): the tag ADDS a
+-- voucher to the next shop -- it still has to be bought ($10). Worth the average net gain of the vouchers that can be
+-- on offer (tier 1 not owned, or the tier 2 of an owned tier 1), and only if the money will be there: nothing when the
+-- next shop cannot afford it. Dollars; nil without a deck. (Was a flat $10 regardless of money.)
+V.TAG_VOUCHER_COST = 10
+function V.tag_voucher_dollars(gs, opts)
+  local VUm = require("engine.value_units")
+  local next_money = dollars(gs) + V.AVG_BLIND_REWARD   -- skipping forfeits this blind's reward; the next blind pays one
+  if next_money < V.TAG_VOUCHER_COST then return 0 end
+  local sum, n = 0, 0
+  local keys = {}
+  for t1 in pairs(V.PAIRS) do keys[#keys + 1] = t1 end
+  table.sort(keys)
+  for _, t1 in ipairs(keys) do
+    local k = (not owns(gs, t1)) and t1 or ((not owns(gs, V.PAIRS[t1])) and V.PAIRS[t1] or nil)
+    if k and DATA[k] then
+      local fv, econ = V.value(gs, k, opts)
+      local d = VUm.fv_to_dollars(gs, fv or 0) + (econ or 0) * VUm.ROUND_INCOME_UTIL / VUm.DOLLAR_UTIL
+        + (V.savings_dollars(gs, k) or 0)   -- discount vouchers: the dollars saved, as the shop prices them
+      sum = sum + math.max(0, d - V.TAG_VOUCHER_COST); n = n + 1
+    end
+  end
+  return n > 0 and sum / n or 0
+end
+
 -- value(gs, key, opts) -> value(FV points), econ($/round), name, note
 function V.value(gs, key, opts)
   local e = DATA[key]

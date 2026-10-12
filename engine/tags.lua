@@ -159,7 +159,11 @@ local TAG = {
   tag_investment = { name = "Investment", val = function() return 25 end },        -- +$25 after boss
   tag_economy    = { name = "Economy",    val = function(gs) return math.min(dollars(gs), 40) end },
   tag_coupon     = { name = "Coupon",     val = function() return 8 end },          -- free shop items
-  tag_voucher    = { name = "Voucher",    val = function() return 10 end },         -- adds a voucher
+  -- adds a voucher to the next shop that still has to be BOUGHT: worth it only if affordable then (engine/vouchers)
+  tag_voucher    = { name = "Voucher",    val = function(gs, o)
+    local ok, V = pcall(require, "engine.vouchers")
+    local v = ok and has_deck(gs) and V.tag_voucher_dollars(gs, o) or nil
+    return (type(v) == "number") and v or 0 end },
   tag_d6         = { name = "D6",         val = function() return 4 end },          -- $0 rerolls
   tag_speed      = { name = "Speed",      val = function() return 5 end },          -- $5/skip this run
   tag_handy      = { name = "Handy",      val = function(gs)                         -- $1 per hand played THIS RUN
@@ -175,7 +179,9 @@ local TAG = {
   tag_foil       = { name = "Foil",       val = measured(function(gs, o) return edition_joker_dollars(gs, "foil", o) end, 5) },
   tag_holo       = { name = "Holographic", val = measured(function(gs, o) return edition_joker_dollars(gs, "holo", o) end, 7) },
   tag_polychrome = { name = "Polychrome", val = measured(function(gs, o) return edition_joker_dollars(gs, "polychrome", o) end, 9) },
-  tag_double     = { name = "Double",     val = function() return 11 end },         -- copies next tag
+  -- copies the NEXT tag taken, which means skipping again; the sim does not model it and the owner rates it "very rarely
+  -- worth" (2026-10-12) -- worth nothing on its own (was a flat $11)
+  tag_double     = { name = "Double",     val = function() return 0 end },
   -- pack tags: reuse the measured MEGA-pack valuation (deck-aware), $ fallback prior
   tag_buffoon    = { name = "Buffoon",    val = measured(function(gs, o) return pack_dollars(gs, "p_buffoon_mega", o) end, 9) },
   tag_meteor     = { name = "Meteor",     val = measured(function(gs, o) return pack_dollars(gs, "p_celestial_mega", o) end, 7) },

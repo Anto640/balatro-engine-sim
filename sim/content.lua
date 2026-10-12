@@ -426,6 +426,8 @@ function Content.gen_shop(run, rng)
   end
   local vouchers = {}
   if run._voucher then vouchers[1] = run._voucher end
+  -- a Voucher tag adds one voucher to THIS (the next) shop, to be bought like any other (fidelity fix 2026-10-12)
+  if run._tag_voucher then vouchers[#vouchers + 1] = run._tag_voucher; run._tag_voucher = nil end
   return {
     jokers = jokers, consumables = consumables, vouchers = vouchers, boosters = boosters,
     reroll_cost = run.reroll_cost or Content.BASE_REROLL, joker_slots = run.joker_slots,
@@ -960,7 +962,8 @@ function Content.apply_tag(run, key, rng)
   elseif key == "tag_foil"       then grant_joker(run, rng, nil, "foil")
   elseif key == "tag_holo"       then grant_joker(run, rng, nil, "holo")
   elseif key == "tag_polychrome" then grant_joker(run, rng, nil, "polychrome")
-  elseif key == "tag_voucher" then local v = Content.gen_voucher(run, rng); apply_voucher(run, v and v.key or "v_blank")
+  -- the game ADDS a voucher to the next shop -- it still costs its price (was applied free: fidelity fix 2026-10-12)
+  elseif key == "tag_voucher" then run._tag_voucher = Content.gen_voucher(run, rng)
   elseif key == "tag_coupon" then run._coupon = true                 -- A5: next shop -> initial jokers/packs free
   elseif key == "tag_d6" then run._free_reroll = true                -- A5: next shop -> rerolls start at $0
   -- A5: one-time payouts based on run history (counters accrued by the driver). -- VERIFY

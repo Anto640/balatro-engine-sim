@@ -148,4 +148,28 @@ return function(t)
     -- joker (same random joker + Foil) is worth at least as much
     t.ok(v(open, "tag_negative") <= v(open, "tag_foil") + 0.01, "with room on the board Negative is no better than Foil")
   end
+
+  -- ---- Voucher / Double tags (2026-10-12, owner review) ----
+  do  -- sim: a Voucher tag ADDS a voucher to the next shop (to be bought), it is not applied free
+    local r = fresh()
+    local owned0 = #(r.vouchers or {})
+    Content.apply_tag(r, "tag_voucher", r.rng)
+    t.eq(#(r.vouchers or {}), owned0, "Voucher Tag: nothing is applied for free")
+    t.ok(r._tag_voucher ~= nil, "...a voucher is queued for the next shop")
+    local shop = Content.gen_shop(r, r.rng)
+    local n = #shop.vouchers
+    t.ok(n >= 1 and r._tag_voucher == nil, "...and appears there, once")
+  end
+  do  -- engine: unaffordable voucher -> worthless tag; Double is not worth a skip on its own
+    local Tags = require("engine.tags")
+    local GS = require("model.game_state")
+    local deck = {}
+    for _, su in ipairs({ "Spades", "Hearts", "Clubs", "Diamonds" }) do
+      for rk = 2, 14 do deck[#deck + 1] = GS.card{ id = #deck + 1, rank_id = rk, suit = su } end
+    end
+    local gs = GS.new{ deck = deck, jokers = {}, run = { hand_levels = {}, hand_size = 8, joker_slots = 5, vouchers_owned = {} },
+      economy = { dollars = 1, interest_cap = 5 }, meta = { ante = 1 }, blind = { base_hands = 4, base_discards = 3 } }
+    t.eq((Tags.value(gs, "tag_voucher", { rng = World.lcg(3) })), 0, "Voucher Tag with $1: the voucher cannot be bought -> $0")
+    t.eq((Tags.value(gs, "tag_double", {})), 0, "Double Tag: no value on its own (was a flat $11)")
+  end
 end
