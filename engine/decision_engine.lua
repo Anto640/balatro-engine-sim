@@ -206,6 +206,15 @@ DE.MOUTH_LOCK_MARGIN = 0.05
 -- back to a play. Keep the intended dig unless playing now is genuinely MUCH safer than digging by
 -- this frac -- the rollout under-credits the dig line, so demand a large real survival gap to abandon it.
 DE.DEFER_SURV_TOL = 0.15
+-- PACE TIE-BREAK (BES_PACE_PLAY=1, 2026-10-12, owner: "died on ante 1 small blind, which any half competent person would
+-- never do"). Live ZS97X4YC a1 Small (300, 4 hands / 4 discards, Two Pair in hand for 120): the greedy choice dug 4 times
+-- ("build a stronger hand") while its own rollouts rated play and dig EQUAL (P(clear) 0.98/0.98, 0.97/0.98, 0.92/0.93,
+-- then 0.95 vs 0.90 -- still dug: the E[frac] margin is capped near 1 and never fired); with 0 discards left P(clear) was
+-- 0.62 and the run died at 235/300. Both the greedy choice and the rollout continuation dig until ONE hand clears the
+-- remainder; a player banks a hand that is on PACE (>= remaining / hands left) and keeps the discards. So when the
+-- rollouts say playing is at least as safe, and the play is on pace, play.
+DE.PACE_PLAY = os.getenv and os.getenv("BES_PACE_PLAY") == "1"
+DE.PACE_TIE = 0.01
 
 -- ---- SURPLUS DIG (probe, 2026-08-12) ----------------------------------------------------
 -- The engine only ever CONSIDERS discarding when the play does not clear (`not clears`
@@ -1266,6 +1275,10 @@ function DE.decide(gs, opts)
       local vdf = vd.frac + DE.DIG_BIAS
       if vdf > vp.frac + DE.SURV_MARGIN and best.type ~= "DISCARD" then
         best = discard_action; best.plan = true        -- survival: discard to set up
+      elseif DE.PACE_PLAY and best.type == "DISCARD" and not best.plan and not best.trade and not best.sixth_sense
+             and defer_uplift <= 0 and (play_action.score or 0) * hands_left >= remaining
+             and vp.clear >= vd.clear - DE.PACE_TIE and vp.frac >= vd.frac - DE.PACE_TIE then
+        best = play_action                              -- pace: bank an on-pace hand, keep the discards
       elseif vp.frac > vdf + DE.SURV_MARGIN and best.type == "DISCARD" and not best.trade
              and (defer_uplift <= 0 or vp.frac > vd.frac + DE.DEFER_SURV_TOL) then
         best = play_action                              -- survival: just play now (but keep a Mystic
