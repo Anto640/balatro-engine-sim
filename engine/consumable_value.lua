@@ -76,7 +76,17 @@ end
 -- the share a PERSISTENT level is priced at: later share under the switch, today's share otherwise
 function CV.level_share(f) return CV.LATER_SHARE_ALL and CV.later_share(f) or f end
 
+-- NO TIME-LEFT RAMP (BES_LEVEL_FLAT=1, 2026-10-12, owner principle -- docs/TIME_LEFT_AUDIT_2026-10-12.md). A level is
+-- static power: what it adds at the blinds that decide the run, not value per blind x blinds left. The ramp below
+-- prices a level up to 4x at ante 1 and 1x at ante 8 -- the opposite of the owner's (and the winners') pattern: few
+-- levels early (no direction yet), many late. The flat value keeps the AVERAGE level price where it is (2.67 = the
+-- ramp averaged over the engine's planet uses by ante, arm etag_7: 161/184/250/278/264/218/136/101 at antes 1-8), so
+-- only the timing changes, not how much the engine levels overall (removing the ramp outright = the engine stops
+-- levelling; a derived sum was -0.272 in Aug).
+CV.LEVEL_FLAT = os.getenv and os.getenv("BES_LEVEL_FLAT") == "1"
+CV.LEVEL_SCALE_FLAT = 2.67
 function CV.level_scale(gs)
+  if CV.LEVEL_FLAT then return CV.LEVEL_SCALE_FLAT end
   local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
   return math.max(1, math.min(4, 1 + (8 - ante) * 0.45))
 end
