@@ -17,6 +17,11 @@ moved later (a1 160 -> 121, a8 97 -> 150; hand levels at a8 12.8 -> 14.3). PROMI
 **lvflat_3 vs head_3 (21:03): NOT CONFIRMED** -- -0.085 (p 0.47), wins 63 -> 51, reach-8 77 -> 70, sign 37/39. Pooled n=320
 +0.027 (t 0.35), wins 119 -> 112 -> BES_LEVEL_FLAT stays OFF (the seed_off-7 gain was noise). **New seed_off-3 baseline:
 `sim_out/head_3.jsonl` (== HEAD, 63 wins); seed_off 7: `neg2_7` (56 wins).**
+**The Water (live 3 deaths / 7 encounters vs sim 12/77): NOT a defect.** Replayed all three death states
+(`bes_flagged.jsonl`): the boards could not clear it whatever was played (best hands 2-7k vs 10-17.5k needed per hand); the
+tiny early plays are deliberate no-discard digging toward the one strong hand (CE13MSB4: Tribe flush). The sim applies the
+no-discard rule (blind_results show discards_left 0). The Water just exposes boards that cleared earlier blinds by digging;
+3/7 vs 16% is within small-sample noise (p ~0.09). Lever = board strength, not Water play.
 Next from the time-left audit: Telescope / seal-generator double time counts, Marble, hand-size x level_scale.
 
 ## START HERE (2026-10-11 night) -- running
