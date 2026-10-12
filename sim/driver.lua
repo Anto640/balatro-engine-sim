@@ -271,6 +271,9 @@ function Driver.run(seed, opts)
         local no_skip = run.probe and run.probe.no_skip_until
           and (run.ante <= run.probe.no_skip_until)
         if no_skip then sk = nil end
+        -- `invest1` (owner 2026-10-12: "only takes like investment tag ante 1 and that's it"): every other skip refused
+        if ok and sk and run.probe and run.probe.skip_only
+           and not (run.probe.skip_only[blind.skip_tag] and run.ante <= (run.probe.skip_only_until or 99)) then sk = nil end
         if ok and sk and sk.recommend == "SKIP" then
           if content.apply_tag then content.apply_tag(run, blind.skip_tag, run.rng) end
           World.skip_tick(run)   -- A1: Throwback +0.25x per skipped blind

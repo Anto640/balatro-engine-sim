@@ -591,6 +591,7 @@ Probe.CONFIGS = {
   -- the human never skips and where the board is known to LOCK (acquisitions collapse by a4).
   noskip       = { no_skip_until = 99 },
   noskip_early = { no_skip_until = 4 },
+  invest1      = { skip_only = { tag_investment = true }, skip_only_until = 1 },
   slots        = { joker_slots = 8 },
   -- +1 and +2 slots: unlike the 8-slot bound, these ARE reachable in a real run (the
   -- Antimatter voucher chain, negative-edition jokers), so they measure how much of the
