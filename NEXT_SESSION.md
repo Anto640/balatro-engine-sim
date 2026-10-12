@@ -8,7 +8,8 @@ close calls are where the engine's first choice loses. `lshare_7` (later-share l
 `docs/TIME_LEFT_AUDIT_2026-10-12.md`): static power must not be multiplied by time left; early hand-specific buys worth less.
 **Shipped + deployed (`1988d73`, `ddd94f9`):** Negative tag = one random joker (no slot credit); Negative slot = one measured
 future joker, no flat 6, no runway taper, no fill discount (0 only for a Negative joker onto a full board).
-**Running:** `neg2_7` (09:34, ~12:00) vs etag_7 = confirmation of the Negative fix; then `lvflat_7` (BES_LEVEL_FLAT=1: level
+**neg2_7 vs etag_7 (12:14): -0.075 (p 0.35), wins 59 -> 56, reach-8 71 -> 69, 115/160 tied; Negative tag taken 41/80
+(was 82/82) -> within noise, kept (correctness; owner review). Main synced.** **Running:** then `lvflat_7` (BES_LEVEL_FLAT=1: level
 price flat 2.67 = the ramp's average, no time-left ramp) vs neg2_7 (~14:30-15:00). (`neg_7` = aborted partial run, ignore.)
 Next from the time-left audit: Telescope / seal-generator double time counts, Marble, hand-size x level_scale.
 
