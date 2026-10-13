@@ -8,7 +8,9 @@ Checked, no change: the ante-5 "milk" play was right (a Gold SEAL pays \$3 when 
 1-2 cards in 59% of discards vs the engine's 29% (small discards are not an engine quirk). Rejected by the owner: pace
 tie-break (money; memory dig-ties-favour-digging). Yardstick check: late-board valuation tracks win lift 0.27 vs 0.17
 (n.s.), not a big lever. **Running (23:24, ~04:30-05:00):** `noskip_7` (never skip) and `invest1_7` (only the Investment
-tag at ante 1, `BES_PROBE=invest1`) vs `neg2_7` -- owner: "it takes many skips which are generally bad". Open idea: free
+tag at ante 1, `BES_PROBE=invest1`) vs `neg2_7` -- owner: "it takes many skips which are generally bad". **Skip probes (05:21) vs neg2_7: noskip_7 -0.077 (p 0.37), wins 56 -> 57; invest1_7 -0.075 (p 0.39), wins 56 -> 58; reach-8 +1
+both, ~79/160 tied** -> skipping neither helps nor hurts measurably (money / board at a3, a5 identical). Owner decision pending
+on restricting skips (no measured cost either way). Open idea: free
 value from discards when the clear is safe (Superposition tarot etc.; MILK only farms through plays).
 
 ## START HERE (2026-10-12 morning)
