@@ -1156,6 +1156,36 @@ function World.play_blind(run, blind)
     -- READ-ONLY observer of the decision state + the incumbent's choice). INERT when
     -- unset (the default): no RNG, no mutation, zero effect on the run either way.
     if World._capture then World._capture(gs, ranked) end
+    -- IN-BLIND DECISION AUDIT (tools/decision_audit.lua, alt "flip"): at the k-th play-or-discard decision of the run that
+    -- has a discard available, replace the engine's choice by its best-ranked alternative of the OTHER kind (its best
+    -- play instead of a dig, its best dig instead of a play), then let it play on. Inert unless _G.BES_FORCE_INBLIND is set.
+    local FI = _G.BES_FORCE_INBLIND
+    if FI and not FI.done and ranked and ranked.best and b.discards_left > 0
+       and (ranked.best.type == "PLAY" or ranked.best.type == "DISCARD") then
+      run._ib_dec = (run._ib_dec or 0) + 1
+      if run._ib_dec == FI.k then
+        FI.done = true
+        local want = (ranked.best.type == "PLAY") and "DISCARD" or "PLAY"
+        local alt
+        for _, a2 in ipairs(ranked.alternatives or {}) do
+          if a2.type == want and a2.cards and #a2.cards > 0 then alt = a2; break end
+        end
+        if not alt and want == "DISCARD" then   -- the ranked list holds no dig: the engine's own best dig
+          local s0 = (run.ante or 1) * 7919 + (FI.k or 0) * 104729
+          local dv = require("engine.discard_value").best(gs, { samples = 4, rng = World.lcg(s0) })
+          if dv and dv.cards and #dv.cards > 0 and #dv.cards < #hand then alt = { type = "DISCARD", cards = dv.cards, value = dv.value } end
+        elseif not alt and want == "PLAY" then  -- ...or no play: its best scoring play
+          local ev, sel = HandEval.best_play(gs, hand)
+          if ev and sel and #sel > 0 then alt = { type = "PLAY", cards = sel, hand_type = ev.hand_type, value = ev.score } end
+        end
+        local function lab(cs) local t = {}; for _, c in ipairs(cs or {}) do t[#t + 1] = card_brief(c) end; return t end
+        FI.record = { kind = "forced", inblind = true, ante = run.ante, blind = b.type, boss_key = b.boss_key,
+          target = b.target, scored = b.scored, hands_left = b.hands_left, discards_left = b.discards_left,
+          best = { type = ranked.best.type, cards = lab(ranked.best.cards), hand_type = ranked.best.hand_type, value = ranked.best.value },
+          forced = alt and { type = alt.type, cards = lab(alt.cards), hand_type = alt.hand_type, value = alt.value } or nil }
+        if alt then ranked = { best = alt, alternatives = ranked.alternatives } end
+      end
+    end
     local action = ranked and ranked.best
     if not action then break end
 
