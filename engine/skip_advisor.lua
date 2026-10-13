@@ -27,6 +27,13 @@ SK.BOARDLESS_SHOP_MULT = 2.0
 -- speculative tag, so the tag must CLEARLY beat playing, not merely edge it out --
 -- otherwise the engine skips every time a tag's raw $-equivalent tops playing.
 SK.SKIP_MARGIN = 1.25
+-- SKIP POLICY (owner decision 2026-10-13, TEMPORARY): skip only for the Investment tag at ante 1. Sim arms vs neg2_7:
+-- never-skip -0.077 (p 0.37) wins 56 -> 57, Investment-at-ante-1-only -0.075 (p 0.39) wins 56 -> 58, ~79/160 tied --
+-- the engine's ~1.6 skips per run measured neither help nor harm, and the owner rates most of them as bad play. Owner:
+-- "once winrate gets a lot higher we can revisit it so it thinks for itself rather than being forced out of
+-- skipping." BES_SKIP_FREE=1 restores the engine's own skip judgement.
+SK.SKIP_FREE = os.getenv and os.getenv("BES_SKIP_FREE") == "1"
+SK.SKIP_ALLOWED = { tag_investment = 1 }   -- tag key -> last ante a skip for it is allowed
 SK.TYPICAL_JOKER_COST = 5   -- \$ a shop joker costs (as SA.TYPICAL_JOKER_COST)
 
 -- RISK-AWARE SHOP (A/B switch BES_SKIP_RISK=<k>, default off). The forgone shop is where an AT-RISK board finds
@@ -107,6 +114,12 @@ function SK.recommend(gs, opts)
   if interest >= 1 then gen_str = gen_str .. string.format(" + $%d interest", interest) end
 
   local skip = tval > play_value * SK.SKIP_MARGIN
+  local held_back = false
+  if skip and not SK.SKIP_FREE then
+    local until_ante = SK.SKIP_ALLOWED[tag_key]
+    local ante = math.floor((gs.meta and gs.meta.ante) or 1)
+    if not (until_ante and ante <= until_ante) then skip, held_back = false, true end
+  end
   local pv = math.floor(play_value + 0.5)   -- play_value is now fractional (board-scaled shop)
   return {
     recommend = skip and "SKIP" or "PLAY",
@@ -114,6 +127,8 @@ function SK.recommend(gs, opts)
     reason = skip
       and string.format("Skip: %s tag (~$%d) beats playing (~$%d: $%d reward + shop + hands%s).",
             tname, tval, pv, reward, gen_str .. risk_note)
+      or (held_back and string.format("Play: skips are limited to the Investment tag at ante 1 (the %s tag ~$%d vs playing ~$%d).",
+            tname, tval, pv))
       or string.format("Play: %s tag (~$%d) < playing (~$%d: $%d reward + shop + hands%s).",
             tname, tval, pv, reward, gen_str .. risk_note),
   }

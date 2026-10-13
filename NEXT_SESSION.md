@@ -1,5 +1,12 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-13)
+**Live = main (deployed). SKIP POLICY (owner decision, TEMPORARY): skip only for the Investment tag at ante 1**
+(`engine/skip_advisor.lua` SK.SKIP_ALLOWED; BES_SKIP_FREE=1 restores the engine's own skips). Never-skip and
+Investment-only measured neutral vs neg2_7 (wins 56 -> 57 / 58). Owner: revisit "once winrate gets a lot higher ... so it
+thinks for itself". **Baselines: seed_off 7 = `sim_out/invest1_7.jsonl` (== HEAD in the sim, verified on 3 seeds);
+seed_off 3 = `head_3` (pre-policy: re-run before the next seed_off-3 comparison).**
+
 ## START HERE (2026-10-12 night)
 **Live = branch HEAD (deployed).** Owner review of live run W33433YS (a win; walkthrough tool: job tmp runthrough.py, reads
 bes_fixtures + bes_runs). Fixed + deployed: Voucher tag = affordable vouchers' net gain (\$0 when the next shop can't pay;

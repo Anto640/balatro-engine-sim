@@ -118,6 +118,15 @@ return function(t)
       run = { joker_slots = 5 },
       blind = { blind_type = "Small", base_hands = 4, skip_tag = "tag_investment" } }
     t.eq(Skip.recommend(built).recommend, "SKIP", "full board: a $25 Investment tag justifies skipping")
+    -- SKIP POLICY (owner 2026-10-13): only the Investment tag, only at ante 1; the engine's own judgement returns
+    -- with SK.SKIP_FREE (BES_SKIP_FREE=1)
+    built.meta.ante = 2
+    local r2 = Skip.recommend(built)
+    t.eq(r2.recommend, "PLAY", "skip policy: no skip after ante 1, even for Investment")
+    t.ok(r2.reason:find("limited", 1, true) ~= nil, "...and the reason says why")
+    Skip.SKIP_FREE = true
+    t.eq(Skip.recommend(built).recommend, "SKIP", "BES_SKIP_FREE: the engine's own judgement skips again")
+    Skip.SKIP_FREE = false
   end
   do
     -- weak tag -> PLAY (even with a full board, a Juggle tag isn't worth a skip)
