@@ -15,7 +15,9 @@ local fh = assert(io.open(arg[1], "a"))
 for i = 2, #arg - 2, 3 do
   local seed, visit, alt = tonumber(arg[i]), tonumber(arg[i + 1]), arg[i + 2]
   local job = seed .. ":" .. visit .. ":" .. alt
-  if alt == "flip" then _G.BES_FORCE_INBLIND = { k = visit } else _G.BES_FORCE = { visit = visit, alt = alt } end
+  if alt == "flip" then _G.BES_FORCE_INBLIND = { k = visit }
+  elseif alt == "iplacebo" then _G.BES_FORCE_INBLIND = { k = visit, placebo = true }   -- in-blind placebo
+  else _G.BES_FORCE = { visit = visit, alt = alt } end                                -- shop: 2 / 3 / save / placebo
   local res = Driver.run(seed, { content = Content, max_ante = 8 })
   local F = _G.BES_FORCE or _G.BES_FORCE_INBLIND
   local fr = F.record or { kind = "forced", visit = visit, alt = alt, missing = true }

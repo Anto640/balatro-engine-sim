@@ -1132,7 +1132,12 @@ function Content.shop_phase(run, opts)
     -- DECISION AUDIT (tools/decision_audit.lua): replace the engine's FIRST action at one shop visit by its
     -- runner-up / third choice / leaving the shop, then let the engine play on. Inert unless _G.BES_FORCE is set.
     local F = _G.BES_FORCE
-    if F and not F.done and guard == 1 and run._shop_visit == F.visit then
+    if F and not F.done and guard == 1 and run._shop_visit == F.visit and F.alt == "placebo" then
+      F.done = true   -- PLACEBO: keep the engine's choice, re-roll every later random stream
+      run._salt = F.salt or 7777
+      F.record = { kind = "forced", placebo = true, visit = F.visit, alt = "placebo", ante = run.ante,
+        best = { type = ranked.best.type }, forced = { type = "PLACEBO" } }
+    elseif F and not F.done and guard == 1 and run._shop_visit == F.visit then
       F.done = true
       local alts = {}
       for _, a in ipairs(ranked.alternatives or {}) do

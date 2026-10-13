@@ -137,6 +137,9 @@ function World.stream_seed(run, purpose, a, b, c)
     for i = 1, #tostring(run.seed) do h = (h * 31 + tostring(run.seed):byte(i)) % P end
   end
   h = h % P
+  -- PLACEBO salt (decision audit, 2026-10-13): once set, every later stream differs -- the run's randomness after that
+  -- point is re-rolled while every choice before it is unchanged. nil on every normal run (byte-identical).
+  if run._salt then h = (h + mulmod(run._salt % P, 2654435, P)) % P end
   for _, x in ipairs({ World.STREAM[purpose] or 0, a or 0, b or 0, c or 0 }) do
     h = (mulmod(h + 7, h + 13, P) + mulmod(math.floor(x) + 101, 1000003, P)) % P
     h = mulmod(h, 48271, P)
@@ -1163,7 +1166,15 @@ function World.play_blind(run, blind)
     if FI and not FI.done and ranked and ranked.best and b.discards_left > 0
        and (ranked.best.type == "PLAY" or ranked.best.type == "DISCARD") then
       run._ib_dec = (run._ib_dec or 0) + 1
-      if run._ib_dec == FI.k then
+      if run._ib_dec == FI.k and FI.placebo then
+        -- PLACEBO: keep the engine's choice, re-roll everything random from here (this blind's remaining draws too)
+        FI.done = true
+        run._salt = FI.salt or 7777
+        local pr = World.lcg(World.stream_seed(run, "blind", run.ante, run.round, 999))
+        for i = #draw_pile, 2, -1 do local j = math.floor(pr() * i) + 1; draw_pile[i], draw_pile[j] = draw_pile[j], draw_pile[i] end
+        FI.record = { kind = "forced", inblind = true, placebo = true, ante = run.ante, blind = b.type,
+          best = { type = ranked.best.type }, forced = { type = "PLACEBO" } }
+      elseif run._ib_dec == FI.k then
         FI.done = true
         local want = (ranked.best.type == "PLAY") and "DISCARD" or "PLAY"
         local alt
