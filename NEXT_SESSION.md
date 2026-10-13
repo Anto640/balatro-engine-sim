@@ -1,5 +1,17 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-13 day) -- running, owner away
+1. `ibaudit_7` (08:25, ~11:00-11:30): IN-BLIND decision audit -- per invest1_7 seed, one play-or-discard decision flipped to
+   the engine's best option of the other kind (`_G.BES_FORCE_INBLIND`, sim/world.lua). Report:
+   `python tools/decision_audit_report.py sim_out/invest1_7.jsonl sim_out/ibaudit_7.jsonl`.
+2. `head2_3` (after 1, ~14:00): seed_off-3 baseline with the skip policy.
+3. VOUCHER OUTCOME TABLE (after 2, ~23:00): `fv2_<key>` probes (voucher free from ante 2), 13 tier-1 vouchers x 40 seeds
+   vs invest1_7; summary job-tmp fv_result.txt (fv_table.py). Screening only (40 seeds finds large effects); the engine
+   prices most vouchers at \$0 (Hieroglyph, Seed Money, Planet/Tarot Merchant, Crystal Ball, ...).
+Combination mining (ante-6 boards, deduped by seed, ~248 seeds): **Banner on 32% of a6 boards, P(win) 0.36 vs 0.48** (the
+one frequent negative -- candidate for a joker test); Photograph +0.21, Stuntman +0.26, Blueprint +0.24; Photograph pairs
+(Scary Face / Smiley / Blueprint) strongest. Correlation only. Next after the vouchers: joker outcome / joker-choice tests.
+
 ## START HERE (2026-10-13)
 **Live = main (deployed). SKIP POLICY (owner decision, TEMPORARY): skip only for the Investment tag at ante 1**
 (`engine/skip_advisor.lua` SK.SKIP_ALLOWED; BES_SKIP_FREE=1 restores the engine's own skips). Never-skip and
