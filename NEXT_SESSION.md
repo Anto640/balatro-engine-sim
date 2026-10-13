@@ -8,6 +8,10 @@
 3. VOUCHER OUTCOME TABLE (after 2, ~23:00): `fv2_<key>` probes (voucher free from ante 2), 13 tier-1 vouchers x 40 seeds
    vs invest1_7; summary job-tmp fv_result.txt (fv_table.py). Screening only (40 seeds finds large effects); the engine
    prices most vouchers at \$0 (Hieroglyph, Seed Money, Planet/Tarot Merchant, Crystal Ball, ...).
+4. `ibplacebo_7` (after 3): PLACEBO for the in-blind audit (same seed + decision index, decision kept, later randomness
+re-rolled via run._salt). Read: `python tools/decision_audit_placebo.py sim_out/ibaudit_7.jsonl sim_out/ibplacebo_7.jsonl`.
+**ibaudit_7 alone (11:27): dug->play +0.48 (se 0.19) but SELECTION-BIASED; the shop audit's early-pack finding is withdrawn
+(docs/DECISION_AUDIT_2026-10-12.md correction, memory decision-audit-selection-bias).**
 Combination mining (ante-6 boards, deduped by seed, ~248 seeds): **Banner on 32% of a6 boards, P(win) 0.36 vs 0.48** (the
 one frequent negative -- candidate for a joker test); Photograph +0.21, Stuntman +0.26, Blueprint +0.24; Photograph pairs
 (Scary Face / Smiley / Blueprint) strongest. Correlation only. Next after the vouchers: joker outcome / joker-choice tests.
