@@ -29,8 +29,8 @@ for job, f in forced.items():
     if s not in base: continue
     (p1, w1), (p0, w0) = res[job], base[s]
     b, a = f['best'], f['forced']
-    rows.append(dict(job=job, alt=f['alt'], ante=f['ante'], best=b['type'], alt_t=a['type'], bt=b.get('target'),
-                     at=a.get('target'), gap=(b.get('value') or 0) - (a.get('value') or 0), dp=p1 - p0, dw=w1 - w0,
+    rows.append(dict(job=job, alt=f.get('alt', 'flip'), ante=f['ante'], best=b['type'], alt_t=a['type'], bt=b.get('target') or b.get('hand_type') or ' '.join(b.get('cards') or []),
+                     at=a.get('target') or a.get('hand_type') or ' '.join(a.get('cards') or []), gap=(b.get('value') or 0) - (a.get('value') or 0), dp=p1 - p0, dw=w1 - w0,
                      dollars=f.get('dollars'), nj=f.get('njokers')))
 def summ(name, rs):
     if not rs: return
@@ -41,7 +41,7 @@ def summ(name, rs):
           % (name, len(rs), m, se, up, dn, len(d) - up - dn, wu, wd))
 print('audited decisions:', len(rows), '(positive dprog = the alternative beat the engine\'s choice)')
 print('\nALL'); summ('all', rows)
-print('\nBY ALTERNATIVE'); [summ(k, [r for r in rows if r['alt'] == k]) for k in ('2', '3', 'save')]
+print('\nBY ALTERNATIVE'); [summ(k, [r for r in rows if r['alt'] == k]) for k in ('2', '3', 'save', 'flip')]
 print('\nBY ENGINE CHOICE -> REPLACEMENT')
 g = collections.defaultdict(list)
 for r in rows: g[r['best'] + ' -> ' + r['alt_t']].append(r)

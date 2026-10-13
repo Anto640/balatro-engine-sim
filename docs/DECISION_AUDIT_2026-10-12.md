@@ -1,3 +1,10 @@
+> ⚠ **CORRECTION 2026-10-13: the "early packs lose" reading below is a SELECTION ARTEFACT.** One decision is sampled
+> uniformly per run, so runs that die early can only contribute early decisions: the "pack bought at antes 1-4" group
+> started at progress 5.37 vs the population 6.33 (gap -0.96), and a flip re-rolls the rest of a run, so a weak group
+> improves from luck alone (it rose only +0.69, LESS than a full re-roll would give). Same for close calls. Consistent
+> with `lshare_7` (fewer early Celestial packs) being neutral. A valid audit needs a PLACEBO arm (same seed, decision
+> kept, post-decision randomness re-rolled) and the effect = flip - placebo. See the in-blind section at the end.
+
 # Decision audit 2026-10-12 -- which shop choices does the engine get wrong?
 
 **Method** (`tools/decision_audit.lua`, `_plan.py`, `.sh`, `_report.py`; hook `_G.BES_FORCE` in `sim/content.lua`):
@@ -45,3 +52,10 @@ packs. Joker buys hold up (replacing one with leaving costs -0.7). Late antes ar
 | xmult jokers a4 / a8 | 1.5 / 2.9 | 0.9 / 1.7 | 0.6 / 1.2 |
 Earlier direct copies (hoard lesions, forced xmult) failed, so these are symptoms; the audit points at the early
 spending choices (packs) that the owner's banking avoids.
+
+## In-blind audit `ibaudit_7` (2026-10-13; 148 flipped decisions vs invest1_7)
+Engine dug -> forced its best play: +0.48 (se 0.19), 41 better / 27 worse; engine played -> forced its best dig: +0.03.
+By baseline outcome (dig -> play / play -> dig): died a1-2 +4.35 (8/8 rescued) / none; a3-5 +0.94 / +0.21; a6-8 +0.01 /
++0.06; WON -0.40 / -0.10. Selection: the "dug" group started 0.27 below the population (struggling runs dig more) and ended
+0.21 ABOVE it -- more than a pure re-roll would give, but only ~1 se. Weak, unproven hint that playing beats digging in
+weak runs; nothing settled until a placebo arm separates choice from re-roll.
