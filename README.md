@@ -10,14 +10,14 @@ real hands, scored by a faithful re-implementation of Balatro's scoring), not fr
 
 ## Status
 
-- **Autonomous win rate:** about **33%** in the headless simulator (red deck, white stake; 54 of 160 runs on a fresh
-  seed pool, October 2026). For scale: ~28% at the start of October, ~6% in late September 2026 and ~1% in August.
-- **Live:** the in-game self-player plays unattended overnight (watchdog + auto-restart); the latest night won 9 of 26
+- **Autonomous win rate:** about **35-39%** in the headless simulator (red deck, white stake; 58 of 160 and 63 of 160 runs on
+  the two seed pools, October 2026). For scale: ~28% at the start of October, ~6% in late September 2026 and ~1% in August.
+- **Live:** the in-game self-player plays unattended overnight (watchdog + auto-restart); recent nights won 9/26 and 4/26
   runs. Its runs are reviewed to find live-only bugs (press F5 at a misplay to save the decision for review).
-- **Recent:** a wide-scope audit (`docs/AUDIT_2026-10-10_next_lever.md`) that shipped a recalibrated scaler-joker model
-  (measured planet/tarot rates) and a last-hand fix (dig when only a dig can clear); the last shop of a run now spends
-  freely; held Wheel of Fortune / Fool cards are used. Boss rerolling was measured and rejected.
-- **Tests:** 1627 headless unit tests + 624 simulator tests, all green.
+- **Recent:** skip tags are limited to the Investment tag at ante 1 (owner decision, temporary); edition / Negative /
+  Voucher / Double tags valued correctly; a decision-audit harness (replay a seed with one choice changed, read against a
+  placebo) and a voucher outcome table (`docs/DECISION_AUDIT_2026-10-12.md`, `docs/TIME_LEFT_AUDIT_2026-10-12.md`).
+- **Tests:** 1632 headless unit tests + the simulator suites, all green.
 - The full, current handoff (what shipped, what was measured, what's next) is in **`NEXT_SESSION.md`**.
 
 ## What it advises

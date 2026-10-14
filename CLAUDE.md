@@ -154,7 +154,13 @@ lua  tools/analyze_runs.lua sim_out/<baseline>.jsonl compare sim_out/<name>.json
   figure (~50 min), which is stale. Estimate from the live rate (finished seeds / elapsed) once a run is under way; late
   seeds are slower, as runs that reach ante 8 last longest. **Always arm a completion watcher** (a background
   `until [ -f sim_out/<name>.jsonl ]` command) when a batch starts, and report the result as soon as it lands -- an arm
-  that finished unreported for 2 h (2026-10-09) is the failure this prevents.
+  that finished unreported for 2 h (2026-10-09) is the failure this prevents. **Measured 2026-10-13: under memory pressure
+  (1-3 GB free) a run takes ~16 min per worker** -- a 40-seed arm on ONE worker is ~10 h; never run small arms one after
+  another on 11 workers (the tail idles most of them) -- run several arms side by side, one worker each. Claude Code's
+  low-memory reaper kills background watchers/commands: launch anything long DETACHED (hidden Start-Process) and have it
+  write its result to a file.
+- **Decision audits** (`tools/decision_audit*.{lua,sh,py}`): a flip re-rolls the rest of the run and one decision is sampled
+  per run, so GROUP means are selection-biased -- always read flip minus PLACEBO (`tools/decision_audit_placebo.py`).
 - **What to read in `analyze_runs`:** the **death-ante histogram** (push the mode later);
   **per-ante trajectory** ($ / jokers / **hand-lv** / pace_margin / run_str); **ENGINE ACTION
   SUMMARY** (what it bought / SOLD / **SKIPPED** = offered-but-not-taken, packs, rerolls,
@@ -327,7 +333,7 @@ NOTE: `xmult_scaling` jokers ARE xmult — use `JokerData.is_xmult()`.
 ## Git
 
 Active work is on branch `winrate-v4-bundle`; `main` is synced to the validated/live state (fast-forward/merge it when a
-batch of changes is confirmed -- last synced 2026-10-10 night (audit: last-hand P(clear) dig + scaler recalibration shipped, boss reroll rejected; baselines in NEXT_SESSION). **Commit and push whenever you (the AI
+batch of changes is confirmed -- last synced 2026-10-14 (skip policy, tag fixes, audit harness + voucher table; baselines in NEXT_SESSION). **Commit and push whenever you (the AI
 assistant) judge it appropriate — you do NOT need to wait to be asked** (owner directive, 2026-08-28).
 Use judgement: commit at coherent checkpoints with a clear message, keep the tree green, and don't
 bundle unrelated changes. Run the test suite before committing.
