@@ -1163,7 +1163,45 @@ function World.play_blind(run, blind)
     -- has a discard available, replace the engine's choice by its best-ranked alternative of the OTHER kind (its best
     -- play instead of a dig, its best dig instead of a play), then let it play on. Inert unless _G.BES_FORCE_INBLIND is set.
     local FI = _G.BES_FORCE_INBLIND
-    if FI and not FI.done and ranked and ranked.best and b.discards_left > 0
+    -- DISCARD-CHOICE audit (mode "dswap"): the k-th discard the engine makes is replaced by its runner-up discard SET
+    -- (DiscardValue's next-best measured set that differs); with FI.placebo the discard is kept and later randomness
+    -- re-rolled. Counts only discard decisions, so a flip and its placebo hit the same decision.
+    if FI and FI.mode == "dswap" and not FI.done and ranked and ranked.best and b.discards_left > 0
+       and ranked.best.type == "DISCARD" and ranked.best.cards and #ranked.best.cards > 0 then
+      run._ib_dd = (run._ib_dd or 0) + 1
+      if run._ib_dd == FI.k then
+        FI.done = true
+        local function lab(cs) local t = {}; for _, c in ipairs(cs or {}) do t[#t + 1] = card_brief(c) end; return t end
+        local rec = { kind = "forced", inblind = true, dswap = true, ante = run.ante, blind = b.type,
+          boss_key = b.boss_key, target = b.target, scored = b.scored, hands_left = b.hands_left,
+          discards_left = b.discards_left, hand = lab(hand),
+          best = { type = "DISCARD", cards = lab(ranked.best.cards), value = ranked.best.value } }
+        if FI.placebo then
+          run._salt = FI.salt or 7777
+          local pr = World.lcg(World.stream_seed(run, "blind", run.ante, run.round, 999))
+          for i = #draw_pile, 2, -1 do local j = math.floor(pr() * i) + 1; draw_pile[i], draw_pile[j] = draw_pile[j], draw_pile[i] end
+          rec.placebo = true; rec.forced = { type = "PLACEBO" }
+        else
+          local function key(cs)
+            local t = {}; for _, c in ipairs(cs or {}) do t[#t + 1] = tostring(c) end; table.sort(t); return table.concat(t, ",")
+          end
+          local mine = key(ranked.best.cards)
+          local all = {}
+          local s0 = (run.ante or 1) * 7919 + (FI.k or 0) * 104729
+          require("engine.discard_value").best(gs, { samples = 4, rng = World.lcg(s0), all = all })
+          table.sort(all, function(x, y) return x.value > y.value end)
+          local alt
+          for _, a in ipairs(all) do if key(a.cards) ~= mine and #a.cards < #hand then alt = a; break end end
+          rec.n_sets = #all
+          if alt then
+            rec.forced = { type = "DISCARD", cards = lab(alt.cards), value = alt.value }
+            ranked = { best = { type = "DISCARD", cards = alt.cards, value = alt.value }, alternatives = ranked.alternatives }
+          end
+        end
+        FI.record = rec
+      end
+    end
+    if FI and FI.mode ~= "dswap" and not FI.done and ranked and ranked.best and b.discards_left > 0
        and (ranked.best.type == "PLAY" or ranked.best.type == "DISCARD") then
       run._ib_dec = (run._ib_dec or 0) + 1
       if run._ib_dec == FI.k and FI.placebo then

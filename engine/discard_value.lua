@@ -266,6 +266,7 @@ function DV.best(gs, opts)
   for _, discard in ipairs(candidates) do
     local v = DV.measured(gs, discard, opts)
     Progress.step()
+    if v and opts.all then opts.all[#opts.all + 1] = { cards = discard, value = v } end   -- audit: every measured set
     if v and (not best or v > best.value) then
       local drop = {}
       for _, c in ipairs(discard) do drop[c] = true end
