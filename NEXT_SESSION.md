@@ -1,5 +1,15 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-14 early)
+**Voucher outcome table (fv2_*, voucher free from ante 2, 40 paired seeds vs invest1_7 = 17 wins / 40):** progress +0.49
+Paint Brush (wins 21), +0.40 Clearance Sale, +0.38 Hieroglyph, +0.36 Crystal Ball (se 0.20), +0.34 Grabber, +0.31 Hone (21 ->
+20 wins, se 0.18), +0.31 Planet Merchant, +0.28 Seed Money (wins 21), +0.27 Reroll Surplus, +0.25 Telescope, +0.17 Wasteful,
++0.11 Tarot Merchant (wins 14). All positive (a free item); the price question needs the MONEY CONTROL: `cash10_2` / `cash20_2`
+(\$10 / \$20 once at ante 2, probe `cash<N>_<A>`) queued after the placebo batch (~08:00 -> ~10:00); summary job-tmp
+fv_result_cash.txt. If \$10 cash << +0.3, the engine (most vouchers priced \$0-10) underbuys vouchers.
+**Running:** `ibplacebo_7` (03:48, ~08:00) + Overstock voucher arm (1 worker). Seed 25007 (Hieroglyph) stalled once under
+memory pressure, re-ran fine (not a code bug).
+
 ## START HERE (2026-10-13 day) -- running, owner away
 1. `ibaudit_7` (08:25, ~11:00-11:30): IN-BLIND decision audit -- per invest1_7 seed, one play-or-discard decision flipped to
    the engine's best option of the other kind (`_G.BES_FORCE_INBLIND`, sim/world.lua). Report:
