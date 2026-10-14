@@ -9,6 +9,12 @@ played -> dig -0.34 (se 0.26). The engine's play/dig choice is not shown wrong; 
 takes its next-ranked choice) 160 seeds vs invest1_7 -> `nobuy_result.txt` (~14:00-15:00). Banner: acquired in 51/160
 invest1_7 runs (those win 41% vs 34%), but on 39 of 111 ante-6 boards P(win) 0.41 vs 0.58 -> kept too long? Correlation
 only; the arm decides. Expected effect is small (one Common joker, ~1/3 of runs): MDE ~0.15-0.27.
+**Cash control (10:23) -- the voucher table cannot show underpricing:** \$10 once at ante 2 = +0.548 (se 0.29), wins 17 -> 22,
+above 12 of 13 free vouchers; \$20 = +0.145 (wins 17 -> 17). \$20 < \$10 is pure noise, so at 40 seeds (se 0.2-0.33) every
+free voucher is indistinguishable from \$10 cash. No voucher-pricing change is justified (live replays: Paint Brush priced
+\$3.5-13.6 vs Grabber \$17-23 at ante 2, but the outcomes do not separate them). Overstock (+0.61, wins 17 -> 23) is the top
+free voucher, also within noise of \$10. Ranking vouchers would need ~160 seeds each; vouchers are ~1 per ante (low firing).
+Banner arm `nobuy_banner` running 10:23 (11 workers), ~13:30-14:30.
 
 ## START HERE (2026-10-14 early)
 **Voucher outcome table (fv2_*, voucher free from ante 2, 40 paired seeds vs invest1_7 = 17 wins / 40):** progress +0.49
