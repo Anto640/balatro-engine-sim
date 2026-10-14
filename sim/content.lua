@@ -664,6 +664,7 @@ local function take_pack(run, pack, rng)
   trace(run, { kind = "pack", items = Json.array(items), advice = po.best and { type = po.best.type,
     target = po.best.target and (po.best.target.name or po.best.target.key), reason = po.reason } or nil })
   local picks = po.picks or (po.best and { po.best } or {})
+  if run.probe and run.probe.nobuy then picks = Probe.nobuy_picks(run, po, picks) end
   if #picks == 0 and po.skip then return end
   -- SELL-TO-MAKE-ROOM (world fidelity, CORE-PROTECTED): on a FULL board the engine's pack advice
   -- may recommend selling a DISPOSABLE joker to slot a better pack joker (`po.sell` = { name, index };
@@ -1131,6 +1132,11 @@ function Content.shop_phase(run, opts)
     if run.probe and run.probe.xgreedy_until then
       local xv = Probe.xgreedy(run, shop, ranked)
       if xv then ranked = xv end
+    end
+    -- JOKER OUTCOME TEST: never acquire the probe's banned joker. Inert without a probe config.
+    if run.probe and run.probe.nobuy then
+      local nv = Probe.nobuy(run, shop, ranked)
+      if nv then ranked = nv end
     end
     -- DECISION AUDIT (tools/decision_audit.lua): replace the engine's FIRST action at one shop visit by its
     -- runner-up / third choice / leaving the shop, then let the engine play on. Inert unless _G.BES_FORCE is set.

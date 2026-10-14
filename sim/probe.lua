@@ -631,6 +631,39 @@ Probe.CONFIGS = {
   rich2        = { income_bonus = 2 },
 }
 
+-- NOBUY (joker outcome test): if the engine's shop choice acquires the banned joker (a buy, or a sale that makes room
+-- for it), take its next-ranked action that does not; nil = no override.
+local function acquires(a, key)
+  if not a then return false end
+  if a.type == "BUY_JOKER" and a.target and a.target.key == key then return true end
+  return a.swap_for ~= nil and a.swap_for.key == key
+end
+function Probe.nobuy(run, shop, ranked)
+  local key = run.probe.nobuy
+  if not acquires(ranked.best, key) then return nil end
+  for _, a in ipairs(ranked.alternatives or {}) do
+    if not acquires(a, key) then return { best = a, alternatives = {}, pace = ranked.pace } end
+  end
+  return { best = { type = "SAVE", value = 0, reason = "probe: nobuy" }, alternatives = {}, pace = ranked.pace }
+end
+-- pack side: drop the banned joker from the picks, taking the pack's next-ranked positive item in its place
+function Probe.nobuy_picks(run, po, picks)
+  local key = run.probe.nobuy
+  local out, hit = {}, false
+  for _, p in ipairs(picks) do
+    local it = p.it or p
+    if it.set == "Joker" and it.key == key then hit = true else out[#out + 1] = p end
+  end
+  if not hit then return picks end
+  local taken = {}
+  for _, p in ipairs(out) do taken[p.it or p] = true end
+  for _, e in ipairs(po.ranked or {}) do
+    if #out >= #picks then break end
+    if e.it and not taken[e.it] and e.key ~= key and (e.v or 0) > 0 then out[#out + 1] = { it = e.it }; taken[e.it] = true end
+  end
+  return out
+end
+
 -- Resolve a config name to the opts overlay Driver.run consumes. Returns nil for the
 -- baseline so the default code paths stay untouched.
 function Probe.opts(name)
@@ -642,6 +675,10 @@ function Probe.opts(name)
   -- the voucher table's money control: "cash<N>_<A>" = $N once, at the first shop of ante A (a voucher costs $10)
   local cn, ca = (not c) and name:match("^cash(%d+)_(%d+)$")
   if cn then c = { cash_once = tonumber(cn), cash_once_ante = tonumber(ca) } end
+  -- JOKER OUTCOME TEST (2026-10-14): "nobuy_<key>" = the engine never acquires j_<key> (shop buy, swap or pack pick);
+  -- it takes its next-ranked choice instead
+  local nbk = (not c) and name:match("^nobuy_(.+)$")
+  if nbk then c = { nobuy = "j_" .. nbk } end
   if not c then error("unknown probe config: " .. tostring(name)) end
   -- ENGINE-flag probes (as opposed to world lesions) are applied to the engine module itself,
   -- since the flag is read deep inside decide() where no per-run opts table reaches. Set
