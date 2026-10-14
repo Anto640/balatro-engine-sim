@@ -74,3 +74,19 @@ weak runs; nothing settled until a placebo arm separates choice from re-roll.
 No evidence that the engine's play-vs-dig choice is wrong; if anything its plays are right (forcing a dig instead
 costs -0.34, t -1.3). Consistent with the owner's dig-ties rule (memory dig-ties-favour-digging). In-blind play/dig timing
 is closed as a lever at this resolution; dig QUALITY (which cards) is untested.
+
+## Discard-choice audit `dswap_7` (2026-10-14; 158 discards, flip - placebo)
+One discard per invest1_7 seed replaced by the engine's RUNNER-UP discard set (DiscardValue's next-best measured set);
+placebo = same discard kept, later luck re-rolled (`tools/decision_audit_dplan.py`, alts dswap / dplacebo).
+
+| group | n | runner-up - placebo | se | better / worse | wins |
+|---|---|---|---|---|---|
+| all | 158 | **-0.380** | 0.159 | 58 / 69 | +4 |
+| ante 1 / 2-4 / 5-8 | 33 / 56 / 69 | -0.72 / -0.48 / -0.14 | 0.54 / 0.29 / 0.10 | | -1 / 0 / +5 |
+| runner-up throws MORE / same / FEWER cards | 53 / 24 / 81 | -0.24 / -1.00 / -0.29 | 0.26 / 0.38 / 0.23 | | |
+| engine threw 1 / 2 / 3 / 4 / 5 cards | 5 / 11 / 30 / 60 / 52 | +0.17 / +0.58 / -0.39 / -0.76 / -0.19 | | | +1 / +3 / -1 / -9 / +10 |
+
+**The engine's discard pick beats its runner-up (t -2.4)**: the ranking is informative, not a weakness. Small (1-2
+card) discards are only 16 of 158 sampled discards here; their runner-up did slightly better (n.s., n 16). Limit: this
+only tests sets INSIDE the engine's candidate list (chaff-first k cards, keep-best-play, board-aware); a human-style
+set outside it is untested.

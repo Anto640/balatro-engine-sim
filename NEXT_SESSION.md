@@ -17,7 +17,9 @@ free voucher, also within noise of \$10. Ranking vouchers would need ~160 seeds 
 **Banner arm `nobuy_banner` vs invest1_7 (13:14): -0.083 (se 0.062, p 0.18), wins 58 -> 57, reach-8 70 -> 71, sign 17/24,
 119 tied -> banning Banner does not help; the "Banner on a6 boards wins less" correlation is selection (weak boards keep
 it), not a bad pick. Banner stays as is. Single-joker bans are below the MDE anyway (frequency ceiling).**
-**Running (14:25, detached, ~20:00-21:00): `dswap_7` DISCARD-CHOICE audit** (owner: odd 1-2 card discards, high cards
+**`dswap_7` RESULT (21:32): the engine's discard beats its runner-up set by 0.38 progress (se 0.16, t -2.4, n 158) -> discard
+choice is not a measured weakness (docs/DECISION_AUDIT_2026-10-12.md). 1-2 card discards: 16/158, n.s.**
+(Was: `dswap_7` DISCARD-CHOICE audit, 14:25) (owner: odd 1-2 card discards, high cards
 thrown): per invest1_7 seed one discard decision (`tools/decision_audit_dplan.py`), alt `dswap` = the engine's runner-up
 discard SET (DiscardValue's next-best measured set) + `dplacebo` (same decision kept, luck re-rolled), 320 jobs, 11 workers.
 Read: `python tools/decision_audit_placebo.py sim_out/dswap_7.jsonl` (job tmp dswap_result.txt) -- by ante, by runner-up
