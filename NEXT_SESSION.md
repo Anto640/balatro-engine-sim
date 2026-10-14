@@ -1,5 +1,15 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-14 morning)
+**In-blind placebo (`ibplacebo_7`, 07:50): the "dug -> play +0.48" was luck** -- flip - placebo +0.02 (se 0.18, n 100);
+played -> dig -0.34 (se 0.26). The engine's play/dig choice is not shown wrong; closed at this resolution
+(docs/DECISION_AUDIT_2026-10-12.md). **Running (detached, job tmp):** `run_cash2.sh` (08:00): `cash10_2` (5 workers) +
+`cash20_2` (4) + 1 extra worker on the Overstock arm -> `cash_done.txt`, `fv_result_full.txt`, `fv_result_cash.txt`
+(~10:30-10:45). Then `run_nobuy.sh`: **`nobuy_banner`** (new probe `nobuy_<key>`: the engine never acquires j_<key>,
+takes its next-ranked choice) 160 seeds vs invest1_7 -> `nobuy_result.txt` (~14:00-15:00). Banner: acquired in 51/160
+invest1_7 runs (those win 41% vs 34%), but on 39 of 111 ante-6 boards P(win) 0.41 vs 0.58 -> kept too long? Correlation
+only; the arm decides. Expected effect is small (one Common joker, ~1/3 of runs): MDE ~0.15-0.27.
+
 ## START HERE (2026-10-14 early)
 **Voucher outcome table (fv2_*, voucher free from ante 2, 40 paired seeds vs invest1_7 = 17 wins / 40):** progress +0.49
 Paint Brush (wins 21), +0.40 Clearance Sale, +0.38 Hieroglyph, +0.36 Crystal Ball (se 0.20), +0.34 Grabber, +0.31 Hone (21 ->

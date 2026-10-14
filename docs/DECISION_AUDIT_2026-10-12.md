@@ -59,3 +59,18 @@ By baseline outcome (dig -> play / play -> dig): died a1-2 +4.35 (8/8 rescued) /
 +0.06; WON -0.40 / -0.10. Selection: the "dug" group started 0.27 below the population (struggling runs dig more) and ended
 0.21 ABOVE it -- more than a pure re-roll would give, but only ~1 se. Weak, unproven hint that playing beats digging in
 weak runs; nothing settled until a placebo arm separates choice from re-roll.
+
+**Placebo `ibplacebo_7` (2026-10-14, 148 decisions with both arms; `tools/decision_audit_placebo.py`): flip - placebo.**
+
+| flip | n | flip - placebo | se | better / worse | wins |
+|---|---|---|---|---|---|
+| all | 148 | -0.096 | 0.146 | 57 / 60 | +5 |
+| engine dug -> its best play | 100 | **+0.019** | 0.177 | 44 / 38 | +3 |
+| ... ante 1 / 2-4 / 5-8 | 22 / 41 / 37 | -0.32 / +0.29 / -0.08 | 0.60 / 0.27 / 0.11 | | |
+| engine played -> its best dig | 48 | -0.336 | 0.260 | 13 / 22 | +2 |
+| ... ante 2-4 / 5-8 | 23 / 22 | -0.78 / +0.12 | 0.42 / 0.20 | | |
+
+**The +0.48 "dug -> play" gain was luck:** a placebo (decision kept, later randomness re-rolled) gains as much as the flip.
+No evidence that the engine's play-vs-dig choice is wrong; if anything its plays are right (forcing a dig instead
+costs -0.34, t -1.3). Consistent with the owner's dig-ties rule (memory dig-ties-favour-digging). In-blind play/dig timing
+is closed as a lever at this resolution; dig QUALITY (which cards) is untested.
