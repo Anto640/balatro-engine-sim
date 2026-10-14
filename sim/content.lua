@@ -1042,6 +1042,9 @@ function Content.shop_phase(run, opts)
   if run._free_reroll then base_reroll = 0; run._free_reroll = nil end                -- A5: D6 tag -> $0 reroll base (one shop)
   run.reroll_cost = base_reroll
   -- `ostock` ceiling probe: a voucher owned from the first shop (inert without a config)
+  if run.probe and run.probe.cash_once and not run._probe_cash and (run.ante or 1) >= (run.probe.cash_once_ante or 1) then
+    run._probe_cash = true; run.economy.dollars = run.economy.dollars + run.probe.cash_once
+  end
   if run.probe and run.probe.free_voucher and not run._probe_voucher
      and (run.ante or 1) >= (run.probe.free_voucher_ante or 1) then
     run._probe_voucher = true; apply_voucher(run, run.probe.free_voucher)

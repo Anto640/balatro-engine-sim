@@ -639,6 +639,9 @@ function Probe.opts(name)
   -- VOUCHER OUTCOME TABLE (2026-10-13): "fv2_<key>" = the voucher v_<key> owned free from the first shop of ante 2
   local fvk = not c and name:match("^fv2_(.+)$")
   if fvk then c = { free_voucher = "v_" .. fvk, free_voucher_ante = 2 } end
+  -- the voucher table's money control: "cash<N>_<A>" = $N once, at the first shop of ante A (a voucher costs $10)
+  local cn, ca = (not c) and name:match("^cash(%d+)_(%d+)$")
+  if cn then c = { cash_once = tonumber(cn), cash_once_ante = tonumber(ca) } end
   if not c then error("unknown probe config: " .. tostring(name)) end
   -- ENGINE-flag probes (as opposed to world lesions) are applied to the engine module itself,
   -- since the flag is read deep inside decide() where no per-run opts table reaches. Set
