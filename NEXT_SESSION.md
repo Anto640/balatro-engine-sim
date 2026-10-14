@@ -14,7 +14,9 @@ above 12 of 13 free vouchers; \$20 = +0.145 (wins 17 -> 17). \$20 < \$10 is pure
 free voucher is indistinguishable from \$10 cash. No voucher-pricing change is justified (live replays: Paint Brush priced
 \$3.5-13.6 vs Grabber \$17-23 at ante 2, but the outcomes do not separate them). Overstock (+0.61, wins 17 -> 23) is the top
 free voucher, also within noise of \$10. Ranking vouchers would need ~160 seeds each; vouchers are ~1 per ante (low firing).
-Banner arm `nobuy_banner` running 10:23 (11 workers), ~13:30-14:30.
+**Banner arm `nobuy_banner` vs invest1_7 (13:14): -0.083 (se 0.062, p 0.18), wins 58 -> 57, reach-8 70 -> 71, sign 17/24,
+119 tied -> banning Banner does not help; the "Banner on a6 boards wins less" correlation is selection (weak boards keep
+it), not a bad pick. Banner stays as is. Single-joker bans are below the MDE anyway (frequency ceiling).**
 
 ## START HERE (2026-10-14 early)
 **Voucher outcome table (fv2_*, voucher free from ante 2, 40 paired seeds vs invest1_7 = 17 wins / 40):** progress +0.49
