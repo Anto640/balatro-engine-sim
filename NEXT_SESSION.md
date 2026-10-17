@@ -15,8 +15,12 @@ owner's 7/8-win corpus (data/bes_runs_live_2026-08-12.jsonl) differs a lot:
 | top tarots per run | Death 2.0, Justice 1.6, Hanged Man 1.6, Strength 1.5, Devil 1.25 | planets; Hermit 1.3, Temperance 1.1 |
 
 (income = \$ at blind start -> \$ at shop open, both sides; owner corpus is winning runs only -- survivorship.) The owner
-builds a money engine early and a face-card combo with a deck shaped to it by tarots. **Running (01:23, ~05:00):
-`rich10_7`** (+\$10/round, current engine) vs invest1_7 -- how much of the gap money alone explains (job tmp rich10_result.txt).
+builds a money engine early and a face-card combo with a deck shaped to it by tarots.
+**`rich10_7` (+\$10/round, current engine) vs invest1_7 (07:00): wins 58 -> 130 / 160 (36% -> 81%), reach-8 70 -> 136,
+progress +1.383 (t 8.5), sign 93/12. MONEY EXPLAINS MOST OF THE GAP.** Owner income above blind reward + interest + \$1/hand:
+a2 +4.8, a3 +6.7, a4 +13.4, a5 +7.0, a6 +19.2, a7 +19.8 per round (engine in-blind money ~\$1/blind). Money jokers explain
+little of it (owner boards: Faceless 10%, Mail 5%, Gift 5%, ...). **Running: timing split** `rich10_until2` / `rich10_from3`
+(80 seeds each, seed_off 7) -> does the engine need the money early, or from ante 3 like the owner's?
 
 ## START HERE (2026-10-14 morning)
 **In-blind placebo (`ibplacebo_7`, 07:50): the "dug -> play +0.48" was luck** -- flip - placebo +0.02 (se 0.18, n 100);
@@ -27,6 +31,8 @@ played -> dig -0.34 (se 0.26). The engine's play/dig choice is not shown wrong; 
 takes its next-ranked choice) 160 seeds vs invest1_7 -> `nobuy_result.txt` (~14:00-15:00). Banner: acquired in 51/160
 invest1_7 runs (those win 41% vs 34%), but on 39 of 111 ante-6 boards P(win) 0.41 vs 0.58 -> kept too long? Correlation
 only; the arm decides. Expected effect is small (one Common joker, ~1/3 of runs): MDE ~0.15-0.27.
+**(CORRECTION 2026-10-17: a probe-parsing bug -- `local a, b = (not c) and name:match(...)` keeps one capture -- made
+`cash10_2` / `cash20_2` pay at the FIRST SHOP OF ANTE 1, not ante 2. Fixed; the comparison was noise-bound either way.)**
 **Cash control (10:23) -- the voucher table cannot show underpricing:** \$10 once at ante 2 = +0.548 (se 0.29), wins 17 -> 22,
 above 12 of 13 free vouchers; \$20 = +0.145 (wins 17 -> 17). \$20 < \$10 is pure noise, so at 40 seeds (se 0.2-0.33) every
 free voucher is indistinguishable from \$10 cash. No voucher-pricing change is justified (live replays: Paint Brush priced

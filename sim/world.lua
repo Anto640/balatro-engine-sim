@@ -1624,7 +1624,8 @@ function World.award_income(run, blind_result)
   income = income + rocket_income(run)       -- W-ECON: Rocket (grows per boss defeated)
   -- Phase A3 resource lesion: hand the engine unlimited money to test whether ACQUISITION
   -- is the bottleneck at all. Inert unless a probe config is active.
-  if run.probe and run.probe.income_bonus and (run.ante or 1) <= (run.probe.income_bonus_until or 99) then
+  if run.probe and run.probe.income_bonus and (run.ante or 1) <= (run.probe.income_bonus_until or 99)
+     and (run.ante or 1) >= (run.probe.income_bonus_from or 1) then
     income = income + run.probe.income_bonus
   end
   run.economy.dollars = run.economy.dollars + income

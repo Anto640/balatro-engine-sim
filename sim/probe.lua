@@ -673,10 +673,18 @@ function Probe.opts(name)
   local fvk = not c and name:match("^fv2_(.+)$")
   if fvk then c = { free_voucher = "v_" .. fvk, free_voucher_ante = 2 } end
   -- the voucher table's money control: "cash<N>_<A>" = $N once, at the first shop of ante A (a voucher costs $10)
-  local cn, ca = (not c) and name:match("^cash(%d+)_(%d+)$")
+  local cn, ca
+  if not c then cn, ca = name:match("^cash(%d+)_(%d+)$") end
   if cn then c = { cash_once = tonumber(cn), cash_once_ante = tonumber(ca) } end
   -- JOKER OUTCOME TEST (2026-10-14): "nobuy_<key>" = the engine never acquires j_<key> (shop buy, swap or pack pick);
   -- it takes its next-ranked choice instead
+  -- MONEY TIMING (2026-10-17): "rich<N>_from<A>" / "rich<N>_until<A>" = +$N per round only from / through ante A
+  local rn, rf
+  if not c then rn, rf = name:match("^rich(%d+)_from(%d+)$") end
+  if rn then c = { income_bonus = tonumber(rn), income_bonus_from = tonumber(rf) } end
+  local un, ua
+  if not c then un, ua = name:match("^rich(%d+)_until(%d+)$") end
+  if un then c = { income_bonus = tonumber(un), income_bonus_until = tonumber(ua) } end
   local nbk = (not c) and name:match("^nobuy_(.+)$")
   if nbk then c = { nobuy = "j_" .. nbk } end
   if not c then error("unknown probe config: " .. tostring(name)) end
