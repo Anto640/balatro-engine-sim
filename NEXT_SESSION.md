@@ -45,6 +45,10 @@ always take Hermit / Temperance; keep the money jokers (no early selling). Done:
   Faceless +15, Business +20, Parking +15, Mail +9 (n 4-10). Most of the owner's money is NOT money jokers: candidates
   Devil gold cards (8 uses / 8 runs), Hermit (+33 in its 3 rounds), interest above \$5 (Seed Money / Money Tree not
   logged in the corpus). Probe stays off; no valuation change.
+  **Owner spotted: reach-8 73 = 73 but wins 62 -> 53.** a8 boards still holding a money joker 10/73 -> 23/73; those win
+  14/23 (61%) vs 39/50 without; a8 capacity 226k -> 195k. Money jokers are never converted late (the trade/sell money
+  rate is flat by ante). **Running (23:52, ~04:30): `econ2_7`** = econ_policy + BES_MONEY_ANTE=1 (ante-aware money
+  weight: x1 to a3, then .73/.52/.35/.22/.10) vs farm_7 -- milk early, swap money jokers for scorers late.
 
 
 ## START HERE (2026-10-14 morning)
