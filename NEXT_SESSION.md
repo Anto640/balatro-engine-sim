@@ -35,8 +35,10 @@ always take Hermit / Temperance; keep the money jokers (no early selling). Done:
   reserve, gated by the survival rollout (clear within 2% of the engine's own line, net money > \$1). Fixed-joker test:
   +\$1-3 a round more (Mail-In a1/a2 \$12.5 -> \$14.2, Faceless a2 \$11.4 -> \$14.5; Business / Parking ~0). Trace: the
   engine SELLS its money joker in the next shops (trades price money jokers ~ a weak scorer) -> nothing left to farm.
-- **Running:** `farm_7` (fix + farm, HEAD) vs invest1_7 (14:13, ~18:00) = regression check; then `econ_7`
-  (probe `econ_policy`: buy money jokers a1-3 into a free slot, never sell before a5) vs farm_7 (~22:00).
+- **`farm_7` vs invest1_7 (18:39): +0.063 (se 0.053, p 0.23), wins 58 -> 62, reach-8 70 -> 73, sign 14/11, 135 tied ->
+  SHIPPED + deployed. New seed_off-7 baseline: `sim_out/farm_7.jsonl`.**
+- **Running:** `econ_7` (probe `econ_policy`: buy money jokers a1-3 into a free slot, never sell before a5) vs farm_7
+  (18:37, ~22:30; job tmp econ7_result.txt).
 
 
 ## START HERE (2026-10-14 morning)
