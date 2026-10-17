@@ -627,9 +627,50 @@ Probe.CONFIGS = {
   gold6        = { start_money = { n = 6, enhancement = "m_gold" } },
   gseal6       = { start_money = { n = 6, seal = "Gold" } },
   rich4        = { income_bonus = 4 },   -- control for gold6: its held Gold paid ~$3.7/round (1.22 held x $3)
+  econ_policy  = { skip_only = { tag_investment = true }, skip_only_until = 1,
+                   econ_buy_until = 3, econ_keep_until = 5, econ_max = 2 },   -- owner econ policy (on the invest1 skips)
   rich1        = { income_bonus = 1 },   -- dose-response for the value of $/round income
   rich2        = { income_bonus = 2 },
 }
+
+-- OWNER ECON POLICY lesion (2026-10-17, owner: "buying one or multiple money jokers and fully milking them ... dont
+-- need to sell jokers early"): buy a money joker (catalogue economy jokers with income) offered at ante <= econ_buy_until
+-- into a free slot when affordable, up to econ_max owned, and never sell one before ante econ_keep_until. Pairs with
+-- the in-blind farm (engine/farm.lua). nil = no override.
+local function money_joker(key)
+  local d = key and JokerData.resolve(key)
+  return d and d.cat == "economy" and (d.econ or 0) > 0 and key ~= "j_matador" or false
+end
+Probe.money_joker = money_joker
+function Probe.econ_policy(run, shop, ranked)
+  local p, ante = run.probe, run.ante or 1
+  local best = ranked and ranked.best
+  local function sells_money(a)
+    return a and (a.type == "SELL_JOKER" or a.type == "SELL_TO_BUY") and a.target and money_joker(a.target.key)
+  end
+  if sells_money(best) and ante < (p.econ_keep_until or 5) then
+    for _, a in ipairs(ranked.alternatives or {}) do
+      if not sells_money(a) then return { best = a, alternatives = {}, pace = ranked.pace } end
+    end
+    return { best = { type = "SAVE", value = 0, reason = "probe: keep the money joker" }, alternatives = {}, pace = ranked.pace }
+  end
+  if ante > (p.econ_buy_until or 3) then return nil end
+  if best and best.type == "BUY_JOKER" and best.target and money_joker(best.target.key) then return nil end
+  local owned = 0
+  for _, j in ipairs(run.jokers or {}) do if money_joker(j.key) then owned = owned + 1 end end
+  if owned >= (p.econ_max or 2) or #(run.jokers or {}) >= (run.joker_slots or 5) then return nil end
+  local cash = (run.economy and run.economy.dollars) or 0
+  local pick, pe
+  for _, j in ipairs(shop.jokers or {}) do
+    if money_joker(j.key) and (j.cost or 0) <= cash then
+      local e = (JokerData.resolve(j.key) or {}).econ or 0
+      if not pe or e > pe or (e == pe and tostring(j.key) < tostring(pick.key)) then pick, pe = j, e end
+    end
+  end
+  if not pick then return nil end
+  return { best = { type = "BUY_JOKER", target = pick, cost = pick.cost, value = 0, reason = "probe: owner econ policy buy" },
+           alternatives = {}, pace = ranked.pace }
+end
 
 -- NOBUY (joker outcome test): if the engine's shop choice acquires the banned joker (a buy, or a sale that makes room
 -- for it), take its next-ranked action that does not; nil = no override.

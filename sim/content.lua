@@ -1133,6 +1133,11 @@ function Content.shop_phase(run, opts)
       local xv = Probe.xgreedy(run, shop, ranked)
       if xv then ranked = xv end
     end
+    -- OWNER ECON POLICY lesion: buy early money jokers, never sell them early. Inert without a probe config.
+    if run.probe and run.probe.econ_buy_until then
+      local ev = Probe.econ_policy(run, shop, ranked)
+      if ev then ranked = ev end
+    end
     -- JOKER OUTCOME TEST: never acquire the probe's banned joker. Inert without a probe config.
     if run.probe and run.probe.nobuy then
       local nv = Probe.nobuy(run, shop, ranked)
