@@ -25,6 +25,19 @@ little of it (owner boards: Faceless 10%, Mail 5%, Gift 5%, ...). **Running: tim
 antes 1-2 only (~\$60 total) wins 49, +1.34 (se 0.22), reach-8 31 -> 60; ante 3+ only (~\$180) wins 53, +0.87 (se 0.19),
 reach-8 31 -> 56. **Early money is ~3x as efficient per dollar: the early-game poverty trap is the binding constraint**;
 the full gain needs both. Next: what the engine can do about ante 1-2 money (owner asked where their money comes from).
+**Owner (2026-10-17): money comes from money jokers MILKED in-blind** -- play non-clearing hands down to one to cycle,
+discard only paying cards (Mail-In rank, 3+ faces for Faceless), finish with a reliable hand; buy jokers around this;
+always take Hermit / Temperance; keep the money jokers (no early selling). Done:
+- **Round-target fix (`f0fe713`)**: Idol / Ancient / Castle / Mail-In targets live in `G.GAME.current_round`, never read
+  live (Idol x2 and Ancient never scored, Mail-In never targeted); sim Mail-In rank was hidden. Mail-In income (12 seeds,
+  a1/a2): +\$2.4 -> +\$5 a round from the fix alone.
+- **Farm mode (`engine/farm.lua`, `e106b43`; BES_FARM=0 disables)**: pay-discards + non-clearing cycle plays down to a
+  reserve, gated by the survival rollout (clear within 2% of the engine's own line, net money > \$1). Fixed-joker test:
+  +\$1-3 a round more (Mail-In a1/a2 \$12.5 -> \$14.2, Faceless a2 \$11.4 -> \$14.5; Business / Parking ~0). Trace: the
+  engine SELLS its money joker in the next shops (trades price money jokers ~ a weak scorer) -> nothing left to farm.
+- **Running:** `farm_7` (fix + farm, HEAD) vs invest1_7 (14:13, ~18:00) = regression check; then `econ_7`
+  (probe `econ_policy`: buy money jokers a1-3 into a free slot, never sell before a5) vs farm_7 (~22:00).
+
 
 ## START HERE (2026-10-14 morning)
 **In-blind placebo (`ibplacebo_7`, 07:50): the "dug -> play +0.48" was luck** -- flip - placebo +0.02 (se 0.18, n 100);
