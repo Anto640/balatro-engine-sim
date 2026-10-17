@@ -31,6 +31,7 @@ local Eval = require("engine.eval_function")
 local Mechanics = require("engine.mechanics")
 local BossEffect = require("engine.boss_effect")
 local DiscardValue = require("engine.discard_value")
+local Farm = require("engine.farm")
 
 local Sim = {}
 
@@ -105,7 +106,11 @@ local ONE_OFF_HAND = {
 -- uses) with the poker-draw heuristic as one extra candidate, instead of the heuristic alone (which only
 -- sees flush/straight/set draws and otherwise PLAYS with discards left). pol.dig_samples = its MC samples.
 -- nil pol = the historical greedy policy, byte-identical (every in-blind caller passes none).
+-- `milk` may also be a FARM policy table { farm = true, reserve = r } (engine/farm.lua): pay-discards and
+-- non-clearing cycle plays while more than r hands remain, then finish clear-ASAP.
 local function rollout(gs, start_hand, pile, target, chips0, hands, discards, hand_size, rng, eff, first, milk, pol)
+  local farm = (type(milk) == "table" and milk.farm) and milk or nil
+  if farm then milk = false end
   local bgs = with_boss(gs, eff)
   -- Card Sharp (x3 if this hand type was ALREADY played this round) reads gs.blind.played_hand_types.
   -- The rollout plays several hands but never updated that set, so Card Sharp could NEVER fire in any
@@ -207,6 +212,7 @@ local function rollout(gs, start_hand, pile, target, chips0, hands, discards, ha
       hands_left = hands_left - 1
     elseif first.kind == "DISCARD" and first.cards and #first.cards > 0
        and #first.cards < #current and discards_left > 0 then
+      money = money + Heuristics.discard_econ(bgs, first.cards)   -- Faceless / Mail-In pay on the discard
       remove_played(first.cards); refill()
       discards_left = discards_left - 1
     end
@@ -231,7 +237,22 @@ local function rollout(gs, start_hand, pile, target, chips0, hands, discards, ha
       end, true)
       if rev then ev, sel = rev, rsel end
     end
-    if not ev then
+    local fstep
+    if farm and ev then
+      local prot = {}
+      for _, c in ipairs(sel or {}) do prot[c] = true end
+      fstep = Farm.step(hgs, current, rem, hands_left, discards_left, farm.reserve or 1, filter, prot)
+    end
+    if fstep and fstep.kind == "DISCARD" then
+      money = money + (fstep.money or 0)
+      remove_played(fstep.cards); refill()
+      discards_left = discards_left - 1
+    elseif fstep then                       -- a non-clearing cycle play (its held $ is added by after_play)
+      chips = chips + (fstep.ev.score or 0)
+      money = money + (fstep.ev.money or 0)
+      after_play(fstep.ev, fstep.sel)
+      hands_left = hands_left - 1
+    elseif not ev then
       -- no legal play: the game still lets you play a hand for 0 (blind.lua debuff_hand), which cycles cards
       -- like a discard. With discards or spare hands left, cycle what the legal-type dig would throw.
       if not filter or hands_left + discards_left < 2 then break end
@@ -283,6 +304,7 @@ local function rollout(gs, start_hand, pile, target, chips0, hands, discards, ha
         end
       end
       if d and d.cards and #d.cards > 0 and #d.cards < #current then
+        money = money + Heuristics.discard_econ(bgs, d.cards)
         remove_played(d.cards); refill()
         discards_left = discards_left - 1
       else

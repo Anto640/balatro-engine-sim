@@ -21,6 +21,7 @@ local Simulation = require("engine.simulation")
 local ScalingFuel = require("engine.scaling_fuel")
 local DiscardFuel = require("engine.discard_fuel")
 local HoldFuel    = require("engine.hold_fuel")
+local Farm        = require("engine.farm")
 local Eval = require("engine.eval_function")
 local DeckPlan = require("engine.deck_plan")
 local Cards = require("util.cards")
@@ -183,6 +184,14 @@ DE.LEVEL_USE_CREDIT = 0.15   -- lasting-leveling credit, as a fraction of a boss
 -- common random numbers; SURV_MARGIN is the E[frac] edge required to OVERRIDE the greedy
 -- choice (so we don't flip on Monte-Carlo noise, and defer to the rich heuristics on ~ties).
 DE.SURV_SAMPLES = 60
+-- IN-BLIND MONEY FARM (engine/farm.lua, owner 2026-10-17): with a money joker on the board, play non-clearing hands
+-- down to a reserve and discard only paying cards, then clear. Taken only when the farm line's rollout clears about
+-- as often as the engine's own choice (FARM_TOL) and nets more money than the unused-hand dollars it gives up.
+DE.FARM = (os.getenv and os.getenv("BES_FARM")) ~= "0"
+DE.FARM_SAMPLES = 40
+DE.FARM_TOL = 0.02
+DE.FARM_MARGIN = 1
+DE.FARM_RESERVES = { 1, 2 }
 DE.SURV_MARGIN  = 0.06
 -- LAST HAND, P(CLEAR) FIRST (audit 2026-10-10, arm audit_lastclear vs fsh: +0.050 p 0.07, wins 48 -> 50, death ante
 -- 5 later / 0 earlier, 149/160 identical). Switch BES_LAST_CLEAR=0 restores the capped-E[frac] arbitration.
@@ -1334,6 +1343,45 @@ function DE.decide(gs, opts)
     end
   end
 
+  -- ---- FARM: milk the board's money jokers before clearing (engine/farm.lua) ----
+  if DE.FARM and best and (best.type == "PLAY" or best.type == "DISCARD") and best.cards and #best.cards > 0
+     and not forced_play and hands_left >= 2 and remaining > 0 and not play_scores_zero
+     and not best.money_dig and not best.milk and Farm.has_lever(gs) then
+    local prot = {}
+    for _, c in ipairs(play_cards or {}) do prot[c] = true end
+    local seed = disc_seed(gs)
+    local first_n = (best.type == "DISCARD") and { kind = "DISCARD", cards = best.cards } or { kind = "PLAY", sel = best.cards }
+    local vn
+    local pick
+    for _, r in ipairs(DE.FARM_RESERVES) do
+      local st = Farm.step(gs, hand, remaining, hands_left, discards_left, r, pfilter, prot)
+      if st and not (pick and same_cards(pick.st.cards or pick.st.sel, st.cards or st.sel)) then
+        vn = vn or Simulation.survive_after(gs, first_n, DE.FARM_SAMPLES, lcg(seed), false)
+        local fa = (st.kind == "DISCARD") and { kind = "DISCARD", cards = st.cards } or { kind = "PLAY", sel = st.sel }
+        local vf = Simulation.survive_after(gs, fa, DE.FARM_SAMPLES, lcg(seed), { farm = true, reserve = r })
+        local net = (vf.money or 0) - (vn.money or 0) - ((vn.banked or 0) - (vf.banked or 0)) * Mechanics.HAND_REWARD
+        if vf.clear >= vn.clear - DE.FARM_TOL and net > DE.FARM_MARGIN and (not pick or net > pick.net) then
+          pick = { st = st, vf = vf, vn = vn, net = net, r = r }
+        end
+      end
+    end
+    if pick then
+      local st = pick.st
+      local why = string.format("Farm your money joker%s: ~$%.0f more this blind, still clears ~%d%% (vs ~%d%%); keep %d hand%s to clear.",
+        (st.kind == "DISCARD") and string.format(" (discard for $%d)", st.money or 0) or " (play a non-clearing hand to cycle cards)",
+        pick.net, math.floor(pick.vf.clear * 100 + 0.5), math.floor(pick.vn.clear * 100 + 0.5), pick.r, pick.r == 1 and "" or "s")
+      candidates[#candidates + 1] = best
+      if st.kind == "DISCARD" then
+        best = { type = "DISCARD", cards = st.cards, value = (best.value or 0) + 1, farm = true, plan = true,
+                 farms_money = (st.money or 0) > 0, banked_money = st.money, reason = why }
+      else
+        best = { type = "PLAY", cards = st.sel, hand_type = st.ev.hand_type, score = st.ev.score,
+                 value = (best.value or 0) + 1, farm = true, plan = true,
+                 play_econ = HandEval.play_econ(gs, st.ev, st.sel), reason = why }
+      end
+    end
+  end
+
   -- order alternatives by comparable value, excluding the chosen one
   local alternatives = {}
   for _, c in ipairs(candidates) do if c ~= best then alternatives[#alternatives + 1] = c end end
@@ -1501,6 +1549,10 @@ function DE._annotate(best, c)
   -- Without simulation, confidence is a documented heuristic (a margin/weight),
   -- NOT a calibrated probability. _apply_sim upgrades the basis when sim is on.
   best.confidence_basis = "heuristic_margin"
+  if best.farm then   -- a FARM step (engine/farm.lua): its reason, set in decide(), states the measured trade
+    best.confidence, best.expected_value = 0.8, 0
+    return
+  end
   if best.type == "PLAY" then
     if best.milk then
       -- A deferred MILK play does NOT clear this hand (that's the point) even though a clear was
