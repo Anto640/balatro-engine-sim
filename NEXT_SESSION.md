@@ -37,8 +37,14 @@ always take Hermit / Temperance; keep the money jokers (no early selling). Done:
   engine SELLS its money joker in the next shops (trades price money jokers ~ a weak scorer) -> nothing left to farm.
 - **`farm_7` vs invest1_7 (18:39): +0.063 (se 0.053, p 0.23), wins 58 -> 62, reach-8 70 -> 73, sign 14/11, 135 tied ->
   SHIPPED + deployed. New seed_off-7 baseline: `sim_out/farm_7.jsonl`.**
-- **Running:** `econ_7` (probe `econ_policy`: buy money jokers a1-3 into a free slot, never sell before a5) vs farm_7
-  (18:37, ~22:30; job tmp econ7_result.txt).
+- **`econ_7` (probe `econ_policy`: buy money jokers a1-3 into a free slot, never sell before a5) vs farm_7 (23:32):
+  -0.013 (p 0.92), wins 62 -> 53, reach-8 73 -> 73, sign 38/46.** Milk-joker boards 9% -> 41-47% (owner-like), in-blind
+  \$ 0.62 -> 1.61 / blind, but board scoring power at a5 -26% (45.5k -> 33.6k) -> a wash. Held money jokers earn per
+  blind: Mail \$10.4, To Do \$5.3, Rough Gem \$5.1, Faceless \$4.4, Business \$3.8, Trading \$2.4, Parking \$1.5.
+  Owner per round ABOVE reward + interest(cap 5) + \$1/hand: **+\$7.7 with NO money joker held** (n 63 rounds);
+  Faceless +15, Business +20, Parking +15, Mail +9 (n 4-10). Most of the owner's money is NOT money jokers: candidates
+  Devil gold cards (8 uses / 8 runs), Hermit (+33 in its 3 rounds), interest above \$5 (Seed Money / Money Tree not
+  logged in the corpus). Probe stays off; no valuation change.
 
 
 ## START HERE (2026-10-14 morning)
