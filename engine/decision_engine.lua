@@ -1344,6 +1344,9 @@ function DE.decide(gs, opts)
   end
 
   -- ---- FARM: milk the board's money jokers before clearing (engine/farm.lua) ----
+  if _G.BES_FARM_DEBUG then io.stderr:write(string.format("FARMCHK best %s cards %d forced %s hl %d rem %d zero %s md %s milk %s lever %s\n",
+    tostring(best and best.type), best and best.cards and #best.cards or -1, tostring(forced_play), hands_left, remaining,
+    tostring(play_scores_zero), tostring(best and best.money_dig), tostring(best and best.milk), tostring(Farm.has_lever(gs)))) end
   if DE.FARM and best and (best.type == "PLAY" or best.type == "DISCARD") and best.cards and #best.cards > 0
      and not forced_play and hands_left >= 2 and remaining > 0 and not play_scores_zero
      and not best.money_dig and not best.milk and Farm.has_lever(gs) then
@@ -1360,6 +1363,8 @@ function DE.decide(gs, opts)
         local fa = (st.kind == "DISCARD") and { kind = "DISCARD", cards = st.cards } or { kind = "PLAY", sel = st.sel }
         local vf = Simulation.survive_after(gs, fa, DE.FARM_SAMPLES, lcg(seed), { farm = true, reserve = r })
         local net = (vf.money or 0) - (vn.money or 0) - ((vn.banked or 0) - (vf.banked or 0)) * Mechanics.HAND_REWARD
+        if _G.BES_FARM_DEBUG then io.stderr:write(string.format("FARM r%d %s vf.clear %.2f vn.clear %.2f vf$ %.1f vn$ %.1f banked %.1f/%.1f net %.1f hl %d dl %d rem %d\n",
+          r, st.kind, vf.clear, vn.clear, vf.money or 0, vn.money or 0, vf.banked or 0, vn.banked or 0, net, hands_left, discards_left, remaining)) end
         if vf.clear >= vn.clear - DE.FARM_TOL and net > DE.FARM_MARGIN and (not pick or net > pick.net) then
           pick = { st = st, vf = vf, vn = vn, net = net, r = r }
         end
