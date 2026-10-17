@@ -50,6 +50,7 @@ local suites = {
   "tests.test_deck_plan",
   "tests.test_eval",
   "tests.test_jokers",
+  "tests.test_farm",
   "tests.test_mechanics",
   "tests.test_advisors",
   "tests.test_value_units",
