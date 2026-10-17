@@ -218,7 +218,7 @@ return function(t)
     t.eq(World._joker_econ_income({ jokers = { { key = "j_todo_list" } } }), 0, "To Do List pays no flat income")
 
     -- Mail: $5 per discarded card matching the round's rank (Kings = rank_id 13)
-    local mail = { economy = { dollars = 0 }, jokers = { { key = "j_mail" } }, _mail_rank = 13 }
+    local mail = { economy = { dollars = 0 }, jokers = { { key = "j_mail", ability = { mail_rank = 13 } } } }
     World._discard_econ(mail, { card{ rank = "King", suit = "Hearts" }, card{ rank = "King", suit = "Spades" },
                                card{ rank = "5", suit = "Clubs" } })
     t.eq(mail.economy.dollars, 10, "Mail: 2 discarded Kings at the King rank -> $10")

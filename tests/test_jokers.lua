@@ -178,6 +178,39 @@ return function(t)
     t.eq(Heuristics.discard_econ(gs, two_faces), 0, "Faceless: nothing for only 2 faces")
   end
 
+  -- ---- Mail-In Rebate reads the round's rank from ability.mail_rank (live: copied from current_round.mail_card) ----
+  do
+    local gs = state{ joker{ key = "j_mail", ability = { extra = 5, mail_rank = 13 } } }
+    local kings = play{ {"King","Spades"}, {"King","Hearts"}, {"5","Clubs"} }
+    t.eq(Heuristics.discard_econ(gs, kings), 10, "Mail-In: 2 Kings at the King rank -> $10")
+    local gs0 = state{ joker{ key = "j_mail", ability = { extra = 5 } } }
+    t.eq(Heuristics.discard_econ(gs0, kings), 0, "Mail-In: no rank known -> $0")
+  end
+
+  -- ---- live extraction copies the round targets (G.GAME.current_round) into the joker's ability ----
+  do
+    local saved = _G.G
+    local function jc(key, ab) return { config = { center = { key = key } }, ability = ab, sell_cost = 2, cost = 4 } end
+    local live_idol = { extra = 2 }
+    _G.G = { GAME = { current_round = { idol_card = { suit = "Hearts", id = 12 }, mail_card = { id = 7 },
+      ancient_card = { suit = "Clubs" }, castle_card = { suit = "Spades" } }, blind = {}, round_resets = {} },
+      jokers = { cards = { jc("j_idol", live_idol), jc("j_mail", { extra = 5 }), jc("j_ancient", { extra = 1.5 }),
+        jc("j_castle", { extra = { chips = 9, chip_mod = 3 } }) } } }
+    local ok, snap = pcall(require("core.state_extraction").snapshot)
+    _G.G = saved
+    t.ok(ok and snap, "snapshot runs on a minimal G")
+    if ok and snap then
+      local by = {}
+      for _, j in ipairs(snap.jokers or {}) do by[j.key] = j.ability end
+      t.eq(by.j_idol and by.j_idol.id, 12, "Idol: rank id from current_round.idol_card")
+      t.eq(by.j_idol and by.j_idol.suit, "Hearts", "Idol: suit from current_round.idol_card")
+      t.eq(by.j_mail and by.j_mail.mail_rank, 7, "Mail-In: rank from current_round.mail_card")
+      t.eq(by.j_ancient and by.j_ancient.suit, "Clubs", "Ancient: suit from current_round.ancient_card")
+      t.eq(by.j_castle and by.j_castle.suit, "Spades", "Castle: suit from current_round.castle_card")
+      t.eq(live_idol.id, nil, "the live ability table is not written")
+    end
+  end
+
   -- ---- best_discard surfaces a money discard when no draw target exists ----
   do
     local hand = play{ {"King","Spades"}, {"Queen","Hearts"}, {"Jack","Clubs"}, {"2","Diamonds"}, {"5","Spades"} }

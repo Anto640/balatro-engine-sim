@@ -103,6 +103,8 @@ function JokerTick.on_blind_start(run, rng, blind_type)
       a.suit = SUITS[math.floor(rng() * 4) + 1]                  -- ... of a random suit, re-picked each round
     elseif k == "j_castle" then
       ab(j).suit = SUITS[math.floor(rng() * 4) + 1]              -- which discards feed it (chips persist)
+    elseif k == "j_mail" then
+      ab(j).mail_rank = 2 + math.floor(rng() * 13)               -- $5 per discarded card of this rank (2..14), shown all round
     elseif k == "j_hit_the_road" then
       ab(j).x_mult = 1                                           -- resets to x1 each round
     elseif k == "j_ceremonial" then

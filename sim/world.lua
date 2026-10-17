@@ -751,13 +751,14 @@ local function discard_econ(run, discarded)
     end
     if nface >= 3 then run.economy.dollars = run.economy.dollars + 5 end   -- Faceless: $5 per event
   end
-  -- Mail-In Rebate: $5 per discarded card of THIS round's rank (run._mail_rank, set at blind start).
-  if run._mail_rank then
-    local owns_mail = false
-    for _, j in ipairs(run.jokers or {}) do if j.key == "j_mail" then owns_mail = true; break end end
-    if owns_mail then
+  -- Mail-In Rebate: $5 per discarded card of THIS round's rank (ability.mail_rank, set at blind start by
+  -- JokerTick.on_blind_start -- visible to the engine, as the game shows it; it was drawn on the first discard and
+  -- never shown, so the engine could not target it and the first discard of a round never paid).
+  for _, j in ipairs(run.jokers or {}) do
+    local rk = j.key == "j_mail" and type(j.ability) == "table" and j.ability.mail_rank
+    if rk then
       local n = 0
-      for _, c in ipairs(discarded) do if Cards.rank_id(c) == run._mail_rank then n = n + 1 end end
+      for _, c in ipairs(discarded) do if Cards.rank_id(c) == rk then n = n + 1 end end
       run.economy.dollars = run.economy.dollars + 5 * n
     end
   end
@@ -917,9 +918,7 @@ local function blind_start_generators(run, rng)
   local original = {}
   for _, j in ipairs(run.jokers or {}) do original[#original + 1] = j end
   for _, j in ipairs(original) do
-    if j.key == "j_mail" then
-      run._mail_rank = 2 + math.floor(rng() * 13)             -- a random rank 2..14, $5 per discarded match
-    elseif j.key == "j_todo_list" then
+    if j.key == "j_todo_list" then
       run._todo_hand = TODO_HANDS[1 + math.floor(rng() * #TODO_HANDS)]  -- $4 each time this hand is played
       if type(j.ability) ~= "table" then j.ability = {} end
       j.ability.to_do_poker_hand = run._todo_hand   -- the live field the engine reads (HandEval play money)

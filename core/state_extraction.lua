@@ -55,12 +55,34 @@ local function read_area(area)
   return out
 end
 
+-- ROUND TARGETS (2026-10-17): The Idol / Ancient Joker / Castle / Mail-In Rebate re-pick their card, suit or rank each
+-- round, and the game keeps it in G.GAME.current_round (idol_card / ancient_card / castle_card / mail_card), NOT in the
+-- joker's ability (a live fixture's Idol ability is just extra = 2, Mail-In's extra = 5). The engine reads ability.id /
+-- ability.suit / ability.mail_rank, so these jokers scored or targeted NOTHING live. Copied into a COPY of the ability
+-- (the live table is never written).  -- VERIFY field names (functions/common_events.lua reset_idol_card etc.)
+local ROUND_TARGET = { j_idol = "idol_card", j_ancient = "ancient_card", j_castle = "castle_card", j_mail = "mail_card" }
+local function with_round_target(key, ab)
+  local field = ROUND_TARGET[key]
+  local G = _G.G
+  local t = field and G and G.GAME and G.GAME.current_round and G.GAME.current_round[field]
+  if type(t) ~= "table" then return ab end
+  local out = {}
+  for k, v in pairs(ab) do out[k] = v end
+  if key == "j_mail" then out.mail_rank = t.id
+  else
+    if t.suit then out.suit = t.suit end
+    if key == "j_idol" and t.id then out.id = t.id end
+  end
+  return out
+end
+
 local function read_joker(c, idx)
   if not c then return nil end
-  local ab = c.ability or {}
+  local key = c.config and c.config.center and c.config.center.key
+  local ab = with_round_target(key, c.ability or {})
   return GS.joker{
     id         = c.sort_id or c.unique_val,
-    key        = c.config and c.config.center and c.config.center.key,  -- "j_blueprint"
+    key        = key,  -- "j_blueprint"
     name       = ab.name,
     position   = idx,
     edition    = c.edition and c.edition.type,

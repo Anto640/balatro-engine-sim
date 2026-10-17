@@ -191,8 +191,10 @@ function H.discard_econ(gs, cards)
   if has_joker(gs, "j_trading") and #cards == 1 then d = d + 3; notes[#notes + 1] = "Trading +$3" end
   -- Mail-In Rebate: $5 per discarded card of its current target rank (runtime).
   local mail = has_joker(gs, "j_mail")
-  if mail and type(mail.ability) == "table" and type(mail.ability.extra) == "table" then
-    local rid = mail.ability.extra.rank or mail.ability.extra.id -- in-game field  -- VERIFY
+  if mail and type(mail.ability) == "table" then
+    -- the round's rank: ability.mail_rank (state_extraction copies G.GAME.current_round.mail_card.id; the sim sets it)
+    local ex = type(mail.ability.extra) == "table" and mail.ability.extra or {}
+    local rid = mail.ability.mail_rank or ex.rank or ex.id
     if rid then
       local n = 0
       for _, c in ipairs(cards) do if Cards.rank_id(c) == rid then n = n + 1 end end
@@ -213,8 +215,9 @@ local function money_discard(gs)
   end
   -- Mail-In Rebate: dump cards of the target rank
   local mail = has_joker(gs, "j_mail")
-  if mail and type(mail.ability) == "table" and type(mail.ability.extra) == "table" then
-    local rid = mail.ability.extra.rank or mail.ability.extra.id
+  if mail and type(mail.ability) == "table" then
+    local ex = type(mail.ability.extra) == "table" and mail.ability.extra or {}
+    local rid = mail.ability.mail_rank or ex.rank or ex.id
     if rid then
       local matches = {}
       for _, c in ipairs(hand) do if Cards.rank_id(c) == rid then matches[#matches + 1] = c end end
