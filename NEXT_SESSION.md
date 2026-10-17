@@ -1,5 +1,23 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-17) -- strategy gap, not tweaks
+Owner: "small tweaks are not the path to +60-70% winrate". Four controlled tests in a row (in-blind play/dig, discard
+choice, voucher pricing, Banner) found the engine's LOCAL choices as good as its alternatives. Whole-run behaviour vs the
+owner's 7/8-win corpus (data/bes_runs_live_2026-08-12.jsonl) differs a lot:
+
+| per round / per board | owner (8 runs) | engine (invest1_7 / 6 sim seeds) |
+|---|---|---|
+| \$ earned per round a2 / a3 / a4 / a5 / a6 / a7 | 12.6 / 17.4 / 24.4 / 21.1 / 33.9 / 31.1 | 8.8 / 10.8 / 10.2 / 10.6 / 9.8 / 12.6 |
+| \$ at ante start a3 / a5 / a7 | 21.5 / 43.4 / 48.9 | 15.1 / 23.9 / 23.1 |
+| money jokers on board a2-4 / a5-8 | 0.54 / 0.25 (bought early, sold later) | 0.19 / 0.19 |
+| packs opened per ante a3-5 | ~5.0 (Tarot 2.1) | 3.3 (Tarot 1.1) |
+| top jokers (share of boards) | Hanging Chad 58%, Photograph 50%, Sock and Buskin 25% | Hanging Chad 22%, Banner 21%, Photograph 15% |
+| top tarots per run | Death 2.0, Justice 1.6, Hanged Man 1.6, Strength 1.5, Devil 1.25 | planets; Hermit 1.3, Temperance 1.1 |
+
+(income = \$ at blind start -> \$ at shop open, both sides; owner corpus is winning runs only -- survivorship.) The owner
+builds a money engine early and a face-card combo with a deck shaped to it by tarots. **Running (01:23, ~05:00):
+`rich10_7`** (+\$10/round, current engine) vs invest1_7 -- how much of the gap money alone explains (job tmp rich10_result.txt).
+
 ## START HERE (2026-10-14 morning)
 **In-blind placebo (`ibplacebo_7`, 07:50): the "dug -> play +0.48" was luck** -- flip - placebo +0.02 (se 0.18, n 100);
 played -> dig -0.34 (se 0.26). The engine's play/dig choice is not shown wrong; closed at this resolution
