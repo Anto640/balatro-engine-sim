@@ -21,6 +21,10 @@ progress +1.383 (t 8.5), sign 93/12. MONEY EXPLAINS MOST OF THE GAP.** Owner inc
 a2 +4.8, a3 +6.7, a4 +13.4, a5 +7.0, a6 +19.2, a7 +19.8 per round (engine in-blind money ~\$1/blind). Money jokers explain
 little of it (owner boards: Faceless 10%, Mail 5%, Gift 5%, ...). **Running: timing split** `rich10_until2` / `rich10_from3`
 (80 seeds each, seed_off 7) -> does the engine need the money early, or from ante 3 like the owner's?
+**Timing split (11:35, 80 paired seeds vs invest1_7 = 29 wins):** all antes (rich10_7) wins 64, progress +1.46 (se 0.24);
+antes 1-2 only (~\$60 total) wins 49, +1.34 (se 0.22), reach-8 31 -> 60; ante 3+ only (~\$180) wins 53, +0.87 (se 0.19),
+reach-8 31 -> 56. **Early money is ~3x as efficient per dollar: the early-game poverty trap is the binding constraint**;
+the full gain needs both. Next: what the engine can do about ante 1-2 money (owner asked where their money comes from).
 
 ## START HERE (2026-10-14 morning)
 **In-blind placebo (`ibplacebo_7`, 07:50): the "dug -> play +0.48" was luck** -- flip - placebo +0.02 (se 0.18, n 100);
