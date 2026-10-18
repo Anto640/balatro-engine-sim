@@ -769,6 +769,11 @@ local function kicker_free(sel, mods)
 end
 HandEval._kicker_free = kicker_free   -- exposed for the exactness test
 
+-- A play filter that judges only the HAND TYPE (The Mouth's lock, The Eye's no-repeat) keeps a kicker set legal
+-- exactly when its scoring cards alone are (a kicker never changes the type), so pruning stays exact under it. Its
+-- creator registers it here; any other filter (The Psychic's 5 cards, Cerulean Bell's forced card) turns pruning off.
+HandEval.TYPE_ONLY = setmetatable({}, { __mode = "k" })
+function HandEval.type_only(fn) if fn then HandEval.TYPE_ONLY[fn] = true end; return fn end
 local KICKER_SENSITIVE = { j_raised_fist = true, j_blackboard = true }
 function HandEval.kicker_neutral(effective)
   for _, e in ipairs(effective) do
@@ -788,7 +793,7 @@ local function each_subset(gs, cards, f, filter, prune)
   local effective = HandEval.effective_jokers(gs)
   local mods = joker_mods(effective)
   if YIELD then YIELD() end   -- cooperative slice boundary (no-op unless driven)
-  if prune and (filter or not HandEval.kicker_neutral(effective)) then prune = false end
+  if prune and ((filter and not HandEval.TYPE_ONLY[filter]) or not HandEval.kicker_neutral(effective)) then prune = false end
   local function copy(t) local o = {} for i = 1, #t do o[i] = t[i] end return o end
   local function rec(start, sel)
     if #sel >= 1 and #sel <= 5 then

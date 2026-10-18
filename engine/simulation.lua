@@ -159,6 +159,7 @@ local function rollout(gs, start_hand, pile, target, chips0, hands, discards, ha
   end
   local restricted = BossEffect.has_play_restriction(eff)
   local filter = restricted and function(sel, ht) return BossEffect.legal_play(eff, sel, ht, pstate) end or nil
+  if filter and not eff.min_play then HandEval.type_only(filter) end   -- Mouth / Eye: HandEval may prune kickers
 
   local function refill()
     while #current < hand_size and #draw > 0 do current[#current + 1] = table.remove(draw) end
@@ -232,9 +233,11 @@ local function rollout(gs, start_hand, pile, target, chips0, hands, discards, ha
     -- Kind, Full House ...) that never comes back. Step down to the best repeatable type unless the one-off clears.
     if ev and eff and eff.single_hand_type and not pstate.first and hands_left >= 2
        and ONE_OFF_HAND[ev.hand_type] and ev.score < rem then
-      local rev, rsel = HandEval.best_play_target(hgs, current, rem, function(s, ht)
+      local of = function(s, ht)
         return not ONE_OFF_HAND[ht] and (not filter or filter(s, ht))
-      end, true)
+      end
+      if not filter or HandEval.TYPE_ONLY[filter] then HandEval.type_only(of) end
+      local rev, rsel = HandEval.best_play_target(hgs, current, rem, of, true)
       if rev then ev, sel = rev, rsel end
     end
     local fstep

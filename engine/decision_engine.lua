@@ -89,11 +89,14 @@ local function boss_filter(gs)
     end
     state = { types = types, first = first }
   end
-  return function(sel, ht)
+  local fn = function(sel, ht)
     if fc and not includes_card(sel, fc) then return false end
     if restricted then return BossEffect.legal_play(eff, sel, ht, state) end
     return true
   end
+  -- hand-type-only (Mouth / Eye, no forced card, no minimum count): HandEval may prune kicker sets under it
+  if not fc and not (eff and eff.min_play) then HandEval.type_only(fn) end
+  return fn
 end
 
 -- A recommended DISCARD must include the forced card too (discards are built in several places; enforce it once
@@ -640,9 +643,11 @@ function DE.decide(gs, opts)
       local cands = {}
       for _, tp in ipairs(HandEval.top_plays(gs, hand, 12)) do
         local T = tp.hand_type
-        local tev, tcards = HandEval.best_play_target(gs, hand, remaining, function(sel, ht)
+        local tf = function(sel, ht)
           return ht == T and (not pfilter or pfilter(sel, ht))
-        end)
+        end
+        if not pfilter or HandEval.TYPE_ONLY[pfilter] then HandEval.type_only(tf) end
+        local tev, tcards = HandEval.best_play_target(gs, hand, remaining, tf)
         if tev and tcards then cands[#cands + 1] = { ev = tev, cards = tcards } end
       end
       if #cands >= 1 then
