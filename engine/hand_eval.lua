@@ -626,6 +626,11 @@ end
 -- overwhelming majority of states) and every previously captured run stay byte-identical.
 HandEval.HAND_BUDGET = 8
 HandEval.PRUNE_KICKERS = (os.getenv and os.getenv("BES_PRUNE")) ~= "0"   -- best_play kicker pruning (BES_PRUNE=0 off)
+-- best_play_target too (2026-10-18): a CLEARING play's tie-break (equal score and money) now also prefers the fewer /
+-- cheaper cards, as the non-clearing tiers already did -- it kept whichever tied play the enumeration met first, often
+-- one with a kicker -- and kickers are then pruned the same way. A behaviour change (which tied clear is played);
+-- BES_PRUNE_TARGET=0 restores the old tie-break and the full enumeration.
+HandEval.PRUNE_TARGET = (os.getenv and os.getenv("BES_PRUNE_TARGET")) ~= "0"
 
 -- The `budget` most play-relevant cards. Built CONSTRUCTIVELY rather than by an additive score:
 -- a weighted ranking cannot guarantee that five cards of one suit survive together, so it can
@@ -717,6 +722,53 @@ HandEval.hand_ctx = hand_ctx
 -- board a play with a kicker scores at most what its scoring cards alone score. A caller whose tie-break also prefers
 -- the fewer / cheaper cards (best_play) loses nothing by skipping those sets: `prune` = score only sets in which every
 -- played card scores (supersets are still walked -- one more card can make a new hand). nil = every set, as before.
+-- Does every card of `sel` score? (== every analyze() scoring flag set, splash aside.) Exact rule: stones always score;
+-- the ranked cards all score iff the set is a flush or a straight, holds at most one ranked card, or every rank in it
+-- appears at least twice (pair / two pair / trips / quads / full house / five of a kind) -- any singleton rank beside
+-- other cards is a kicker (or the High Card's unscored low cards). Allocation-free: this runs for every set the
+-- enumeration walks, and the full analyze there was ~45% of a run after the scoring speed-up.
+local K_CNT, K_IDS, K_TOUCH = {}, {}, {}
+for i = 0, 15 do K_CNT[i] = 0 end
+local function kicker_free(sel, mods)
+  local n = #sel
+  if n <= 1 then return true end
+  local m, single, nt = 0, false, 0
+  for i = 1, n do
+    local c = sel[i]
+    if not Cards.is_stone(c) then
+      local id = Cards.rank_id(c)
+      m = m + 1; K_IDS[m] = id
+      local k = K_CNT[id]
+      if k == 0 then nt = nt + 1; K_TOUCH[nt] = id end
+      K_CNT[id] = k + 1
+    end
+  end
+  for i = 1, nt do if K_CNT[K_TOUCH[i]] == 1 then single = true end end
+  local distinct = (nt == m)
+  for i = 1, nt do K_CNT[K_TOUCH[i]] = 0 end
+  if m <= 1 or not single then return true end
+  local min_len = mods.four_fingers and 4 or 5
+  if m < min_len then return false end
+  -- straight (all ranks distinct, one run; Shortcut allows gaps of 2; the A-2-3-4-5 wheel)
+  if distinct and m <= 5 then
+    for i = 2, m do                                   -- insertion sort of <= 5 ids
+      local v, j = K_IDS[i], i - 1
+      while j >= 1 and K_IDS[j] > v do K_IDS[j + 1] = K_IDS[j]; j = j - 1 end
+      K_IDS[j + 1] = v
+    end
+    local max_step = mods.shortcut and 2 or 1
+    local run = true
+    for i = 2, m do
+      local st = K_IDS[i] - K_IDS[i - 1]
+      if st < 1 or st > max_step then run = false; break end
+    end
+    if run then return true end
+    if m == 5 and K_IDS[1] == 2 and K_IDS[2] == 3 and K_IDS[3] == 4 and K_IDS[4] == 5 and K_IDS[5] == 14 then return true end
+  end
+  return is_flush(sel, mods)
+end
+HandEval._kicker_free = kicker_free   -- exposed for the exactness test
+
 local KICKER_SENSITIVE = { j_raised_fist = true, j_blackboard = true }
 function HandEval.kicker_neutral(effective)
   for _, e in ipairs(effective) do
@@ -741,14 +793,9 @@ local function each_subset(gs, cards, f, filter, prune)
   local function rec(start, sel)
     if #sel >= 1 and #sel <= 5 then
       if prune then
-        local ht, scoring, contains = HandEval.analyze(sel, mods)
-        local all = true
-        if not mods.splash then
-          for i = 1, #sel do if not scoring[i] then all = false; break end end
-        end
-        if all then
-          local ev = HandEval.score_with(gs, sel, effective, mods, ht, scoring, contains)
-          f(ev, sel, copy)
+        if mods.splash or kicker_free(sel, mods) then
+          local ev = HandEval.score_with(gs, sel, effective, mods)
+          if not filter or filter(sel, ev.hand_type) then f(ev, sel, copy) end
         end
       else
         local ev = HandEval.score_with(gs, sel, effective, mods)
@@ -947,7 +994,7 @@ function HandEval.best_play_target(gs, cards, remaining, filter, cheap)
     -- blind: once you CLEAR (tier 2) the round ends and the full deck returns, so a spent card isn't lost,
     -- and the tier-2 econ/overkill + milk/hold-fuel logic owns card count there. Breaks an exact tie only,
     -- so it never sacrifices score/survival.
-    elseif tier < 2 and sk ~= bsk then better = sk < bsk
+    elseif (tier < 2 or HandEval.PRUNE_TARGET) and sk ~= bsk then better = sk < bsk
     else better = false end
     if better then
       best, best_sel, bt, be, bs, bmin, bsk = ev, copy(sel), tier, econ, ev.score, floor, sk
@@ -972,7 +1019,7 @@ function HandEval.best_play_target(gs, cards, remaining, filter, cheap)
         cur.sel, cur.score = copy(sel), ev.score
       end
     end
-  end, filter)
+  end, filter, HandEval.PRUNE_TARGET)
 
   if cands and #cands > 0 then
     -- stable on ties: the enumeration order breaks them (Lua's sort is not stable), so the pick never flickers
@@ -988,7 +1035,7 @@ function HandEval.best_play_target(gs, cards, remaining, filter, cheap)
       elseif tier == 2 and econ ~= be then better = econ > be
       elseif score ~= bs then better = score > bs
       elseif tier == 1 and floor ~= bmin then better = floor > bmin
-      elseif tier < 2 and sk ~= bsk then better = sk < bsk
+      elseif (tier < 2 or HandEval.PRUNE_TARGET) and sk ~= bsk then better = sk < bsk
       else better = false end
       if better then best, best_sel, bt, be, bs, bmin, bsk = oev, osel, tier, econ, score, floor, sk end
     end

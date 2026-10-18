@@ -48,4 +48,25 @@ return function(t)
   end
   HandEval.PRUNE_KICKERS = saved
   t.eq(mismatches, 0, string.format("best_play pruned == full enumeration on %d random hands", cases))
+
+  -- the allocation-free kicker check == "every analyze() scoring flag is set", on random sets of 1-5 cards,
+  -- including stones, wilds and the Four Fingers / Shortcut / Smeared modifiers
+  local MODS = { {}, { four_fingers = true }, { shortcut = true }, { smeared = true }, { four_fingers = true, shortcut = true } }
+  local bad, n = 0, 0
+  for _, mods in ipairs(MODS) do
+    for _ = 1, 400 do
+      local k = rnd(5)
+      local sel = {}
+      for i = 1, k do
+        sel[i] = card{ id = i, rank = RANKS[rnd(13)], suit = SUITS[rnd(4)],
+                       enhancement = (rnd(10) == 1) and "m_stone" or ((rnd(10) == 1) and "m_wild" or nil) }
+      end
+      local _, scoring = HandEval.analyze(sel, mods)
+      local all = true
+      for i = 1, #sel do if not scoring[i] then all = false end end
+      n = n + 1
+      if HandEval._kicker_free(sel, mods) ~= all then bad = bad + 1 end
+    end
+  end
+  t.eq(bad, 0, string.format("kicker_free == analyze all-scoring on %d random card sets", n))
 end

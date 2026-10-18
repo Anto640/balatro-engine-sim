@@ -1186,15 +1186,23 @@ return function(t)
           blind = { target_chips = 25, chips_scored = 0, hands_left = 4, discards_left = 2,
                     base_hands = 4, base_discards = 4, played_hand_types = {} } }
       end
-      -- WITHOUT Parking: just play the big pair and bank the hands
+      local function held_faces(play)
+        local played = {}
+        for _, c in ipairs(play.cards or {}) do played[c.id] = true end
+        local n = 0
+        for _, id in ipairs({ 2, 3, 4, 5 }) do if not played[id] then n = n + 1 end end
+        return n
+      end
+      -- WITHOUT Parking: play the big pair and bank the hands. Since 2026-10-18 a tied clear prefers the fewer cards,
+      -- so the clear itself is the bare pair and keeps the Queen and Jack in hand (it used to add every kicker).
       local plain = DE.decide(park_state({ joker{ key = "j_joker" } })).best
-      t.ok(#(plain.cards or {}) >= 3, "no hold lever: play the strong hand normally")
-      -- WITH Reserved Parking: play a MINIMAL hand, holding the faces for the per-hand $
+      t.eq(plain.hand_type, "Pair", "no hold lever: play the strong hand normally")
+      t.eq(#(plain.cards or {}), 2, "...without spending kickers")
+      -- WITH Reserved Parking: a PLAY that holds at least as many faces as the plain clear (the held-money farm)
       local park = DE.decide(park_state({ joker{ key = "j_reserved_parking" } })).best
-      t.eq(park.type, "PLAY", "Reserved Parking: still a PLAY (a milk play)")
-      t.ok(#(park.cards or {}) < #(plain.cards or {}),
-        "Reserved Parking: plays FEWER cards (holds faces) to farm held money")
-      t.ok(park.milk, "...tagged as a milk (hold-farm) play")
+      t.eq(park.type, "PLAY", "Reserved Parking: still a PLAY")
+      t.ok(held_faces(park) >= held_faces(plain) and held_faces(park) >= 2,
+        "Reserved Parking: holds the faces for the per-hand $")
     end
   end
 
