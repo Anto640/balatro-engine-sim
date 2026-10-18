@@ -15,6 +15,12 @@ property tests `tests/test_hand_eval_prune.lua`. **Run CPU (seed 1007 to a4): 20
 0.15 ms. **`pt_7` (a40edff) vs farm_7 (04:37): +0.116 (p 0.068), wins 62 -> 66, reach-8 73 -> 77, sign 20/10, 130
 tied -> SHIPPED + deployed. New seed_off-7 baseline: `sim_out/pt_7.jsonl`.** The 160-seed arm took 67 min on 11
 workers (03:30-04:37) vs ~4 h before. Next (owner's chess-engine idea): shallow look-ahead at early shop decisions.
+**LOOK-AHEAD (`sim/lookahead.lua`, probe `lookahead`, `ec74464`)**: at shops in antes 1-3, the engine's best, its best
+different spend and leaving the shop are each played forward 4x on SALTED futures (mid-ante resume: rest of the shop,
+then the ante's remaining blinds with its rolled boss, then the next ante) with the engine as the rollout policy;
+value = died ? 0.5 x horizon fraction : 1 + 0.25 x clamp(log2 pace margin); switch only on a paired gain > 0.02 and
+> 1 SE. Smoke (seed 1007 to a2): 6 decisions, 3 switched, ~190 CPU-s per decision. **Running (10:38, ~15:00):
+`la_7`, 40 seeds vs pt_7** (job tmp la_result.txt; records `kind = "lookahead"` list each decision's values).
 
 ## START HERE (2026-10-17) -- strategy gap, not tweaks
 Owner: "small tweaks are not the path to +60-70% winrate". Four controlled tests in a row (in-blind play/dig, discard
