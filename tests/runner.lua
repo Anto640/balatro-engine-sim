@@ -43,6 +43,7 @@ end
 -- ---- Discover + run suites --------------------------------------------------
 local suites = {
   "tests.test_hand_eval",
+  "tests.test_hand_eval_prune",
   "tests.test_decision",
   "tests.test_simulation",
   "tests.test_shop",

@@ -79,19 +79,18 @@ end
 -- Flush detection. mods.four_fingers lowers the threshold to 4; mods.smeared
 -- groups Hearts/Diamonds and Clubs/Spades together (by colour). Wild cards fill
 -- any group.
+-- (No closures in here or in analyze / score_with: LuaJIT cannot compile closure creation (FNEW / UCLO), and these run
+-- for every card set the subset enumeration scores -- the whole hot path fell back to the interpreter. 2026-10-18.)
 local function is_flush(cards, mods)
   mods = mods or {}
   local min_len = mods.four_fingers and 4 or 5
-  local function group_of(c)
-    if mods.smeared then return Cards.color(c) end
-    return c.suit
-  end
+  local smeared = mods.smeared
   local n, wilds, groups = 0, 0, {}
   for _, c in ipairs(cards) do
     if not Cards.is_stone(c) then
       n = n + 1
       if Cards.is_wild(c) then wilds = wilds + 1
-      else local k = group_of(c); groups[k] = (groups[k] or 0) + 1 end
+      else local k = smeared and Cards.color(c) or c.suit; groups[k] = (groups[k] or 0) + 1 end
     end
   end
   if n < min_len then return false end
@@ -136,6 +135,25 @@ local function is_straight(ids, mods)
   if n == 5 and distinct[1] == 2 and distinct[2] == 3 and distinct[3] == 4
      and distinct[4] == 5 and distinct[5] == 14 then return true end
   return false
+end
+
+-- Mark the cards of the ranks appearing >= minCount times as scoring, up to `limit` distinct ranks, taken by descending
+-- count then descending rank (the order the old table.sort produced; picked by repeated max -- limit is 1 or 2).
+local function score_ranks_with(played, counts, scoring, minCount, limit)
+  local chosen, taken = {}, 0
+  while taken < limit do
+    local bid, bcnt
+    for id, cnt in pairs(counts) do
+      if cnt >= minCount and not chosen[id] and (not bid or cnt > bcnt or (cnt == bcnt and id > bid)) then
+        bid, bcnt = id, cnt
+      end
+    end
+    if not bid then break end
+    chosen[bid] = true; taken = taken + 1
+  end
+  for i, c in ipairs(played) do
+    if not Cards.is_stone(c) and chosen[Cards.rank_id(c)] then scoring[i] = true end
+  end
 end
 
 -- Returns: hand_type, scoring_set(map index->true over `played`), contains-table
@@ -184,35 +202,14 @@ function HandEval.analyze(played, mods)
 
   -- Determine which cards score.
   local scoring = {}
-  local function score_all() for i = 1, #played do scoring[i] = true end end
-  local function score_ranks_with(minCount, limit)
-    -- score cards whose rank appears >= minCount, up to `limit` distinct ranks
-    local chosen, taken = {}, 0
-    -- pick ranks by descending count then rank for determinism
-    local order = {}
-    for id, cnt in pairs(counts) do order[#order + 1] = { id = id, cnt = cnt } end
-    table.sort(order, function(a, b)
-      if a.cnt ~= b.cnt then return a.cnt > b.cnt end
-      return a.id > b.id
-    end)
-    for _, e in ipairs(order) do
-      if e.cnt >= minCount and (not limit or taken < limit) then
-        chosen[e.id] = true; taken = taken + 1
-      end
-    end
-    for i, c in ipairs(played) do
-      if not Cards.is_stone(c) and chosen[Cards.rank_id(c)] then scoring[i] = true end
-    end
-  end
-
   if ht == "Flush Five" or ht == "Flush House" or ht == "Five of a Kind"
      or ht == "Straight Flush" or ht == "Full House" or ht == "Flush"
      or ht == "Straight" then
-    score_all()
-  elseif ht == "Four of a Kind" then score_ranks_with(4, 1)
-  elseif ht == "Three of a Kind" then score_ranks_with(3, 1)
-  elseif ht == "Two Pair" then score_ranks_with(2, 2)
-  elseif ht == "Pair" then score_ranks_with(2, 1)
+    for i = 1, #played do scoring[i] = true end
+  elseif ht == "Four of a Kind" then score_ranks_with(played, counts, scoring, 4, 1)
+  elseif ht == "Three of a Kind" then score_ranks_with(played, counts, scoring, 3, 1)
+  elseif ht == "Two Pair" then score_ranks_with(played, counts, scoring, 2, 2)
+  elseif ht == "Pair" then score_ranks_with(played, counts, scoring, 2, 1)
   else -- High Card: single highest card
     local best_i, best_id = nil, -1
     for i, c in ipairs(played) do
@@ -362,10 +359,13 @@ local function apply_effect(chips, mult, eff, log, src)
 end
 
 -- Edition effect on a card or joker (foil/holo/poly).
+-- Effect tables are read-only (apply never writes them), so the constant ones are shared, not rebuilt per call: the
+-- subset enumeration scores ~10M card sets a run and these allocations were a large part of it (2026-10-18 speed audit).
+local EFF_FOIL, EFF_HOLO, EFF_POLY = { chips = 50 }, { mult = 10 }, { xmult = 1.5 }
 local function edition_effect(edition)
-  if edition == "foil" then return { chips = 50 }
-  elseif edition == "holo" then return { mult = 10 }
-  elseif edition == "polychrome" then return { xmult = 1.5 } end
+  if edition == "foil" then return EFF_FOIL
+  elseif edition == "holo" then return EFF_HOLO
+  elseif edition == "polychrome" then return EFF_POLY end
   return nil
 end
 -- K5: a JOKER's edition applies in two parts around the joker's OWN effect. The ADDITIVE part
@@ -373,12 +373,12 @@ end
 -- too -- a Holo Cavendish is (mult+10)*3 in-game, not mult*3+10. The MULTIPLICATIVE part
 -- (polychrome x1.5) applies AFTER. (For a scored CARD, edition_effect is used as-is.)
 local function joker_edition_pre(edition)
-  if edition == "foil" then return { chips = 50 }
-  elseif edition == "holo" then return { mult = 10 } end
+  if edition == "foil" then return EFF_FOIL
+  elseif edition == "holo" then return EFF_HOLO end
   return nil
 end
 local function joker_edition_post(edition)
-  if edition == "polychrome" then return { xmult = 1.5 } end
+  if edition == "polychrome" then return EFF_POLY end
   return nil
 end
 
@@ -386,11 +386,15 @@ end
 -- probability -- so a Lucky card's expected +Mult doubles (1/5 -> 2/5 of +20). Only the Lucky branch
 -- is probabilistic; the others are deterministic and unaffected. Gated on `oops`, so a board without
 -- it is byte-identical (the golden hand_eval tests never own Oops).
+local EFF_BONUS, EFF_MULTC, EFF_GLASS = { chips = 30 }, { mult = 4 }, { xmult = 2 }
+local EFF_LUCKY = { mult = 4, approx = true, roll = "lucky" }               -- expected: 1/5 * 20
+local EFF_LUCKY_OOPS = { mult = 8, approx = true, roll = "lucky_oops" }     -- expected: 2/5 * 20
+local EFF_STEEL_HELD = { xmult = 1.5 }
 local function scored_enhancement_effect(enh, oops)
-  if enh == "m_bonus" then return { chips = 30 }
-  elseif enh == "m_mult" then return { mult = 4 }
-  elseif enh == "m_glass" then return { xmult = 2 }
-  elseif enh == "m_lucky" then return { mult = oops and 8 or 4, approx = true, roll = oops and "lucky_oops" or "lucky" } -- expected: (1 or 2)/5 * 20
+  if enh == "m_bonus" then return EFF_BONUS
+  elseif enh == "m_mult" then return EFF_MULTC
+  elseif enh == "m_glass" then return EFF_GLASS
+  elseif enh == "m_lucky" then return oops and EFF_LUCKY_OOPS or EFF_LUCKY
   end
   return nil
 end
@@ -410,6 +414,32 @@ local function roll_effect(kind, r)
   return nil
 end
 
+-- Apply a hook effect to the running totals of one score_with call. `st` carries that call's guaranteed floor
+-- (cmin/mmin; approx effects are excluded from it), the approx flag, the trigger log and the referee rng. `kind` ..
+-- label(`val`) names the trigger in the log, built only when the effect logs. Module-level, not a closure per call
+-- (LuaJIT cannot compile closure creation; see is_flush). Same arithmetic as apply_effect.
+local function apply(st, c, m, eff, kind, val)
+  local R = st.R
+  if R and eff and eff.roll then eff = roll_effect(eff.roll, R) end   -- referee: sample the chance effect
+  if not eff then return c, m end
+  local ec, em, ex = eff.chips, eff.mult, eff.xmult
+  if eff.approx then st.approx = true
+  else
+    if ec then st.cmin = st.cmin + ec end
+    if em then st.mmin = st.mmin + em end
+    if ex then st.mmin = st.mmin * ex end
+  end
+  if ec then c = c + ec end
+  if em then m = m + em end
+  if ex then m = m * ex end
+  if ec or em or ex then
+    local lab = (type(val) == "table") and Cards.label(val) or tostring(val)
+    local log = st.log
+    log[#log + 1] = { source = kind .. lab, chips = ec, mult = em, xmult = ex }
+  end
+  return c, m
+end
+
 -- score(gs, played) -> HandEvaluation
 -- Resolves the effective jokers (copy expansion) + hand-modifier flags, then
 -- delegates to score_with. Both depend only on gs.jokers (NOT on `played`), so
@@ -423,8 +453,10 @@ function HandEval.score(gs, played)
 end
 
 -- Score `played` with PRECOMPUTED effective jokers + mods (see HandEval.score).
-function HandEval.score_with(gs, played, effective, mods)
-  local ht, scoring, contains = HandEval.analyze(played, mods)
+function HandEval.score_with(gs, played, effective, mods, pre_ht, pre_scoring, pre_contains)
+  local ht, scoring, contains
+  if pre_ht then ht, scoring, contains = pre_ht, pre_scoring, pre_contains   -- analyze already run (each_subset prune)
+  else ht, scoring, contains = HandEval.analyze(played, mods) end
   local base = base_for(gs, ht)
   local chips, mult = base.chips, base.mult
   -- guaranteed floor: same scoring but excluding probabilistic UPSIDE (lucky,
@@ -472,13 +504,8 @@ function HandEval.score_with(gs, played, effective, mods)
 
   -- apply a hook effect to the running totals (mutates chips/mult and the
   -- guaranteed-floor cmin/mmin; approx effects are excluded from the floor).
-  local R = HandEval.roll_rng
-  local function apply(c, m, eff, src)
-    if R and eff and eff.roll then eff = roll_effect(eff.roll, R) end   -- referee: sample the chance effect
-    if eff and eff.approx then approx = true
-    else cmin, mmin = apply_effect(cmin, mmin, eff, nil, nil) end
-    return apply_effect(c, m, eff, log, src)
-  end
+  local st = { approx = false, cmin = cmin, mmin = mmin, log = log, R = HandEval.roll_rng }
+  local chip_eff = {}   -- the scored card's own chips (reused: apply only reads it)
 
   -- 2. scoring cards, left -> right. Debuffed cards score nothing -- both the
   --    live game's per-card flag AND the boss suit/face debuff (gs.boss_effect).
@@ -491,13 +518,14 @@ function HandEval.score_with(gs, played, effective, mods)
       end
       local triggers = 1 + ((card.seal == "Red") and 1 or 0) + extra
       for _ = 1, triggers do
-        chips, mult = apply(chips, mult, { chips = Cards.chips(card) }, "card:" .. Cards.label(card))
-        chips, mult = apply(chips, mult, scored_enhancement_effect(card.enhancement, mods.oops), "enh:" .. tostring(card.enhancement))
-        chips, mult = apply(chips, mult, edition_effect(card.edition), "edition:" .. tostring(card.edition))
+        chip_eff.chips = Cards.chips(card)
+        chips, mult = apply(st, chips, mult, chip_eff, "card:", card)
+        chips, mult = apply(st, chips, mult, scored_enhancement_effect(card.enhancement, mods.oops), "enh:", card.enhancement)
+        chips, mult = apply(st, chips, mult, edition_effect(card.edition), "edition:", card.edition)
         for _, e in ipairs(effective) do
           if e.impl and e.impl.on_card_scored then
             local eff = e.impl.on_card_scored(card, ctx, e.hookj)
-            chips, mult = apply(chips, mult, eff, "joker:" .. e.hookj.key)
+            chips, mult = apply(st, chips, mult, eff, "joker:", e.hookj.key)
             if eff and eff.dollars then money = money + eff.dollars end -- e.g. Rough Gem $/diamond
           end
         end
@@ -506,12 +534,12 @@ function HandEval.score_with(gs, played, effective, mods)
         -- retrigger (Hanging Chad) on a money card is worth ordering for.
         if card.seal == "Gold" then money = money + 3 end
         if card.enhancement == "m_lucky" then
-          if R then money = money + ((R() < (mods.oops and 2 or 1) / 15) and 20 or 0)
+          if st.R then money = money + ((st.R() < (mods.oops and 2 or 1) / 15) and 20 or 0)
           else money = money + (mods.oops and 40 or 20) / 15 end  -- Oops doubles Lucky's 1/15 $ odds
         end
         if business > 0 and (mods.all_faces or Cards.is_face(card)) then
-          if R then
-            for _ = 1, business do if mods.oops or R() < 0.5 then money = money + 2 end end
+          if st.R then
+            for _ = 1, business do if mods.oops or st.R() < 0.5 then money = money + 2 end end
           else
             money = money + business * (mods.oops and 2 or 1)   -- $2 at 1/2 (Oops -> 1/1) per Business Card, per trigger
           end
@@ -531,11 +559,11 @@ function HandEval.score_with(gs, played, effective, mods)
       local triggers = 1 + ((card.seal == "Red") and 1 or 0) + extra
       for _ = 1, triggers do
         if card.enhancement == "m_steel" then
-          chips, mult = apply(chips, mult, { xmult = 1.5 }, "steel-held:" .. Cards.label(card))
+          chips, mult = apply(st, chips, mult, EFF_STEEL_HELD, "steel-held:", card)
         end
         for _, e in ipairs(effective) do
           if e.impl and e.impl.on_held then
-            chips, mult = apply(chips, mult, e.impl.on_held(card, ctx, e.hookj), "joker:" .. e.hookj.key)
+            chips, mult = apply(st, chips, mult, e.impl.on_held(card, ctx, e.hookj), "joker:", e.hookj.key)
           end
         end
       end
@@ -551,15 +579,15 @@ function HandEval.score_with(gs, played, effective, mods)
   for _, e in ipairs(effective) do
     -- K5: foil/holo (additive) apply BEFORE the joker's own effect (so an xmult joker
     -- multiplies the +chips/+mult too); polychrome (x1.5) applies AFTER.
-    chips, mult = apply(chips, mult, joker_edition_pre(e.edition), "joker-edition:" .. tostring(e.edition))
+    chips, mult = apply(st, chips, mult, joker_edition_pre(e.edition), "joker-edition:", e.edition)
     if e.impl and e.impl.on_hand then
-      chips, mult = apply(chips, mult, e.impl.on_hand(ctx, e.hookj), "joker:" .. e.hookj.key)
+      chips, mult = apply(st, chips, mult, e.impl.on_hand(ctx, e.hookj), "joker:", e.hookj.key)
     end
-    chips, mult = apply(chips, mult, joker_edition_post(e.edition), "joker-edition:" .. tostring(e.edition))
+    chips, mult = apply(st, chips, mult, joker_edition_post(e.edition), "joker-edition:", e.edition)
     if other_x > 1 then
       local src = (gs.jokers or {})[e.position]   -- the joker IN this slot (a copier is not itself Uncommon)
       if src and not src.debuffed and Jokers.is_uncommon(src) then
-        chips, mult = apply(chips, mult, { xmult = other_x }, "joker:j_baseball")
+        chips, mult = apply(st, chips, mult, { xmult = other_x }, "joker:", "j_baseball")
       end
     end
   end
@@ -571,8 +599,8 @@ function HandEval.score_with(gs, played, effective, mods)
     chips = chips,
     mult = mult,
     score = score,
-    score_min = math.floor(cmin * mmin + 1e-9), -- guaranteed floor (no RNG upside)
-    approx = approx,           -- true if any RNG-expected value was used
+    score_min = math.floor(st.cmin * st.mmin + 1e-9), -- guaranteed floor (no RNG upside)
+    approx = st.approx,        -- true if any RNG-expected value was used
     money = money,             -- retrigger-aware in-blind $ from scoring
     scoring_cards = scoring_cards,
     contains = contains,       -- {pair,two_pair,three,four,straight,flush,full_house}
@@ -597,6 +625,7 @@ end
 -- At or below the budget nothing changes at all, so the simulator (hand size 8 in the
 -- overwhelming majority of states) and every previously captured run stay byte-identical.
 HandEval.HAND_BUDGET = 8
+HandEval.PRUNE_KICKERS = (os.getenv and os.getenv("BES_PRUNE")) ~= "0"   -- best_play kicker pruning (BES_PRUNE=0 off)
 
 -- The `budget` most play-relevant cards. Built CONSTRUCTIVELY rather than by an additive score:
 -- a weighted ranking cannot guarantee that five cards of one suit survive together, so it can
@@ -681,7 +710,22 @@ local function hand_ctx(gs, cards)
 end
 HandEval.hand_ctx = hand_ctx
 
-local function each_subset(gs, cards, f, filter)
+-- KICKER PRUNING (2026-10-18 speed audit: ~10M card sets scored a run). A played card that does NOT score (a kicker)
+-- can only change a play's score through the cards it leaves HELD or the number of cards played. Those effects only
+-- LOSE value when a card is played (Baron / Shoot the Moon / Mime / held Steel lose a held card, Half Joker a slot),
+-- except Raised Fist (the lowest held card moves) and Blackboard (a red card leaving the hand) -- so on every other
+-- board a play with a kicker scores at most what its scoring cards alone score. A caller whose tie-break also prefers
+-- the fewer / cheaper cards (best_play) loses nothing by skipping those sets: `prune` = score only sets in which every
+-- played card scores (supersets are still walked -- one more card can make a new hand). nil = every set, as before.
+local KICKER_SENSITIVE = { j_raised_fist = true, j_blackboard = true }
+function HandEval.kicker_neutral(effective)
+  for _, e in ipairs(effective) do
+    local k = e.hookj and e.hookj.key
+    if k and KICKER_SENSITIVE[k] and e.impl then return false end
+  end
+  return true
+end
+local function each_subset(gs, cards, f, filter, prune)
   gs = hand_ctx(gs, cards)
   local budget = HandEval.HAND_BUDGET
   if budget and #cards > budget then cards = budget_cards(cards, budget) end
@@ -692,11 +736,24 @@ local function each_subset(gs, cards, f, filter)
   local effective = HandEval.effective_jokers(gs)
   local mods = joker_mods(effective)
   if YIELD then YIELD() end   -- cooperative slice boundary (no-op unless driven)
+  if prune and (filter or not HandEval.kicker_neutral(effective)) then prune = false end
   local function copy(t) local o = {} for i = 1, #t do o[i] = t[i] end return o end
   local function rec(start, sel)
     if #sel >= 1 and #sel <= 5 then
-      local ev = HandEval.score_with(gs, sel, effective, mods)
-      if not filter or filter(sel, ev.hand_type) then f(ev, sel, copy) end
+      if prune then
+        local ht, scoring, contains = HandEval.analyze(sel, mods)
+        local all = true
+        if not mods.splash then
+          for i = 1, #sel do if not scoring[i] then all = false; break end end
+        end
+        if all then
+          local ev = HandEval.score_with(gs, sel, effective, mods, ht, scoring, contains)
+          f(ev, sel, copy)
+        end
+      else
+        local ev = HandEval.score_with(gs, sel, effective, mods)
+        if not filter or filter(sel, ev.hand_type) then f(ev, sel, copy) end
+      end
       yield_tick()
     end
     if #sel == 5 then return end
@@ -764,7 +821,7 @@ function HandEval.best_play(gs, cards)
        or (ev.score == best.score and spent_keep(sel) < bsk) then
       best = ev; best_sel = copy(sel); bsk = spent_keep(sel)
     end
-  end)
+  end, nil, HandEval.PRUNE_KICKERS)
   return best, best_sel
 end
 
