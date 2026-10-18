@@ -12,8 +12,9 @@ each). Done (all in `engine/hand_eval.lua`):
    first-enumerated tie, often a kicker play) -- the ONE behaviour change, `BES_PRUNE_TARGET=0` restores.
 Verification: 3 golden seeds (a1-3) byte-identical for 1 and 2 (and for the type-only-filter step vs its parent);
 property tests `tests/test_hand_eval_prune.lua`. **Run CPU (seed 1007 to a4): 201s -> 21.6s (~9x)**; best_play 2.46 ->
-0.15 ms. **Pending: `pt_7` (HEAD a40edff) vs farm_7** -- queued after econ2_7 (job tmp pt_result.txt), checks the
-tie-break change and times a full arm. Not deployed until it passes.
+0.15 ms. **`pt_7` (a40edff) vs farm_7 (04:37): +0.116 (p 0.068), wins 62 -> 66, reach-8 73 -> 77, sign 20/10, 130
+tied -> SHIPPED + deployed. New seed_off-7 baseline: `sim_out/pt_7.jsonl`.** The 160-seed arm took 67 min on 11
+workers (03:30-04:37) vs ~4 h before. Next (owner's chess-engine idea): shallow look-ahead at early shop decisions.
 
 ## START HERE (2026-10-17) -- strategy gap, not tweaks
 Owner: "small tweaks are not the path to +60-70% winrate". Four controlled tests in a row (in-blind play/dig, discard

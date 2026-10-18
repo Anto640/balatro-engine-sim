@@ -137,7 +137,8 @@ lua  tools/analyze_runs.lua sim_out/<baseline>.jsonl compare sim_out/<name>.json
 ```
 - **Run FULL FIDELITY** (no `mc_cap` arg). The `_G.BES_MC_CAP` cheap-path **distorts** decisions
   (cap=3 degrades in-blind play → too harsh); only for rough scans.
-- **Speed:** ~95 s/run single-core; batches run in parallel (one LuaJIT process per worker, interleaved seeds).
+- **Speed (2026-10-18, hand_eval speed-up ~9x):** a 160-seed arm takes ~70 min on 11 workers (was ~3-4 h; the timing
+  notes below predate it). Older: batches run in parallel (one LuaJIT process per worker, interleaved seeds).
   Merged parallel output is byte-identical to sequential because the sim is cross-process deterministic
   (sorted-key sampling + stable tie-breaks).
 - **Worker count (owner rule, updated 2026-10-08):** always **11**, whether or not the owner is using the PC -- batches run at
