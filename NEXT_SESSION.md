@@ -1,5 +1,20 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-18) -- sim speed-up (owner: "chess engine" search needs a fast sim)
+Speed audit: ~80% of sim time was HandEval scoring every 1-5 card subset (10.4M subsets for one run to ante 3, ~20 us
+each). Done (all in `engine/hand_eval.lua`):
+1. no closures in the scoring hot path (LuaJIT could not compile FNEW/UCLO, so the loop ran interpreted), lazy trigger
+   labels, shared effect tables -- byte-identical;
+2. KICKER PRUNING: a set with a non-scoring card is skipped when no joker gains from a card leaving the hand (only Raised
+   Fist / Blackboard do) -- exact for `best_play` (tie-break prefers fewer cards); allocation-free `kicker_free` check;
+   also under hand-type-only boss filters (Mouth / Eye; not Psychic / Cerulean Bell);
+3. `best_play_target` prunes too, with a clearing-play tie-break that now prefers the fewer/cheaper cards (it kept the
+   first-enumerated tie, often a kicker play) -- the ONE behaviour change, `BES_PRUNE_TARGET=0` restores.
+Verification: 3 golden seeds (a1-3) byte-identical for 1 and 2 (and for the type-only-filter step vs its parent);
+property tests `tests/test_hand_eval_prune.lua`. **Run CPU (seed 1007 to a4): 201s -> 21.6s (~9x)**; best_play 2.46 ->
+0.15 ms. **Pending: `pt_7` (HEAD a40edff) vs farm_7** -- queued after econ2_7 (job tmp pt_result.txt), checks the
+tie-break change and times a full arm. Not deployed until it passes.
+
 ## START HERE (2026-10-17) -- strategy gap, not tweaks
 Owner: "small tweaks are not the path to +60-70% winrate". Four controlled tests in a row (in-blind play/dig, discard
 choice, voucher pricing, Banner) found the engine's LOCAL choices as good as its alternatives. Whole-run behaviour vs the
