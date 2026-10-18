@@ -64,6 +64,9 @@ always take Hermit / Temperance; keep the money jokers (no early selling). Done:
   14/23 (61%) vs 39/50 without; a8 capacity 226k -> 195k. Money jokers are never converted late (the trade/sell money
   rate is flat by ante). **Running (23:52, ~04:30): `econ2_7`** = econ_policy + BES_MONEY_ANTE=1 (ante-aware money
   weight: x1 to a3, then .73/.52/.35/.22/.10) vs farm_7 -- milk early, swap money jokers for scorers late.
+  **`econ2_7` vs farm_7 (03:32): +0.067 (p 0.60), wins 62 -> 56, reach-8 73 -> 77, sign 42/41.** The late swap happens
+  (a8 boards with a money joker 23 -> 5) but a8 capacity is LOWER still (farm 226k, econ 195k, econ2 158k; a5 45k vs
+  34k): the early slot cost never comes back. Forcing money jokers does not pay in this engine; probes stay off.
 
 
 ## START HERE (2026-10-14 morning)
