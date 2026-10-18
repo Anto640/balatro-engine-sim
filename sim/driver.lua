@@ -105,6 +105,7 @@ end
 -- These replace `engine/pacing.lua`'s six invented growth coefficients with something that
 -- can be FITTED. Labels come from the run outcome: dense `reach(ante+1)` per boundary plus
 -- the sparse `win`, which is what makes 4-positives-per-160 trainable at all.
+Driver._metrics = metrics   -- the leaf value of a look-ahead rollout (sim/lookahead.lua)
 function Driver.features(run)
   local f = {
     ante = run.ante, round = run.round, dollars = run.economy.dollars,
@@ -224,22 +225,32 @@ function Driver.run(seed, opts)
   -- W4: the ante counter is MUTABLE -- Hieroglyph's -1 ante (content sets run._ante_back)
   -- is consumed at the boundary below by replaying the ante, so the loop is a while.
   local ante = (opts.run and run.ante) or 1
+  -- LOOK-AHEAD resume (sim/lookahead.lua, 2026-10-18): a forked run continues from the blind AFTER the shop it was
+  -- forked in, with the ante's blinds (and boss) already rolled -- not by replaying the ante from its Small blind.
+  local resume = opts.resume and opts.run and run._ante_blinds and true or false
   while ante <= max_ante do
     run.ante = ante
-    -- Phase A probe: free hand levels per ante (sim/probe.lua). Applied BEFORE the ante's
-    -- snapshot so the feature vector reflects them. Inert on every normal run.
-    if run.probe and run.probe.free_levels and content.grant_free_levels then
-      content.grant_free_levels(run, run.probe.free_levels)
-    end
-    if ante > 1 then
-      local r = { kind = "ante", ante = ante, metrics = metrics(run) }
-      local b = board(run); for k, v in pairs(b) do r[k] = v end
-      emit(r)
-    end
+    local blinds, first_bi
+    if resume then
+      blinds, first_bi, resume = run._ante_blinds, (run._blind_idx or 0) + 1, false
+    else
+      first_bi = 1
+      -- Phase A probe: free hand levels per ante (sim/probe.lua). Applied BEFORE the ante's
+      -- snapshot so the feature vector reflects them. Inert on every normal run.
+      if run.probe and run.probe.free_levels and content.grant_free_levels then
+        content.grant_free_levels(run, run.probe.free_levels)
+      end
+      if ante > 1 then
+        local r = { kind = "ante", ante = ante, metrics = metrics(run) }
+        local b = board(run); for k, v in pairs(b) do r[k] = v end
+        emit(r)
+      end
 
-    World.checkpoint(run, "ante", ante)        -- common random numbers (World.stream): the boss roll
-    local blinds = World.ante_blinds(run)
-    for _, blind in ipairs(blinds) do
+      World.checkpoint(run, "ante", ante)        -- common random numbers (World.stream): the boss roll
+      blinds = World.ante_blinds(run)
+    end
+    for bi, blind in ipairs(blinds) do
+      if bi < first_bi then goto next_blind end
       run.round = run.round + 1
       -- SKIP decision (Small/Big only): offer a tag, ask the engine, and if it skips,
       -- take the tag's effect and move to the next blind (no play, no income, NO shop).
@@ -353,6 +364,7 @@ function Driver.run(seed, opts)
       -- emit forwards the action trace (shop offers/advice, buys, sells, packs) into the
       -- run's records, so analyze_runs surfaces what it bought AND what it SKIPPED.
       run._next_blind = (blind.type == "Small" and "Big") or (blind.type == "Big" and "Boss") or "Small"
+      run._ante_blinds, run._blind_idx = blinds, bi       -- where a look-ahead fork resumes (no rng)
       World.checkpoint(run, "shop", ante, run.round)      -- the shop's first offers
       content.shop_phase(run, { rng = run.rng, emit = emit })
       ::next_blind::

@@ -627,6 +627,7 @@ Probe.CONFIGS = {
   gold6        = { start_money = { n = 6, enhancement = "m_gold" } },
   gseal6       = { start_money = { n = 6, seal = "Gold" } },
   rich4        = { income_bonus = 4 },   -- control for gold6: its held Gold paid ~$3.7/round (1.22 held x $3)
+  lookahead    = { skip_only = { tag_investment = true }, skip_only_until = 1, lookahead = true, lookahead_until = 3 },
   econ_policy  = { skip_only = { tag_investment = true }, skip_only_until = 1,
                    econ_buy_until = 3, econ_keep_until = 5, econ_max = 2 },   -- owner econ policy (on the invest1 skips)
   rich1        = { income_bonus = 1 },   -- dose-response for the value of $/round income

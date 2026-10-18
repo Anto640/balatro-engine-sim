@@ -1035,44 +1035,9 @@ end
 
 -- The driver hook: open a shop, let the engine spend until it SAVEs (or a safety cap).
 -- opts.emit (optional) collects the action trace (shop offers/advice, buys, sells, packs).
-function Content.shop_phase(run, opts)
-  local rng = run.rng
-  local crn_n = {}   -- per-visit action counters for the common-random-number streams (see the action loop)
-  run._emit = opts and opts.emit
-  local base_reroll = math.max(0, Content.BASE_REROLL - (run._reroll_discount or 0))  -- A4: Reroll Surplus -$2
-  if run._free_reroll then base_reroll = 0; run._free_reroll = nil end                -- A5: D6 tag -> $0 reroll base (one shop)
-  run.reroll_cost = base_reroll
-  -- `ostock` ceiling probe: a voucher owned from the first shop (inert without a config)
-  if run.probe and run.probe.cash_once and not run._probe_cash and (run.ante or 1) >= (run.probe.cash_once_ante or 1) then
-    run._probe_cash = true; run.economy.dollars = run.economy.dollars + run.probe.cash_once
-  end
-  if run.probe and run.probe.free_voucher and not run._probe_voucher
-     and (run.ante or 1) >= (run.probe.free_voucher_ante or 1) then
-    run._probe_voucher = true; apply_voucher(run, run.probe.free_voucher)
-  end
-  local shop = Content.gen_shop(run, rng)
-  -- Chaos the Clown (JOKER_FIDELITY P0): ONE free reroll each shop. Grant it and expose free_rerolls
-  -- on the shop so the engine's OwnedSynergy.reroll_free values the roll as free; the free roll does
-  -- not escalate the price (see the REROLL branch of apply_action). -- VERIFY: 1 free/shop (wiki).
-  do
-    local chaos = false
-    for _, j in ipairs(run.jokers or {}) do if j.key == "j_chaos" then chaos = true; break end end
-    run._chaos_free = chaos and 1 or 0
-    -- `reroll1` ceiling probe: free rerolls each shop through an ante (inert without a config)
-    local p = run.probe
-    if p and p.free_rerolls and (run.ante or 1) <= (p.free_rerolls_until or 8) then
-      run._chaos_free = math.max(run._chaos_free, p.free_rerolls)
-    end
-    shop.free_rerolls = run._chaos_free
-  end
-  -- A5: Coupon tag -> the initial jokers & booster packs in THIS shop are free (one shop).
-  if run._coupon then
-    for _, j in ipairs(shop.jokers) do j.cost = 0 end
-    for _, b in ipairs(shop.boosters) do b.cost = 0 end
-    run._coupon = nil
-  end
-  run._shop = shop
-  run._shop_visit = (run._shop_visit or 0) + 1   -- visit counter (decision audit); touches no rng
+-- The shop's action loop + shop-exit effects, split out of shop_phase (2026-10-18) so a LOOK-AHEAD rollout
+-- (sim/lookahead.lua) can finish a shop part-way through on a forked run. `crn_n` = the visit's action counters.
+local function shop_loop(run, shop, rng, crn_n)
   local guard, last_sig = 0, nil
   while guard < 40 do
     guard = guard + 1
@@ -1142,6 +1107,15 @@ function Content.shop_phase(run, opts)
     if run.probe and run.probe.nobuy then
       local nv = Probe.nobuy(run, shop, ranked)
       if nv then ranked = nv end
+    end
+    -- LOOK-AHEAD (sim/lookahead.lua): compare the engine's top choices by playing each forward on sampled futures.
+    -- Inert without the probe config, and never inside a look-ahead rollout (no recursion).
+    if run.probe and run.probe.lookahead and not run._la_rollout and (run.ante or 1) <= (run.probe.lookahead_until or 3)
+       and ranked.best.type ~= "SAVE" then
+      local LA = require("sim.lookahead")
+      local pick, rec = LA.choose(run, shop, crn_n, ranked)
+      if rec then trace(run, rec) end
+      if pick then ranked = pick end
     end
     -- DECISION AUDIT (tools/decision_audit.lua): replace the engine's FIRST action at one shop visit by its
     -- runner-up / third choice / leaving the shop, then let the engine play on. Inert unless _G.BES_FORCE is set.
@@ -1214,6 +1188,48 @@ function Content.shop_phase(run, opts)
     end
   end
   run._shop = nil; run._emit = nil
+end
+Content._shop_loop = shop_loop
+
+function Content.shop_phase(run, opts)
+  local rng = run.rng
+  local crn_n = {}   -- per-visit action counters for the common-random-number streams (see the action loop)
+  run._emit = opts and opts.emit
+  local base_reroll = math.max(0, Content.BASE_REROLL - (run._reroll_discount or 0))  -- A4: Reroll Surplus -$2
+  if run._free_reroll then base_reroll = 0; run._free_reroll = nil end                -- A5: D6 tag -> $0 reroll base (one shop)
+  run.reroll_cost = base_reroll
+  -- `ostock` ceiling probe: a voucher owned from the first shop (inert without a config)
+  if run.probe and run.probe.cash_once and not run._probe_cash and (run.ante or 1) >= (run.probe.cash_once_ante or 1) then
+    run._probe_cash = true; run.economy.dollars = run.economy.dollars + run.probe.cash_once
+  end
+  if run.probe and run.probe.free_voucher and not run._probe_voucher
+     and (run.ante or 1) >= (run.probe.free_voucher_ante or 1) then
+    run._probe_voucher = true; apply_voucher(run, run.probe.free_voucher)
+  end
+  local shop = Content.gen_shop(run, rng)
+  -- Chaos the Clown (JOKER_FIDELITY P0): ONE free reroll each shop. Grant it and expose free_rerolls
+  -- on the shop so the engine's OwnedSynergy.reroll_free values the roll as free; the free roll does
+  -- not escalate the price (see the REROLL branch of apply_action). -- VERIFY: 1 free/shop (wiki).
+  do
+    local chaos = false
+    for _, j in ipairs(run.jokers or {}) do if j.key == "j_chaos" then chaos = true; break end end
+    run._chaos_free = chaos and 1 or 0
+    -- `reroll1` ceiling probe: free rerolls each shop through an ante (inert without a config)
+    local p = run.probe
+    if p and p.free_rerolls and (run.ante or 1) <= (p.free_rerolls_until or 8) then
+      run._chaos_free = math.max(run._chaos_free, p.free_rerolls)
+    end
+    shop.free_rerolls = run._chaos_free
+  end
+  -- A5: Coupon tag -> the initial jokers & booster packs in THIS shop are free (one shop).
+  if run._coupon then
+    for _, j in ipairs(shop.jokers) do j.cost = 0 end
+    for _, b in ipairs(shop.boosters) do b.cost = 0 end
+    run._coupon = nil
+  end
+  run._shop = shop
+  run._shop_visit = (run._shop_visit or 0) + 1   -- visit counter (decision audit); touches no rng
+  shop_loop(run, shop, rng, crn_n)
 end
 
 return Content
