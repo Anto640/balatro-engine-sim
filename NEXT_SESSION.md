@@ -21,6 +21,9 @@ then the ante's remaining blinds with its rolled boss, then the next ante) with 
 value = died ? 0.5 x horizon fraction : 1 + 0.25 x clamp(log2 pace margin); switch only on a paired gain > 0.02 and
 > 1 SE. Smoke (seed 1007 to a2): 6 decisions, 3 switched, ~190 CPU-s per decision. **Running (10:38, ~15:00):
 `la_7`, 40 seeds vs pt_7** (job tmp la_result.txt; records `kind = "lookahead"` list each decision's values).
+Owner: the pace leaf's growth projection is arbitrary (smoke: every future survived, so the TIE-BREAK chose). **Queued
+after la_7: `la2_7`** = BES_LA_LEAF=cap (measured capacity / next boss requirement at the horizon, no projection) +
+BES_LA_HORIZON=2, 40 seeds vs pt_7 (job tmp la2_result.txt).
 
 ## START HERE (2026-10-17) -- strategy gap, not tweaks
 Owner: "small tweaks are not the path to +60-70% winrate". Four controlled tests in a row (in-blind play/dig, discard
