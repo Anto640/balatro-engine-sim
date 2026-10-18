@@ -1,5 +1,18 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-18 afternoon) -- consolidated state
+**Live = main = HEAD (deployed through `6833b00`; later commits are sim-only).** Baseline seed_off 7 = **`sim_out/pt_7.jsonl`
+(66/160 wins, 77 reach-8)**. Shipped this week: round-target fix (Idol/Ancient/Castle/Mail-In live targets), in-blind
+money FARM (`engine/farm.lua`), hand_eval speed-up (~9x CPU; 160-seed arm ~70 min), fewer-cards tie-break for tied clears.
+Closed (measured, no gain): voucher pricing (cash control), Banner ban, discard-choice audit, play/dig placebo, forcing
+money jokers (econ_7 / econ2_7). Key fact: +$10/round = 36% -> 81% wins, but the engine's own money engine does not
+convert; owner thinks board building (joker choice), not money, is the gap.
+**Running:** `la_7` (look-ahead, probe `lookahead`, 40 seeds vs pt_7; started 10:38, ~3 h per seed -> ~23:00; job tmp
+la_result.txt). **Queued after it:** `la2_7` (BES_LA_LEAF=cap + BES_LA_HORIZON=2, ~18-20 h; la2_result.txt). Read each
+with `lua tools/analyze_runs.lua sim_out/pt_7.jsonl compare sim_out/la_7.jsonl` (40 seeds: only large effects show) plus
+the `kind = "lookahead"` records (how often it overrode the engine, on what, value gaps). If promising -> 160 seeds /
+longer horizon / measured (win-rate-fitted) leaf; if null -> the leaf or horizon is the limit, not the search.
+
 ## START HERE (2026-10-18) -- sim speed-up (owner: "chess engine" search needs a fast sim)
 Speed audit: ~80% of sim time was HandEval scoring every 1-5 card subset (10.4M subsets for one run to ante 3, ~20 us
 each). Done (all in `engine/hand_eval.lua`):

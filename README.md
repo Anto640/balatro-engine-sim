@@ -10,14 +10,15 @@ real hands, scored by a faithful re-implementation of Balatro's scoring), not fr
 
 ## Status
 
-- **Autonomous win rate:** about **35-39%** in the headless simulator (red deck, white stake; 58 of 160 and 63 of 160 runs on
-  the two seed pools, October 2026). For scale: ~28% at the start of October, ~6% in late September 2026 and ~1% in August.
+- **Autonomous win rate:** about **41%** in the headless simulator (red deck, white stake; 66 of 160 on the seed_off-7 pool,
+  18 October 2026). For scale: ~28% at the start of October, ~6% in late September 2026 and ~1% in August.
 - **Live:** the in-game self-player plays unattended overnight (watchdog + auto-restart); recent nights won 9/26 and 4/26
   runs. Its runs are reviewed to find live-only bugs (press F5 at a misplay to save the decision for review).
-- **Recent:** skip tags are limited to the Investment tag at ante 1 (owner decision, temporary); edition / Negative /
-  Voucher / Double tags valued correctly; a decision-audit harness (replay a seed with one choice changed, read against a
-  placebo) and a voucher outcome table (`docs/DECISION_AUDIT_2026-10-12.md`, `docs/TIME_LEFT_AUDIT_2026-10-12.md`).
-- **Tests:** 1632 headless unit tests + the simulator suites, all green.
+- **Recent (Oct 2026):** the simulator is ~9x faster (hand scoring compiled by LuaJIT, exact pruning of plays that can't be
+  best; a 160-seed A/B now takes ~70 min); in-blind money farming of money jokers (`engine/farm.lua`); Idol / Ancient /
+  Castle / Mail-In round targets read live; a shallow look-ahead search at early shops (`sim/lookahead.lua`, sim-only,
+  under test). Measured: +$10/round money lifts the sim win rate 36% -> 81%, but forcing money jokers does not pay.
+- **Tests:** 1657 headless unit tests + 637 simulator-suite tests, all green.
 - The full, current handoff (what shipped, what was measured, what's next) is in **`NEXT_SESSION.md`**.
 
 ## What it advises
