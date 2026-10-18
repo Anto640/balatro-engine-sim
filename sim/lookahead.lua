@@ -20,7 +20,11 @@ local World  = require("sim.world")
 local LA = {}
 LA.UNTIL_ANTE = 3     -- search the shops of antes 1..3 (the early board decides runs: MCTS_PLAN Phase 1)
 LA.SAMPLES    = 4     -- sampled futures per candidate (same salts across candidates: common random numbers)
-LA.HORIZON    = 1     -- antes beyond the current one to play (owner: "through the end of the next ante")
+LA.HORIZON    = tonumber(os.getenv and os.getenv("BES_LA_HORIZON") or "") or 1   -- antes beyond the current one to play
+-- leaf among SURVIVING futures: "pace" = the pace model's projected margin at ante 8 (hand-set growth constants);
+-- "cap" = the board's MEASURED capacity over the next boss's requirement at the horizon -- no projection, so every
+-- candidate is judged at the same point by what its board actually scores (owner: the projection is arbitrary)
+LA.LEAF       = (os.getenv and os.getenv("BES_LA_LEAF")) or "pace"
 LA.MARGIN     = 0.02  -- an alternative must beat the engine's own choice by this much (noise guard)
 LA.SALT       = 900001
 
@@ -83,7 +87,13 @@ local function rollout(run, shop, crn_n, cand, s)
     return 0.5 * math.min(1, cleared / math.max(1, total))
   end
   local m = Driver._metrics(f)
-  local pm = (m and m.pace_margin) or 1
+  local pm
+  if LA.LEAF == "cap" then
+    local req = require("engine.mechanics").blind_requirement(math.min(8, horizon + 1), "Boss")
+    pm = ((m and m.capacity) or 0) / math.max(1, req)
+  else
+    pm = (m and m.pace_margin) or 1
+  end
   local l = math.log(math.max(1e-6, pm)) / math.log(2)
   if l > 2 then l = 2 elseif l < -2 then l = -2 end
   return 1 + 0.25 * l
