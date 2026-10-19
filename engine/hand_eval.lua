@@ -782,6 +782,7 @@ function HandEval.kicker_neutral(effective)
   end
   return true
 end
+local function copy_list(t) local o = {} for i = 1, #t do o[i] = t[i] end return o end
 local function each_subset(gs, cards, f, filter, prune)
   gs = hand_ctx(gs, cards)
   local budget = HandEval.HAND_BUDGET
@@ -794,28 +795,30 @@ local function each_subset(gs, cards, f, filter, prune)
   local mods = joker_mods(effective)
   if YIELD then YIELD() end   -- cooperative slice boundary (no-op unless driven)
   if prune and ((filter and not HandEval.TYPE_ONLY[filter]) or not HandEval.kicker_neutral(effective)) then prune = false end
-  local function copy(t) local o = {} for i = 1, #t do o[i] = t[i] end return o end
-  local function rec(start, sel)
-    if #sel >= 1 and #sel <= 5 then
+  -- Depth-first pre-order over index sets ({1}, {1,2}, ..., {1,2,3,4,5}, {1,2,3,4,6}, ...), the exact order the old
+  -- recursive walk visited them (ties go to the first set met), as a plain loop: the recursive closure re-created per
+  -- call blocked LuaJIT compilation thousands of times a run (2026-10-18).
+  local sel, c, L, start = {}, {}, 0, 1
+  local split = mods.splash
+  while true do
+    if L < 5 and start <= n then
+      L = L + 1; c[L] = start; sel[L] = cards[start]
       if prune then
-        if mods.splash or kicker_free(sel, mods) then
+        if split or kicker_free(sel, mods) then
           local ev = HandEval.score_with(gs, sel, effective, mods)
-          if not filter or filter(sel, ev.hand_type) then f(ev, sel, copy) end
+          if not filter or filter(sel, ev.hand_type) then f(ev, sel, copy_list) end
         end
       else
         local ev = HandEval.score_with(gs, sel, effective, mods)
-        if not filter or filter(sel, ev.hand_type) then f(ev, sel, copy) end
+        if not filter or filter(sel, ev.hand_type) then f(ev, sel, copy_list) end
       end
       yield_tick()
-    end
-    if #sel == 5 then return end
-    for i = start, n do
-      sel[#sel + 1] = cards[i]
-      rec(i + 1, sel)
-      sel[#sel] = nil
+      start = start + 1
+    else
+      if L == 0 then break end
+      start = c[L] + 1; sel[L] = nil; L = L - 1
     end
   end
-  rec(1, {})
 end
 
 -- Top plays by score, ONE per hand type (for diagnostics / the F7 dump). Shows
