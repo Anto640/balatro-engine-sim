@@ -1,5 +1,22 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-19 evening) -- consolidated state
+**Live = main (deployed through `6833b00`; later commits are sim-only).** Baseline seed_off 7 = **`sim_out/pt_7.jsonl`
+(66/160 wins = 41%, 77 reach-8)**. Sim speed: a 160-seed arm is ~35-70 min on 11 workers (hand_eval ~9x + LuaJIT trace
+cache ~2x, all byte-identical); `BES_ARM_ORDER=<abs path to an arm>.jsonl` starts the longest seeds first.
+**Look-ahead search (owner's chess-engine idea) = CLOSED at this depth.** `sim/lookahead.lua` (probe lookahead /
+lookahead2; off by default): la_7 (antes 1-3, +1 ante, pace leaf) +0.31 (se 0.26) wins 22 -> 21; la3_7 (antes 1-2,
++2 antes, capacity leaf, transpositions, widened leaf) -0.30 (se 0.28) wins 22 -> 20 on 39/40 seeds (last seed pending,
+job tmp la3_result.txt). Both override 17-26% of shop decisions, mostly "save instead of the pack / joker", in opposite
+net directions -> the overrides are mostly noise; the "save" pattern is NOT reliable (earlier hoard lesions also lost).
+Cost ~40x a run per seed. Keep as a tool, do not batch further without a stronger leaf.
+**Closed this week (measured):** voucher pricing, Banner ban, discard choice, play/dig placebo, forcing money jokers
+(econ_7 / econ2_7), look-ahead. **Shipped:** round targets (Idol/Ancient/Castle/Mail-In live), farm mode, speed-ups,
+fewer-cards tie-break. **Owner's view:** casual players win without economy play -> the gap is BOARD BUILDING / joker
+choice (owner builds a coherent combo, e.g. Photograph + Hanging Chad + Sock and Buskin, with tarots shaping the deck;
+the engine holds generic jokers: Banner, Blue Joker, Raised Fist, Misprint). +$10/round = 36% -> 81% shows boards are
+too weak early, not that money is the root cause.
+
 ## START HERE (2026-10-18 afternoon) -- consolidated state
 **Live = main = HEAD (deployed through `6833b00`; later commits are sim-only).** Baseline seed_off 7 = **`sim_out/pt_7.jsonl`
 (66/160 wins, 77 reach-8)**. Shipped this week: round-target fix (Idol/Ancient/Castle/Mail-In live targets), in-blind

@@ -137,7 +137,8 @@ lua  tools/analyze_runs.lua sim_out/<baseline>.jsonl compare sim_out/<name>.json
 ```
 - **Run FULL FIDELITY** (no `mc_cap` arg). The `_G.BES_MC_CAP` cheap-path **distorts** decisions
   (cap=3 degrades in-blind play → too harsh); only for rough scans.
-- **Speed (2026-10-18, hand_eval speed-up ~9x):** a 160-seed arm takes ~70 min on 11 workers (was ~3-4 h; the timing
+- **Speed (2026-10-19: hand_eval ~9x + LuaJIT trace cache ~2x in sim/driver.lua):** a 160-seed arm takes ~35-70 min on 11
+  workers (was ~3-4 h; `BES_ARM_ORDER=<abs path to a previous arm>.jsonl` runs the longest seeds first; the timing
   notes below predate it). Older: batches run in parallel (one LuaJIT process per worker, interleaved seeds).
   Merged parallel output is byte-identical to sequential because the sim is cross-process deterministic
   (sorted-key sampling + stable tie-breaks).
@@ -334,7 +335,7 @@ NOTE: `xmult_scaling` jokers ARE xmult — use `JokerData.is_xmult()`.
 ## Git
 
 Active work is on branch `winrate-v4-bundle`; `main` is synced to the validated/live state (fast-forward/merge it when a
-batch of changes is confirmed -- last synced 2026-10-18 (hand_eval speed-up, farm mode, round-target fix, look-ahead harness; baselines in NEXT_SESSION). **Commit and push whenever you (the AI
+batch of changes is confirmed -- last synced 2026-10-19 (speed-ups incl. LuaJIT trace cache, farm mode, round targets, look-ahead closed; baselines in NEXT_SESSION). **Commit and push whenever you (the AI
 assistant) judge it appropriate — you do NOT need to wait to be asked** (owner directive, 2026-08-28).
 Use judgement: commit at coherent checkpoints with a clear message, keep the tree green, and don't
 bundle unrelated changes. Run the test suite before committing.

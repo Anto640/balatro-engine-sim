@@ -17,7 +17,8 @@ real hands, scored by a faithful re-implementation of Balatro's scoring), not fr
 - **Recent (Oct 2026):** the simulator is ~9x faster (hand scoring compiled by LuaJIT, exact pruning of plays that can't be
   best; a 160-seed A/B now takes ~70 min); in-blind money farming of money jokers (`engine/farm.lua`); Idol / Ancient /
   Castle / Mail-In round targets read live; a shallow look-ahead search at early shops (`sim/lookahead.lua`, sim-only,
-  under test). Measured: +$10/round money lifts the sim win rate 36% -> 81%, but forcing money jokers does not pay.
+  tested and closed: no gain at this depth). Measured: +$10/round money lifts the sim win rate 36% -> 81%, but forcing
+  money jokers does not pay.
 - **Tests:** 1657 headless unit tests + 637 simulator-suite tests, all green.
 - The full, current handoff (what shipped, what was measured, what's next) is in **`NEXT_SESSION.md`**.
 
