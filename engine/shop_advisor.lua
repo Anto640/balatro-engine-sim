@@ -155,7 +155,7 @@ function SA.final_shop(gs)
   end
   return true
 end
-SA.ECON_FLOOR = 10        -- keep ~2 interest dollars working (early-game base; see SA.econ_floor)
+SA.ECON_FLOOR = tonumber(os.getenv and os.getenv("BES_ECON_FLOOR") or "") or 10   -- keep ~2 interest dollars working (early-game base; see SA.econ_floor); env: A/B
 SA.ECON_FLOOR_RATE = 0.5  -- FV charged per dollar pushed below the floor (tunable:
                           -- raise to curb the spend-to-$0 spiral harder, lower if it
                           -- gets too stingy on a genuinely strong cheap buy)
@@ -167,7 +167,7 @@ SA.ECON_FLOOR_RATE = 0.5  -- FV charged per dollar pushed below the floor (tunab
 -- free to spend (the interest-cap value-buy fix), so good vouchers/jokers are unaffected; only sub-cap
 -- dip-to-poverty buys are damped. Capped at the real interest cap: holding PAST it is option-value banking
 -- (a separate, unsolved lever -- docs/archive/conversion_baseline.txt), not attempted here.
-SA.ECON_FLOOR_STEP = 5    -- $ the floor rises per ante over the base
+SA.ECON_FLOOR_STEP = tonumber(os.getenv and os.getenv("BES_ECON_FLOOR_STEP") or "") or 5   -- $ the floor rises per ante over the base; env: A/B
 function SA.econ_floor(gs)
   local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
   -- real interest cap in DOLLARS (self-contained -- cap_int_of is declared later in the file):
