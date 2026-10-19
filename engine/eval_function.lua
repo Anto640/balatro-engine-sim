@@ -692,7 +692,85 @@ function Eval.xmult_forward_scale(gs, key, opts)
   return math.max(1, math.min(Eval.XMULT_FWD_CAP, Eval.BOARD_RATIO_TYPICAL / math.max(r, 1e-6)))
 end
 
+-- ROUND-STATE XMULTS (2026-10-19). Five xmult jokers fire on something a single fresh deal never shows, so their
+-- sampled delta is exactly 0, Eval.is_inert drops their tier floor, and the shop priced every one of them like a joker
+-- that does nothing (10 replayed live shop states, one free slot, $6: Ancient / Idol / Card Sharp / Acrobat / Loyalty
+-- Card all 1.01, Duo 11.5, Photograph 15.1). The sim never bought them (offered 187 times in pt_7). Each is valued by
+-- its expected per-hand multiplier on this board, in the same units as a measured delta:
+--   Card Sharp  x3 when the hand type was already played THIS round: the share of a boss blind's hands that repeat an
+--               earlier type (hand-type frequencies from this deck, over the hands this board needs at the boss);
+--   Acrobat     x3 on the round's final hand: fires only when the board needs every hand at the boss;
+--   Loyalty     x4 on every 6th hand;
+--   Ancient / Idol: their target (a suit / one card of the deck) is re-picked every round, so a bought one is worth
+--               the AVERAGE over targets -- measured, one delta per target (an unset target read 0 in the sim shop).
+local BLIND_HANDS = function(gs)
+  local h = (gs.blind and gs.blind.base_hands) or (gs.run and gs.run.base_hands)
+  if not h or h <= 0 then h = 4 end
+  return h
+end
+-- hands this board needs at the next boss (continuous; capped at the hands available)
+local function boss_hands_needed(gs, opts)
+  local base = board_base(gs, opts)
+  if not base or base <= 0 then return nil end
+  local hands = BLIND_HANDS(gs)
+  return math.min(hands, Mechanics.boss_per_hand_need(gs) * hands / base), hands
+end
+local STATE_XMULT = {
+  j_card_sharp = { x = 3, p = function(gs, opts)
+    local freq = hand_freq(gs, opts)
+    local H = boss_hands_needed(gs, opts)
+    if not freq or not H then return nil end
+    local k = math.max(1, math.ceil(H - 1e-9))
+    local rep = 0
+    for i = 2, k do
+      for _, f in pairs(freq) do rep = rep + f * (1 - (1 - f) ^ (i - 1)) end
+    end
+    return rep / k
+  end },
+  j_acrobat = { x = 3, p = function(gs, opts)
+    local H, hands = boss_hands_needed(gs, opts)
+    if not H then return nil end
+    return math.max(0, math.min(1, H - (hands - 1))) / hands
+  end },
+  j_loyalty_card = { x = 4, p = function() return 1 / 6 end },
+}
+local SUITS4 = { "Spades", "Hearts", "Clubs", "Diamonds" }
+local function round_target_marginal(gs, key, opts)
+  local targets = {}
+  if key == "j_ancient" then
+    for _, s in ipairs(SUITS4) do targets[#targets + 1] = { suit = s } end
+  else
+    local deck = gs.deck or {}
+    if #deck == 0 or not opts.rng then return nil end
+    for _ = 1, 6 do
+      local c = deck[math.floor(opts.rng() * #deck) + 1]
+      if c then targets[#targets + 1] = { id = Cards.rank_id(c), suit = c.suit } end
+    end
+  end
+  local sum, n = 0, 0
+  for _, t in ipairs(targets) do
+    -- no cache: score_delta's cache key does not include the ability, and every target is a different joker
+    local d = JokerValue.score_delta(gs, { key = key, ability = t }, { samples = opts.samples or 8, rng = opts.rng })
+    if d then sum, n = sum + d, n + 1 end
+  end
+  if n == 0 then return nil end
+  return sum / n
+end
+Eval.STATE_XMULT = STATE_XMULT
+
 local function conditional_xmult_marginal(gs, key, opts, owned)
+  local sx = STATE_XMULT[key]
+  if sx then
+    local p = sx.p(gs, opts)
+    local base = board_base(gs, opts)
+    if not p or not base or base <= 0 then return nil end
+    local factor = owned and (1 - 1 / sx.x) or (sx.x - 1)
+    return p * factor * base * Eval.xmult_forward_scale(gs, key, opts)
+  end
+  if (key == "j_ancient" or key == "j_idol") and not owned then
+    local m = round_target_marginal(gs, key, opts)
+    return m and m * Eval.xmult_forward_scale(gs, key, opts) or nil
+  end
   local cx = COND_XMULT[key]
   if not cx then return nil end
   local freq = hand_freq(gs, opts)
