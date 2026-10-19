@@ -10,6 +10,12 @@
 -- jokers are bought -- so a stub run dies early. Real fidelity lives in sim/content.lua
 -- (the rarity/odds work), which plugs in here without touching the loop.
 
+-- JIT CACHE SIZE (2026-10-18 speed audit): LuaJIT's default trace limits (maxtrace 1000, maxmcode 512 KB) are too small
+-- for the engine -- the compiler log showed ~400 full flushes of the compiled code in one run, each followed by
+-- recompiling everything. Larger limits halve sim run time (2007: 19.5s -> 11.0s, 3007: 37.5s -> 18.6s CPU) and do not
+-- change results (golden seeds byte-identical). Sim only: every sim entry point loads this module.
+if jit and jit.opt and jit.opt.start then pcall(jit.opt.start, "maxtrace=4000", "maxmcode=16384") end
+
 local World       = require("sim.world")
 local Pacing      = require("engine.pacing")
 local Eval        = require("engine.eval_function")
