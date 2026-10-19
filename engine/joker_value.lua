@@ -15,7 +15,13 @@ local JV = {}
 
 -- Sim cheap-path: a global MC sample cap (set via _G.BES_MC_CAP during headless self-play
 -- to trade a little decision precision for ~Nx speed). nil in production -> unchanged.
-local function mc(n) local c = rawget(_G, "BES_MC_CAP"); if c and n > c then return c end; return n end
+-- BES_MC_MULT (sim A/B, 2026-10-19): multiply every measurement's sample count -- the test of whether the shop's
+-- measurement NOISE binds (live shop states flip their recommendation between rng seeds about half the time). 1 = off.
+JV.MC_MULT = tonumber(os.getenv and os.getenv("BES_MC_MULT") or "") or 1
+local function mc(n)
+  if JV.MC_MULT ~= 1 then n = math.max(1, math.floor(n * JV.MC_MULT + 0.5)) end
+  local c = rawget(_G, "BES_MC_CAP"); if c and n > c then return c end; return n
+end
 
 JV.MIN_DECK = 5     -- need at least this many cards to sample meaningful hands
 
@@ -141,7 +147,7 @@ local function deal_seed(deck, dkey, k)
     base = { key = dkey, h = h }
     SEED_MEMO[deck] = base
   end
-  return (base.h + k * 104729) % 2147483646 + 1
+  return (base.h + k * 104729 + (JV._salt or 0) * 7919) % 2147483646 + 1
 end
 
 local function shuffled(list, rng)
@@ -170,11 +176,27 @@ JV._sample_hand = sample_hand
 -- best play on deal k is computed ONCE (content-keyed cache) instead of once per measured candidate -- the bulk of
 -- the shop's cost (score_delta is ~2/3 of sim runtime; half of it re-scores the unchanged base board).
 JV.CRN_DEALS = os.getenv("BES_CRN_DEALS") == "1"
+-- DECISION-SCOPED CRN (2026-10-19, BES_CRN_DECISION=1, sim A/B): the same, but the deals are drawn FRESH for each
+-- decision (a salt from the decision's own rng), so candidates in one shop are compared on identical hands while
+-- different decisions still see different hands -- the content-seeded version above reused one deck's deals for the
+-- whole run and lost (crnd_7, wins 59 -> 44). Live shop states flip their recommendation between rng seeds about
+-- half the time; most of that is candidates measured on different deals.
+JV.CRN_DECISION = os.getenv("BES_CRN_DECISION") == "1"
+JV._salt = nil
+local function crn_on() return JV.CRN_DEALS or JV._salt ~= nil end
+-- open a decision scope (returns the previous salt, to restore with JV.end_decision); inert unless CRN_DECISION
+function JV.begin_decision(rng)
+  local prev = JV._salt
+  if JV.CRN_DECISION then JV._salt = math.floor(rng() * 1073741823) + 1 end
+  return prev
+end
+function JV.end_decision(prev) JV._salt = prev end
 local CRN_BASE, CRN_N = {}, 0
 local CRN_HANDS = setmetatable({}, { __mode = "k" })
 local function crn_hand(deck, dkey, hs, k)
   local per = CRN_HANDS[deck]
-  if not per or per.key ~= dkey then per = { key = dkey }; CRN_HANDS[deck] = per end
+  local pk = JV._salt and (dkey .. "|" .. JV._salt) or dkey
+  if not per or per.key ~= pk then per = { key = pk }; CRN_HANDS[deck] = per end
   local hk = hs * 1000 + k
   local h = per[hk]
   if h then return h end
@@ -216,7 +238,7 @@ local function ctx_sig(g, dkey, hs)
 end
 JV._crn_hand = crn_hand
 local function crn_base_score(g, deck, dkey, hs, k)
-  local key = ctx_sig(g, dkey, hs) .. "#" .. k
+  local key = ctx_sig(g, dkey, hs) .. "#" .. k .. (JV._salt and ("@" .. JV._salt) or "")
   local v = CRN_BASE[key]
   if v == nil then
     local a = HandEval.best_play(g, crn_hand(deck, dkey, hs, k))
@@ -263,15 +285,16 @@ function JV.score_delta(gs, joker, opts)
   -- Determinism is unchanged for the common append path: the same `samples` shuffles are
   -- consumed, in the same order, whether or not the candidate is a copier.
   local hands, a_scores, seeds = {}, {}, {}
-  local dkey = (JV.DIG_HANDS or JV.CRN_DEALS) and deck_key(deck)
-  local off = (JV.CRN_DEALS and opts.crn_offset) or 0
+  local crn = crn_on()
+  local dkey = (JV.DIG_HANDS or crn) and deck_key(deck)
+  local off = (crn and opts.crn_offset) or 0
   for k = 1, samples do
     local hand
     if JV.DIG_HANDS then seeds[k] = deal_seed(deck, dkey, k); hand = deal_dig(without, deck, dkey, hs, seeds[k])
-    elseif JV.CRN_DEALS then hand = crn_hand(deck, dkey, hs, k + off)
+    elseif crn then hand = crn_hand(deck, dkey, hs, k + off)
     else hand = sample_hand(gs, deck, hs, rng) end
     hands[k] = hand
-    if JV.CRN_DEALS and not JV.DIG_HANDS then
+    if crn and not JV.DIG_HANDS then
       a_scores[k] = crn_base_score(without, deck, dkey, hs, k + off)
     else
       local a = HandEval.best_play(without, hand)
@@ -342,11 +365,19 @@ function JV.swap_delta(gs, idx, joker, opts)
   local cur = clone_with_jokers(gs, jokers)
   local new = clone_with_jokers(gs, swapped)
   local sum, sumsq = 0, 0
-  for _ = 1, samples do
-    local hand = sample_hand(gs, deck, hs, rng)
-    local a = HandEval.best_play(cur, hand)
-    local b = HandEval.best_play(new, hand)
-    local d = (b and b.score or 0) - (a and a.score or 0)
+  local crn = crn_on() and not JV.DIG_HANDS
+  local dkey = crn and deck_key(deck)
+  for k = 1, samples do
+    local d
+    if crn then
+      local b = HandEval.best_play(new, crn_hand(deck, dkey, hs, k))
+      d = (b and b.score or 0) - crn_base_score(cur, deck, dkey, hs, k)
+    else
+      local hand = sample_hand(gs, deck, hs, rng)
+      local a = HandEval.best_play(cur, hand)
+      local b = HandEval.best_play(new, hand)
+      d = (b and b.score or 0) - (a and a.score or 0)
+    end
     sum, sumsq = sum + d, sumsq + d * d
   end
   local mean = sum / samples
@@ -377,16 +408,17 @@ function JV.remove_delta(gs, idx, opts)
   local withoutg = clone_with_jokers(gs, rest)
 
   local total = 0
-  local dkey = (JV.DIG_HANDS or JV.CRN_DEALS) and deck_key(deck)
+  local crn = crn_on()
+  local dkey = (JV.DIG_HANDS or crn) and deck_key(deck)
   for k = 1, samples do
     local ha, hb
     if JV.DIG_HANDS then
       local sd = deal_seed(deck, dkey, k)
       ha, hb = deal_dig(withg, deck, dkey, hs, sd), deal_dig(withoutg, deck, dkey, hs, sd)
-    elseif JV.CRN_DEALS then
+    elseif crn then
       total = total + crn_base_score(withg, deck, dkey, hs, k) - crn_base_score(withoutg, deck, dkey, hs, k)
     else ha = sample_hand(gs, deck, hs, rng); hb = ha end
-    if not (JV.CRN_DEALS and not JV.DIG_HANDS) then
+    if not (crn and not JV.DIG_HANDS) then
       local a = HandEval.best_play(withg, ha)
       local b = HandEval.best_play(withoutg, hb)
       total = total + ((a and a.score or 0) - (b and b.score or 0))
@@ -416,11 +448,15 @@ function JV.avg_score(gs, opts)
 
   local g = clone_with_jokers(gs, gs.jokers or {})
   local total = 0
-  local dkey = JV.DIG_HANDS and deck_key(deck)
+  local crn = JV._salt ~= nil and not JV.DIG_HANDS
+  local dkey = (JV.DIG_HANDS or crn) and deck_key(deck)
   for k = 1, samples do
-    local hand = JV.DIG_HANDS and deal_dig(g, deck, dkey, hs, deal_seed(deck, dkey, k)) or sample_hand(gs, deck, hs, rng)
-    local ev = HandEval.best_play(g, hand)
-    total = total + (ev and ev.score or 0)
+    if crn then total = total + crn_base_score(g, deck, dkey, hs, k)
+    else
+      local hand = JV.DIG_HANDS and deal_dig(g, deck, dkey, hs, deal_seed(deck, dkey, k)) or sample_hand(gs, deck, hs, rng)
+      local ev = HandEval.best_play(g, hand)
+      total = total + (ev and ev.score or 0)
+    end
   end
   local result = total / samples
   if cache then cache[ckey] = result end

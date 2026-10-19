@@ -2095,4 +2095,16 @@ function SA.summary(ranked)
     math.floor((a.confidence or 0) * 100 + 0.5), a.reason or "")
 end
 
+-- DECISION-SCOPED CRN (BES_CRN_DECISION=1, sim A/B; see JokerValue.CRN_DECISION): every measurement inside one
+-- recommend() shares one fresh set of deals, salted from this state's own seed (deterministic -> no live flicker).
+local recommend_unscoped = SA.recommend
+function SA.recommend(gs, opts)
+  if not JokerValue.CRN_DECISION then return recommend_unscoped(gs, opts) end
+  local prev = JokerValue.begin_decision((opts and opts.rng) or lcg(state_seed(gs) + 31337))
+  local r = { pcall(recommend_unscoped, gs, opts) }
+  JokerValue.end_decision(prev)
+  if not r[1] then error(r[2], 0) end
+  return (table.unpack or unpack)(r, 2, table.maxn(r))
+end
+
 return SA
