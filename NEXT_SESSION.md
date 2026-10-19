@@ -8,7 +8,10 @@ Closed (measured, no gain): voucher pricing (cash control), Banner ban, discard-
 money jokers (econ_7 / econ2_7). Key fact: +$10/round = 36% -> 81% wins, but the engine's own money engine does not
 convert; owner thinks board building (joker choice), not money, is the gap.
 **Running:** `la_7` (look-ahead, probe `lookahead`, 40 seeds vs pt_7; started 10:38, ~3 h per seed -> ~23:00; job tmp
-la_result.txt). **Queued after it:** `la2_7` (BES_LA_LEAF=cap + BES_LA_HORIZON=2, ~18-20 h; la2_result.txt). Read each
+la_result.txt). **Queued after it:** `la2_7` (probe `lookahead2` = antes 1-2 only, BES_LA_LEAF=cap + BES_LA_HORIZON=2,
+~1 day; script job tmp run_la2b.sh, la2_result.txt). la_7 partial (32 seeds): wins 19 -> 16, progress +0.26 (se 0.30);
+overrides 18% of 703 decisions, mostly "skip the pack / consumable / reroll -> save"; ~22 decisions per run (11 at
+ante 3); 4-6 CPU-h per seed. Read each
 with `lua tools/analyze_runs.lua sim_out/pt_7.jsonl compare sim_out/la_7.jsonl` (40 seeds: only large effects show) plus
 the `kind = "lookahead"` records (how often it overrode the engine, on what, value gaps). If promising -> 160 seeds /
 longer horizon / measured (win-rate-fitted) leaf; if null -> the leaf or horizon is the limit, not the search.
