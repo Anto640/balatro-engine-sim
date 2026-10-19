@@ -707,6 +707,18 @@ function Probe.nobuy_picks(run, po, picks)
   return out
 end
 
+-- NOREROLL (reroll outcome test): if the engine's shop choice is a reroll, take its best other action that it values
+-- above zero (else leave the shop); nil = no override
+function Probe.noreroll(run, shop, ranked)
+  if not (ranked and ranked.best and ranked.best.type == "REROLL") then return nil end
+  for _, a in ipairs(ranked.alternatives or {}) do
+    if a.type ~= "REROLL" and (a.type == "SAVE" or (type(a.value) == "number" and a.value > 0)) then
+      return { best = a, alternatives = {}, pace = ranked.pace }
+    end
+  end
+  return { best = { type = "SAVE", value = 0, reason = "probe: noreroll" }, alternatives = {}, pace = ranked.pace }
+end
+
 -- Resolve a config name to the opts overlay Driver.run consumes. Returns nil for the
 -- baseline so the default code paths stay untouched.
 function Probe.opts(name)
@@ -728,6 +740,8 @@ function Probe.opts(name)
   local un, ua
   if not c then un, ua = name:match("^rich(%d+)_until(%d+)$") end
   if un then c = { income_bonus = tonumber(un), income_bonus_until = tonumber(ua) } end
+  local nra = (not c) and name:match("^noreroll_from(%d+)$")
+  if nra then c = { skip_only = { tag_investment = true }, skip_only_until = 1, noreroll_from = tonumber(nra) } end
   local nbk = (not c) and name:match("^nobuy_(.+)$")
   if nbk then c = { nobuy = "j_" .. nbk } end
   if not c then error("unknown probe config: " .. tostring(name)) end

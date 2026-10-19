@@ -1108,6 +1108,12 @@ local function shop_loop(run, shop, rng, crn_n)
       local nv = Probe.nobuy(run, shop, ranked)
       if nv then ranked = nv end
     end
+    -- REROLL OUTCOME TEST (2026-10-19): "noreroll_from<A>" = no rerolls from ante A on; the engine takes its best
+    -- non-reroll action with positive value instead (else leaves). Inert without a probe config.
+    if run.probe and run.probe.noreroll_from and (run.ante or 1) >= run.probe.noreroll_from then
+      local nv = Probe.noreroll(run, shop, ranked)
+      if nv then ranked = nv end
+    end
     -- LOOK-AHEAD (sim/lookahead.lua): compare the engine's top choices by playing each forward on sampled futures.
     -- Inert without the probe config, and never inside a look-ahead rollout (no recursion).
     if run.probe and run.probe.lookahead and not run._la_rollout and (run.ante or 1) <= (run.probe.lookahead_until or 3)
