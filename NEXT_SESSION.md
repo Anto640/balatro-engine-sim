@@ -11,7 +11,10 @@ convert; owner thinks board building (joker choice), not money, is the gap.
 la_result.txt). **Queued after it:** `la2_7` (probe `lookahead2` = antes 1-2 only, BES_LA_LEAF=cap + BES_LA_HORIZON=2,
 ~1 day; script job tmp run_la2b.sh, la2_result.txt). la_7 partial (32 seeds): wins 19 -> 16, progress +0.26 (se 0.30);
 overrides 18% of 703 decisions, mostly "skip the pack / consumable / reroll -> save"; ~22 decisions per run (11 at
-ante 3); 4-6 CPU-h per seed. Read each
+ante 3); 4-6 CPU-h per seed.
+**`la_7` FINAL (08:23), 40 seeds vs pt_7: +0.311 (se 0.258, p 0.23), wins 22 -> 21, reach-8 23 -> 24, sign 14/11, 15 tied.**
+875 decisions, 148 overridden (17%), every seed had >= 1 override. Within-batch: seeds with 2+ "save" overrides +0.47
+(se 0.40, n 20), override seeds with no save +0.23 (se 0.45, n 10) -- no conclusive pattern. `la2_7` running 08:23. Read each
 with `lua tools/analyze_runs.lua sim_out/pt_7.jsonl compare sim_out/la_7.jsonl` (40 seeds: only large effects show) plus
 the `kind = "lookahead"` records (how often it overrode the engine, on what, value gaps). If promising -> 160 seeds /
 longer horizon / measured (win-rate-fitted) leaf; if null -> the leaf or horizon is the limit, not the search.
