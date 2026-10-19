@@ -19,6 +19,18 @@ for f in glob.glob('arm_%s_*.jsonl'%name):
         except: continue
         if r.get('kind') in ('death','win'): fin.add(str(r['seed']))
 missing=[str(s*1000+off) for s in range(1,n+1) if str(s*1000+off) not in fin]
+# LONGEST FIRST (2026-10-18): with BES_ARM_ORDER=<a previous arm's jsonl>, start the seeds that ran longest there (the
+# deepest runs) first, so the batch does not end with a few long seeds running alone. Order only -- each seed's result
+# is independent and the merge is by seed, so the output is unchanged.
+import os
+ref=os.environ.get('BES_ARM_ORDER')
+if ref and os.path.exists(ref):
+    depth={}
+    for l in open(ref):
+        try: r=json.loads(l)
+        except: continue
+        if r.get('kind') in ('death','win'): depth[str(r['seed'])]=9 if r['kind']=='win' else (r.get('ante') or 0)
+    missing.sort(key=lambda s: (-depth.get(s,5), int(s)))
 print('arm',name,'finished',len(fin),'missing',len(missing))
 open('armseeds_%s.txt'%name,'w').write(' '.join(missing))
 EOF

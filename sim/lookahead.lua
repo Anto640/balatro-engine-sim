@@ -9,7 +9,7 @@
 -- one-ply search -- not a re-valuation: it never reads the engine's prices.
 --
 --   value of one rollout = died ? 0.5 * (fraction of the horizon's blinds cleared)
---                                : 1 + 0.25 * clamp(log2(pace margin at the horizon), -2, 2)
+--                                : 1 + 0.12 * clamp(log2(margin at the horizon), -4, 4)
 -- (dying is what matters; among survivors, the board's measured pace over the requirement breaks the tie.)
 --
 -- Sim-only (the live overlay never runs it). Enabled by a probe config (`lookahead`); inert otherwise.
@@ -58,8 +58,44 @@ function LA.candidates(ranked)
   return cs
 end
 
--- one sampled future of taking `cand` now
-local function rollout(run, shop, crn_n, cand, s)
+-- TRANSPOSITIONS (2026-10-18): in 28% of la_7's decisions two candidates ended the shop in the SAME position (buy the
+-- pack then the joker, or the joker then the pack). Every future re-seeds its random streams from the salt at the next
+-- checkpoint, so an identical post-shop position has an identical future: it is played out once per future and its
+-- value reused. Exact -- values are unchanged, only repeated work is skipped.
+local function serialize(v, out, seen)
+  local t = type(v)
+  if t == "table" then
+    if seen[v] then out[#out + 1] = "@"; return end
+    seen[v] = true
+    -- keys are ordered by their own CONTENT (some run tables are sets keyed by card / joker tables)
+    local entries = {}
+    for k, x in pairs(v) do
+      if type(x) ~= "function" then
+        local ks
+        if type(k) == "table" then local o = {}; serialize(k, o, seen); ks = "t" .. table.concat(o)
+        else ks = type(k):sub(1, 1) .. tostring(k) end
+        entries[#entries + 1] = { ks, x }
+      end
+    end
+    table.sort(entries, function(a, b) return a[1] < b[1] end)
+    out[#out + 1] = "{"
+    for _, e in ipairs(entries) do
+      out[#out + 1] = e[1]; out[#out + 1] = "="
+      serialize(e[2], out, seen); out[#out + 1] = ";"
+    end
+    out[#out + 1] = "}"
+    seen[v] = nil
+  elseif t == "number" then out[#out + 1] = string.format("%.17g", v)
+  else out[#out + 1] = tostring(v) end
+end
+local function position_key(f)
+  local out = {}
+  serialize(f, out, {})
+  return table.concat(out)
+end
+
+-- one sampled future of taking `cand` now, in two stages: finish the shop (returns the forked run), then play it out
+local function prepare(run, shop, crn_n, cand, s)
   local Content = require("sim.content")
   local st = copy({ run = run, shop = shop, cand = cand, crn = crn_n }, {})
   local f, fshop = st.run, st.shop
@@ -67,7 +103,6 @@ local function rollout(run, shop, crn_n, cand, s)
   f.rng = World.lcg(World.stream_seed(f, "lookahead", run.ante or 1, run.round or 0, s))
   f._emit, f._la_rollout = nil, true
   if f.probe then f.probe.lookahead = nil end
-  local start_round = f.round or 0
   if st.cand.type == "SAVE" then
     -- leave: nothing more is bought in this shop (an emptied shop -> the engine saves; exit effects still run)
     fshop.jokers, fshop.boosters, fshop.vouchers, fshop.consumables = {}, {}, {}, {}
@@ -76,6 +111,12 @@ local function rollout(run, shop, crn_n, cand, s)
     Content._apply_action(f, fshop, st.cand, f.rng)   -- then the engine finishes the shop as usual
   end
   Content._shop_loop(f, fshop, f.rng, st.crn)
+  return f
+end
+
+local function play_out(run, f)
+  local Content = require("sim.content")
+  local start_round = f.round or 0
   local horizon = math.min(8, (run.ante or 1) + LA.HORIZON)
   local res = Driver.run(f.seed, { run = f, content = Content, max_ante = horizon, silent = true, resume = true })
   local total = 0
@@ -94,21 +135,36 @@ local function rollout(run, shop, crn_n, cand, s)
   else
     pm = (m and m.pace_margin) or 1
   end
+  -- survivors: 1 + 0.12 x log2(margin), clamped at +-4 -> [0.52, 1.48], always above any death (<= 0.5). It was
+  -- 0.25 x clamp(+-2): early boards far ahead of the requirement all hit the 1.5 ceiling (9% of la_7's decisions had
+  -- EVERY option there, 31% at least one), so the search could not rank them.
   local l = math.log(math.max(1e-6, pm)) / math.log(2)
-  if l > 2 then l = 2 elseif l < -2 then l = -2 end
-  return 1 + 0.25 * l
+  if l > 4 then l = 4 elseif l < -4 then l = -4 end
+  return 1 + 0.12 * l
 end
 
 -- Evaluate the candidates; returns a ranked table to replace the engine's (or nil to keep it) and a trace record.
 function LA.choose(run, shop, crn_n, ranked)
   local cs = LA.candidates(ranked)
   if #cs < 2 then return nil end
-  local vals, per, errs = {}, {}, 0
+  local vals, per, errs, dups = {}, {}, 0, 0
   for i = 1, #cs do vals[i] = 0; per[i] = {} end
   for s = 1, LA.SAMPLES do
+    local seen = {}   -- post-shop position -> value, for this future
     for i, c in ipairs(cs) do
-      local ok, v = pcall(rollout, run, shop, crn_n, c, s)
-      if not ok then errs = errs + 1; v = 0 end
+      local okp, f = pcall(prepare, run, shop, crn_n, c, s)
+      local v
+      if not okp then errs = errs + 1; v = 0
+      else
+        local okk, key = pcall(position_key, f)
+        if not okk then key = {} end   -- unkeyable: a fresh key, never matches (no reuse)
+        if seen[key] ~= nil then v = seen[key]; dups = dups + 1
+        else
+          local ok, pv = pcall(play_out, run, f)
+          if not ok then errs = errs + 1; pv = 0 end
+          v = pv; seen[key] = pv
+        end
+      end
       per[i][s] = v
       vals[i] = vals[i] + v
     end
@@ -125,7 +181,7 @@ function LA.choose(run, shop, crn_n, ranked)
     local se = math.sqrt(sq / math.max(1, LA.SAMPLES - 1) / LA.SAMPLES)
     if mean > LA.MARGIN and mean > se and mean > bgain then bi, bgain = i, mean end
   end
-  local rec = { kind = "lookahead", ante = run.ante, round = run.round, chosen = bi, errors = errs, cands = {} }
+  local rec = { kind = "lookahead", ante = run.ante, round = run.round, chosen = bi, errors = errs, dups = dups, cands = {} }
   for i, c in ipairs(cs) do
     rec.cands[i] = { type = c.type, target = c.target and (c.target.key or c.target.name) or nil, value = vals[i] }
   end
