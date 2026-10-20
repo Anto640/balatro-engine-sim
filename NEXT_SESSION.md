@@ -1,5 +1,19 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-20 evening) -- consolidated state
+**Live = main = `bbf9856` (deployed 16:15). NEW BASELINE seed_off 7 = `sim_out/sh1_7.jsonl` (64/160 wins, 78 reach-8).**
+Shipped today: the full measurement-cache key (JokerValue: the cache ignored the joker's ability, the deck's
+enhancements and hand levels -> event-fed scalers worth 0 in full-board trades, the forward valuation's +Mult anchor
+always 1.00) + swap admission (multiplicative offers weighed in full-board trades when their valuation is positive) +
+Throwback unfed under the skip policy. sh1_7 vs sx_7: wins 60 -> 64, reach-8 75 -> 78, +0.015 (n.s.).
+**The multiplier gap, resolved as SUPPLY:** horizon (hz1/hzw), swap admission (adm), cache fixes (ck1/ck2) and a lower
+swap bar (sb3_7 vs sh1_7: wins 64 -> 59, -0.083) all leave board composition ~unchanged. Owner corpus vs engine: the
+owner SEES 9.8 distinct multiplicative offers a run vs 6.7 and takes them at the same rate (37% vs 34%); the gap is at
+antes 2-4 (offers 1.0/1.9/1.5 vs 0.6/0.9/0.9). The owner starts ante 3 with $24.5 (engine $15), ante 5 with $49.5 ($25)
+and rerolls 4.6/7.0/6.0 times at antes 3-5 (engine 1.5/2.2/2.8). => the gap is early economy -> rerolls/packs -> offers.
+Consistent with rich10_until2 (+$10/round to a2: wins 29 -> 49 / 80). Closed today: noise (mc3), reroll ban (nr3),
+spend-early floor (ef), horizon (hz1/hzw), lower swap bar (sb3). Next: where the owner's ante-2-3 money comes from.
+
 ## START HERE (2026-10-20 morning) -- consolidated state
 **Live = main = `cda7a59` (deployed 10-20 07:40).** Baseline still `sim_out/pt_7.jsonl` (66/160 wins, 77 reach-8); the
 round-state xmult fix (`6cea5ba`) is on main and changes behaviour (sx_7: 60 wins) -- the next promising arm should
