@@ -592,6 +592,8 @@ Probe.CONFIGS = {
   noskip       = { no_skip_until = 99 },
   noskip_early = { no_skip_until = 4 },
   invest1      = { skip_only = { tag_investment = true }, skip_only_until = 1 },
+  mcard        = { skip_only = { tag_investment = true }, skip_only_until = 1,
+                   force_take = { c_devil = true, c_talisman = true } },   -- always take The Devil / Talisman
   vall         = { skip_only = { tag_investment = true }, skip_only_until = 1, vbuy_all = true, vbuy_reserve = 25 },   -- any voucher when rich
   slots        = { joker_slots = 8 },
   -- +1 and +2 slots: unlike the 8-slot bound, these ARE reachable in a real run (the
@@ -734,6 +736,39 @@ function Probe.vbuy(run, shop, ranked)
     local cost = v.cost or 10
     if ok and cost + (p.vbuy_reserve or 0) <= cash then
       return { best = { type = "BUY_VOUCHER", target = v, cost = cost, value = 0, reason = "probe: voucher habit" },
+               alternatives = {}, pace = ranked and ranked.pace }
+    end
+  end
+  return nil
+end
+
+-- MONEY CARDS (2026-10-20: the owner's decks hold 3-10x the engine's gold cards / gold seals at antes 3-5, mostly via
+-- The Devil; the engine takes it about a third of the times it sees it): "mcard" = always take the listed consumables --
+-- pick them from an open pack (in place of the engine's last pick) and buy them in the shop when affordable with a free
+-- consumable slot. nil / picks unchanged otherwise.
+function Probe.force_picks(run, po, picks, opened)
+  local want = run.probe.force_take
+  local taken = {}
+  for _, p in ipairs(picks) do local it = p.it or p; taken[it] = true; if want[it.key] then return picks end end
+  for _, it in ipairs(opened.items or {}) do
+    if want[it.key] and not taken[it] then
+      local out = {}
+      for i = 1, math.max(0, #picks - 1) do out[i] = picks[i] end
+      out[#out + 1] = { it = it }
+      return out
+    end
+  end
+  return picks
+end
+function Probe.force_buy(run, shop, ranked)
+  local want = run.probe.force_take
+  local best = ranked and ranked.best
+  if best and best.type == "BUY_CONSUMABLE" and best.target and want[best.target.key] then return nil end
+  if #(run.consumables or {}) >= (run.consumable_slots or 2) then return nil end
+  local cash = (run.economy and run.economy.dollars) or 0
+  for _, c in ipairs(shop.consumables or {}) do
+    if want[c.key] and (c.cost or 3) <= cash then
+      return { best = { type = "BUY_CONSUMABLE", target = c, cost = c.cost or 3, value = 0, reason = "probe: money card" },
                alternatives = {}, pace = ranked and ranked.pace }
     end
   end

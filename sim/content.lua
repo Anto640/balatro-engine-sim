@@ -665,6 +665,7 @@ local function take_pack(run, pack, rng)
     target = po.best.target and (po.best.target.name or po.best.target.key), reason = po.reason } or nil })
   local picks = po.picks or (po.best and { po.best } or {})
   if run.probe and run.probe.nobuy then picks = Probe.nobuy_picks(run, po, picks) end
+  if run.probe and run.probe.force_take then picks = Probe.force_picks(run, po, picks, opened) end
   if #picks == 0 and po.skip then return end
   -- SELL-TO-MAKE-ROOM (world fidelity, CORE-PROTECTED): on a FULL board the engine's pack advice
   -- may recommend selling a DISPOSABLE joker to slot a better pack joker (`po.sell` = { name, index };
@@ -1113,6 +1114,11 @@ local function shop_loop(run, shop, rng, crn_n)
     if run.probe and run.probe.noreroll_from and (run.ante or 1) >= run.probe.noreroll_from then
       local nv = Probe.noreroll(run, shop, ranked)
       if nv then ranked = nv end
+    end
+    -- MONEY CARDS probe: buy the listed consumables on sight. Inert without a probe config.
+    if run.probe and run.probe.force_take then
+      local fv = Probe.force_buy(run, shop, ranked)
+      if fv then ranked = fv end
     end
     -- VOUCHER HABIT (owner capture runs 2026-10-20): buy the voucher on sight. Inert without a probe config.
     if run.probe and (run.probe.vbuy or run.probe.vbuy_all) then
