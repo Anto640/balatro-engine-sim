@@ -19,6 +19,12 @@ vs_7: Seed Money bought in 18 runs; they held \$40 vs \$27 at a6 but a8 capacity
 vall_7: the owner's voucher habit is a CONSEQUENCE of wealth, not a cause -- at the engine's income it costs board power.
 Both switches stay off. Voucher timing (owner question): the engine has no model of a voucher staying for the ante or of
 the pre-boss shop being the last chance -- not built (only matters for marginal buys, and vouchers measured negative).
+**Option 1 tried (`5fefe58`, switch BES_PLAY_MONEY=1, off):** a free-slot joker buy's income = the money the engine's best
+plays earn with it minus without it (Business per face trigger, gold seals, Lucky, Rough Gem, Golden Ticket golds), so
+retriggers / face builds count. Corpus shops: Business \$5.1/round (static \$2.3), Rough Gem 2.0 (3.7), Ticket 1.6 (3.0),
+Sock and Buskin / Hanging Chad ~1.5 (0). **`pm_7` vs sh1_7: wins 64 -> 59, reach-8 78 -> 75, -0.037 (p 0.12), 152/160 tied**
+(Business bought 3x vs 2x): it barely fires -- the engine's decks hold almost no money cards (gold seals 0.03-0.27 at a3-a5
+vs the owner's 0.55-1.2; gold cards 0.1-0.4 vs 2-2.6), so there is little for a money joker to multiply.
 **Next:** the in-blind money gap with build-fitting money jokers (econ_7 forced money jokers generically and lost board
 power; the owner's are part of the face build) -- or accept money as an exogenous ceiling.
 
