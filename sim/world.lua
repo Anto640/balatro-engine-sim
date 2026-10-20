@@ -262,6 +262,25 @@ function World.new_run(seed, opts)
       if sm.seal then order[i].seal = sm.seal end
     end
   end
+  -- probe: start with a THINNED deck (sim/probe.lua `thin<N>`): the N lowest cards (2s, then 3s, suit order) removed --
+  -- the ceiling for valuing deck thinning (Hanged Man etc.), as gold6 was for money cards.
+  local nthin = opts.probe and opts.probe.start_thin
+  if nthin and nthin > 0 then
+    local Cards = require("util.cards")
+    local SUIT = { Spades = 1, Hearts = 2, Clubs = 3, Diamonds = 4 }
+    local order = {}
+    for i, c in ipairs(run.deck) do order[i] = c end
+    table.sort(order, function(x, y)
+      local rx, ry = Cards.rank_id(x) or 99, Cards.rank_id(y) or 99
+      if rx ~= ry then return rx < ry end
+      return (SUIT[x.suit] or 9) < (SUIT[y.suit] or 9)
+    end)
+    local drop = {}
+    for i = 1, math.min(nthin, #order - 8) do drop[order[i]] = true end
+    local keep = {}
+    for _, c in ipairs(run.deck) do if not drop[c] then keep[#keep + 1] = c end end
+    run.deck = keep
+  end
   return run
 end
 

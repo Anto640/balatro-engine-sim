@@ -816,6 +816,8 @@ function Probe.opts(name)
   local un, ua
   if not c then un, ua = name:match("^rich(%d+)_until(%d+)$") end
   if un then c = { income_bonus = tonumber(un), income_bonus_until = tonumber(ua) } end
+  local thn = (not c) and name:match("^thin(%d+)$")   -- start with the N lowest cards removed (thinning ceiling)
+  if thn then c = { skip_only = { tag_investment = true }, skip_only_until = 1, start_thin = tonumber(thn) } end
   local npa = (not c) and name:match("^noplanet_until(%d+)$")
   if npa then c = { skip_only = { tag_investment = true }, skip_only_until = 1, noplanet_until = tonumber(npa) } end
   local nra = (not c) and name:match("^noreroll_from(%d+)$")
