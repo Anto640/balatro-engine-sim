@@ -13,6 +13,9 @@ antes 2-4 (offers 1.0/1.9/1.5 vs 0.6/0.9/0.9). The owner starts ante 3 with $24.
 and rerolls 4.6/7.0/6.0 times at antes 3-5 (engine 1.5/2.2/2.8). => the gap is early economy -> rerolls/packs -> offers.
 Consistent with rich10_until2 (+$10/round to a2: wins 29 -> 49 / 80). Closed today: noise (mc3), reroll ban (nr3),
 spend-early floor (ef), horizon (hz1/hzw), lower swap bar (sb3). Next: where the owner's ante-2-3 money comes from.
+**Owner capture runs (2026-10-20 evening):** the owner plays 2 runs with capture-only (F10) on. They are the records AFTER line
+53787 of `%APPDATA%/Balatro/bes_runs.jsonl` and line 51257 of `bes_fixtures.jsonl` (counts before the session). Compare
+them with sh1_7 by ante: $ at ante start, rerolls (reroll_cost rises), multiplier offers seen/taken, income per blind.
 
 ## START HERE (2026-10-20 morning) -- consolidated state
 **Live = main = `cda7a59` (deployed 10-20 07:40).** Baseline still `sim_out/pt_7.jsonl` (66/160 wins, 77 reach-8); the
