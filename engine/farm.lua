@@ -34,10 +34,27 @@ local function owns(gs, key)
   return nil
 end
 
+-- SEAL FARMING (2026-10-21, owner capture run X778PBYT: "so I could play the most gold cards and find the most purple
+-- and gold seals without winning so I can fully use as much of the deck potential as possible"; A/B switch
+-- BES_FARM_SEALS=1, default off). The farm only ran with a money JOKER on the board; a deck's own money cards -- Gold
+-- seals ($3 each time scored) and Purple seals (a Tarot when discarded, slot permitting) -- are levers too. Under the
+-- switch they turn the farm on, a Purple-seal discard pays (Heuristics.discard_econ), and a cycle play may score Gold-seal
+-- cards (a played card returns to the deck after the blind, so playing it costs nothing but this hand).
+Farm.SEALS = os.getenv and os.getenv("BES_FARM_SEALS") == "1"
+local function slot_free(gs)
+  return #(gs.consumables or {}) < ((gs.run and gs.run.consumable_slots) or 2)
+end
+local function seal_lever_in(gs, cards)
+  for _, c in ipairs(cards or {}) do
+    if c.seal == "Gold" or (c.seal == "Purple" and slot_free(gs)) then return true end
+  end
+  return false
+end
 function Farm.has_lever(gs)
   for _, j in ipairs(gs.jokers or {}) do
     if not j.debuffed and (Farm.DISCARD_LEVERS[j.key] or Farm.PLAY_LEVERS[j.key]) then return true end
   end
+  if Farm.SEALS and (seal_lever_in(gs, gs.hand) or seal_lever_in(gs, gs.remaining)) then return true end
   return false
 end
 
@@ -58,10 +75,12 @@ local function discard_money_pred(gs)
   local rid = mail_rank(gs)
   local faceless = owns(gs, "j_faceless") ~= nil
   local pareidolia = owns(gs, "j_pareidolia") ~= nil
-  if not rid and not faceless then return nil end
+  local purple = Farm.SEALS and slot_free(gs)
+  if not rid and not faceless and not purple then return nil end
   return function(c)
     if HandEval.is_debuffed(gs, c) then return false end
     if rid and Cards.rank_id(c) == rid then return true end
+    if purple and c.seal == "Purple" then return true end
     return faceless and (pareidolia or Cards.is_face(c))
   end
 end
@@ -119,7 +138,7 @@ function Farm.cycle_play(gs, hand, rem, filter)
   for _, c in ipairs(hand) do
     if not (pred and pred(c)) and keep_value(c, gs) < Farm.MAX_KEEP then pool[#pool + 1] = c end
   end
-  if #pool == 0 then return nil end
+  if #pool == 0 and not Farm.SEALS then return nil end
   table.sort(pool, function(a, b)
     local ka, kb = keep_value(a, gs), keep_value(b, gs)
     if ka ~= kb then return ka < kb end
@@ -148,6 +167,19 @@ function Farm.cycle_play(gs, hand, rem, filter)
       local _, msel = HandEval.best_fuel_play(gs, pool, 0, function(sel, ev) return play_money(gs, hand, sel, ev) end, filter)
       consider(msel)
       break
+    end
+  end
+  -- seal farming: the chaff pool plus the Gold-seal cards (scoring one pays $3; it is back in the deck next blind)
+  if Farm.SEALS then
+    local gpool, any = {}, false
+    for _, c in ipairs(pool) do gpool[#gpool + 1] = c end
+    for _, c in ipairs(hand) do
+      if c.seal == "Gold" and not (pred and pred(c)) and keep_value(c, gs) >= Farm.MAX_KEEP then gpool[#gpool + 1] = c; any = true end
+    end
+    for _, c in ipairs(pool) do if c.seal == "Gold" then any = true end end
+    if any then
+      local _, msel = HandEval.best_fuel_play(gs, gpool, 0, function(sel, ev) return play_money(gs, hand, sel, ev) end, filter)
+      consider(msel)
     end
   end
   return best

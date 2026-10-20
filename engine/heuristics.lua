@@ -201,8 +201,20 @@ function H.discard_econ(gs, cards)
       if n > 0 then d = d + 5 * n; notes[#notes + 1] = "Mail-In +$" .. (5 * n) end
     end
   end
+  -- SEAL FARMING (BES_FARM_SEALS=1, engine/farm.lua): a discarded Purple-seal card makes a Tarot when a consumable
+  -- slot is free -- priced at a Tarot's shop price (H.PURPLE_TAROT_DOLLARS), one per free slot
+  if H.FARM_SEALS then
+    local free = ((gs.run and gs.run.consumable_slots) or 2) - #(gs.consumables or {})
+    local n = 0
+    for _, c in ipairs(cards) do
+      if c.seal == "Purple" and not HandEval.is_debuffed(gs, c) and n < free then n = n + 1 end
+    end
+    if n > 0 then d = d + H.PURPLE_TAROT_DOLLARS * n; notes[#notes + 1] = "Purple seal -> " .. n .. " Tarot" end
+  end
   return d, table.concat(notes, ", ")
 end
+H.FARM_SEALS = os.getenv and os.getenv("BES_FARM_SEALS") == "1"
+H.PURPLE_TAROT_DOLLARS = 3
 
 -- Best set of cards to discard purely for MONEY (independent of draw targets).
 local function money_discard(gs)
