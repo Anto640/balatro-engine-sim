@@ -391,6 +391,9 @@ local function event_rate(gs, e)
   elseif fuel == "reroll" then
     return is_rich(gs) and 0.30 or 0.12                             -- money-gated
   elseif fuel == "skip" then
+    -- the owner's temporary skip policy (engine/skip_advisor: only the ante-1 Investment tag; BES_SKIP_FREE=1 restores
+    -- the engine's own skips) means no blind is skipped from here on, so Throwback is never fed (2026-10-20)
+    if not (os.getenv and os.getenv("BES_SKIP_FREE") == "1") then return 0 end
     return 0.03
   elseif fuel == "pack_skip" then
     return 0.04

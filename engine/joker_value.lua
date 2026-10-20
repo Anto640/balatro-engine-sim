@@ -244,7 +244,9 @@ JV._crn_hand = crn_hand
 --   * the forward valuation's projected context (same card ids, projected enhancements and hand levels) hit the
 --     current one -- its +Mult anchor was always 1.00 (fresh: 1.27-2.31 on six live shops).
 -- "ability" adds the measured joker's ability; "full" also the board's abilities, the deck's content and the context.
-JV.CACHE_KEY = os.getenv and os.getenv("BES_CACHE_KEY") or nil
+-- SHIPPED "full" 2026-10-20 (ck2_7 vs sx_7: wins 60 -> 60, -0.006, p 0.95; correctness). BES_CACHE_KEY=old restores the old key.
+JV.CACHE_KEY = (os.getenv and os.getenv("BES_CACHE_KEY")) or "full"
+if JV.CACHE_KEY == "old" then JV.CACHE_KEY = nil end
 local DK_MEMO = setmetatable({}, { __mode = "k" })
 local function full_ctx_key(gs, deck, hs)
   local dk = DK_MEMO[deck]

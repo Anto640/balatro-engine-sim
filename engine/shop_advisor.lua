@@ -213,8 +213,11 @@ SA.PAIRED_SAMPLES = 12
 -- swap bar: 80 sim seeds, 32-42% of the multiplicative offers at antes 3-8 were never weighed (Constellation,
 -- Hit the Road, Hologram, Loyalty, Acrobat, Card Sharp, Madness, Campfire, Dusk, Vampire...; Vampire 0/41 bought).
 -- With the switch, a multiplicative offer (xmult incl. scaling, retrigger, copier) is weighed anyway on its full buy
--- value; the survival gate (the swap scored as adding NOTHING now), the keep charge and the bar still apply.
-SA.SWAP_ADMIT = os.getenv and os.getenv("BES_SWAP_ADMIT") == "1"
+-- value; the survival gate (the swap scored as adding NOTHING now), the keep charge and the bar still apply. Only an
+-- offer whose own valuation is POSITIVE is admitted: BuildPlan.fit adds a flat bonus for the xmult tag, and an unfed
+-- Throwback (worth 0 under the skip policy) otherwise cleared a weak joker's bar on that bonus alone (test_shop 31b).
+-- SHIPPED ON 2026-10-20 with the full cache key (ck2_7 vs sx_7: wins 60 -> 60, neutral). BES_SWAP_ADMIT=0 disables.
+SA.SWAP_ADMIT = not (os.getenv and os.getenv("BES_SWAP_ADMIT") == "0")
 function SA.swap_admits_zero(key)
   return SA.SWAP_ADMIT and (JokerData.is_xmult(key) or JokerData.has_tag(key, "retrigger") or JokerData.has_tag(key, "copy"))
 end
@@ -1555,7 +1558,8 @@ function SA.recommend(gs, opts)
             local sv = surv()
             local swap_ok = not (sv and sv.unsafe(worst_i, math.max(0, cur or 0) / sv.need))
               and not Eval.trade_leans_on(gs, worst_i, sj, mopts)   -- the buy must not lean on the joker sold
-            if swap_ok and (cur == nil or cur > 0 or (keystone and invest) or SA.swap_admits_zero(sj.key)) then
+            if swap_ok and (cur == nil or cur > 0 or (keystone and invest)
+                or (SA.swap_admits_zero(sj.key) and buy_fv_delta(gs, sj, swap_mopts) > 0)) then
               -- PLAN the swap toward the core too: on a full board of additive commons, a
               -- core piece (xmult that multiplies the base) is a real upgrade even if its
               -- raw marginal only edges the weakest -- and a redundant flat is damped.
@@ -1634,7 +1638,8 @@ function SA.recommend(gs, opts)
               local sv = surv()
               local ok_s = not (sv and sv.unsafe(i, math.max(0, cur or 0) / sv.need))
               -- a trade whose buy leans on the joker sold for it is no trade (Eval.trade_leans_on; live Z9ZPREGI)
-              if ok_s and (cur == nil or cur > 0 or SA.swap_admits_zero(sj.key)) and not Eval.trade_leans_on(gs, i, sj, mopts) then
+              if ok_s and (cur == nil or cur > 0 or (SA.swap_admits_zero(sj.key) and buy_fv_delta(gs, sj, swap_mopts) > 0))
+                 and not Eval.trade_leans_on(gs, i, sj, mopts) then
                 local g = buy_fv_delta(gs, sj, swap_mopts) + (BuildPlan.fit(gs, sj, build, invest))
                 local up = g - keep
                 -- diagnostic only (tools/swap_bar_probe.lua): every full-board trade the bar weighed
