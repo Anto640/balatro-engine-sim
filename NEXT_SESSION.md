@@ -25,7 +25,13 @@ retriggers / face builds count. Corpus shops: Business \$5.1/round (static \$2.3
 Sock and Buskin / Hanging Chad ~1.5 (0). **`pm_7` vs sh1_7: wins 64 -> 59, reach-8 78 -> 75, -0.037 (p 0.12), 152/160 tied**
 (Business bought 3x vs 2x): it barely fires -- the engine's decks hold almost no money cards (gold seals 0.03-0.27 at a3-a5
 vs the owner's 0.55-1.2; gold cards 0.1-0.4 vs 2-2.6), so there is little for a money joker to multiply.
-**Next:** the in-blind money gap with build-fitting money jokers (econ_7 forced money jokers generically and lost board
+**`mc_7` (probe `mcard`: always take The Devil / Talisman, `9981a67`) vs sh1_7: wins 64 -> 56, reach-8 78 -> 68, -0.285
+(p 0.0009), sign 19/42.** Devil uses 106 -> 212, money cards on Small blinds a5 1.05 -> 1.84, yet in-blind \$ unchanged
+(a5 1.65 -> 1.68): forced money cards displace better picks and do not pay back (gold6's 6 FREE gold cards had no
+opportunity cost). **The money line is closed for this engine:** vouchers (vs/vall), interest (vs), build-aware money
+(pm), money cards (mcard) all <= 0 -- the engine's own pricing of money sources is right at its operating point; the
+owner's money comes from a coherent plan, not from any single source the engine under-takes.
+**Was next:** the in-blind money gap with build-fitting money jokers (econ_7 forced money jokers generically and lost board
 power; the owner's are part of the face build) -- or accept money as an exogenous ceiling.
 
 ## START HERE (2026-10-20 evening) -- consolidated state
