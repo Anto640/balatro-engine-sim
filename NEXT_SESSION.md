@@ -1,5 +1,27 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-20 night) -- owner capture runs analysed, two voucher arms negative
+**Live = main = `bbf9856` (unchanged). Baseline seed_off 7 = `sim_out/sh1_7.jsonl` (64/160 wins, 78 reach-8).**
+Owner capture runs SEMXURN5 (stopped a5, 13M score) + X778PBYT (stopped a6, 1.5M): records after line 53787 of
+bes_runs.jsonl / 51257 of bes_fixtures.jsonl; replay picks in the session scratchpad (own_replay.jsonl).
+**Findings (owner corpus 18 runs + these 2 vs sh1_7):** income/round a2 $14.6 vs $6.8, a3 $16.6 vs $8.5; the gap is IN-BLIND
+money ($4.6 / $6.7 a blind at a2 / a3 vs $0.36 / $0.55) from money jokers that fit a face build (Business Card, Midas,
+Faceless, To Do) + gold seals; these 2 runs: Egg sold $14 + Hermit $20 (a2), Hermit $16 + Seed Money a2 / Money Tree a3 +
+To the Moon + 2x Temperance $41. Owner buys 4-6 vouchers a run (holding $30-90) vs the engine's 1.2. **Replayed on the
+owner's rich a4-a5 states the engine picks the same keystones (Blueprint, Sock and Buskin, Hanging Chad 129, Invisible,
+Photograph) and wants to reroll as much** -> the engine's choices are fine given money; the gap is getting the money.
+Engine undervalues Egg (0.36 vs Devious 0.54 on an empty a1 board) and prices Seed Money from the CURRENT bank only.
+| arm | change | wins | reach-8 | progress (p) | sign |
+|---|---|---|---|---|---|
+| vs_7 | Seed Money / Money Tree priced as income streams (BES_VOUCHER_STREAM=1) | 59 | 72 | -0.052 (0.15) | 8/15 |
+| vall_7 | probe `vall`: buy the ante's voucher when it leaves \$25 (3.85 vouchers/run) | 50 | 64 | -0.212 (0.05) | 47/62 |
+vs_7: Seed Money bought in 18 runs; they held \$40 vs \$27 at a6 but a8 capacity 90k vs 215k (interest piles up idle).
+vall_7: the owner's voucher habit is a CONSEQUENCE of wealth, not a cause -- at the engine's income it costs board power.
+Both switches stay off. Voucher timing (owner question): the engine has no model of a voucher staying for the ante or of
+the pre-boss shop being the last chance -- not built (only matters for marginal buys, and vouchers measured negative).
+**Next:** the in-blind money gap with build-fitting money jokers (econ_7 forced money jokers generically and lost board
+power; the owner's are part of the face build) -- or accept money as an exogenous ceiling.
+
 ## START HERE (2026-10-20 evening) -- consolidated state
 **Live = main = `bbf9856` (deployed 16:15). NEW BASELINE seed_off 7 = `sim_out/sh1_7.jsonl` (64/160 wins, 78 reach-8).**
 Shipped today: the full measurement-cache key (JokerValue: the cache ignored the joker's ability, the deck's
