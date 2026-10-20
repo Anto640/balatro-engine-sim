@@ -237,6 +237,25 @@ local function ctx_sig(g, dkey, hs)
   return table.concat(p, "|")
 end
 JV._crn_hand = crn_hand
+-- CACHE KEY (2026-10-20, BES_CACHE_KEY=ability|full, sim A/B; default = the old key). The measurement cache keyed a
+-- delta by the joker's KEY, the board's keys and the deck's card ids only, so within one decision:
+--   * a scaler's per-unit measurement (Eval unit_spu: the same joker at x_mult 2) hit the fresh joker's cached 0 --
+--     every event-fed scaler (Constellation, Hologram, Vampire, Campfire...) was worth 0 in a full-board trade;
+--   * the forward valuation's projected context (same card ids, projected enhancements and hand levels) hit the
+--     current one -- its +Mult anchor was always 1.00 (fresh: 1.27-2.31 on six live shops).
+-- "ability" adds the measured joker's ability; "full" also the board's abilities, the deck's content and the context.
+JV.CACHE_KEY = os.getenv and os.getenv("BES_CACHE_KEY") or nil
+local DK_MEMO = setmetatable({}, { __mode = "k" })
+local function full_ctx_key(gs, deck, hs)
+  local dk = DK_MEMO[deck]
+  if not dk then dk = deck_key(deck); DK_MEMO[deck] = dk end
+  return ctx_sig(gs, dk, hs)
+end
+local function ability_sig(j)
+  local p = {}
+  if j and type(j.ability) == "table" then num_fields(j.ability, p); num_fields(j.ability.extra, p) end
+  return table.concat(p, ";")
+end
 local function crn_base_score(g, deck, dkey, hs, k)
   local key = ctx_sig(g, dkey, hs) .. "#" .. k .. (JV._salt and ("@" .. JV._salt) or "")
   local v = CRN_BASE[key]
@@ -275,6 +294,8 @@ function JV.score_delta(gs, joker, opts)
     ckey = "delta|" .. samples .. "|" .. hs .. "|"
       .. (joker.key or "?") .. ":" .. (joker.edition or "") .. "|"
       .. jokers_sig(gs.jokers) .. "|" .. deck_sig(deck, cache)
+    if JV.CACHE_KEY then ckey = ckey .. "|A" .. ability_sig(joker) end
+    if JV.CACHE_KEY == "full" then ckey = ckey .. "|F" .. full_ctx_key(gs, deck, hs) end
     local hit = cache[ckey]
     if hit ~= nil then return hit end
   end
@@ -442,6 +463,7 @@ function JV.avg_score(gs, opts)
   if cache then
     ckey = "avg|" .. samples .. "|" .. hs .. "|"
       .. jokers_sig(gs.jokers) .. "|" .. deck_sig(deck, cache)
+    if JV.CACHE_KEY == "full" then ckey = ckey .. "|F" .. full_ctx_key(gs, deck, hs) end
     local hit = cache[ckey]
     if hit ~= nil then return hit end
   end
