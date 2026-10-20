@@ -2073,9 +2073,98 @@ end
 -- (only a buy into a free slot passes it; see CONDITIONAL_ECON).
 function Eval.econ_value(gs, key, measured_income)
   local base = JokerData.resolve(key).econ or 0
+  if measured_income and Eval.PLAY_MONEY then
+    local pm = Eval.play_money_delta(gs, key)
+    if pm then
+      -- a PLAY-money joker's whole income is what its plays earn (measured, board-aware); any other joker keeps its
+      -- own income and adds the money its retriggers / copies bring to the board's money cards
+      if Eval.PLAY_MONEY_JOKER[key] then return pm end
+      local fn = CONDITIONAL_ECON[key]
+      if fn and base ~= 0 then base = fn(gs, base, measured_income) end
+      return base * probability_factor(gs, key) + pm
+    end
+  end
   local fn = CONDITIONAL_ECON[key]
   if fn and base ~= 0 then base = fn(gs, base, measured_income) end
   return base * probability_factor(gs, key)
+end
+
+-- BUILD-AWARE PLAY MONEY (2026-10-20, owner capture runs; A/B switch BES_PLAY_MONEY=1, default off). The owner earns
+-- \$4.6 / \$6.7 a blind inside blinds at antes 2 / 3 (engine \$0.4 / \$0.6), much of it from money that the BOARD
+-- multiplies: Business Card on a face build whose plays score faces, retriggered by Sock and Buskin / Hanging Chad;
+-- gold seals retriggered; Golden Ticket on Midas Mask's gold faces. The static incomes above ignore the board: Business
+-- Card is \$2 x the deck's face share whatever plays the board makes (measured on 390 corpus shops it earns \$5.1 a
+-- round, static \$2.3; Rough Gem \$2.0 vs static \$3.7). Measured here: the money the engine's own best play earns
+-- WITH the joker minus WITHOUT it, over sampled deals (HandEval ev.money: Business per face trigger, gold seals, Lucky,
+-- Rough Gem; plus Golden Ticket's \$4 per scored Gold card, which the world pays outside ev.money), x the plays a round
+-- spends (half its hands, as To Do List's model). Only for a buy into a FREE slot (econ_value's measured_income), as
+-- for Mail-In / To Do: weighing money against scorers in trades is the shape that lost before (bn, pt).
+Eval.PLAY_MONEY = os.getenv and os.getenv("BES_PLAY_MONEY") == "1"
+Eval.PLAY_MONEY_JOKER = { j_business = true, j_rough_gem = true, j_ticket = true }
+Eval.PLAY_MONEY_SAMPLES = 8
+local PM_RETRIG = { j_sock_and_buskin = true, j_hanging_chad = true, j_seltzer = true, j_dusk = true, j_hack = true,
+  j_blueprint = true, j_brainstorm = true, j_pareidolia = true, j_oops = true, j_splash = true, j_midas_mask = true }
+-- does the board / deck hold anything a joker's plays could earn money from?
+local function money_sources(gs)
+  for _, j in ipairs(gs.jokers or {}) do
+    if Eval.PLAY_MONEY_JOKER[j.key] or j.key == "j_todo_list" then return true end
+  end
+  for _, c in ipairs(gs.deck or {}) do
+    if c.seal == "Gold" or c.enhancement == "m_lucky" then return true end
+  end
+  return false
+end
+local pm_cache = setmetatable({}, { __mode = "k" })
+function Eval.play_money_delta(gs, key)
+  local deck = gs.deck
+  if not deck or #deck < 8 then return nil end
+  if not Eval.PLAY_MONEY_JOKER[key] and not (PM_RETRIG[key] and money_sources(gs)) then return nil end
+  local memo = pm_cache[deck]
+  if not memo then memo = {}; pm_cache[deck] = memo end
+  local sig = { key }
+  for _, j in ipairs(gs.jokers or {}) do sig[#sig + 1] = j.key end
+  sig = table.concat(sig, ",")
+  if memo[sig] then return memo[sig] end
+  local HandEval = require("engine.hand_eval")
+  local hs = math.min((gs.run and gs.run.hand_size) or 8, #deck)
+  local s = (#deck * 15485863 + #sig * 7919 + 104729) % 2147483647
+  for c = 1, #key do s = (s + key:byte(c) * 131 * c) % 2147483647 end
+  if s <= 0 then s = 1 end
+  local rng = function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end
+  local base = gs.jokers or {}
+  local with = {}
+  for i, j in ipairs(base) do with[i] = j end
+  with[#with + 1] = { key = key, ability = {} }
+  local has_ticket_after, has_ticket_before = key == "j_ticket", false
+  for _, j in ipairs(base) do if j.key == "j_ticket" then has_ticket_before = true; has_ticket_after = true end end
+  local function ticket_money(ev, on)
+    if not (on and ev and ev.scoring_cards) then return 0 end
+    local g = 0
+    for _, c in ipairs(ev.scoring_cards) do if c.enhancement == "m_gold" then g = g + 4 end end
+    return g
+  end
+  local saveR = HandEval.roll_rng
+  HandEval.roll_rng = nil   -- expected money (no sampled Business / Lucky rolls)
+  local ok, total = pcall(function()
+    local sum = 0
+    for _ = 1, Eval.PLAY_MONEY_SAMPLES do
+      local hand = JokerValue._sample_hand(gs, deck, hs, rng)
+      gs.jokers = with
+      local e1 = HandEval.best_play(gs, hand)
+      local m1 = ((e1 and e1.money) or 0) + ticket_money(e1, has_ticket_after)   -- read now: evaluations may be reused
+      gs.jokers = base
+      local e0 = HandEval.best_play(gs, hand)
+      sum = sum + m1 - ((e0 and e0.money) or 0) - ticket_money(e0, has_ticket_before)
+    end
+    return sum
+  end)
+  gs.jokers = base
+  HandEval.roll_rng = saveR
+  if not ok then return nil end
+  local hands = (gs.blind and gs.blind.base_hands) or 4
+  local v = math.max(0, total / Eval.PLAY_MONEY_SAMPLES * hands / 2)
+  memo[sig] = v
+  return v
 end
 
 -- Passive economy generated by jokers ($/round), deck-aware (see econ_value).
