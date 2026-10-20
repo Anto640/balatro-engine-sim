@@ -1449,6 +1449,15 @@ end
 -- run's midpoint deck).
 Eval.LIMITED_LIFE = { j_selzer = true, j_ramen = true, j_ice_cream = true, j_popcorn = true, j_gros_michel = true,
                       j_turtle_bean = true }
+-- FORWARD HORIZON (2026-10-19, owner: boards should turn multiplicative). A joker is valued now and at a projected
+-- later point of the run; that point was the run's MIDPOINT (ante 2 -> 5). The blinds that decide runs are the late
+-- bosses (52 of pt_7's 94 deaths are at antes 6-8), and there the owner's boards hold ~2.6 xmult + 1.6 retrigger jokers
+-- vs the engine's 1.8 + 1.0 while it keeps ~1.5 flat jokers. A/B switches: BES_FWD_AT = how far along the remaining
+-- run the projection sits (0.5 = midpoint, 1.0 = the ante-8 boss); BES_FWD_W = the weight on that projected reading
+-- (0.5 = the even average of now and later).
+Eval.FWD_AT = tonumber(os.getenv and os.getenv("BES_FWD_AT") or "") or 0.5
+Eval.FWD_W  = tonumber(os.getenv and os.getenv("BES_FWD_W") or "") or 0.5
+local function fwd_point(ante) return ante + (8 - ante) * Eval.FWD_AT end
 function Eval.forward_measure(ctx_gs, j, m, opts)
   opts = opts or {}
   m = Eval.refine_measure(ctx_gs, j, m, opts)
@@ -1456,7 +1465,7 @@ function Eval.forward_measure(ctx_gs, j, m, opts)
   if Eval.FWD_ALL and m and Eval.floor_free(j.key) and not JokerData.has_tag(j.key, "retrigger")
      and can_measure(ctx_gs, opts) then
     local ante = (ctx_gs.meta and ctx_gs.meta.ante) or 1
-    local mid = ante + (8 - ante) / 2
+    local mid = fwd_point(ante)
     if mid > ante then
       local cache = opts.cache
       local ckey = "_fwd_ctx|" .. tostring(ctx_gs.deck) .. "|" .. tostring(ctx_gs.jokers) .. "|" .. mid
@@ -1500,7 +1509,7 @@ function Eval.forward_measure(ctx_gs, j, m, opts)
       end
       if mf and ref and m > 0 then
         local rel = (mf / m) / ref                      -- this joker's growth relative to +Mult's
-        m = m * (0.5 + 0.5 * math.max(0, math.min(3, rel)))
+        m = m * ((1 - Eval.FWD_W) + Eval.FWD_W * math.max(0, math.min(3, rel)))
       end
     end
     return m
@@ -1513,7 +1522,7 @@ function Eval.forward_measure(ctx_gs, j, m, opts)
   if not m or not JokerData.has_tag(j.key, "retrigger") or not Eval.floor_free(j.key) then return m end
   if not can_measure(ctx_gs, opts) then return m end
   local ante = (ctx_gs.meta and ctx_gs.meta.ante) or 1
-  local mid = ante + (8 - ante) / 2
+  local mid = fwd_point(ante)
   if mid <= ante then return m end
   local cache = opts.cache
   local dkey = "_proj_deck|" .. tostring(ctx_gs.deck) .. "|" .. mid
