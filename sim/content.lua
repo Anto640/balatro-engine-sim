@@ -1114,6 +1114,11 @@ local function shop_loop(run, shop, rng, crn_n)
       local nv = Probe.noreroll(run, shop, ranked)
       if nv then ranked = nv end
     end
+    -- VOUCHER HABIT (owner capture runs 2026-10-20): buy the voucher on sight. Inert without a probe config.
+    if run.probe and (run.probe.vbuy or run.probe.vbuy_all) then
+      local vv = Probe.vbuy(run, shop, ranked)
+      if vv then ranked = vv end
+    end
     -- LOOK-AHEAD (sim/lookahead.lua): compare the engine's top choices by playing each forward on sampled futures.
     -- Inert without the probe config, and never inside a look-ahead rollout (no recursion).
     if run.probe and run.probe.lookahead and not run._la_rollout and (run.ante or 1) <= (run.probe.lookahead_until or 3)

@@ -359,6 +359,7 @@ local ECON = {
   -- the DISCOUNT vouchers (Clearance Sale, Liquidation, Reroll Surplus/Glut) are not a \$/round stream here: they are
   -- priced as TOTAL dollars saved over the rest of the run (V.savings_dollars), against their price, in shop_advisor
 }
+V.INTEREST = { v_seed_money = true, v_money_tree = true }   -- the ECON entries that are interest-cap streams
 -- Overstock is priced in shop_advisor (SA.overstock_value) from the shop's OWN measured card value -- the gross
 -- value a reroll's new cards are expected to add -- because it IS free card views: the only measurement of what a
 -- card view is worth to this engine lives in the reroll valuation.

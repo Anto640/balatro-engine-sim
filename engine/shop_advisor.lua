@@ -383,6 +383,7 @@ SA.econ_floor_penalty = econ_floor_penalty
 -- penalty, whose purpose (keep a reserve) an income source serves. FREE-SLOT buys only: money jokers displacing scorers
 -- in trades is the shape that failed before (paired trades, wins 35 -> 17).
 SA.INCOME_STREAM = os.getenv and os.getenv("BES_INCOME_STREAM") == "1"
+SA.VOUCHER_STREAM = os.getenv and os.getenv("BES_VOUCHER_STREAM") == "1"   -- interest-cap vouchers as streams (below)
 SA.INCOME_STREAM_SCALE = tonumber(os.getenv and os.getenv("BES_INCOME_SCALE") or "") or 1.0   -- bracket the size (arm inch = 0.5)
 function SA.income_stream_util(gs, per_round)
   if not per_round or per_round <= 0 then return 0 end
@@ -1279,6 +1280,14 @@ function SA.recommend(gs, opts)
       { rng = rng, cache = mopts.cache, samples = 6, at_risk = not secure })
     vval = vval * SA.VOUCHER_FV_UTIL   -- FV points -> utility (the joker buy's scale)
     local value = w_score * vval + w_econ * vecon * VU.ROUND_INCOME_UTIL - net_cost_c(cost)
+    -- an INTEREST-CAP voucher (Seed Money / Money Tree) under SA.VOUCHER_STREAM: its extra interest is a \$/round stream
+    -- that takes no joker slot, so it is priced as the money it pays over the rounds left (SA.income_stream_util) --
+    -- the slot cost that made the same pricing lose for money jokers (inc / inch) does not apply. (Was one round-income
+    -- unit, ~3 one-off dollars per \$/round: a \$4/round Seed Money at \$45 read +1.2, below an Arcana pack; the
+    -- owner's capture runs 2026-10-20 bought it at \$45 and Money Tree at \$75.) A/B switch BES_VOUCHER_STREAM=1.
+    if SA.VOUCHER_STREAM and Vouchers.INTEREST[v.key] and vecon > 0 then
+      value = w_score * vval + SA.income_stream_util(gs, vecon) - net_cost_c(cost)
+    end
     -- a DISCOUNT voucher: the dollars it saves over the rest of the run, priced like the dollars it costs
     -- (SA.COST_WEIGHT per dollar, w_econ for the situation), see Vouchers.savings_dollars
     local saved = Vouchers.savings_dollars(gs, v.key)

@@ -592,6 +592,7 @@ Probe.CONFIGS = {
   noskip       = { no_skip_until = 99 },
   noskip_early = { no_skip_until = 4 },
   invest1      = { skip_only = { tag_investment = true }, skip_only_until = 1 },
+  vall         = { skip_only = { tag_investment = true }, skip_only_until = 1, vbuy_all = true, vbuy_reserve = 25 },   -- any voucher when rich
   slots        = { joker_slots = 8 },
   -- +1 and +2 slots: unlike the 8-slot bound, these ARE reachable in a real run (the
   -- Antimatter voucher chain, negative-edition jokers), so they measure how much of the
@@ -717,6 +718,26 @@ function Probe.noreroll(run, shop, ranked)
     end
   end
   return { best = { type = "SAVE", value = 0, reason = "probe: noreroll" }, alternatives = {}, pace = ranked.pace }
+end
+
+-- VOUCHER HABIT (2026-10-20, owner capture runs: the owner buys ~1 voucher per ante -- 4 each by ante 5 in two runs, 4-6
+-- per run in the corpus -- vs the engine's 1.2 a run, almost always holding \$30+ when they buy): "vall" = buy the ante's
+-- voucher (all but Hieroglyph / Petroglyph) whenever it leaves vbuy_reserve dollars. nil = no override.
+Probe.VOUCHER_SKIP = { v_hieroglyph = true, v_petroglyph = true }
+function Probe.vbuy(run, shop, ranked)
+  local p = run.probe
+  local best = ranked and ranked.best
+  if best and best.type == "BUY_VOUCHER" then return nil end
+  local cash = (run.economy and run.economy.dollars) or 0
+  for _, v in ipairs(shop.vouchers or {}) do
+    local ok = (p.vbuy and p.vbuy[v.key]) or (p.vbuy_all and not Probe.VOUCHER_SKIP[v.key])
+    local cost = v.cost or 10
+    if ok and cost + (p.vbuy_reserve or 0) <= cash then
+      return { best = { type = "BUY_VOUCHER", target = v, cost = cost, value = 0, reason = "probe: voucher habit" },
+               alternatives = {}, pace = ranked and ranked.pace }
+    end
+  end
+  return nil
 end
 
 -- Resolve a config name to the opts overlay Driver.run consumes. Returns nil for the
