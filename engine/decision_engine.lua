@@ -1388,6 +1388,15 @@ function DE.decide(gs, opts)
         best = { type = "PLAY", cards = st.sel, hand_type = st.ev.hand_type, score = st.ev.score,
                  value = (best.value or 0) + 1, farm = true, plan = true,
                  play_econ = HandEval.play_econ(gs, st.ev, st.sel), reason = why }
+        -- REPOINT (BES_REPOINT=1): a farm hand is played for money, so order the jokers / cards for MONEY (a copier on
+        -- Golden Ticket); the clearing hand's own score reorder points it back.
+        if require("engine.joker_effects").REPOINT then
+          local o = Ordering.optimize(gs, st.sel, { objective = "money", remaining = 0 })
+          if o and o.improves and (o.money_gain or 0) > 1e-9 then
+            best.reorder = o
+            best.reason = best.reason .. string.format("  Reorder for +$%g on this hand.", o.money_gain)
+          end
+        end
       end
     end
   end

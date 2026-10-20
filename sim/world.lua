@@ -712,7 +712,7 @@ local function post_play_econ(run, ev, sel, eff)
     if has_hiker then
       for _, c in ipairs(sc) do c.perma_chips = (c.perma_chips or 0) + 5 end   -- Hiker: +5 perma chips/scored
     end
-    if has_ticket and run.economy then
+    if has_ticket and run.economy and not require("engine.joker_effects").REPOINT then   -- REPOINT: paid via ev.money
       local gold = 0
       for _, c in ipairs(sc) do if c.enhancement == "m_gold" then gold = gold + 1 end end
       run.economy.dollars = run.economy.dollars + 4 * gold

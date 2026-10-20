@@ -99,6 +99,16 @@ J.j_gluttenous_joker = J.j_gluttonous_joker
 J.j_arrowhead   = suit_joker("Spades",   { chips = 50 })
 J.j_onyx_agate  = suit_joker("Clubs",    { mult = 7 })
 J.j_rough_gem   = suit_joker("Diamonds", { dollars = 1 })  -- money only (no score)
+-- Golden Ticket: $4 per scored Gold card, per trigger (retriggers and a Blueprint / Brainstorm copy pay again) -- under the
+-- REPOINT switch (BES_REPOINT=1, default off; sim/world.lua then banks it from ev.money instead of its flat count), so a
+-- money-objective reorder can point a copier at it for a farm hand (owner X778PBYT/SEMXURN5: Blueprint on Golden Ticket
+-- for the money hands, then on Photograph for the clear).
+J.REPOINT = os.getenv and os.getenv("BES_REPOINT") == "1"
+if J.REPOINT then
+  J.j_ticket = { on_card_scored = function(card)
+    if card.enhancement == "m_gold" then return { dollars = 4 } end
+  end }
+end
 J.j_bloodstone  = { on_card_scored = function(card)
   if Cards.is_suit(card, "Hearts") then return { xmult = 1.25, approx = true, roll = "bloodstone" } end -- 1/2 of x1.5
 end }
@@ -411,7 +421,7 @@ local VALUE_ONLY = {
   -- economy ($/round or on-event money; econ lives in joker_data)
   j_credit_card = true, j_delayed_grat = true, j_business = true, j_egg = true,
   j_faceless = true, j_golden = true, j_cloud_9 = true, j_rocket = true,
-  j_gift = true, j_to_the_moon = true, j_ticket = true, j_mail = true,
+  j_gift = true, j_to_the_moon = true, j_ticket = not J.REPOINT or nil, j_mail = true,
   j_trading = true, j_reserved_parking = true, j_matador = true, j_satellite = true,
   j_todo_list = true, j_astronomer = true,
   -- deck modifiers

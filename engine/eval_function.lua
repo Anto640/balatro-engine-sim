@@ -2135,8 +2135,9 @@ function Eval.play_money_delta(gs, key)
   local with = {}
   for i, j in ipairs(base) do with[i] = j end
   with[#with + 1] = { key = key, ability = {} }
-  local has_ticket_after, has_ticket_before = key == "j_ticket", false
-  for _, j in ipairs(base) do if j.key == "j_ticket" then has_ticket_before = true; has_ticket_after = true end end
+  local repoint = require("engine.joker_effects").REPOINT   -- Golden Ticket already in ev.money
+  local has_ticket_after, has_ticket_before = key == "j_ticket" and not repoint, false
+  for _, j in ipairs(base) do if j.key == "j_ticket" and not repoint then has_ticket_before = true; has_ticket_after = true end end
   local function ticket_money(ev, on)
     if not (on and ev and ev.scoring_cards) then return 0 end
     local g = 0
