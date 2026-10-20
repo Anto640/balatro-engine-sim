@@ -1,5 +1,28 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-20 morning) -- consolidated state
+**Live = main = `cda7a59` (deployed 10-20 07:40).** Baseline still `sim_out/pt_7.jsonl` (66/160 wins, 77 reach-8); the
+round-state xmult fix (`6cea5ba`) is on main and changes behaviour (sx_7: 60 wins) -- the next promising arm should
+also be read against an sx_7-equivalent control. Arms now take ~40 min on 11 workers.
+**Board-building investigation (owner's prompt, 10-19 night), all paired n=160 vs pt_7:**
+| arm | change | wins | reach-8 | progress | wins +/- |
+|---|---|---|---|---|---|
+| mc3_7 | every JokerValue sample count x3 (BES_MC_MULT=3) | 60 | 69 | -0.12 (p 0.47) | 24/30 |
+| nr3_7 | no rerolls from ante 3 (probe noreroll_from3) | 60 | 75 | -0.01 (p 0.90) | 21/27 |
+| sx_7 | round-state xmults valued (SHIPPED, correctness) | 60 | 75 | +0.05 (p 0.48) | 4/10 (p 0.18) |
+| ef_7 | econ floor 0/8/16/24 (BES_ECON_FLOOR=0 _STEP=8) | 57 | 70 | -0.01 (p 0.94) | 16/25 |
+Findings: (1) 59% of 80 replayed live shop states flip their recommendation with the rng seed (tools: scratch stab.lua);
+decision-scoped CRN (BES_CRN_DECISION) barely steadies it, x3 samples does not win -> measurement noise is NOT a lever.
+(2) Card Sharp / Acrobat / Loyalty / Ancient / Idol read 0 on a single deal and were priced like a do-nothing joker
+(all 1.01 vs Duo 11.5; 187 sim offers, never bought) -> expected-value models in Eval.conditional_xmult_marginal.
+(3) rerolls = the biggest spend from ante 3 (~$45/run, ~1 joker change per 12) but banning them is neutral.
+(4) synergy with OWNED partners is measured directly; strong jokers are almost never sold once owned.
+(5) THE LEAD: by ante 5 the owner's boards hold xmult 1.75 + retrigger 1.12 + flat 1.0 vs engine winners 1.18 + 0.62 +
+2.29 (ante 7: 2.57 + 1.57 + 0.58 vs 1.80 + 0.98 + 1.52). Being tested: value jokers at the late bosses instead of the
+run midpoint -- BES_FWD_AT (0.5 shipped; 1.0 = ante-8 boss) / BES_FWD_W (0.5): arms hz1_7 (AT=1) then hzw_7 (AT=1, W=0.75),
+job tmp hz1_result.txt / hzw_result.txt. On 10 live shops AT=1 moves Hanging Chad 11.9 -> 18.8, Cavendish 17.6 -> 19.6,
+Banner 3.9 -> 3.5.
+
 ## START HERE (2026-10-19 evening) -- consolidated state
 **Live = main (deployed through `6833b00`; later commits are sim-only).** Baseline seed_off 7 = **`sim_out/pt_7.jsonl`
 (66/160 wins = 41%, 77 reach-8)**. Sim speed: a 160-seed arm is ~35-70 min on 11 workers (hand_eval ~9x + LuaJIT trace
