@@ -108,6 +108,15 @@ local ONE_OFF_HAND = {
 -- nil pol = the historical greedy policy, byte-identical (every in-blind caller passes none).
 -- `milk` may also be a FARM policy table { farm = true, reserve = r } (engine/farm.lua): pay-discards and
 -- non-clearing cycle plays while more than r hands remain, then finish clear-ASAP.
+-- IN-BLIND ROLLOUT DIG (2026-10-21; A/B switch BES_ROLLOUT_DIG=1, default off). The greedy policy only discards toward a
+-- flush / straight / set draw and otherwise PLAYS with discards left, so its P(clear) is far below the engine's own play:
+-- on 481 sim blinds the full engine cleared 88% of those the rollout put under 50% (75% of those under 10%); on the
+-- owner's capture run SEMXURN5 it read 0.20-0.47 for blinds the full engine clears 12/12. Every in-blind comparison
+-- (play vs dig, farm, milk, Mouth types) judges its first moves by this continuation. Under the switch the in-blind
+-- rollouts (survive_current / survive_after) dig with the measured DiscardValue policy -- the same dig the engine plays
+-- (pol.dig, already used by the shop's fresh-blind estimates); on the owner's blinds 0.43 -> 0.92, 0.20 -> 0.75.
+Sim.ROLLOUT_DIG = os.getenv and os.getenv("BES_ROLLOUT_DIG") == "1"
+Sim.ROLLOUT_DIG_POL = { dig = true, dig_samples = tonumber(os.getenv and os.getenv("BES_ROLLOUT_DIG_SAMPLES") or "") or 2 }
 local function rollout(gs, start_hand, pile, target, chips0, hands, discards, hand_size, rng, eff, first, milk, pol)
   local farm = (type(milk) == "table" and milk.farm) and milk or nil
   if farm then milk = false end
@@ -362,7 +371,8 @@ function Sim.survive_current(gs, samples, rng, yield)
   local wins = 0
   for _ = 1, samples do
     if rollout(gs, gs.hand or {}, pile, target, b.chips_scored or 0,
-               b.hands_left or 0, b.discards_left or 0, hand_size_of(gs), rng, eff) >= target then
+               b.hands_left or 0, b.discards_left or 0, hand_size_of(gs), rng, eff, nil, nil,
+               Sim.ROLLOUT_DIG and Sim.ROLLOUT_DIG_POL or nil) >= target then
       wins = wins + 1
     end
     if yield then yield() end
@@ -397,7 +407,8 @@ function Sim.survive_after(gs, first, samples, rng, milk)
   local hs = hand_size_of(gs)
   local sum_frac, clears, sum_money, sum_banked = 0, 0, 0, 0
   for _ = 1, samples do
-    local chips, money, banked = rollout(gs, hand, pile, target, chips0, hands, discards, hs, rng, eff, first, milk)
+    local chips, money, banked = rollout(gs, hand, pile, target, chips0, hands, discards, hs, rng, eff, first, milk,
+      Sim.ROLLOUT_DIG and Sim.ROLLOUT_DIG_POL or nil)
     local f = chips / target
     sum_frac = sum_frac + (f > 1 and 1 or f)
     sum_money = sum_money + (money or 0)
