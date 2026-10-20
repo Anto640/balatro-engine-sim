@@ -1115,6 +1115,11 @@ local function shop_loop(run, shop, rng, crn_n)
       local nv = Probe.noreroll(run, shop, ranked)
       if nv then ranked = nv end
     end
+    -- NO EARLY PLANETS probe (noplanet_until<A>). Inert without a probe config.
+    if run.probe and run.probe.noplanet_until and (run.ante or 1) <= run.probe.noplanet_until then
+      local nv = Probe.noplanet(run, shop, ranked)
+      if nv then ranked = nv end
+    end
     -- MONEY CARDS probe: buy the listed consumables on sight. Inert without a probe config.
     if run.probe and run.probe.force_take then
       local fv = Probe.force_buy(run, shop, ranked)

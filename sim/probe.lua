@@ -775,6 +775,26 @@ function Probe.force_buy(run, shop, ranked)
   return nil
 end
 
+-- NO EARLY PLANETS (2026-10-21, owner capture runs + corpus: the engine opens 0.42 / 0.58 Celestial packs at antes 1 / 2
+-- vs the owner's 0.05 / 0.15 and holds 3.1 levels at ante 3 vs 0.7; the owner spends that money on Buffoon / Arcana /
+-- Standard / Spectral packs and stacks one hand from ante 4): "noplanet_until<A>" = through ante A the engine never buys
+-- a Celestial pack or a loose planet in the shop -- it takes its best other action valued above zero, else leaves.
+local function planet_buy(a)
+  if not a or not a.target then return false end
+  if a.type == "BUY_PACK" then return tostring(a.target.key or ""):find("celestial") ~= nil end
+  if a.type == "BUY_CONSUMABLE" then return a.target.set == "Planet" end
+  return false
+end
+function Probe.noplanet(run, shop, ranked)
+  if not (ranked and planet_buy(ranked.best)) then return nil end
+  for _, a in ipairs(ranked.alternatives or {}) do
+    if not planet_buy(a) and (a.type == "SAVE" or (type(a.value) == "number" and a.value > 0)) then
+      return { best = a, alternatives = {}, pace = ranked.pace }
+    end
+  end
+  return { best = { type = "SAVE", value = 0, reason = "probe: no early planets" }, alternatives = {}, pace = ranked.pace }
+end
+
 -- Resolve a config name to the opts overlay Driver.run consumes. Returns nil for the
 -- baseline so the default code paths stay untouched.
 function Probe.opts(name)
@@ -796,6 +816,8 @@ function Probe.opts(name)
   local un, ua
   if not c then un, ua = name:match("^rich(%d+)_until(%d+)$") end
   if un then c = { income_bonus = tonumber(un), income_bonus_until = tonumber(ua) } end
+  local npa = (not c) and name:match("^noplanet_until(%d+)$")
+  if npa then c = { skip_only = { tag_investment = true }, skip_only_until = 1, noplanet_until = tonumber(npa) } end
   local nra = (not c) and name:match("^noreroll_from(%d+)$")
   if nra then c = { skip_only = { tag_investment = true }, skip_only_until = 1, noreroll_from = tonumber(nra) } end
   local nbk = (not c) and name:match("^nobuy_(.+)$")
