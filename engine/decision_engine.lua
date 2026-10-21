@@ -1390,7 +1390,14 @@ function DE.decide(gs, opts)
                  play_econ = HandEval.play_econ(gs, st.ev, st.sel), reason = why }
         -- REPOINT (BES_REPOINT=1): a farm hand is played for money, so order the jokers / cards for MONEY (a copier on
         -- Golden Ticket); the clearing hand's own score reorder points it back.
-        if require("engine.joker_effects").REPOINT then
+        -- narrowed after rp_7 (2026-10-21: a money reorder on EVERY farm hand changed 96/160 seeds, wins 64 -> 62 n.s.,
+        -- in-blind \$ no higher): only the owner's case -- a copier that can point at a per-card money joker
+        local copier, payer = false, false
+        for _, j in ipairs(gs.jokers or {}) do
+          if j.key == "j_blueprint" or j.key == "j_brainstorm" then copier = true end
+          if j.key == "j_ticket" or j.key == "j_rough_gem" or j.key == "j_business" then payer = true end
+        end
+        if require("engine.joker_effects").REPOINT and copier and payer then
           local o = Ordering.optimize(gs, st.sel, { objective = "money", remaining = 0 })
           if o and o.improves and (o.money_gain or 0) > 1e-9 then
             best.reorder = o

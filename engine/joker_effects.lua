@@ -421,7 +421,7 @@ local VALUE_ONLY = {
   -- economy ($/round or on-event money; econ lives in joker_data)
   j_credit_card = true, j_delayed_grat = true, j_business = true, j_egg = true,
   j_faceless = true, j_golden = true, j_cloud_9 = true, j_rocket = true,
-  j_gift = true, j_to_the_moon = true, j_ticket = not J.REPOINT or nil, j_mail = true,
+  j_gift = true, j_to_the_moon = true, j_ticket = true, j_mail = true,   -- Ticket stays money-only for valuation even with its REPOINT money hook
   j_trading = true, j_reserved_parking = true, j_matador = true, j_satellite = true,
   j_todo_list = true, j_astronomer = true,
   -- deck modifiers
