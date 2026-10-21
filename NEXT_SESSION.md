@@ -20,8 +20,13 @@ the engine picks the same keystones -- the gap is the trajectory. (5) engine lev
 spreads them; owner stacks one hand from a4 (a7 top level 10 vs 5.7) -- np_7 moved a3 money 15 -> 19 but no wins.
 (6) THINNING: engine decks grow 52 -> 55.7 (Hanged Man used 0.45/run of ~1.4 offered); owner normally thins (these 2
 runs were unusual). thin8 +0.42 => removal is undervalued: DeckPlan.removal_value is a HAND-SET heuristic (~0.037 boss
-hand per card; ~4x low vs the thin8 / rich10_until2 cash rate). **Running: `hm_7` (probe `hanged`, always take The
-Hanged Man) vs fsl_7, ~05:35.** Next: a measured / calibrated card-removal value (Hanged Man, Immolate, standard-pack
+hand per card; ~4x low vs the thin8 / rich10_until2 cash rate). **Follow-ups (vs fsl_7 unless noted):** `hm_7` (probe `hanged`, always take The Hanged Man) 60 wins, 74 reach-8, -0.116
+(p 0.09): Hanged Man 0.49 -> 1.30/run but a8 deck only 55.9 -> 53.5. `thr8_7` (probe `thinr8`: 8 cards SPREAD over the
+ranks removed; vs sh1_7) 61 / 71, -0.163 n.s.; vs th8_7 -0.588 (p 0.001) => the thin8 gain is deck QUALITY (no 2s/3s),
+not size. `dq4_7` (BES_DECKQ_MULT=4: removal value + rank/enhancement tarot gain x4) 60 / 69, -0.306 (p 0.03): tarot
+use up (Death 0.75 -> 1.09, Strength 0.39 -> 0.74, Empress 0.72 -> 1.16) but worse -- across-the-board repricing loses.
+Pattern of the whole night: a FREE resource helps (rich*, gold6, thin8), the engine BUYING more of it does not (vouchers,
+interest, money cards, Hanged Man, tarot repricing). Next: a measured / calibrated card-removal value (Hanged Man, Immolate, standard-pack
 dilution), then the owner-state continuation test (resume the sim from the owner's ante-2/3 fixtures).
 Owner wants repoint shipped for the live overlay? -- asked 03:13 (rp_7 n.s. negative; narrowed version is sim-inert).
 
