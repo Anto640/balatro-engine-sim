@@ -2061,7 +2061,7 @@ local CONDITIONAL_ECON = {
 -- ante 1.1) and Golden Ticket in 147 (ante 1.4) for Jolly / Ice Cream / Odd Todd: each money joker was priced alone --
 -- Ticket a flat \$3 with or without Gold cards to pay on, Midas only the \$3 its Gold faces pay HELD. Together they are a
 -- money engine (Midas makes Gold faces, Ticket pays \$4 per scored Gold card, a copier doubles it).
-Eval.MONEY_COMBO = os.getenv and os.getenv("BES_MONEY_COMBO") == "1"
+Eval.MONEY_COMBO = not (os.getenv and os.getenv("BES_MONEY_COMBO") == "0")   -- SHIPPED (bpc_7 vs bp1_7 on the owner board: wins 119 -> 132, +0.156); =0 disables
 Eval.TICKET_PAY = 4
 Eval.SCORED_PER_ROUND = 6        -- cards scored a round: ~1.6-1.9 hands x ~3.5 scoring cards (sim blind_result), + farm
 Eval.MIDAS_CONVERT = 0.5         -- share of the deck's non-Gold faces Midas turns Gold over the next few rounds
