@@ -1050,6 +1050,7 @@ function CV.card_value(gs, set, key, freq, need, rng, samples, hand_ctx)
       -- gain sat on the joker scale ~5x too high: The Tower read 0.61 of a boss hand and out-ranked jokers and money.
       local frac = math.max(0, sv) / need
       if CV.TAROT_PER_HAND then frac = frac * CV.tarot_presence(gs, (spec and spec.n) or (Tarot.RANK[key] and 2) or 1) end
+      frac = frac * require("engine.deck_plan").DECKQ_MULT   -- deck-quality calibration test (BES_DECKQ_MULT)
       return frac + econ, 0, string.format("enhance ~+%d score", math.floor(math.max(0, sv)))
     end
     return CV.TAROT_BASE[key] or 0.15, 0, "tarot"

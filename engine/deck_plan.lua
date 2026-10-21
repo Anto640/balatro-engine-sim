@@ -162,8 +162,13 @@ function DP.removal_value(gs, card, target, mean, n)
   local hs = (gs.run and gs.run.hand_size) or 8
   local focus = (mean - DP.card_quality(gs, card, target)) / n   -- >0 when below the mean
   local thin = (n > target.ideal_size) and 0.02 or 0.004
-  return focus * QUALITY_FRAC * hs + thin
+  return (focus * QUALITY_FRAC * hs + thin) * DP.DECKQ_MULT
 end
+-- DECK-QUALITY CALIBRATION TEST (2026-10-21; BES_DECKQ_MULT, default 1): thin8_7 (the 8 lowest cards removed at the
+-- start) +0.424 p 0.03, but the same 8 spread over the ranks -0.163 (thinr8, -0.588 vs thin8, p 0.001): deck QUALITY
+-- pays, and at the rich10_until2 cash rate it is worth ~4x what this heuristic credits. Scales removal value and (in
+-- consumable_value) the rank / enhancement tarots' measured per-hand gain.
+DP.DECKQ_MULT = tonumber(os.getenv and os.getenv("BES_DECKQ_MULT") or "") or 1
 
 -- Rank the deck's cards by how worth-removing they are (best removal first).
 -- Returns (sorted list of { card, idx, value }, target).
