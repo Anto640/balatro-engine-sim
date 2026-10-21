@@ -592,6 +592,8 @@ Probe.CONFIGS = {
   noskip       = { no_skip_until = 99 },
   noskip_early = { no_skip_until = 4 },
   invest1      = { skip_only = { tag_investment = true }, skip_only_until = 1 },
+  hanged       = { skip_only = { tag_investment = true }, skip_only_until = 1,
+                   force_take = { c_hanged_man = true } },   -- always take The Hanged Man (thinning, after thin8_7 +0.42)
   mcard        = { skip_only = { tag_investment = true }, skip_only_until = 1,
                    force_take = { c_devil = true, c_talisman = true } },   -- always take The Devil / Talisman
   vall         = { skip_only = { tag_investment = true }, skip_only_until = 1, vbuy_all = true, vbuy_reserve = 25 },   -- any voucher when rich
