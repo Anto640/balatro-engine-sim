@@ -25,6 +25,11 @@ hand per card; ~4x low vs the thin8 / rich10_until2 cash rate). **Follow-ups (vs
 ranks removed; vs sh1_7) 61 / 71, -0.163 n.s.; vs th8_7 -0.588 (p 0.001) => the thin8 gain is deck QUALITY (no 2s/3s),
 not size. `dq4_7` (BES_DECKQ_MULT=4: removal value + rank/enhancement tarot gain x4) 60 / 69, -0.306 (p 0.03): tarot
 use up (Death 0.75 -> 1.09, Strength 0.39 -> 0.74, Empress 0.72 -> 1.16) but worse -- across-the-board repricing loses.
+`bt_7` (BES_BUILD_TARGET: Death / Strength / Hanged Man aimed by DeckPlan.card_quality toward the committed deck target)
+62 / 79, -0.005 (103 tied) -> SHIPPED by default (`2197d1e`, correctness: the cards hit match the target the value uses;
+not yet deployed). `cmb_7` (BUILD_TARGET + VOUCHER_STREAM + PLAY_MONEY + ROLLOUT_DIG + REPOINT together) 57 / 73, -0.133
+(p 0.37): no hidden synergy -- those four stay off. Running: bp0_7 / bp1_7 (probe bpticket = start with Photograph,
+Blueprint, Golden Ticket, Midas Mask; REPOINT off / on), ~11:40.
 Pattern of the whole night: a FREE resource helps (rich*, gold6, thin8), the engine BUYING more of it does not (vouchers,
 interest, money cards, Hanged Man, tarot repricing). Next: a measured / calibrated card-removal value (Hanged Man, Immolate, standard-pack
 dilution), then the owner-state continuation test (resume the sim from the owner's ante-2/3 fixtures).
