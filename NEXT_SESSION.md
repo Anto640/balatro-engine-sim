@@ -1,5 +1,30 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-21 early morning) -- capture-run review round 2; seal farming SHIPPED; THINNING = the lead
+**Live = main = `9fe1bed` (deployed 03:13): seal farming ON by default (only behaviour change); every other switch below
+OFF.** Baseline for new arms = `sim_out/fsl_7.jsonl` (seal farming on; 64/160 wins, 81 reach-8); sh1_7 = the old one.
+All vs sh1_7 (64 wins, 78 reach-8), 160 paired seeds, seed_off 7:
+| arm | change (switch / probe) | wins | reach-8 | progress (p) |
+|---|---|---|---|---|
+| rd_7 | in-blind rollouts dig with the measured DiscardValue (BES_ROLLOUT_DIG=1) | 56 | 74 | -0.103 (0.43) |
+| fsl_7 | SEAL FARMING: Gold/Purple seals turn the farm on (BES_FARM_SEALS, now default ON) | 64 | 81 | +0.025 (0.56) |
+| rp_7 | repoint: Golden Ticket in ev.money + money reorder of farm hands (BES_REPOINT=1) | 62 | 75 | -0.075 (0.49) |
+| np_7 | probe noplanet_until2: no Celestial packs / planets through ante 2 | 60 | 72 | -0.054 (0.71) |
+| **th8_7** | **probe thin8: start with the 8 lowest cards removed** | **74** | **93** | **+0.424 (0.03)** |
+Findings from the owner's 2 capture runs (replayed, scratchpad): (1) the greedy survival ROLLOUT is badly pessimistic --
+on 481 sim blinds the full engine cleared 88% of those it put < 50% (75% of < 10%); owner SEMXURN5 a4 0.10-0.32 vs full
+engine 11-12/12; half of the live gap is joker ORDER (Blueprint), half the greedy dig. Fixing it (rd_7) did not move
+decisions (relative comparisons). (2) owner digs with the clear in hand to play gold cards / find gold+purple seals
+(-> seal farming). (3) owner holds The Fool for a later, better tarot. (4) pack picks agree 23/35; in the owner's states
+the engine picks the same keystones -- the gap is the trajectory. (5) engine levels EARLY (3.1 levels at a3 vs 0.7) and
+spreads them; owner stacks one hand from a4 (a7 top level 10 vs 5.7) -- np_7 moved a3 money 15 -> 19 but no wins.
+(6) THINNING: engine decks grow 52 -> 55.7 (Hanged Man used 0.45/run of ~1.4 offered); owner normally thins (these 2
+runs were unusual). thin8 +0.42 => removal is undervalued: DeckPlan.removal_value is a HAND-SET heuristic (~0.037 boss
+hand per card; ~4x low vs the thin8 / rich10_until2 cash rate). **Running: `hm_7` (probe `hanged`, always take The
+Hanged Man) vs fsl_7, ~05:35.** Next: a measured / calibrated card-removal value (Hanged Man, Immolate, standard-pack
+dilution), then the owner-state continuation test (resume the sim from the owner's ante-2/3 fixtures).
+Owner wants repoint shipped for the live overlay? -- asked 03:13 (rp_7 n.s. negative; narrowed version is sim-inert).
+
 ## START HERE (2026-10-20 night) -- owner capture runs analysed, two voucher arms negative
 **Live = main = `bbf9856` (unchanged). Baseline seed_off 7 = `sim_out/sh1_7.jsonl` (64/160 wins, 78 reach-8).**
 Owner capture runs SEMXURN5 (stopped a5, 13M score) + X778PBYT (stopped a6, 1.5M): records after line 53787 of
