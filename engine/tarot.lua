@@ -138,9 +138,37 @@ T.CARD_PERM_CREDIT = 0.03
 -- The up-to-n WORST cards in a hand to destroy (lowest chips, non-stone, deterministic).
 -- Used by best_use (to value/propose thinning) and by the sim world (to apply it), so both
 -- agree on which cards Hanged Man removes.
-function T.thin_targets(hand, n)
+-- BUILD-AWARE TARGETING (2026-10-21; A/B switch BES_BUILD_TARGET=1, default off). thin8_7 (the 8 lowest cards removed)
+-- +0.42 but the same 8 spread over the ranks -0.16: what the deck KEEPS matters, not its size -- and the owner aims
+-- Death / Strength / Hanged Man at a target hand (concentrate Full House ranks, cut off-suit cards). The engine already
+-- derives that target (DeckPlan.target: committed ranks / flush suit / faces) and prices Hanged Man toward it, but the
+-- cards it actually hit were build-blind (lowest chips; highest rank onto lowest). Under the switch all three aim by
+-- DeckPlan.card_quality toward the target.
+T.BUILD_TARGET = os.getenv and os.getenv("BES_BUILD_TARGET") == "1"
+local function build_target(gs)
+  if not (T.BUILD_TARGET and gs and gs.deck and #gs.deck > 0) then return nil end
+  local DP = require("engine.deck_plan")
+  local t = DP.target(gs)
+  if not (t and (t.ranks or t.suit or t.face)) then return nil end
+  return t, function(c) return DP.card_quality(gs, c, t) end
+end
+T._build_target = build_target
+
+function T.thin_targets(hand, n, gs)
   local cand = {}
   for _, c in ipairs(hand or {}) do if not Cards.is_stone(c) then cand[#cand + 1] = c end end
+  local _, q = build_target(gs)
+  if q then
+    local qv = {}
+    for _, c in ipairs(cand) do qv[c] = q(c) end
+    table.sort(cand, function(a, b)
+      if qv[a] ~= qv[b] then return qv[a] < qv[b] end
+      return (a.id or 0) < (b.id or 0)
+    end)
+    local out = {}
+    for k = 1, math.min(n or 2, #cand) do out[k] = cand[k] end
+    return out
+  end
   table.sort(cand, function(a, b)
     local ca, cb = Cards.chips(a), Cards.chips(b)
     if ca ~= cb then return ca < cb end
@@ -176,21 +204,23 @@ end
 -- is valued is the card the self-player selects.
 function T.strength_targets(pool, gs, n)
   local rel = gs and T.card_relevance_fn(gs) or nil
+  local _, q = build_target(gs)
   local cand = {}
   for _, c in ipairs(pool or {}) do
     local r = Cards.rank_id(c) or 0
     if not Cards.is_stone(c) and r > 0 and r < 14 then
-      local d = 0
-      if rel then
-        local up = {}
-        for k, v in pairs(c) do up[k] = v end
-        up.rank_id = r + 1
-        d = rel(up) - rel(c)
-      end
-      cand[#cand + 1] = { c = c, d = d }
+      local d, dq = 0, 0
+      local up = {}
+      for k, v in pairs(c) do up[k] = v end
+      up.rank_id = r + 1
+      if up.rank then up.rank = nil end   -- rank_id carries the new rank (Cards.rank_id reads it first)
+      if rel then d = rel(up) - rel(c) end
+      if q then dq = q(up) - q(c) end      -- build target: the move INTO a target rank / face
+      cand[#cand + 1] = { c = c, d = d, dq = dq }
     end
   end
   table.sort(cand, function(a, b)
+    if a.dq ~= b.dq then return a.dq > b.dq end
     if a.d ~= b.d then return a.d > b.d end
     local ca, cb = Cards.chips(a.c), Cards.chips(b.c)
     if ca ~= cb then return ca > cb end
@@ -215,7 +245,27 @@ end
 -- cards (best_targets picked the two Queens, already a pair); the game shows no Use button without two selected,
 -- and the self-player stalled.
 local function extras(c) return (c.enhancement and 1 or 0) + (c.seal and 1 or 0) + (c.edition and 1 or 0) end
-function T.death_pick(cards)
+function T.death_pick(cards, gs)
+  local _, q = build_target(gs)
+  if q then
+    -- build target: copy the best card FOR THE TARGET onto the worst one (another rank or suit)
+    local qv, src = {}, nil
+    for i, c in ipairs(cards or {}) do
+      if not Cards.is_stone(c) then
+        qv[i] = q(c)
+        if not src or qv[i] > qv[src] or (qv[i] == qv[src] and Cards.rank_id(c) > Cards.rank_id(cards[src])) then src = i end
+      end
+    end
+    if src then
+      local s, tgt = cards[src], nil
+      for i, c in ipairs(cards) do
+        if i ~= src and qv[i] and (Cards.rank_id(c) ~= Cards.rank_id(s) or c.suit ~= s.suit) then
+          if not tgt or qv[i] < qv[tgt] or (qv[i] == qv[tgt] and Cards.rank_id(c) < Cards.rank_id(cards[tgt])) then tgt = i end
+        end
+      end
+      if tgt and qv[tgt] < qv[src] then return tgt, src end
+    end
+  end
   local src
   for i, c in ipairs(cards or {}) do
     if not Cards.is_stone(c) then
@@ -299,7 +349,7 @@ function T.apply_to_hand(hand, key, gs)
   end
   -- Death: of the 2 selected cards the LEFT one becomes a copy of the RIGHT one (see T.death_pick).
   if key == "c_death" then
-    local lo, hi = T.death_pick(hand)
+    local lo, hi = T.death_pick(hand, gs)
     if not lo then return nil end
     local new = {}
     for i, c in ipairs(hand) do new[i] = (i == lo) and copy_card(c) or c end
@@ -405,13 +455,13 @@ function T.best_targets(gs, key, pool)
   end
   -- RANK — Death: the same two cards apply_to_hand converts (T.death_pick), so the named targets are the ones valued.
   if key == "c_death" then
-    local lo, hi = T.death_pick(pool)
+    local lo, hi = T.death_pick(pool, gs)
     if not lo then return nil end
     return { pool[lo], pool[hi] }
   end
   -- THIN — Hanged Man etc.: DESTROY the n WEAKEST cards (same order the sim world uses).
   if T.THIN[key] then
-    local t = T.thin_targets(pool, T.THIN[key])
+    local t = T.thin_targets(pool, T.THIN[key], gs)
     return (#t > 0) and t or nil
   end
   -- SPECTRAL — a seal/edition on 1 card: the highest-value card that doesn't already have one.
@@ -547,7 +597,7 @@ function T.best_use(gs, base_ev, remaining, dollar_value, filter)
         -- Hanged Man: destroy the worst chaff cards (permanent thinning). Only worth it when
         -- removing them does NOT hurt this hand's best play (delete cards outside it), so
         -- scoring is preserved and every FUTURE draw improves. Credit the permanent thinning.
-        local deadlist = T.thin_targets(hand, T.THIN[c.key])
+        local deadlist = T.thin_targets(hand, T.THIN[c.key], gs)
         local dead, tcards = {}, {}
         for _, tc in ipairs(deadlist) do dead[tc] = true; tcards[#tcards + 1] = { id = tc.id } end
         local kept = {}

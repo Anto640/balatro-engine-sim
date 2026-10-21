@@ -375,7 +375,9 @@ local function apply_deck_tarot(run, key, hand, draw_pile)
   if not hand or #hand == 0 then return nil end
   if Tarot.THIN[key] then
     local removed = 0
-    for _, c in ipairs(Tarot.thin_targets(hand, Tarot.THIN[key])) do
+    local tgs = run and { jokers = run.jokers, deck = run.deck,
+      run = { hand_levels = run.hand_levels, hand_size = run.hand_size, build_plan = run.build_plan } } or nil
+    for _, c in ipairs(Tarot.thin_targets(hand, Tarot.THIN[key], tgs)) do
       if run and run.deck then remove_obj(run.deck, c) end
       remove_obj(hand, c)
       if draw_pile then remove_obj(draw_pile, c) end
@@ -385,7 +387,8 @@ local function apply_deck_tarot(run, key, hand, draw_pile)
     return { shape = "thin", n = removed }
   end
   local nh = Tarot.apply_to_hand(hand, key, run and { jokers = run.jokers, deck = run.deck,
-    run = { hand_levels = run.hand_levels, hand_size = run.hand_size } } or nil)   -- enh / suit / rank -> changed slots are copies
+    run = { hand_levels = run.hand_levels, hand_size = run.hand_size,
+            build_plan = Tarot.BUILD_TARGET and run.build_plan or nil } } or nil)   -- enh / suit / rank -> changed slots are copies
   if not nh then return nil end
   local n = 0
   for i, c in ipairs(hand) do
