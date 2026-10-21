@@ -1,8 +1,7 @@
 # NEXT_SESSION.md — fresh-session handoff
 
 ## START HERE (2026-10-21 early morning) -- capture-run review round 2; seal farming SHIPPED; THINNING = the lead
-**Live = main = `9fe1bed` (deployed 03:13): seal farming ON by default (only behaviour change); every other switch below
-OFF.** Baseline for new arms = `sim_out/fsl_7.jsonl` (seal farming on; 64/160 wins, 81 reach-8); sh1_7 = the old one.
+**(superseded -- see bp note below: live = `58795cd`)** Live was `9fe1bed` (03:13): seal farming ON. Baseline for new arms = `sim_out/fsl_7.jsonl` (seal farming on; 64/160 wins, 81 reach-8); sh1_7 = the old one.
 All vs sh1_7 (64 wins, 78 reach-8), 160 paired seeds, seed_off 7:
 | arm | change (switch / probe) | wins | reach-8 | progress (p) |
 |---|---|---|---|---|
@@ -28,8 +27,11 @@ use up (Death 0.75 -> 1.09, Strength 0.39 -> 0.74, Empress 0.72 -> 1.16) but wor
 `bt_7` (BES_BUILD_TARGET: Death / Strength / Hanged Man aimed by DeckPlan.card_quality toward the committed deck target)
 62 / 79, -0.005 (103 tied) -> SHIPPED by default (`2197d1e`, correctness: the cards hit match the target the value uses;
 not yet deployed). `cmb_7` (BUILD_TARGET + VOUCHER_STREAM + PLAY_MONEY + ROLLOUT_DIG + REPOINT together) 57 / 73, -0.133
-(p 0.37): no hidden synergy -- those four stay off. Running: bp0_7 / bp1_7 (probe bpticket = start with Photograph,
-Blueprint, Golden Ticket, Midas Mask; REPOINT off / on), ~11:40.
+(p 0.37): no hidden synergy -- those four stay off. bp0_7 / bp1_7 (probe bpticket = start with Photograph, Blueprint,
+Golden Ticket, Midas Mask; REPOINT off / on): +0.157 (p 0.16), wins 116 -> 119, reach-8 123 -> 130 -> REPOINT SHIPPED
+(narrowed to copier + per-card money joker boards). NOTE: even started with that board the engine SELLS it -- Blueprint
++ Ticket still held at ante 4 in 1-2 of 160 runs. **Live = main = `58795cd` (deployed 12:05): seal farming + build-aware
+tarot targeting + repoint ON.** Baseline for new arms still fsl_7 (+ targeting ~neutral).
 Pattern of the whole night: a FREE resource helps (rich*, gold6, thin8), the engine BUYING more of it does not (vouchers,
 interest, money cards, Hanged Man, tarot repricing). Next: a measured / calibrated card-removal value (Hanged Man, Immolate, standard-pack
 dilution), then the owner-state continuation test (resume the sim from the owner's ante-2/3 fixtures).
