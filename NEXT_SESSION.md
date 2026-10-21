@@ -43,6 +43,16 @@ engine's own positions 41% / 42% / 44% (fsl_7). => at ante 2 the owner's positio
 (~66%). The owner (who won-level both) builds the edge DURING antes 2-3 from ordinary starts; and the engine still loses
 ~1/3 from the owner's strong a4 boards. Next: more capture runs to locate the ante-2/3 decisions. `shp_7` (HEAD defaults = targeting + repoint + money combo) vs fsl_7: wins 64 -> 64, reach-8 81 -> 77, -0.074 (p 0.51)
 -> DEPLOYED. **New baseline for arms: `sim_out/shp_7.jsonl` (live defaults).**
+**Capture runs 3-4 (2026-10-21 evening; records after line 54599 of bes_runs / 52138 of bes_fixtures):** UEZMTED9
+(two Souls -> Perkeo + Brainstorm, owner reorders so Brainstorm copies Perkeo at shop end and a scorer in blinds; stopped
+after a6 boss, millions) and 9MY8IRY3 (gold build: Midas + Pareidolia, sold Abstract / Faceless / Golden for value
+generators, died at The Flint a3, ratio 0.36 -- owner: own misjudgement). Replay: in-blind and shop decisions at a2-a3
+largely agree; the engine ranked Perkeo the WEAKEST joker (ci 1.74) and advised selling it every a5 shop; at the a6
+Soul it says sell Perkeo (owner did too). Continuation from owner positions: UEZM a2 38% / a3 52% / a4 72%; 9MY8 a2 50%
+/ a3 70% (the engine would likely have survived the owner's a3). Pooled 4 runs: a2 42% (engine own 41%), a3 55% (42%),
+a4 68% (44%). **Perkeo seed switch (BES_PERKEO=1, `01130f2`):** keep the best repeatable held card (Hanged Man, Magician,
+...) as Perkeo's copy target, price Perkeo by the best target x (1 + copiers), sim copier gives a 2nd copy. Running:
+pk0_7 / pk1_7 (probe startperkeo, switch off / on), ~20:00.
 Pattern of the whole night: a FREE resource helps (rich*, gold6, thin8), the engine BUYING more of it does not (vouchers,
 interest, money cards, Hanged Man, tarot repricing). Next: a measured / calibrated card-removal value (Hanged Man, Immolate, standard-pack
 dilution), then the owner-state continuation test (resume the sim from the owner's ante-2/3 fixtures).
