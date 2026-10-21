@@ -1966,7 +1966,10 @@ function SA.recommend(gs, opts)
     local vo = (gs.run and gs.run.vouchers_owned) or {}
     local held_value = vo.v_observatory and true or false          -- live: a set { key = true }
     for _, k in ipairs(vo) do if k == "v_observatory" then held_value = true end end   -- sim: a list
-    for _, j in ipairs(gs.jokers or {}) do if j.key == "j_perkeo" then held_value = true end end
+    -- Perkeo: under BES_PERKEO its copy target is the hidden seed (engine/perkeo.lua), so every OTHER held planet is used
+    if not require("engine.perkeo").SWITCH then
+      for _, j in ipairs(gs.jokers or {}) do if j.key == "j_perkeo" then held_value = true end end
+    end
     if held_value then return end
     local hfreq, hctx
     for _, c in ipairs(gs.consumables or {}) do

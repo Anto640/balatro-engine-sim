@@ -622,6 +622,9 @@ function T.best_use(gs, base_ev, remaining, dollar_value, filter)
           local card_tarot = T.ENH[c.key] or T.SUIT[c.key] or T.RANK[c.key]
           local need = Mechanics.boss_per_hand_need(gs)
           local material = (not card_tarot) or gain >= need * T.CARD_USE_MIN_FRAC
+          -- a Negative copy (Perkeo's) is free: its permanent gain is the point, so use it whenever it does not hurt
+          -- this hand (BES_PERKEO; engine/perkeo.lua) -- held copies otherwise piled up unused (13 held by ante 5)
+          if c.edition == "negative" and gain >= 0 and require("engine.perkeo").SWITCH then material = true end
           -- MONEY ENHANCEMENT (2026-10-04, owner on live UAPB3XY9: "held a devil for a long time rather than using it
           -- and getting the 3 dollars"). A Gold card scores nothing -- it pays \$3 when HELD at round end -- so the
           -- score-only test above read The Devil as worthless and it sat in the tray from ante 4 to the death. Credit
@@ -629,7 +632,8 @@ function T.best_use(gs, base_ev, remaining, dollar_value, filter)
           -- outside the play, so the play is unchanged (gain 0) and the use is free.
           local money = T.money_enh_dollars(gs, c.key)
           if money > 0 and ev2 and gain >= 0 then material = true end
-          if ev2 and (gain > 0 or money > 0) and material then
+          local free_copy = c.edition == "negative" and card_tarot and require("engine.perkeo").SWITCH
+          if ev2 and (gain > 0 or money > 0 or (free_copy and gain >= 0)) and material then
             local tn = T.target_note(gs, c.key, hand)   -- name the hand card(s) to target
             -- machine-readable target card ids (for the auto-play actuator to select), from the SAME
             -- best_targets that produced the note. nil for non-targeting tarots.
