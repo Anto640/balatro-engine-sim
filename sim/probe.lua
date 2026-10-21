@@ -632,6 +632,7 @@ Probe.CONFIGS = {
   gold6        = { start_money = { n = 6, enhancement = "m_gold" } },
   -- REPOINT TEST BOARD (2026-10-21): the owner's SEMXURN5 money engine -- the sim never builds it (copier + per-card
   -- money joker in 0 of 160 sh1_7 runs), so repoint (BES_REPOINT) is measured by starting runs with it, both arms alike
+  startperkeo  = { skip_only = { tag_investment = true }, skip_only_until = 1, start_jokers = { "j_perkeo" } },   -- Perkeo seed test board
   bpticket     = { skip_only = { tag_investment = true }, skip_only_until = 1,
                    start_jokers = { "j_photograph", "j_blueprint", "j_ticket", "j_midas_mask" } },
   gseal6       = { start_money = { n = 6, seal = "Gold" } },

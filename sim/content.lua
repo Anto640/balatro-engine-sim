@@ -1201,12 +1201,17 @@ local function shop_loop(run, shop, rng, crn_n)
     for _, j in ipairs(run.jokers or {}) do if j.key == "j_perkeo" then has_perkeo = true; break end end
     if has_perkeo and #(run.consumables or {}) > 0 then
       local prng = require("sim.world").CRN and require("sim.world").stream(run, "perkeo", run.ante, run.round) or rng
-      local pick = run.consumables[1 + math.floor(prng() * #run.consumables)]
-      local copy = {}
-      for k, v in pairs(pick) do copy[k] = v end
-      copy.edition = "negative"
-      run.consumables[#run.consumables + 1] = copy
-      run.consumable_slots = (run.consumable_slots or 2) + 1
+      -- BES_PERKEO: a copier (Blueprint / Brainstorm) pointed at Perkeo at shop end makes a second copy
+      local P = require("engine.perkeo")
+      local n = P.SWITCH and (1 + P.copiers(run)) or 1
+      for _ = 1, n do
+        local pick = run.consumables[1 + math.floor(prng() * #run.consumables)]
+        local copy = {}
+        for k, v in pairs(pick) do copy[k] = v end
+        copy.edition = "negative"
+        run.consumables[#run.consumables + 1] = copy
+        run.consumable_slots = (run.consumable_slots or 2) + 1
+      end
     end
   end
   run._shop = nil; run._emit = nil

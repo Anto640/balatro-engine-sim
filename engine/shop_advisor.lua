@@ -2132,4 +2132,10 @@ function SA.recommend(gs, opts)
   return (table.unpack or unpack)(r, 2, table.maxn(r))
 end
 
+-- PERKEO SEED (engine/perkeo.lua, BES_PERKEO=1): the held copy target is never spent by the shop
+local recommend_seeded = SA.recommend
+function SA.recommend(gs, opts)
+  return require("engine.perkeo").with_seed_hidden(gs, recommend_seeded, opts)
+end
+
 return SA

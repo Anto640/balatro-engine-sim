@@ -999,12 +999,23 @@ local function generator_fraction(gs, key, opts, owned)
   local fit = (Generators.output_room_free(gs, key, owned) > 0) and 1 or 0.6
   if key == "j_perkeo" then
     -- the copy is of a card you HOLD (and is Negative: no slot needed)
-    local held, n = 0, 0
-    for _, c in ipairs(gs.consumables or {}) do
+    local P = require("engine.perkeo")
+    local held, n, best = 0, 0, 0
+    local pool = {}
+    for _, c in ipairs(gs.consumables or {}) do pool[#pool + 1] = c end
+    if gs._perkeo_seed then pool[#pool + 1] = gs._perkeo_seed end
+    for _, c in ipairs(pool) do
       local v, g = ConsumableValue.card_value(gs, c.set or "Tarot", c.key, nil, Mechanics.boss_per_hand_need(gs), opts.rng, 3)
-      held = held + math.max(0, (v or 0) + VU.income_frac(gs, g or 0)); n = n + 1
+      local x = math.max(0, (v or 0) + VU.income_frac(gs, g or 0))
+      held = held + x; n = n + 1; if x > best then best = x end
     end
-    mean = (n > 0) and (held / n) or (mean * Eval.PERKEO_HOLD)
+    if P.SWITCH then
+      -- the player chooses what to hold: the BEST target (or the best a pack/shop will offer: the random-tarot mean,
+      -- not a third of it), copied once per shop, twice with a copier pointed at it
+      mean = math.max(best, mean) * (1 + P.copiers(gs))
+    else
+      mean = (n > 0) and (held / n) or (mean * Eval.PERKEO_HOLD)
+    end
     fit = 1
   end
   return 0.5 * rate * R * mean * fit

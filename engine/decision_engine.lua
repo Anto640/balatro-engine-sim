@@ -1679,4 +1679,10 @@ function DE.summary(ranked)
     math.floor((a.expected_value or 0) * 100 + 0.5), a.reason or "")
 end
 
+-- PERKEO SEED (engine/perkeo.lua, BES_PERKEO=1): the held copy target is never spent in a blind
+local decide_seeded = DE.decide
+function DE.decide(gs, opts)
+  return require("engine.perkeo").with_seed_hidden(gs, decide_seeded, opts)
+end
+
 return DE
