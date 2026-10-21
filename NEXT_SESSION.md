@@ -41,8 +41,8 @@ a1, cash-starved). **Step 3 OWNER-STATE CONTINUATION (tools/owner_continue.lua, 
 from the owner's ante-start positions: SEMXURN5 a2 30% / a3 38% / a4 70%; X778PBYT a2 50% / a3 58% / a4 62%; vs the
 engine's own positions 41% / 42% / 44% (fsl_7). => at ante 2 the owner's positions are NO better; by ante 4 they are
 (~66%). The owner (who won-level both) builds the edge DURING antes 2-3 from ordinary starts; and the engine still loses
-~1/3 from the owner's strong a4 boards. Next: more capture runs to locate the ante-2/3 decisions. Running: `shp_7`
-(HEAD defaults = targeting + repoint + money combo) vs fsl_7, regression before deploying, ~15:50.
+~1/3 from the owner's strong a4 boards. Next: more capture runs to locate the ante-2/3 decisions. `shp_7` (HEAD defaults = targeting + repoint + money combo) vs fsl_7: wins 64 -> 64, reach-8 81 -> 77, -0.074 (p 0.51)
+-> DEPLOYED. **New baseline for arms: `sim_out/shp_7.jsonl` (live defaults).**
 Pattern of the whole night: a FREE resource helps (rich*, gold6, thin8), the engine BUYING more of it does not (vouchers,
 interest, money cards, Hanged Man, tarot repricing). Next: a measured / calibrated card-removal value (Hanged Man, Immolate, standard-pack
 dilution), then the owner-state continuation test (resume the sim from the owner's ante-2/3 fixtures).
