@@ -1,5 +1,31 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-22 01:00) -- consolidated state after the 4-capture-run review (STOPPED here at owner request)
+**Live = main = `2e3b0ec` (deployed 2026-10-21 15:55).** Live behaviour changes from this review, all default ON:
+seal farming (BES_FARM_SEALS), build-aware tarot targeting (BES_BUILD_TARGET), repoint (BES_REPOINT, narrowed to copier +
+per-card money joker boards), money combo (BES_MONEY_COMBO: Golden Ticket / Midas / copier priced together); `=0` disables
+each. **Baseline for new arms = `sim_out/shp_7.jsonl`** (live defaults; 64/160 wins, 77 reach-8; regression vs fsl_7
+-0.074 n.s.). Branch `winrate-v4-bundle` is ahead of main only by docs + default-OFF switches (Perkeo, etc.).
+**What the 4 capture runs established** (SEMXURN5, X778PBYT, UEZMTED9, 9MY8IRY3; tools/owner_continue.lua): the engine
+continuing from the owner's positions wins a2 42% (= its own 41%), a3 55% (42%), a4 68% (44%) -> the owner's edge is
+built DURING antes 2-3 from ordinary starts; in the owner's own states the engine mostly makes the same shop / pack /
+in-blind choices (pack picks 23/35 agree; keystones bought when rich). So the gap is many small ante-2/3 decisions or a
+plan, not one lever. Closed this review (all measured, keep off): vouchers (vs/vall), interest stream, play-money pricing
+(pm), forced money cards (mcard), early-planet ban (np), forced Hanged Man (hm), deck-quality x4 (dq4), measured-dig
+rollout (rd), all-switches combo (cmb). Thinning: thin8 +0.42 but thinr8 -0.16 => quality not size; blind-level measure
+prices one Hanged Man at 0.043 (< heuristic 0.074) -> not underpriced.
+**Perkeo (BES_PERKEO, OFF):** the engine ranked Perkeo the weakest joker and never used what it made. Switch = keep the
+best repeatable held card as its copy target (hidden from use paths), price Perkeo by best target x (1 + copiers), sim
+copier gives a 2nd copy, use held planets / free Negative tarot copies. On the start-with-Perkeo board (probe
+startperkeo), vs pk0_7 (switch off, 88 wins, 104 reach-8): pk1_7 (seed + pricing) 79 / 87, -0.419 (p 0.0002); pk2_7
+(+ use planets / free copies) 85 / 95, -0.378 (p 0.007). Keeping Perkeo still costs a scorer's slot: consumables pile
+up (5.1 at a5 / 9.4 at a7 held even in pk2: unusable Judgement on a full board, spare Temperance, Lovers) and Perkeo
+copies a RANDOM held card, so junk dilutes it. Missing piece if resumed: a SELL-CONSUMABLE action (tray cleanup to
+leave only the seed, as the owner does) -- the self-player has none. Do not ship BES_PERKEO as is.
+**Open owner decisions / next options:** (1) more capture runs, then compare ante-2/3 decisions where the trajectories
+diverge (continue the sim from each); (2) Perkeo tray cleanup (sell-consumable action); (3) pacing risk messages are
+pessimistic on combo boards (live advice only).
+
 ## START HERE (2026-10-21 early morning) -- capture-run review round 2; seal farming SHIPPED; THINNING = the lead
 **(superseded -- see bp note below: live = `58795cd`)** Live was `9fe1bed` (03:13): seal farming ON. Baseline for new arms = `sim_out/fsl_7.jsonl` (seal farming on; 64/160 wins, 81 reach-8); sh1_7 = the old one.
 All vs sh1_7 (64 wins, 78 reach-8), 160 paired seeds, seed_off 7:
