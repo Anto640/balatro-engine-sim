@@ -2038,9 +2038,56 @@ local CONDITIONAL_ECON = {
   j_midas_mask = function(gs, base)
     local n, _, face = deck_counts(gs)
     if n == 0 then return base end
-    return base * clampf((face / n) / (12 / 52), 0, 3)
+    local held = base * clampf((face / n) / (12 / 52), 0, 3)
+    -- MONEY COMBO: the faces it turns Gold also pay Golden Ticket's \$4 each time they score
+    if Eval.MONEY_COMBO then
+      local g = Eval.gold_projection(gs)
+      if g.ticket > 0 then held = held + Eval.TICKET_PAY * Eval.SCORED_PER_ROUND * g.midas_new / g.n * g.ticket end
+    end
+    return held
+  end,
+  -- Golden Ticket (MONEY COMBO only; otherwise the flat catalogue \$3): \$4 per Gold card scored, so its income is the
+  -- Gold cards the deck has -- plus the faces an owned Midas Mask will turn Gold -- times the cards scored a round, x2
+  -- per copier (Blueprint / Brainstorm, pointed at it by the REPOINT reorder on money hands).
+  j_ticket = function(gs, base)
+    if not Eval.MONEY_COMBO then return base end
+    local g = Eval.gold_projection(gs, true)
+    if g.n == 0 then return base end
+    return Eval.TICKET_PAY * Eval.SCORED_PER_ROUND * (g.gold + g.midas_new) / g.n * math.max(1, g.ticket)
   end,
 }
+-- MONEY COMBO (2026-10-21; A/B switch BES_MONEY_COMBO=1, default off). Started with the owner's SEMXURN5 board
+-- (Photograph, Blueprint, Golden Ticket, Midas Mask; probe bpticket) the engine sold Midas Mask in 144 / 160 runs (mean
+-- ante 1.1) and Golden Ticket in 147 (ante 1.4) for Jolly / Ice Cream / Odd Todd: each money joker was priced alone --
+-- Ticket a flat \$3 with or without Gold cards to pay on, Midas only the \$3 its Gold faces pay HELD. Together they are a
+-- money engine (Midas makes Gold faces, Ticket pays \$4 per scored Gold card, a copier doubles it).
+Eval.MONEY_COMBO = os.getenv and os.getenv("BES_MONEY_COMBO") == "1"
+Eval.TICKET_PAY = 4
+Eval.SCORED_PER_ROUND = 6        -- cards scored a round: ~1.6-1.9 hands x ~3.5 scoring cards (sim blind_result), + farm
+Eval.MIDAS_CONVERT = 0.5         -- share of the deck's non-Gold faces Midas turns Gold over the next few rounds
+-- { n = deck size, gold = Gold cards now, midas_new = faces Midas will turn Gold (if owned), ticket = Golden Ticket
+--   multiplier (0 none; 1 + copiers) }. `as_ticket`: price a Ticket being bought (counts as one Ticket).
+function Eval.gold_projection(gs, as_ticket)
+  local n, gold, face_plain = 0, 0, 0
+  for _, c in ipairs(gs.deck or {}) do
+    if not Cards.is_stone(c) then
+      n = n + 1
+      if c.enhancement == "m_gold" then gold = gold + 1
+      elseif Cards.is_face(c) then face_plain = face_plain + 1 end
+    end
+  end
+  local midas, ticket, copier = false, 0, 0
+  for _, j in ipairs(gs.jokers or {}) do
+    if not j.debuffed then
+      if j.key == "j_midas_mask" then midas = true end
+      if j.key == "j_ticket" then ticket = 1 end
+      if j.key == "j_blueprint" or j.key == "j_brainstorm" then copier = copier + 1 end
+    end
+  end
+  if as_ticket then ticket = 1 end
+  if ticket > 0 then ticket = 1 + copier end
+  return { n = n, gold = gold, midas_new = midas and face_plain * Eval.MIDAS_CONVERT or 0, ticket = ticket }
+end
 
 -- PROBABILITY-SCALING ECONOMY (2026-08-13). Eval.econ_power is a plain SUM of static
 -- per-joker dollar figures, so it is structurally unable to represent a MULTIPLICATIVE money
