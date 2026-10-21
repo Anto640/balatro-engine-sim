@@ -275,6 +275,17 @@ function World.new_run(seed, opts)
       if rx ~= ry then return rx < ry end
       return (SUIT[x.suit] or 9) < (SUIT[y.suit] or 9)
     end)
+    -- `thinr<N>`: N cards spread evenly over the rank order instead (size-only control: same thinning, no quality gain)
+    if opts.probe.start_thin_spread then
+      local spread, step = {}, #order / nthin
+      for k = 0, nthin - 1 do spread[#spread + 1] = order[math.floor(k * step) + 1] end
+      local rest = {}
+      local picked = {}
+      for _, c in ipairs(spread) do picked[c] = true end
+      for _, c in ipairs(order) do if not picked[c] then rest[#rest + 1] = c end end
+      order = spread
+      for _, c in ipairs(rest) do order[#order + 1] = c end
+    end
     local drop = {}
     for i = 1, math.min(nthin, #order - 8) do drop[order[i]] = true end
     local keep = {}
