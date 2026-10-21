@@ -630,6 +630,10 @@ Probe.CONFIGS = {
   faceless     = { start_jokers = { "j_faceless" } },
   -- money-deck ceiling (docs/PLAN_2026-10-07_money_farming.md follow-up): start with 6 Gold cards / 6 Gold-seal cards
   gold6        = { start_money = { n = 6, enhancement = "m_gold" } },
+  -- REPOINT TEST BOARD (2026-10-21): the owner's SEMXURN5 money engine -- the sim never builds it (copier + per-card
+  -- money joker in 0 of 160 sh1_7 runs), so repoint (BES_REPOINT) is measured by starting runs with it, both arms alike
+  bpticket     = { skip_only = { tag_investment = true }, skip_only_until = 1,
+                   start_jokers = { "j_photograph", "j_blueprint", "j_ticket", "j_midas_mask" } },
   gseal6       = { start_money = { n = 6, seal = "Gold" } },
   rich4        = { income_bonus = 4 },   -- control for gold6: its held Gold paid ~$3.7/round (1.22 held x $3)
   lookahead    = { skip_only = { tag_investment = true }, skip_only_until = 1, lookahead = true, lookahead_until = 3 },
