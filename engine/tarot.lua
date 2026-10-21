@@ -138,13 +138,13 @@ T.CARD_PERM_CREDIT = 0.03
 -- The up-to-n WORST cards in a hand to destroy (lowest chips, non-stone, deterministic).
 -- Used by best_use (to value/propose thinning) and by the sim world (to apply it), so both
 -- agree on which cards Hanged Man removes.
--- BUILD-AWARE TARGETING (2026-10-21; A/B switch BES_BUILD_TARGET=1, default off). thin8_7 (the 8 lowest cards removed)
+-- BUILD-AWARE TARGETING (2026-10-21; SHIPPED -- correctness: the cards hit now match the target the value uses). thin8_7 (the 8 lowest cards removed)
 -- +0.42 but the same 8 spread over the ranks -0.16: what the deck KEEPS matters, not its size -- and the owner aims
 -- Death / Strength / Hanged Man at a target hand (concentrate Full House ranks, cut off-suit cards). The engine already
 -- derives that target (DeckPlan.target: committed ranks / flush suit / faces) and prices Hanged Man toward it, but the
 -- cards it actually hit were build-blind (lowest chips; highest rank onto lowest). Under the switch all three aim by
 -- DeckPlan.card_quality toward the target.
-T.BUILD_TARGET = os.getenv and os.getenv("BES_BUILD_TARGET") == "1"
+T.BUILD_TARGET = not (os.getenv and os.getenv("BES_BUILD_TARGET") == "0")   -- SHIPPED (bt_7 vs fsl_7: 62 vs 64 wins, -0.005, 103 tied); =0 disables
 local function build_target(gs)
   if not (T.BUILD_TARGET and gs and gs.deck and #gs.deck > 0) then return nil end
   local DP = require("engine.deck_plan")
