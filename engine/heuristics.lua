@@ -213,7 +213,7 @@ function H.discard_econ(gs, cards)
   end
   return d, table.concat(notes, ", ")
 end
-H.FARM_SEALS = os.getenv and os.getenv("BES_FARM_SEALS") == "1"
+H.FARM_SEALS = not (os.getenv and os.getenv("BES_FARM_SEALS") == "0")
 H.PURPLE_TAROT_DOLLARS = 3
 
 -- Best set of cards to discard purely for MONEY (independent of draw targets).

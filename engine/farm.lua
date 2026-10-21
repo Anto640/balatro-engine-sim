@@ -36,11 +36,11 @@ end
 
 -- SEAL FARMING (2026-10-21, owner capture run X778PBYT: "so I could play the most gold cards and find the most purple
 -- and gold seals without winning so I can fully use as much of the deck potential as possible"; A/B switch
--- BES_FARM_SEALS=1, default off). The farm only ran with a money JOKER on the board; a deck's own money cards -- Gold
+-- SHIPPED by default after fsl_7 vs sh1_7: wins 64 -> 64, reach-8 78 -> 81, +0.025, in-blind $ 1.21 -> 1.34; BES_FARM_SEALS=0 disables). The farm only ran with a money JOKER on the board; a deck's own money cards -- Gold
 -- seals ($3 each time scored) and Purple seals (a Tarot when discarded, slot permitting) -- are levers too. Under the
 -- switch they turn the farm on, a Purple-seal discard pays (Heuristics.discard_econ), and a cycle play may score Gold-seal
 -- cards (a played card returns to the deck after the blind, so playing it costs nothing but this hand).
-Farm.SEALS = os.getenv and os.getenv("BES_FARM_SEALS") == "1"
+Farm.SEALS = not (os.getenv and os.getenv("BES_FARM_SEALS") == "0")   -- SHIPPED 2026-10-21 (fsl_7); =0 disables
 local function slot_free(gs)
   return #(gs.consumables or {}) < ((gs.run and gs.run.consumable_slots) or 2)
 end
