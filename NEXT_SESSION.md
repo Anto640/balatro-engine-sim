@@ -32,6 +32,17 @@ Golden Ticket, Midas Mask; REPOINT off / on): +0.157 (p 0.16), wins 116 -> 119, 
 (narrowed to copier + per-card money joker boards). NOTE: even started with that board the engine SELLS it -- Blueprint
 + Ticket still held at ante 4 in 1-2 of 160 runs. **Live = main = `58795cd` (deployed 12:05): seal farming + build-aware
 tarot targeting + repoint ON.** Baseline for new arms still fsl_7 (+ targeting ~neutral).
+**Step 1 (deck-shaping value) DROPPED:** a blind-level measure (Sim.blind_output_frac, greedy) reproduces thin8 (+0.166)
+vs thinr8 (-0.010) and puts one Hanged Man at +0.043 -- BELOW the heuristic's 0.074: not underpriced; thin8 was 4 free
+Hanged Men at ante 1. **Step 2 MONEY COMBO SHIPPED (`ced8442`, not yet deployed):** Golden Ticket = \$4 x Gold cards
+scored a round (deck Gold + faces an owned Midas will gold) x (1 + copiers); Midas gets Ticket's payout. bpc_7 vs bp1_7
+(owner board): wins 119 -> 132, reach-8 130 -> 139, +0.156 (p 0.12); Ticket kept at a3 6 -> 27 runs (Midas still sold
+a1, cash-starved). **Step 3 OWNER-STATE CONTINUATION (tools/owner_continue.lua, 40 seeds per position):** engine wins
+from the owner's ante-start positions: SEMXURN5 a2 30% / a3 38% / a4 70%; X778PBYT a2 50% / a3 58% / a4 62%; vs the
+engine's own positions 41% / 42% / 44% (fsl_7). => at ante 2 the owner's positions are NO better; by ante 4 they are
+(~66%). The owner (who won-level both) builds the edge DURING antes 2-3 from ordinary starts; and the engine still loses
+~1/3 from the owner's strong a4 boards. Next: more capture runs to locate the ante-2/3 decisions. Running: `shp_7`
+(HEAD defaults = targeting + repoint + money combo) vs fsl_7, regression before deploying, ~15:50.
 Pattern of the whole night: a FREE resource helps (rich*, gold6, thin8), the engine BUYING more of it does not (vouchers,
 interest, money cards, Hanged Man, tarot repricing). Next: a measured / calibrated card-removal value (Hanged Man, Immolate, standard-pack
 dilution), then the owner-state continuation test (resume the sim from the owner's ante-2/3 fixtures).
