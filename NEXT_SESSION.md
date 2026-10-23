@@ -1,5 +1,37 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-23 night) -- 12-human-run review: engine stress-tested FROM the owner's positions
+**Live / baseline unchanged (main = `2e3b0ec`, baseline arm `sim_out/shp_7.jsonl`).** Owner asked for new pathways from
+the 12 human runs (8 expert corpus `data/bes_runs_live_2026-08-12.jsonl` 7W/1L + 4 capture runs 3 stopped-winning/1L).
+New tool `tools/owner_continue_trace.lua`: continue the sim from ANY owner blind start (real boss), full traces, with
+ablations (CONT_MONEY / CONT_DECK=std / CONT_JOKERS=<engine boards>). Scratch data in the session scratchpad.
+**Continuation from owner positions, 33 paired world seeds each (330 runs):** 9MY8 a3 67%, SEMX a4 70% / a4-boss 76% /
+a5 91%, UEZM a4 73% / a5 88% / a6 82%, X778 a4 61% / a5 97% / a6 85%. The engine's deaths from these strong boards are
+RICH deaths: median $40-124 in the bank (its own baseline deaths ~$25) and 40-50 rerolls a run.
+**Defects found (each traced to code):**
+1. **Full-board reroll inflation** (`SA` REROLL, `Packs.expected_shop_joker` priced as a FREE slot): a4+ rerolls claim a
+   median +105..+143% of a boss hand (p90 up to +1600%), yet 85-92% buy no joker (shp_7). Owner-position SEMX a4-boss seed
+   5007: $200 -> 35 rerolls over a4-a6 claiming up to +1388%, bought nothing, died a6 Big holding $105. R12's swap-bar fix
+   lost (rerolls also refresh consumables); the note's proper fix -- trade-aware joker term PLUS a consumable-refresh
+   term -- was never built. After a late reroll the next action is a consumable buy 13%, a joker 9%.
+2. **Economy commitment never expires** (`BP.keep_bias`: every money joker CORE_KEEP 2.5 forever). Live X778 committed
+   economy at a3; from its a4, 13/32 continuations died holding 3-4 of Egg/To the Moon/Bootstraps/Golden with $42-110 at
+   a5-a7 while the advice said "At risk ~78-94% -- build power"; the wins sold them. Owner policy P2 says sell econ once
+   time is short. Fix built in worktree `$TMP/bes_wt_ecx` (BES_ECON_EXIT=1: protection + buy fit x blinds-left/12, full
+   to a4, 0 at a8; tests green on/off); paired test on X778 a4/a5/a6 queued (job ecx, ~03:10).
+3. **SAVE to the interest cap at "risk 88-94%"** (UEZM a4: banks $50 with Seed Money while keeping Golden + Perkeo). In
+   shp_7, 15-20% of high-risk shops SAVE. BUT the risk read is 2-4x pessimistic (claimed 50-59% -> 13% die this/next ante,
+   70-79% -> 34%) and the known refit lost (50 -> 32 wins): the shop thresholds lean on the inflated risk. Only a JOINT
+   refit (risk + thresholds) is untried.
+**Owner-vs-engine structure (12 runs vs shp_7 wins):** joker gains/ante owner a1 1.7 / a3 3.8 / a4-a6 2.2-2.6 vs engine
+3.1 / 1.5 / 0.9-1.3; 64% of the engine's ante-1 jokers are still on its a4 board (owner ~0.7 per run); owner opens ~3-4x
+the Arcana packs at a2-a4 and takes Celestial late (a5+); owner money comes from COMBOS (X778 To the Moon + Seed Money +
+Money Tree = +$21-26/round from a4; SEMX Midas -> 11 Gold + Ticket + Blueprint = +$111 in one blind; 9MY8 Faceless
++$15-23/blind at a2). In the owner's a2-a3 shop states the engine's "Celestial first" picks are mostly sequencing hints
+(it buys the joker too) -- per-decision agreement stays high, as before.
+**Queued (detached, results to scratchpad *_summary.txt):** ablation of the owner a4 / 9MY8 a3 positions (deck -> fresh
+52, jokers -> an engine board, money -> engine median), then the same 10 positions with BES_MONEY_ANTE=1, then ecx.
+
 ## START HERE (2026-10-22 01:00) -- consolidated state after the 4-capture-run review (STOPPED here at owner request)
 **Live = main = `2e3b0ec` (deployed 2026-10-21 15:55).** Live behaviour changes from this review, all default ON:
 seal farming (BES_FARM_SEALS), build-aware tarot targeting (BES_BUILD_TARGET), repoint (BES_REPOINT, narrowed to copier +
