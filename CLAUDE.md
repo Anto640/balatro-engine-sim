@@ -33,6 +33,10 @@ plus a large correctness/coverage/strategy pass.
 > "only Mult" measurement was invalid because the sampled hand contained no Diamonds at all. **Replay the
 > recorded state; do not rebuild it from the description.**
 >
+> **Second diagnostic: continue the sim FROM a human's position** (`tools/owner_continue_trace.lua`, any recorded blind
+> start, paired seeds, ablations that swap the deck / jokers / money for the engine's typical one). It exposes failures
+> the engine's own runs rarely reach and attributes a human edge to a component -- `docs/HUMAN_RUNS_REVIEW_2026-10-23.md`.
+>
 > **Current state, the live install and next steps:** the START HERE block at the top of `NEXT_SESSION.md`. Read it
 > before starting work. Dated status lives there, not here.
 >

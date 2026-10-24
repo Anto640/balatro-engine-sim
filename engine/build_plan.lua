@@ -452,6 +452,20 @@ function BP.is_keeper(key, gs)
 end
 
 BP.SCALER_KEEP_RUNWAY = tonumber(os.getenv and os.getenv("BES_SCALER_KEEP_RUNWAY") or "")   -- env: swap-bar A/B (sb2)
+-- ECONOMY-COMMITMENT EXIT (2026-10-23, BES_ECON_EXIT=1, A/B switch): an economy commitment used to protect every
+-- money joker with the full CORE_KEEP to the end of the run, so a run committed at ante 3 still refused to sell Egg /
+-- To the Moon / Golden Joker at ante 7 "At risk ~90%" (owner-position continuations from X778PBYT a4: 13/32 died
+-- holding 3-4 money jokers and $42-110; the wins were the seeds that sold them). The owner's rule (human-economy-policy
+-- P2): econ is worth keeping only while there is time left for the income to buy power. So the protection (and the
+-- buy-side fit bonus) scales with the blinds left AFTER this ante: full through ante 4, 0.75 / 0.5 / 0.25 / 0 at 5-8.
+BP.ECON_EXIT = (os.getenv and os.getenv("BES_ECON_EXIT")) == "1"
+BP.ECON_RUNWAY_BLINDS = 12
+function BP.econ_runway(gs)
+  if not BP.ECON_EXIT then return 1 end
+  local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
+  return math.max(0, math.min(1, (math.max(0, 8 - ante) * 3) / BP.ECON_RUNWAY_BLINDS))
+end
+
 function BP.keep_bias(key, gs, fires)
   local c = gs and BP.anchored_commitment(gs)
   if c and c.kind == "hand" then
@@ -460,7 +474,7 @@ function BP.keep_bias(key, gs, fires)
     end
   elseif c and c.kind == "economy" then
     if key == "j_bull" or key == "j_bootstraps" or JokerData.resolve(key).cat == "economy" then
-      return BP.CORE_KEEP
+      return BP.CORE_KEEP * BP.econ_runway(gs)
     end
   end
   -- R12 (2026-09-24, owner: "excluding 'core' jokers is a weakness, considering how core is classed"):
@@ -613,7 +627,7 @@ function BP.fit(gs, sj, plan, invest)
         fit = fit + BP.COMMIT_JOKER_FILL
         note = "converts the committed bankroll into score"
       elseif e.cat == "economy" then
-        fit = fit + BP.COMMIT_JOKER_FILL * 0.5
+        fit = fit + BP.COMMIT_JOKER_FILL * 0.5 * BP.econ_runway(gs)
         note = note or "supports the committed economy build"
       end
     end

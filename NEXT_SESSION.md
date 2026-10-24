@@ -1,6 +1,7 @@
 # NEXT_SESSION.md — fresh-session handoff
 
-## START HERE (2026-10-23 night) -- 12-human-run review: engine stress-tested FROM the owner's positions
+## START HERE (2026-10-24) -- 12-human-run review: engine stress-tested FROM the owner's positions (STOPPED for owner)
+**Full write-up: `docs/HUMAN_RUNS_REVIEW_2026-10-23.md`.** Branch = main + docs + default-OFF switches (incl. BES_ECON_EXIT).
 **Live / baseline unchanged (main = `2e3b0ec`, baseline arm `sim_out/shp_7.jsonl`).** Owner asked for new pathways from
 the 12 human runs (8 expert corpus `data/bes_runs_live_2026-08-12.jsonl` 7W/1L + 4 capture runs 3 stopped-winning/1L).
 New tool `tools/owner_continue_trace.lua`: continue the sim from ANY owner blind start (real boss), full traces, with
@@ -17,8 +18,8 @@ RICH deaths: median $40-124 in the bank (its own baseline deaths ~$25) and 40-50
 2. **Economy commitment never expires** (`BP.keep_bias`: every money joker CORE_KEEP 2.5 forever). Live X778 committed
    economy at a3; from its a4, 13/32 continuations died holding 3-4 of Egg/To the Moon/Bootstraps/Golden with $42-110 at
    a5-a7 while the advice said "At risk ~78-94% -- build power"; the wins sold them. Owner policy P2 says sell econ once
-   time is short. Fix built in worktree `$TMP/bes_wt_ecx` (BES_ECON_EXIT=1: protection + buy fit x blinds-left/12, full
-   to a4, 0 at a8; tests green on/off); paired test on X778 a4/a5/a6 queued (job ecx, ~03:10).
+   time is short. Fix COMMITTED default OFF (BES_ECON_EXIT=1, `BP.econ_runway`: protection + buy fit x blinds-left/12,
+   full to a4, 0 at a8; tests green on/off); paired result below.
 3. **SAVE to the interest cap at "risk 88-94%"** (UEZM a4: banks $50 with Seed Money while keeping Golden + Perkeo). In
    shp_7, 15-20% of high-risk shops SAVE. BUT the risk read is 2-4x pessimistic (claimed 50-59% -> 13% die this/next ante,
    70-79% -> 34%) and the known refit lost (50 -> 32 wins): the shop thresholds lean on the inflated risk. Only a JOINT
@@ -36,7 +37,7 @@ Money Tree = +$21-26/round from a4; SEMX Midas -> 11 Gold + Ticket + Blueprint =
 | ablation: jokers -> engine a4/a3 board | same (n 88) | 72% | 40% | **-32pp** (se 0.07) |
 | ablation: money -> engine median $23/$15 | same (n 88) | 72% | 60% | -11pp (se 0.07; X778 -27, 9MY8 -23, others ~0) |
 | BES_MONEY_ANTE=1 | all 10 positions (n 220) | 81% | 81% | 0 (se 0.02); X778 a4 64 -> 86% (n 22), rest flat |
-| BES_ECON_EXIT=1 (worktree `$TMP/bes_wt_ecx`, uncommitted) | X778 a4/a5/a6 (n 99) | 81% | 85% | +4pp (se 0.02): a4 61 -> 73%, a5/a6 identical |
+| BES_ECON_EXIT=1 (committed, default off) | X778 a4/a5/a6 (n 99) | 81% | 85% | +4pp (se 0.02): a4 61 -> 73%, a5/a6 identical |
 => At ante 4 the owner's edge is the SHAPED DECK + the jokers chosen for it (deck alone > jokers > money). Next lead:
 deck shaping matched to the board (free thin8 +0.42 and this ablation agree; blanket tarot repricing dq4 lost). The
 economy-commitment exit helps only where it fires (rare in the engine's own runs -> live-advice correctness); with
