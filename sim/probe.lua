@@ -243,9 +243,10 @@ end
 function Probe.pack_greed(run, shop, ranked)
   local p = run.probe
   if not (p and p.pack_greed) then return nil end
+  if p.pack_greed_until and (run.ante or 1) > p.pack_greed_until then return nil end
   local best = ranked and ranked.best
   if best and (best.type == "BUY_JOKER" or best.type == "SELL_TO_BUY") then return nil end
-  if best and best.type == "BUY_PACK" then return nil end     -- already doing it
+  if best and best.type == "BUY_PACK" and not p.pack_greed_kind then return nil end     -- already doing it
   local cash = run.economy.dollars
   local keep = p.pack_reserve or 0
   -- cheapest affordable pack first: maximise THROUGHPUT (the measured human behaviour) rather
@@ -253,8 +254,11 @@ function Probe.pack_greed(run, shop, ranked)
   local best_b, best_cost = nil, nil
   for _, b in ipairs(shop.boosters or {}) do
     local c = b.cost or 4
-    if cash - c >= keep and (not best_cost or c < best_cost) then best_b, best_cost = b, c end
+    -- `buyarc<N>` (2026-10-25): Arcana packs only, the engine's own money (the paid twin of the free arcana<N> ceiling)
+    local kind_ok = not p.pack_greed_kind or tostring(b.key or b.name or ""):lower():find(p.pack_greed_kind, 1, true)
+    if kind_ok and cash - c >= keep and (not best_cost or c < best_cost) then best_b, best_cost = b, c end
   end
+  if p.pack_greed_kind and best and best.type == "BUY_PACK" and best_b == best.target then return nil end
   if not best_b then return nil end
   return { best = { type = "BUY_PACK", target = best_b, cost = best_cost, value = 0,
                     reason = "probe: pack-greed" }, alternatives = {} }
@@ -835,6 +839,9 @@ function Probe.opts(name)
   -- shop of antes 2..N: free shaping the engine aims itself (build-aware targeting), without its low pack valuation
   local shn = (not c) and name:match("^shape(%d+)$")
   if shn then c = { skip_only = { tag_investment = true }, skip_only_until = 1, free_shape_until = tonumber(shn) } end
+  local ban = (not c) and name:match("^buyarc(%d+)$")   -- buy every affordable Arcana pack through ante N (own money)
+  if ban then c = { skip_only = { tag_investment = true }, skip_only_until = 1, pack_greed = true, pack_reserve = 0,
+                    pack_greed_kind = "arcana", pack_greed_until = tonumber(ban) } end
   local enn = (not c) and name:match("^enhance(%d+)$")   -- the same with the 8 enhancement tarots (Content.ENHANCE_TAROTS)
   if enn then c = { skip_only = { tag_investment = true }, skip_only_until = 1, free_shape_until = tonumber(enn),
                     free_shape_pool = "enhance" } end
