@@ -59,3 +59,42 @@ Ticket, extra faces for Photograph / Sock and Buskin, thinning for Trio), not mo
 2. `BES_ECON_EXIT=1` + `BES_MONEY_ANTE=1` together on the owner positions, then one regression arm vs shp_7 (correctness,
    mainly live advice).
 3. Trade-aware reroll value with the consumable-refresh term (fires every late shop).
+
+## Follow-up (2026-10-24 afternoon/evening)
+**1. `BES_ECON_EXIT=1` + `BES_MONEY_ANTE=1` together**, all 10 owner positions, 33 paired seeds (330): 79% -> 82% (+3pp,
+se 0.02). X778 a4 61% -> 91% (12 seeds gained / 2 lost; alone: ECON_EXIT 73%, MONEY_ANTE 86%); the other 9 positions flat
+(13 / 12). Regression arm **emx_7 vs shp_7**: wins 64 -> 65, reach-8 77 -> 78, +0.006 (p 0.80), sign 10/3, 147 tied
+(MDE ~0.07) -> clean; a correctness fix (never-expiring commitment) that fires rarely in the engine's own runs.
+Ship decision is the owner's.
+
+**2. Finer deck ablation** (`CONT_DECK=plain / stdmods / sizemods`, 4 positions x 22 paired seeds = 88 each, base 72%):
+
+| removed | variant | win | change |
+|---|---|---|---|
+| enhancements / seals / editions (owner cards kept) | plain | 48% | -24pp (se 0.06) |
+| which ranks / suits + size (owner modifiers on a fresh 52) | stdmods | 49% | -23pp (se 0.07) |
+| which ranks / suits only (size matched) | sizemods | 50% | -22pp (se 0.07) |
+| everything (fresh 52) | std | 31% | -41pp (se 0.06) |
+
+Modifiers and composition carry about half each and add up; size alone ~0 (cf. thin8 vs thinr8). SEMX's edge is its
+modifiers (11 Gold + Ticket: plain -36, stdmods 0), UEZM's its composition (46 cards, Clubs-heavy for Onyx Agate:
+stdmods -45). Per position n=22 (se ~0.12).
+
+**Why the engine's decks stay vanilla:** at antes 2-4 it uses ENHANCEMENT tarots at the owner's rate (1.83 vs 1.89 a
+run) but COMPOSITION tarots (Death / Strength / Hanged Man / suit) ~3x less (0.87 vs 2.49; pack picks 0.33 vs 2.0 in the
+capture runs). It sees ~3.7 a run and takes 22%: in packs it prices the suit tarots at the flat 0.03 floor
+(`CV.suit_tarot_value`), Hanged Man ~0.08, Strength ~0.10, vs Hermit ~1.05.
+
+**3. Free-shaping ceiling probes** (vs shp_7, 160 paired seeds, seed_off 7):
+
+| arm | free supply | wins | reach-8 | progress (p) | sign |
+|---|---|---|---|---|---|
+| ar4_7 (`arcana4`) | a Mega Arcana opened every shop a1-a4 (~24 tarots) | 140 | 143 | +1.157 (<0.0001) | 88/11 |
+| sh4_7 (`shape4`) | 3 composition tarots, 1 forced engine-ranked pick, every shop a2-a4 | 75 | 93 | +0.330 (0.028) | 70/46 |
+| en4_7 (`enhance4`) | the same with the 8 enhancement tarots | (pending) | | | |
+
+ar4_7 at a5: 20.7 enhanced cards (4.4), hand levels 12.5 (7.7), median capacity 2.8x, same money -- tarot SUPPLY of every
+kind (enhancement, High Priestess planets, Hermit / Temperance money), not shaping alone. sh4_7: composition uses 0.87 ->
+9.5 a run (Death 2.9, Hanged Man 1.9, Strength 1.7), a5 deck 49.9 cards (53.4), same money / enhancements: matched
+composition is worth wins even when the engine aims it, about thin8's size. These are FREE-supply ceilings: they do not
+yet show the engine's own price is wrong (buying costs money + the pick); dq4 (blanket x4 repricing) lost.

@@ -1,5 +1,22 @@
 # NEXT_SESSION.md — fresh-session handoff
 
+## START HERE (2026-10-24 night) -- econ-exit + money-ante regression clean; deck edge = modifiers + composition; tarot supply is the biggest ceiling yet
+**Live / baseline unchanged (main = `2e3b0ec`, baseline arm `sim_out/shp_7.jsonl`). Nothing shipped or deployed.** Full
+results: `docs/HUMAN_RUNS_REVIEW_2026-10-23.md` "Follow-up". New on the branch (all inert by default): continuation deck
+ablations `CONT_DECK=plain / stdmods / sizemods` (+ `CONT_DECK_DUMP=1`), probes `arcana<N>`, `shape<N>`, `enhance<N>`.
+| test | result |
+|---|---|
+| ECON_EXIT + MONEY_ANTE, 10 owner positions (330) | 79% -> 82%; X778 a4 61 -> 91% (12/2) |
+| emx_7 (both on) vs shp_7 | wins 64 -> 65, reach-8 77 -> 78, +0.006 (p 0.80), 147 tied -> clean |
+| deck ablation (88 each, base 72%) | strip modifiers -24pp; owner modifiers on fresh 52 -23pp; + size-matched -22pp |
+| ar4_7 free Mega Arcana every shop a1-a4 | wins 64 -> 140, reach-8 77 -> 143, +1.157 (p<0.0001) |
+| sh4_7 free composition tarot (forced) a2-a4 | wins 64 -> 75, reach-8 77 -> 93, +0.330 (p 0.028) |
+| en4_7 free enhancement tarot (forced) a2-a4 | (pending at write time -- sim_out/en4_7.jsonl) |
+Engine uses enhancement tarots at the owner's rate but composition tarots ~3x less (prices suit tarots at the flat 0.03
+floor, Hanged Man ~0.08). **Owner decisions open:** (1) ship ECON_EXIT + MONEY_ANTE as defaults? (2) next = what
+carries the ar4 gain beyond composition (enhance4, then High Priestess / Hermit supply), then a NARROW measured repricing
+(suit-tarot floor first) -- not a blanket x4 (dq4 lost).
+
 ## START HERE (2026-10-24) -- 12-human-run review: engine stress-tested FROM the owner's positions (STOPPED for owner)
 **Full write-up: `docs/HUMAN_RUNS_REVIEW_2026-10-23.md`.** Branch = main + docs + default-OFF switches (incl. BES_ECON_EXIT).
 **Live / baseline unchanged (main = `2e3b0ec`, baseline arm `sim_out/shp_7.jsonl`).** Owner asked for new pathways from
