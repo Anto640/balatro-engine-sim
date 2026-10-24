@@ -29,8 +29,19 @@ the Arcana packs at a2-a4 and takes Celestial late (a5+); owner money comes from
 Money Tree = +$21-26/round from a4; SEMX Midas -> 11 Gold + Ticket + Blueprint = +$111 in one blind; 9MY8 Faceless
 +$15-23/blind at a2). In the owner's a2-a3 shop states the engine's "Celestial first" picks are mostly sequencing hints
 (it buys the joker too) -- per-decision agreement stays high, as before.
-**Queued (detached, results to scratchpad *_summary.txt):** ablation of the owner a4 / 9MY8 a3 positions (deck -> fresh
-52, jokers -> an engine board, money -> engine median), then the same 10 positions with BES_MONEY_ANTE=1, then ecx.
+**Results (2026-10-24 ~02:40, all paired by world seed):**
+| test | positions | base | variant | change |
+|---|---|---|---|---|
+| ablation: deck -> fresh 52 | SEMX/X778/UEZM a4, 9MY8 a3 (n 88) | 72% | 31% | **-41pp** (se 0.06) |
+| ablation: jokers -> engine a4/a3 board | same (n 88) | 72% | 40% | **-32pp** (se 0.07) |
+| ablation: money -> engine median $23/$15 | same (n 88) | 72% | 60% | -11pp (se 0.07; X778 -27, 9MY8 -23, others ~0) |
+| BES_MONEY_ANTE=1 | all 10 positions (n 220) | 81% | 81% | 0 (se 0.02); X778 a4 64 -> 86% (n 22), rest flat |
+| BES_ECON_EXIT=1 (worktree `$TMP/bes_wt_ecx`, uncommitted) | X778 a4/a5/a6 (n 99) | 81% | 85% | +4pp (se 0.02): a4 61 -> 73%, a5/a6 identical |
+=> At ante 4 the owner's edge is the SHAPED DECK + the jokers chosen for it (deck alone > jokers > money). Next lead:
+deck shaping matched to the board (free thin8 +0.42 and this ablation agree; blanket tarot repricing dq4 lost). The
+economy-commitment exit helps only where it fires (rare in the engine's own runs -> live-advice correctness); with
+ECON_EXIT on, 6 of 9 X778-a4 deaths still hold >= 3 money jokers ($99) -> the money weight (mw) acts on more of it;
+try both together before shipping. Stopped here at owner request (2026-10-24).
 
 ## START HERE (2026-10-22 01:00) -- consolidated state after the 4-capture-run review (STOPPED here at owner request)
 **Live = main = `2e3b0ec` (deployed 2026-10-21 15:55).** Live behaviour changes from this review, all default ON:
