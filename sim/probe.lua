@@ -831,6 +831,10 @@ function Probe.opts(name)
   -- at every shop through ante N; the engine picks and targets the tarots itself (the ceiling for board-matched shaping)
   local arn = (not c) and name:match("^arcana(%d+)$")
   if arn then c = { skip_only = { tag_investment = true }, skip_only_until = 1, free_arcana_until = tonumber(arn) } end
+  -- "shape<N>" = a free pack of 3 composition tarots (Death / Strength / Hanged Man / suit), one forced pick, at every
+  -- shop of antes 2..N: free shaping the engine aims itself (build-aware targeting), without its low pack valuation
+  local shn = (not c) and name:match("^shape(%d+)$")
+  if shn then c = { skip_only = { tag_investment = true }, skip_only_until = 1, free_shape_until = tonumber(shn) } end
   local npa = (not c) and name:match("^noplanet_until(%d+)$")
   if npa then c = { skip_only = { tag_investment = true }, skip_only_until = 1, noplanet_until = tonumber(npa) } end
   local nra = (not c) and name:match("^noreroll_from(%d+)$")

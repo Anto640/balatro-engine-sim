@@ -482,7 +482,15 @@ end
 
 -- Open a pack: produce its revealed items (the gs.pack.items shape the advisor consumes),
 -- plus picks_left (how many you may take). Sizes from engine/packs (single source of truth).
+-- `shape<N>` ceiling probe: a free pack of 3 COMPOSITION tarots (the deck-shaping cards the owner uses ~3x more at
+-- antes 2-4: Death / Strength / Hanged Man / the suit tarots); one must be taken (the engine's best-ranked)
+Content.SHAPE_TAROTS = { "c_death", "c_strength", "c_hanged_man", "c_star", "c_moon", "c_sun", "c_world" }
 function Content.open_pack(pack, run, rng)
+  if pack.key == "p_probe_shape" then
+    local items = {}
+    for _ = 1, 3 do local key = pick_uniform(rng, Content.SHAPE_TAROTS); items[#items + 1] = { set = "Tarot", key = key, name = key } end
+    return { items = items, picks_left = 1 }
+  end
   local kind, n, k = Packs.size_of(pack.key or pack.name)
   n = n or 3; k = k or 1
   local items = {}
@@ -666,6 +674,10 @@ local function take_pack(run, pack, rng)
   local picks = po.picks or (po.best and { po.best } or {})
   if run.probe and run.probe.nobuy then picks = Probe.nobuy_picks(run, po, picks) end
   if run.probe and run.probe.force_take then picks = Probe.force_picks(run, po, picks, opened) end
+  if #picks == 0 and pack.key == "p_probe_shape" then   -- the shape probe always takes one (the engine's best-ranked)
+    local top = po.ranked and po.ranked[1]
+    picks = { { it = (top and top.it) or opened.items[1] } }
+  end
   if #picks == 0 and po.skip then return end
   -- SELL-TO-MAKE-ROOM (world fidelity, CORE-PROTECTED): on a FULL board the engine's pack advice
   -- may recommend selling a DISPOSABLE joker to slot a better pack joker (`po.sell` = { name, index };
@@ -1260,6 +1272,11 @@ function Content.shop_phase(run, opts)
   -- a config)
   if run.probe and run.probe.free_arcana_until and (run.ante or 1) <= run.probe.free_arcana_until then
     open_free_pack(run, "p_arcana_mega", require("sim.world").stream(run, "probe", run.ante, run.round))
+  end
+  -- `shape<N>` ceiling probe: a free composition-tarot pack (Content.SHAPE_TAROTS, one forced pick) at every shop from
+  -- ante 2 through ante N
+  if run.probe and run.probe.free_shape_until and (run.ante or 1) >= 2 and (run.ante or 1) <= run.probe.free_shape_until then
+    open_free_pack(run, "p_probe_shape", require("sim.world").stream(run, "probe", run.ante, run.round, 2))
   end
   shop_loop(run, shop, rng, crn_n)
 end
