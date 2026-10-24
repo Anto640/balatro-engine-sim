@@ -91,10 +91,15 @@ capture runs). It sees ~3.7 a run and takes 22%: in packs it prices the suit tar
 |---|---|---|---|---|---|
 | ar4_7 (`arcana4`) | a Mega Arcana opened every shop a1-a4 (~24 tarots) | 140 | 143 | +1.157 (<0.0001) | 88/11 |
 | sh4_7 (`shape4`) | 3 composition tarots, 1 forced engine-ranked pick, every shop a2-a4 | 75 | 93 | +0.330 (0.028) | 70/46 |
-| en4_7 (`enhance4`) | the same with the 8 enhancement tarots | (pending) | | | |
+| en4_7 (`enhance4`) | the same with the 8 enhancement tarots | 102 | 113 | +0.733 (<0.0001) | 78/27 |
 
 ar4_7 at a5: 20.7 enhanced cards (4.4), hand levels 12.5 (7.7), median capacity 2.8x, same money -- tarot SUPPLY of every
 kind (enhancement, High Priestess planets, Hermit / Temperance money), not shaping alone. sh4_7: composition uses 0.87 ->
 9.5 a run (Death 2.9, Hanged Man 1.9, Strength 1.7), a5 deck 49.9 cards (53.4), same money / enhancements: matched
 composition is worth wins even when the engine aims it, about thin8's size. These are FREE-supply ceilings: they do not
 yet show the engine's own price is wrong (buying costs money + the pick); dq4 (blanket x4 repricing) lost.
+en4_7 at a5: 18.4 enhanced cards (4.4), median capacity 42k (30.7k), same money / deck size; enhancement uses a1-a4
+1.8 -> 10.4 a run (Magician 2.4, Hierophant 2.1, Empress 1.7). So of ar4's +1.16: enhancement ~+0.73, composition ~+0.33,
+the rest (planets / money tarots) small or interacting. NOTE the free supply is ~5x the owner's enhancement rate --
+the engine already matches the owner's PAID rate, so the open question is the price: `ba4_7` (`buyarc4`, buy every
+affordable Arcana pack a1-a4 with its own money) tests it.

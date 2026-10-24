@@ -11,7 +11,8 @@ ablations `CONT_DECK=plain / stdmods / sizemods` (+ `CONT_DECK_DUMP=1`), probes 
 | deck ablation (88 each, base 72%) | strip modifiers -24pp; owner modifiers on fresh 52 -23pp; + size-matched -22pp |
 | ar4_7 free Mega Arcana every shop a1-a4 | wins 64 -> 140, reach-8 77 -> 143, +1.157 (p<0.0001) |
 | sh4_7 free composition tarot (forced) a2-a4 | wins 64 -> 75, reach-8 77 -> 93, +0.330 (p 0.028) |
-| en4_7 free enhancement tarot (forced) a2-a4 | (pending at write time -- sim_out/en4_7.jsonl) |
+| en4_7 free enhancement tarot (forced) a2-a4 | wins 64 -> 102, reach-8 77 -> 113, +0.733 (p<0.0001) |
+| ba4_7 buy every affordable Arcana pack a1-a4 (own money, `buyarc4`) | (running 2026-10-25 00:15) |
 Engine uses enhancement tarots at the owner's rate but composition tarots ~3x less (prices suit tarots at the flat 0.03
 floor, Hanged Man ~0.08). **Owner decisions open:** (1) ship ECON_EXIT + MONEY_ANTE as defaults? (2) next = what
 carries the ar4 gain beyond composition (enhance4, then High Priestess / Hermit supply), then a NARROW measured repricing
