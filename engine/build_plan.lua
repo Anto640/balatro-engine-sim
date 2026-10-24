@@ -452,13 +452,15 @@ function BP.is_keeper(key, gs)
 end
 
 BP.SCALER_KEEP_RUNWAY = tonumber(os.getenv and os.getenv("BES_SCALER_KEEP_RUNWAY") or "")   -- env: swap-bar A/B (sb2)
--- ECONOMY-COMMITMENT EXIT (2026-10-23, BES_ECON_EXIT=1, A/B switch): an economy commitment used to protect every
+-- ECONOMY-COMMITMENT EXIT (2026-10-23, BES_ECON_EXIT): an economy commitment used to protect every
 -- money joker with the full CORE_KEEP to the end of the run, so a run committed at ante 3 still refused to sell Egg /
 -- To the Moon / Golden Joker at ante 7 "At risk ~90%" (owner-position continuations from X778PBYT a4: 13/32 died
 -- holding 3-4 money jokers and $42-110; the wins were the seeds that sold them). The owner's rule (human-economy-policy
 -- P2): econ is worth keeping only while there is time left for the income to buy power. So the protection (and the
 -- buy-side fit bonus) scales with the blinds left AFTER this ante: full through ante 4, 0.75 / 0.5 / 0.25 / 0 at 5-8.
-BP.ECON_EXIT = (os.getenv and os.getenv("BES_ECON_EXIT")) == "1"
+-- DEFAULT ON since 2026-10-25 (owner): owner positions 79 -> 82% (X778 a4 61 -> 91% with BES_MONEY_ANTE), regression
+-- emx_7 vs shp_7 wins 64 -> 65, 147/160 tied. BES_ECON_EXIT=0 restores the never-expiring protection.
+BP.ECON_EXIT = (os.getenv and os.getenv("BES_ECON_EXIT")) ~= "0"
 BP.ECON_RUNWAY_BLINDS = 12
 function BP.econ_runway(gs)
   if not BP.ECON_EXIT then return 1 end

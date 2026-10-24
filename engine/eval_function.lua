@@ -1726,7 +1726,10 @@ end
 -- ante <=3 1.00, 4 0.73, 5 0.52, 6 0.35, 7 0.22, 8 0.10. Arm pt (wins 35 -> 17) showed the flat rate letting \$/round
 -- outweigh real scoring late.
 -- ⚠ OPT-IN (sim verdict 2026-10-03, arm mw vs bn2, n=160): progress +0.070 (p 0.40), sign 39/37, reach-8 60 -> 62,
--- wins 43 -> 38 -- no positive evidence for a magnitude change, so the flat rate stays the default. BES_MONEY_ANTE=1.
+-- wins 43 -> 38 -- no positive evidence for a magnitude change, so the flat rate stayed the default.
+-- DEFAULT ON since 2026-10-25 (owner), together with BP.ECON_EXIT: owner positions 79 -> 82%, X778 a4 61 -> 91%;
+-- regression emx_7 vs shp_7 wins 64 -> 65, 147/160 tied. BES_MONEY_ANTE=0 restores the flat rate.
+Eval.MONEY_ANTE = (os.getenv and os.getenv("BES_MONEY_ANTE")) ~= "0"
 Eval.MONEY_LAST_ANTE = 8
 -- FV points per \$/round of joker income. 0.8 FV = 0.32 boss-hand fraction = 1.6 shop utility, while the shop BUYS that
 -- same income at VU.ROUND_INCOME_UTIL = 1.0 utility (2026-10-06 unit audit) -- so a money joker was worth 1.6x more to keep
@@ -1736,7 +1739,7 @@ Eval.MONEY_LAST_ANTE = 8
 Eval.ECON_FV = (os.getenv and os.getenv("BES_ECON_FV") == "0") and 0.8
   or (VU.ROUND_INCOME_UTIL / VU.FRAC_UTIL * VU.FV_PER_FRAC)
 function Eval.money_weight(gs)
-  if not (_G.BES_MONEY_ANTE or (os.getenv and os.getenv("BES_MONEY_ANTE") == "1")) then return 1 end
+  if _G.BES_MONEY_ANTE == false or (_G.BES_MONEY_ANTE == nil and not Eval.MONEY_ANTE) then return 1 end
   local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
   if ante <= VU.REF_ANTE then return 1 end
   local left = math.max(1, Eval.MONEY_LAST_ANTE + 1 - ante)

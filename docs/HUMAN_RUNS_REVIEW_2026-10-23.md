@@ -65,7 +65,7 @@ Ticket, extra faces for Photograph / Sock and Buskin, thinning for Trio), not mo
 se 0.02). X778 a4 61% -> 91% (12 seeds gained / 2 lost; alone: ECON_EXIT 73%, MONEY_ANTE 86%); the other 9 positions flat
 (13 / 12). Regression arm **emx_7 vs shp_7**: wins 64 -> 65, reach-8 77 -> 78, +0.006 (p 0.80), sign 10/3, 147 tied
 (MDE ~0.07) -> clean; a correctness fix (never-expiring commitment) that fires rarely in the engine's own runs.
-Ship decision is the owner's.
+**Both made DEFAULT ON 2026-10-25 (owner); `=0` disables each. New baseline arm: `sim_out/emx_7.jsonl`.**
 
 **2. Finer deck ablation** (`CONT_DECK=plain / stdmods / sizemods`, 4 positions x 22 paired seeds = 88 each, base 72%):
 

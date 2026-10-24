@@ -1,7 +1,10 @@
 # NEXT_SESSION.md — fresh-session handoff
 
-## START HERE (2026-10-24 night) -- econ-exit + money-ante regression clean; deck edge = modifiers + composition; tarot supply is the biggest ceiling yet
-**Live / baseline unchanged (main = `2e3b0ec`, baseline arm `sim_out/shp_7.jsonl`). Nothing shipped or deployed.** Full
+## START HERE (2026-10-25) -- ECON_EXIT + MONEY_ANTE now DEFAULT ON; deck edge = modifiers + composition; free tarots = biggest ceiling yet
+**Branch `winrate-v4-bundle`: `BP.ECON_EXIT` + `Eval.MONEY_ANTE` default ON (owner 2026-10-25; `BES_ECON_EXIT=0` /
+`BES_MONEY_ANTE=0` restore the old behaviour). NOT yet merged to main or deployed (live = main = `2e3b0ec`) -- ask the
+owner. New baseline arm for HEAD = `sim_out/emx_7.jsonl` (= these defaults; 65/160 wins, 78 reach-8); `shp_7` = the old
+defaults (64 / 77) and still pairs with switch-off probe arms (ar4_7 / sh4_7 / en4_7 / ba4_7).** Full
 results: `docs/HUMAN_RUNS_REVIEW_2026-10-23.md` "Follow-up". New on the branch (all inert by default): continuation deck
 ablations `CONT_DECK=plain / stdmods / sizemods` (+ `CONT_DECK_DUMP=1`), probes `arcana<N>`, `shape<N>`, `enhance<N>`.
 | test | result |
@@ -14,9 +17,13 @@ ablations `CONT_DECK=plain / stdmods / sizemods` (+ `CONT_DECK_DUMP=1`), probes 
 | en4_7 free enhancement tarot (forced) a2-a4 | wins 64 -> 102, reach-8 77 -> 113, +0.733 (p<0.0001) |
 | ba4_7 buy every affordable Arcana pack a1-a4 (own money, `buyarc4`) | (running 2026-10-25 00:15) |
 Engine uses enhancement tarots at the owner's rate but composition tarots ~3x less (prices suit tarots at the flat 0.03
-floor, Hanged Man ~0.08). **Owner decisions open:** (1) ship ECON_EXIT + MONEY_ANTE as defaults? (2) next = what
-carries the ar4 gain beyond composition (enhance4, then High Priestess / Hermit supply), then a NARROW measured repricing
-(suit-tarot floor first) -- not a blanket x4 (dq4 lost).
+floor, Hanged Man ~0.08). Of ar4's +1.16: enhancement ~+0.73, composition ~+0.33. The free supply is ~5x the owner's
+enhancement rate, so it does NOT show mispricing by itself.
+**Next:** (1) read `ba4_7` (probe `buyarc4` = buy every affordable Arcana pack a1-a4 with the engine's own money, worktree
+`$TEMP/bes_wt_ba4_7`, launched 00:07 10-25; result -> `sim_out/ba4_7.jsonl`, compare vs shp_7). Positive -> Arcana packs /
+enhancement tarots are underpriced: design a NARROW measured repricing (e.g. the pack's enhancement EV, the suit-tarot 0.03
+floor) and A/B it vs emx_7. Negative (like mcard / vall) -> the free gain needs money the engine lacks: income is the lever.
+(2) ask the owner to merge + deploy the new defaults (`bash tools/deploy.sh`).
 
 ## START HERE (2026-10-24) -- 12-human-run review: engine stress-tested FROM the owner's positions (STOPPED for owner)
 **Full write-up: `docs/HUMAN_RUNS_REVIEW_2026-10-23.md`.** Branch = main + docs + default-OFF switches (incl. BES_ECON_EXIT).

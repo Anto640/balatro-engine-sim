@@ -10,8 +10,10 @@ local SA = require("engine.shop_advisor")
 local SK = require("engine.skip_advisor")
 
 return function(t)
-  t.eq(Eval.money_weight({ meta = { ante = 8 } }), 1, "the flat money rate is the default (arm mw: no positive evidence)")
-  _G.BES_MONEY_ANTE = true
+  _G.BES_MONEY_ANTE = false
+  t.eq(Eval.money_weight({ meta = { ante = 8 } }), 1, "BES_MONEY_ANTE=0 restores the flat money rate")
+  _G.BES_MONEY_ANTE = nil
+  t.ok(Eval.money_weight({ meta = { ante = 8 } }) < 1, "the ante-weighted money rate is the default (2026-10-25)")
   local w = function(a) return Eval.money_weight({ meta = { ante = a } }) end
   t.eq(w(1), 1, "early money keeps the calibrated weight")
   t.eq(w(3), 1, "... through the calibration ante")
