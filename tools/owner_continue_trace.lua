@@ -8,7 +8,8 @@
 --   every emitted record carries r.start = "<seed>:<ante><S|B|X>" and r.cseed = the world seed; one
 --   {kind="cont_end", won, death_ante} per continuation. World seeds are s*1000+7, so two runs with the same s pair.
 --
--- ABLATIONS (env): CONT_MONEY=<n> sets the bankroll; CONT_DECK=std gives a fresh 52-card deck; CONT_JOKERS=<file>
+-- ABLATIONS (env): CONT_MONEY=<n> sets the bankroll; CONT_DECK=std gives a fresh 52-card deck (plain / stdmods /
+-- sizemods: finer splits, see shape_deck; CONT_DECK_DUMP=1 prints the deck and runs nothing); CONT_JOKERS=<file>
 -- swaps the owner's jokers for an engine board (one line of joker keys per board, chosen by seed); CONT_LEVELS=reset;
 -- CONT_PROBE=<Probe config> (default invest1 = the live skip policy). Any engine BES_* switch passes through the env.
 --
@@ -48,6 +49,51 @@ local function deep(v) if type(v) ~= "table" then return v end local o = {} for 
 local SHOP_V = { v_overstock_norm = true, v_overstock_plus = true, v_clearance_sale = true, v_liquidation = true,
   v_reroll_surplus = true, v_reroll_glut = true, v_telescope = true, v_hone = true, v_glow_up = true,
   v_tarot_merchant = true, v_planet_merchant = true, v_seed_money = true, v_money_tree = true }
+-- Finer deck ablations (CONT_DECK=, 2026-10-24) splitting the owner deck's edge into modifiers / composition / size:
+--   plain    = the owner's cards with every enhancement, seal and edition removed (ranks, suits, size kept);
+--   stdmods  = a fresh 52 with the owner's modifiers moved onto the same rank+suit (else same rank, else any free card);
+--   sizemods = stdmods trimmed (unmodified cards) or padded (copies of unmodified cards) to the owner's deck size.
+-- base - plain = modifiers; base - sizemods = which ranks / suits; sizemods - stdmods = size alone.
+local function has_mod(c) return c.enhancement or c.seal or c.edition end
+local function shape_deck(mode, owner, s)
+  if mode == "plain" then
+    local d = deep(owner)
+    for _, c in ipairs(d) do c.enhancement, c.seal, c.edition = nil, nil, nil end
+    return d
+  end
+  local d = World.standard_deck()
+  local used = {}
+  local function take(pred) for i, c in ipairs(d) do if not used[i] and pred(c) then used[i] = true return c end end end
+  local mods = {}
+  for _, c in ipairs(owner) do if has_mod(c) then mods[#mods + 1] = c end end
+  table.sort(mods, function(a, b) return (a.id or 0) < (b.id or 0) end)
+  for _, o in ipairs(mods) do
+    local t = take(function(c) return c.rank_id == o.rank_id and c.suit == o.suit end)
+      or take(function(c) return c.rank_id == o.rank_id end) or take(function() return true end)
+    if t then t.enhancement, t.seal, t.edition = o.enhancement, o.seal, o.edition end
+  end
+  if mode == "sizemods" then
+    local x = (s * 7919 + 17) % 2147483647
+    local function rnd(n) x = (x * 48271) % 2147483647 return x % n + 1 end
+    local free = {}
+    for i, c in ipairs(d) do if not has_mod(c) then free[#free + 1] = i end end
+    local want = #owner
+    if want < #d then
+      local drop = {}
+      for _ = 1, math.min(#d - want, #free) do local k = rnd(#free) drop[free[k]] = true table.remove(free, k) end
+      local kept = {}
+      for i, c in ipairs(d) do if not drop[i] then kept[#kept + 1] = c end end
+      d = kept
+    else
+      local id = 1000
+      while #d < want do
+        local c = deep(d[free[rnd(#free)]]); id = id + 1; c.id = id; d[#d + 1] = c
+      end
+    end
+  end
+  return d
+end
+
 local BI = { Small = 1, Big = 2, Boss = 3 }
 local TAGC = { Small = "S", Big = "B", Boss = "X" }
 
@@ -82,7 +128,9 @@ for _, k in ipairs(keys) do
       -- CONT_JOKERS=<boards file> swaps the owner's jokers for an engine a4 board (line chosen by seed);
       -- CONT_LEVELS=reset clears the hand levels.
       if os.getenv("CONT_MONEY") then run.economy.dollars = tonumber(os.getenv("CONT_MONEY")) end
-      if os.getenv("CONT_DECK") == "std" then run.deck = World.standard_deck() end
+      local dm = os.getenv("CONT_DECK")
+      if dm == "std" then run.deck = World.standard_deck()
+      elseif dm == "plain" or dm == "stdmods" or dm == "sizemods" then run.deck = shape_deck(dm, run.deck, s) end
       if os.getenv("CONT_LEVELS") == "reset" then run.hand_levels = {} end
       if os.getenv("CONT_JOKERS") then
         local bl = {}
@@ -95,6 +143,22 @@ for _, k in ipairs(keys) do
           run.jokers[#run.jokers + 1] = GS.joker{ key = key, name = d.name or key, cost = d.cost or 4,
             sell_value = math.max(1, math.floor((d.cost or 4) / 2)), rarity = d.rarity, ability = { extra = {} } }
         end
+      end
+      if os.getenv("CONT_DECK_DUMP") then   -- print the (ablated) deck's make-up and skip the run
+        local m, r = {}, {}
+        for _, c in ipairs(run.deck) do
+          for _, f in pairs({ c.enhancement or false, c.seal or false, c.edition or false }) do
+            if f then m[f] = (m[f] or 0) + 1 end
+          end
+          r[c.rank_id] = (r[c.rank_id] or 0) + 1
+        end
+        local o = {}
+        for kk, v in pairs(m) do o[#o + 1] = kk .. "=" .. v end
+        table.sort(o)
+        local ro = {}
+        for rr = 2, 14 do ro[#ro + 1] = r[rr] or 0 end
+        print(start, s, "n=" .. #run.deck, table.concat(o, " "), "ranks2-A " .. table.concat(ro, ","))
+        goto continue
       end
       local A = w.ante
       run.ante = A
@@ -120,6 +184,7 @@ for _, k in ipairs(keys) do
           death_ante = res.death_ante }) .. "\n")
         out:flush()
       end
+      ::continue::
     end
   end
 end
