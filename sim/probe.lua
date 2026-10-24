@@ -835,6 +835,9 @@ function Probe.opts(name)
   -- shop of antes 2..N: free shaping the engine aims itself (build-aware targeting), without its low pack valuation
   local shn = (not c) and name:match("^shape(%d+)$")
   if shn then c = { skip_only = { tag_investment = true }, skip_only_until = 1, free_shape_until = tonumber(shn) } end
+  local enn = (not c) and name:match("^enhance(%d+)$")   -- the same with the 8 enhancement tarots (Content.ENHANCE_TAROTS)
+  if enn then c = { skip_only = { tag_investment = true }, skip_only_until = 1, free_shape_until = tonumber(enn),
+                    free_shape_pool = "enhance" } end
   local npa = (not c) and name:match("^noplanet_until(%d+)$")
   if npa then c = { skip_only = { tag_investment = true }, skip_only_until = 1, noplanet_until = tonumber(npa) } end
   local nra = (not c) and name:match("^noreroll_from(%d+)$")

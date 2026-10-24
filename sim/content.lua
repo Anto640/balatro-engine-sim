@@ -485,10 +485,14 @@ end
 -- `shape<N>` ceiling probe: a free pack of 3 COMPOSITION tarots (the deck-shaping cards the owner uses ~3x more at
 -- antes 2-4: Death / Strength / Hanged Man / the suit tarots); one must be taken (the engine's best-ranked)
 Content.SHAPE_TAROTS = { "c_death", "c_strength", "c_hanged_man", "c_star", "c_moon", "c_sun", "c_world" }
+-- `enhance<N>` twin: the enhancement tarots instead (splits the arcana<N> gain into composition vs enhancement)
+Content.ENHANCE_TAROTS = { "c_magician", "c_empress", "c_heirophant", "c_lovers", "c_chariot", "c_justice", "c_devil",
+  "c_tower" }
 function Content.open_pack(pack, run, rng)
   if pack.key == "p_probe_shape" then
+    local pool = (run.probe and run.probe.free_shape_pool == "enhance") and Content.ENHANCE_TAROTS or Content.SHAPE_TAROTS
     local items = {}
-    for _ = 1, 3 do local key = pick_uniform(rng, Content.SHAPE_TAROTS); items[#items + 1] = { set = "Tarot", key = key, name = key } end
+    for _ = 1, 3 do local key = pick_uniform(rng, pool); items[#items + 1] = { set = "Tarot", key = key, name = key } end
     return { items = items, picks_left = 1 }
   end
   local kind, n, k = Packs.size_of(pack.key or pack.name)
