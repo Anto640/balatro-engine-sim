@@ -827,6 +827,10 @@ function Probe.opts(name)
   if thr then c = { skip_only = { tag_investment = true }, skip_only_until = 1, start_thin = tonumber(thr), start_thin_spread = true } end
   local thn = (not c) and name:match("^thin(%d+)$")   -- start with the N lowest cards removed (thinning ceiling)
   if thn then c = { skip_only = { tag_investment = true }, skip_only_until = 1, start_thin = tonumber(thn) } end
+  -- FREE SHAPING SUPPLY (2026-10-24, owner-position deck ablation -41pp): "arcana<N>" = a free Mega Arcana pack opened
+  -- at every shop through ante N; the engine picks and targets the tarots itself (the ceiling for board-matched shaping)
+  local arn = (not c) and name:match("^arcana(%d+)$")
+  if arn then c = { skip_only = { tag_investment = true }, skip_only_until = 1, free_arcana_until = tonumber(arn) } end
   local npa = (not c) and name:match("^noplanet_until(%d+)$")
   if npa then c = { skip_only = { tag_investment = true }, skip_only_until = 1, noplanet_until = tonumber(npa) } end
   local nra = (not c) and name:match("^noreroll_from(%d+)$")

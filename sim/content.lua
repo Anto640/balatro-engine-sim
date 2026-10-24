@@ -1256,6 +1256,11 @@ function Content.shop_phase(run, opts)
   end
   run._shop = shop
   run._shop_visit = (run._shop_visit or 0) + 1   -- visit counter (decision audit); touches no rng
+  -- `arcana<N>` ceiling probe: a free Mega Arcana opened at every shop through ante N, on its own stream (inert without
+  -- a config)
+  if run.probe and run.probe.free_arcana_until and (run.ante or 1) <= run.probe.free_arcana_until then
+    open_free_pack(run, "p_arcana_mega", require("sim.world").stream(run, "probe", run.ante, run.round))
+  end
   shop_loop(run, shop, rng, crn_n)
 end
 

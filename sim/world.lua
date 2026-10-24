@@ -121,7 +121,7 @@ World.lcg = lcg
 -- the shop for visit r, the k-th reroll / pack / sale of that visit. A changed decision now only changes what it
 -- touches. BES_CRN=0 restores the single stream (to reproduce pre-CRN arms).
 World.CRN = not (os.getenv and os.getenv("BES_CRN") == "0")
-World.STREAM = { ante = 1, tag = 2, blind = 3, shop = 4, reroll = 5, pack = 6, perkeo = 7, sell = 8, slot = 9 }
+World.STREAM = { ante = 1, tag = 2, blind = 3, shop = 4, reroll = 5, pack = 6, perkeo = 7, sell = 8, slot = 9, probe = 10 }
 -- (a * b) mod m without losing precision in a double (a, b < 2^31): split b into 16-bit halves
 local function mulmod(a, b, m)
   local hi, lo = math.floor(b / 65536), b % 65536
