@@ -8,6 +8,8 @@ how its advice is tested in the real game.
 Every recommendation comes from **measuring** options against your actual deck and board (Monte-Carlo over
 real hands, scored by a faithful re-implementation of Balatro's scoring), not from fixed tier lists.
 
+![The advice panel (top left) in an Arcana Pack: it recommends The Tower, names the card to apply it to (TARGET) and the pick (TAKE), with a confidence](docs/images/screenshot-pack-advice.jpg)
+
 *Unofficial fan project. Not affiliated with or endorsed by Playstack or LocalThunk, and it ships no game code or
 assets. It is a single-player aid and self-player: don't use it in Balatro Multiplayer or any competitive setting
 (see [Known limits](#known-limits)).*
