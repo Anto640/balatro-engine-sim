@@ -338,8 +338,9 @@ NOTE: `xmult_scaling` jokers ARE xmult — use `JokerData.is_xmult()`.
 
 ## Git
 
-Active work is on branch `winrate-v4-bundle`; `main` is synced to the validated/live state (fast-forward/merge it when a
-batch of changes is confirmed -- last synced 2026-10-19 (speed-ups incl. LuaJIT trace cache, farm mode, round targets, look-ahead closed; baselines in NEXT_SESSION). **Commit and push whenever you (the AI
+The public repo is `Anto640/balatro-engine-sim` (renamed from `balatro_engine_new` 2026-11-08); `main` is its only remote branch and is the
+published state. Work happens on the local branch `winrate-v4-bundle` (no remote counterpart since 2026-11-08); fast-forward `main` to it
+and push `main` when a batch of changes is confirmed -- last synced 2026-11-08 (baselines in NEXT_SESSION). **Commit and push whenever you (the AI
 assistant) judge it appropriate — you do NOT need to wait to be asked** (owner directive, 2026-08-28).
 Use judgement: commit at coherent checkpoints with a clear message, keep the tree green, and don't
 bundle unrelated changes. Run the test suite before committing.

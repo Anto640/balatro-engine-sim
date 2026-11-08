@@ -34,12 +34,12 @@ def main():
     manifest = {
         "name": NAME,
         "version_number": version,
-        "website_url": "https://github.com/Anto640/balatro_engine_new",
+        "website_url": "https://github.com/Anto640/balatro-engine-sim",
         "description": "Decision assistant: recommends the best play, discard, shop and pack choice, and can self-play runs (F11).",
         "dependencies": [],
     }
     readme = ("# Engine Sim - Decision Assistant\n\n" + meta["description"] +
-              "\n\nRequires Steamodded and Lovely. Source: https://github.com/Anto640/balatro_engine_new\n")
+              "\n\nRequires Steamodded and Lovely. Source: https://github.com/Anto640/balatro-engine-sim\n")
     os.makedirs(os.path.join(ROOT, "dist"), exist_ok=True)
     out = os.path.join(ROOT, "dist", "%s-%s-%s.zip" % (AUTHOR, NAME, version))
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
