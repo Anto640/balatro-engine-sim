@@ -8,10 +8,16 @@ how its advice is tested in the real game.
 Every recommendation comes from **measuring** options against your actual deck and board (Monte-Carlo over
 real hands, scored by a faithful re-implementation of Balatro's scoring), not from fixed tier lists.
 
+*Unofficial fan project. Not affiliated with or endorsed by Playstack or LocalThunk, and it ships no game code or
+assets. It is a single-player aid and self-player: don't use it in Balatro Multiplayer or any competitive setting
+(see [Known limits](#known-limits)).*
+
 ## Status
 
 - **Autonomous win rate:** about **41%** in the headless simulator (red deck, white stake; 66 of 160 on the seed_off-7 pool,
-  18 October 2026). For scale: ~28% at the start of October, ~6% in late September 2026 and ~1% in August.
+  18 October 2026). The simulator is this project's own model of the game's rules, so that is **not** a measured
+  in-game win rate; the live numbers below are the real ones. For scale: ~28% at the start of October, ~6% in late
+  September 2026 and ~1% in August.
 - **Live:** the in-game self-player plays unattended overnight (watchdog + auto-restart); recent nights won 9/26 and 4/26
   runs. Its runs are reviewed to find live-only bugs (press F5 at a misplay to save the decision for review).
 - **Recent (Oct 2026):** the simulator is ~9x faster (hand scoring compiled by LuaJIT, exact pruning of plays that can't be
@@ -19,8 +25,20 @@ real hands, scored by a faithful re-implementation of Balatro's scoring), not fr
   Castle / Mail-In round targets read live; a shallow look-ahead search at early shops (`sim/lookahead.lua`, sim-only,
   tested and closed: no gain at this depth). Measured: +$10/round money lifts the sim win rate 36% -> 81%, but forcing
   money jokers does not pay.
-- **Tests:** 1657 headless unit tests + 637 simulator-suite tests, all green.
+- **Tests:** 1666 headless unit tests + 637 simulator-suite tests, all green.
 - The full, current handoff (what shipped, what was measured, what's next) is in **`NEXT_SESSION.md`**.
+
+## About this project
+
+This took a lot of sustained effort: about eleven weeks (August–October 2026), 59 working days, 800+ commits, roughly
+48,000 lines of Lua (about 11,000 of them tests), hundreds of paired simulation experiments and a stack of live
+runs reviewed by hand, decision by decision. Most of what is in the repo is the *measurement* — which ideas helped,
+which didn't, and why — and the negative results are kept on purpose (`docs/archive/CLAUDE_HISTORY.md`,
+`docs/GRAND_AUDIT.md`), so nobody has to re-try a dead end.
+
+The win rate has been flat for a while: the big levers (shop, economy, in-blind play) have mostly been measured and
+exhausted, and the remaining gap is build assembly and supply. If you want to pick it up, `NEXT_SESSION.md` and the
+Known limits below are the honest starting point.
 
 ## What it advises
 
@@ -117,3 +135,14 @@ tests/    headless unit + simulator suites
   than as a sum of individual jokers.
 - A green headless suite is necessary but not sufficient: fields marked `-- VERIFY` in
   `core/state_extraction.lua` depend on the game version and are confirmed only in-game.
+- Tested on Steamodded and Lovely as installed through r2modman. Other mod setups and game versions may need
+  fixes.
+
+## Credits & support
+
+Built by **Anto640** together with **Claude** (Anthropic): Anto640 set the goals, played and reviewed the live runs,
+and decided what to keep or revert; Claude Code wrote most of the code, tests and docs. `CLAUDE.md` is the working
+guide used for that collaboration and doubles as a contributor guide.
+
+Maintenance is sporadic and there is no promise of support. Issues and pull requests are welcome but may wait.
+Released under the [MIT License](LICENSE).

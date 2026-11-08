@@ -4,7 +4,7 @@
 # Output: <worktree>/arm_<name>_*.jsonl (parts) and, when complete, <repo>/sim_out/<name>.jsonl (merged, seed order).
 # Seeds are s*1000+seed_off for s=1..n (seed_off 3 = the standard pool, 7 = out-of-sample). Re-running the same command
 # resumes: finished seeds are kept, only the missing ones run.
-export PATH="$PATH:/c/Users/Anto/AppData/Local/Programs/LuaJIT/bin:/c/Users/Anto/AppData/Local/Programs/Lua/bin"
+export PATH="$PATH:$HOME/AppData/Local/Programs/LuaJIT/bin:$HOME/AppData/Local/Programs/Lua/bin"
 name="$1"; wt="$2"; nw="$3"; n="${4:-160}"; off="${5:-3}"; shift 5 2>/dev/null
 for kv in "$@"; do export "$kv"; done
 REPO="$(cd "$(dirname "$0")/.." && pwd)"   # the main checkout: the merged output lands in its sim_out/

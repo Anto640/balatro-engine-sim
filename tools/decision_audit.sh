@@ -2,7 +2,7 @@
 # Resumable runner for tools/decision_audit.lua (same shape as tools/arm.sh): N workers claim jobs from <jobs.txt>
 # (mkdir is atomic); finished jobs are skipped on a re-run; merged output -> <repo>/sim_out/<name>.jsonl.
 #   usage: bash tools/decision_audit.sh <name> <worktree_dir> <nworkers> <jobs.txt>
-export PATH="$PATH:/c/Users/Anto/AppData/Local/Programs/LuaJIT/bin:/c/Users/Anto/AppData/Local/Programs/Lua/bin"
+export PATH="$PATH:$HOME/AppData/Local/Programs/LuaJIT/bin:$HOME/AppData/Local/Programs/Lua/bin"
 name="$1"; wt="$2"; nw="$3"; jobs="$(cd "$(dirname "$4")" && pwd)/$(basename "$4")"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$wt" || exit 1

@@ -6,10 +6,11 @@
 # and how it valued the options. Fields to know: shop-kind records with advice.type PLAY/DISCARD are
 # IN-BLIND decisions (offer_jokers empty); with BUY_*/SAVE they're SHOP decisions. Values live in `ranked`,
 # tags in `skip_tag`.  usage: python tools/run_trace.py <SEED> [runs.jsonl fixtures.jsonl]
-import json, sys
+import json, os, sys
+SAVE = os.path.join(os.environ.get("APPDATA", ""), "Balatro")  # LOVE save folder
 SEED = sys.argv[1] if len(sys.argv) > 1 else None
-RN = sys.argv[2] if len(sys.argv) > 2 else "C:/Users/Anto/AppData/Roaming/Balatro/bes_runs.jsonl"
-FX = sys.argv[3] if len(sys.argv) > 3 else "C:/Users/Anto/AppData/Roaming/Balatro/bes_fixtures.jsonl"
+RN = sys.argv[2] if len(sys.argv) > 2 else os.path.join(SAVE, "bes_runs.jsonl")
+FX = sys.argv[3] if len(sys.argv) > 3 else os.path.join(SAVE, "bes_fixtures.jsonl")
 def load(P):
     return [r for r in (json.loads(l) for l in open(P, encoding='utf-8') if l.strip())
             if SEED is None or str(r.get('seed')) == SEED]

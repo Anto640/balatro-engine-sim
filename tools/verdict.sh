@@ -16,7 +16,7 @@
 # independent deltas rather than one bundle.
 
 set -u
-export PATH="$PATH:/c/Users/Anto/scoop/shims:/c/ProgramData/chocolatey/bin"
+export PATH="$PATH:$HOME/scoop/shims:/c/ProgramData/chocolatey/bin"
 
 base="${1:?baseline jsonl required}"
 shift

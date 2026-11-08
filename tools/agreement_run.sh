@@ -22,7 +22,7 @@
 # Falls back to the live save folder if the snapshot is missing.
 
 set -euo pipefail
-export PATH="$PATH:/c/Users/Anto/scoop/apps/luajit/current:/c/Users/Anto/scoop/shims"
+export PATH="$PATH:$HOME/scoop/apps/luajit/current:$HOME/scoop/shims"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="$ROOT/sim_out/agreement"
 mkdir -p "$OUT"

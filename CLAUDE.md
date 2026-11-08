@@ -329,7 +329,7 @@ NOTE: `xmult_scaling` jokers ARE xmult — use `JokerData.is_xmult()`.
   `main.lua` registers a custom `package.searcher` for our namespaces. Headless tests set
   `package.path` instead, so they bypass it.
 - **Toolchain on this machine:** `lua`/`luajit` need
-  `export PATH="$PATH:/c/Users/Anto/AppData/Local/Programs/LuaJIT/bin:/c/Users/Anto/AppData/Local/Programs/Lua/bin"` in
+  `export PATH="$PATH:$HOME/AppData/Local/Programs/LuaJIT/bin:$HOME/AppData/Local/Programs/Lua/bin"` in
   every Bash call. From PowerShell, `bash` resolves to WSL; launch a detached batch with
   `Start-Process cmd.exe -WindowStyle Hidden -ArgumentList '/c start "" /b /belownormal "C:\Program Files\Git\bin\bash.exe" -l <script>'` -- HIDDEN (no window: the owner closes stray windows, which kills the batch; a visible `start /min` launch
   was used 10-05/06 by mistake) and BELOW-NORMAL priority, inherited by every worker (11 normal-priority workers on this
