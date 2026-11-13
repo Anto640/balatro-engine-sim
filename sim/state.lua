@@ -15,9 +15,7 @@ local SimState = {}
 
 -- kind -> { "section.field" = true }: facts the live state carries that this sim state does not.
 SimState.GAPS = {
-  shop = {
-    ["last_tarot_planet"] = true,     -- the Fool's copy target (pack_open_advisor): never offered in a sim pack
-  },
+  shop = {},
   skip = {
     ["meta.round"] = true, ["meta.state"] = true, ["meta.seed_hash"] = true,
     ["consumables"] = true,
