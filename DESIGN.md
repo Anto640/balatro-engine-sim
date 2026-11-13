@@ -8,7 +8,7 @@
 > Target platform: Balatro (LÖVE2D / Lua) · Steamodded `1.0.0-beta` · Lovely `0.9.0`
 > Document status: ORIGINAL design baseline (greenfield), kept for historical
 > context — the roadmap is now implemented. For current features see `README.md`;
-> for working context (architecture, conventions, gotchas) see `CLAUDE.md`.
+> for working context (architecture, conventions, gotchas) see `CONTRIBUTING.md`.
 > Verified against Steamodded wiki, Lovely README, decompiled source (June 2026).
 
 ---

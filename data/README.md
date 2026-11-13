@@ -1,12 +1,14 @@
 # `data/` — captured live-game telemetry
 
+**What this is:** the maintainer's own recorded live runs — game states, decisions and seeds only, no personal data.
+
 Real telemetry written by the **live mod** while a human played Balatro. This is the only
 data in the project that is *not* reproducible by re-running anything: the simulator can be
 re-run at will, these runs cannot. Copied here so they survive a save-folder wipe, a mod
 reinstall, or a machine change.
 
 Source: the LÖVE save folder, `%APPDATA%\Balatro\` (written by `main.lua` —
-`BES_RUNLOG = "bes_runs.jsonl"`, and the `F7` handler for the joker dump).
+`BES_RUNLOG = "bes_runs.jsonl"`, and the debug joker-ability dump for `bes_joker_dump.txt`).
 
 ## Files
 
@@ -14,7 +16,7 @@ Source: the LÖVE save folder, `%APPDATA%\Balatro\` (written by `main.lua` —
 |---|---|---|---|
 | `bes_runs.jsonl` | through **2026-07-02** | 1948 records | 22 runs started, 14 completed: **1 win, 13 deaths** |
 | `bes_runs_baseline.jsonl` | **2026-06-25** | 244 records | the **pre-fix** baseline: 5 runs started, 4 deaths, 0 wins |
-| `bes_joker_dump.txt` | **2026-06-28** | 2 jokers | `F7` dump of live `ability` tables (Runner, Wee Joker) |
+| `bes_joker_dump.txt` | **2026-06-28** | 2 jokers | debug dump of live `ability` tables (Runner, Wee Joker) |
 | **`bes_runs_live_2026-08-12.jsonl`** | **2026-08-13** | 2400+ records | **8 EXPERT runs, 7 WINS.** The single most valuable file in the project — see below |
 
 `bes_runs_baseline.jsonl` is the "measure against this" file referenced by
@@ -38,13 +40,12 @@ lua tools/analyze_runs.lua data/bes_runs.jsonl trace <seed>
 
 Note the sample is far too small for a winrate — 1/14 carries a 95% CI of 0%–21%. Its value
 is **qualitative**: the death contexts, the per-ante dollar/joker/hand-level trajectory, and
-the joker lists of the runs that went deep. `CLAUDE.md` and the `winning-archetype-from-real-run`
-memory draw the "keep the xmult stack" conclusion from human wins; only **one** of those is
-present as a `"kind":"win"` record in this capture.
+the joker lists of the runs that went deep. The "keep the xmult stack" conclusion drawn from
+human wins rests on more runs than this; only **one** of them is present as a `"kind":"win"`
+record in this capture.
 
-The real-world trajectory here is also the calibration target for `sim/world.lua` — the
-comparison `NEXT_SESSION.md` asks for ("compare the dollar trajectory in `bes_runs.jsonl`
-vs the sim") is run against this file.
+The real-world trajectory here is also the calibration target for `sim/world.lua`: comparing
+the dollar trajectory in `bes_runs.jsonl` with the simulator's is run against this file.
 
 ## Refreshing after more play
 

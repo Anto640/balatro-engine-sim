@@ -1,6 +1,6 @@
 # docs/GRAND_AUDIT.md — the consolidated master audit (2026-08-25)
 
-> **⭐⭐ SUPERSEDED FRAMING (2026-08-28) — read `NEXT_SESSION.md` first.** This doc is the authoritative
+> **⭐⭐ SUPERSEDED FRAMING (2026-08-28) — read [`ROADMAP.md`](../ROADMAP.md) first** for the current state. This doc is the authoritative
 > record of the *autonomous-winrate ceiling* investigation and remains true on that objective. But two
 > things happened after it: (1) the **objective pivoted to ADVICE QUALITY** (the mod advises a human who
 > wins ~87.5%; a non-compute-bound objective), and (2) the **sim was found to be FLATTERING the engine** —

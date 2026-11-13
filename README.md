@@ -20,15 +20,15 @@ assets. It is a single-player aid and self-player: don't use it in Balatro Multi
   18 October 2026). The simulator is this project's own model of the game's rules, so that is **not** a measured
   in-game win rate; the live numbers below are the real ones. For scale: ~28% at the start of October, ~6% in late
   September 2026 and ~1% in August.
-- **Live:** the in-game self-player plays unattended overnight (watchdog + auto-restart); recent nights won 9/26 and 4/26
-  runs. Its runs are reviewed to find live-only bugs (press F5 at a misplay to save the decision for review).
+- **Live:** the in-game self-player can play unattended overnight (self-play + auto-restart); recent nights won 9/26 and
+  4/26 runs. Its runs are reviewed decision by decision to find live-only bugs.
 - **Recent (Oct 2026):** the simulator is ~9x faster (hand scoring compiled by LuaJIT, exact pruning of plays that can't be
   best; a 160-seed A/B now takes ~70 min); in-blind money farming of money jokers (`engine/farm.lua`); Idol / Ancient /
   Castle / Mail-In round targets read live; a shallow look-ahead search at early shops (`sim/lookahead.lua`, sim-only,
   tested and closed: no gain at this depth). Measured: +$10/round money lifts the sim win rate 36% -> 81%, but forcing
   money jokers does not pay.
 - **Tests:** 1666 headless unit tests + 637 simulator-suite tests, all green.
-- The full, current handoff (what shipped, what was measured, what's next) is in **`NEXT_SESSION.md`**.
+- Current state, known limits and open ideas: **[`ROADMAP.md`](ROADMAP.md)**.
 
 ## About this project
 
@@ -39,8 +39,8 @@ which didn't, and why — and the negative results are kept on purpose (`docs/ar
 `docs/GRAND_AUDIT.md`), so nobody has to re-try a dead end.
 
 The win rate has been flat for a while: the big levers (shop, economy, in-blind play) have mostly been measured and
-exhausted, and the remaining gap is build assembly and supply. If you want to pick it up, `NEXT_SESSION.md` and the
-Known limits below are the honest starting point.
+exhausted, and the remaining gap is build assembly and supply. If you want to pick it up, [`ROADMAP.md`](ROADMAP.md)
+and [`CONTRIBUTING.md`](CONTRIBUTING.md) are the honest starting point.
 
 ## What it advises
 
@@ -62,13 +62,9 @@ Known limits below are the honest starting point.
 
 | Key | Action |
 |---|---|
-| F5 | Flag a misplay: saves the last 4 decisions to `bes_flagged.jsonl` for review (a lost run saves its last 12 automatically) |
-| F6 | Auto-restart on/off (with self-play on, a finished run restarts after 4 s via the game's hold-R path) |
-| F7 | Dump owned jokers' live `ability` tables (`bes_joker_dump.txt`), tagged scored / value-only / UNCOVERED |
-| F8 | Force a re-evaluation |
 | F9 | Show / hide the panel |
-| F10 | Capture-only mode (log decisions, no evaluation) |
 | F11 | Self-play on/off |
+| F6 | Auto-restart on/off (with self-play on, a finished run restarts after 4 s via the game's hold-R path) |
 
 The advice panel sits at the top of the left HUD (hover it for the reason, stats and Self-play / Auto-restart status), and a tag marks the recommended card, shop item or button. Pack choices show "Evaluating pack…"
 until the measured decision is ready.
@@ -101,7 +97,8 @@ lua tools/analyze_runs.lua sim_out/<A>.jsonl compare sim_out/<B>.jsonl   # paire
 
 The simulator (`sim/`) drives the real engine through whole runs with the same telemetry as the live mod and
 is deterministic per seed across processes, so A/B comparisons are paired and parallel batches are exact.
-`tools/README.md` indexes the analysis tools.
+`tools/README.md` indexes the analysis tools; [`CONTRIBUTING.md`](CONTRIBUTING.md) covers the architecture rules, the
+A/B verdict standard and the gotchas.
 
 ## Layout
 
@@ -122,12 +119,12 @@ tests/    headless unit + simulator suites
 
 | File | What it is |
 |---|---|
-| `NEXT_SESSION.md` | Current state, recent results and the prioritised next steps — start here |
-| `CLAUDE.md` | Working guide: architecture rules, workflow, measurement rules, gotchas |
-| `docs/ADVICE_REVIEW.md` | Live-run misplays reported by the owner and how each was fixed |
+| [`ROADMAP.md`](ROADMAP.md) | Current state, known limits, open ideas — start here |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Architecture rules, tests, the simulator and A/B verdict standard, gotchas |
+| `docs/ADVICE_REVIEW.md` | Live-run misplays reported by the maintainer and how each was fixed |
 | `docs/GRAND_AUDIT.md` | Deep audit of the win-rate investigation (historical, still referenced) |
 | `DESIGN.md` | Original design baseline (historical) |
-| `docs/archive/` | Superseded plans |
+| [`docs/archive/`](docs/archive/README.md) | Research log: superseded plans, measurements and refuted ideas |
 
 ## Known limits
 
@@ -143,8 +140,8 @@ tests/    headless unit + simulator suites
 ## Credits & support
 
 Built by **Anto640** together with **Claude** (Anthropic): Anto640 set the goals, played and reviewed the live runs,
-and decided what to keep or revert; Claude Code wrote most of the code, tests and docs. `CLAUDE.md` is the working
-guide used for that collaboration and doubles as a contributor guide.
+and decided what to keep or revert; Claude Code wrote most of the code, tests and docs. The working rules from that
+collaboration are distilled for contributors in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 Maintenance is sporadic and there is no promise of support. Issues and pull requests are welcome but may wait.
 Released under the [MIT License](LICENSE).

@@ -7,6 +7,10 @@ carries the method, the caveats, and (for most) the result it produced when it w
 Almost everything here reads **existing** telemetry and costs nothing to run. Only the four marked
 **[sim]** actually drive the simulator.
 
+> **Maintainer tooling.** `deploy.sh`, `r2modman_state.py`, `package_r2.py`, `selfplay_watchdog.sh`, `game_click.ps1`
+> and `selfplay_night.py` (see *Getting a change into the live game* and *Unattended live self-play* below) automate the author's own Windows / r2modman setup and
+> unattended self-play sessions. They are not needed to use the mod or to work on the engine.
+
 ---
 
 ## Running batches and calling verdicts
@@ -66,7 +70,7 @@ Almost everything here reads **existing** telemetry and costs nothing to run. On
 | **`live_gap.lua`** | live vs sim death RATE per blind played (Small/Big/Boss, by ante band), with skips inferred. `lua tools/live_gap.lua <bes_runs.jsonl> <from_line> <sim.jsonl>` |
 | **`live_audit/play_realisation.lua`** | every live Small/Big play re-scored by the current engine vs the game's actual score: share under 0.8x, deterministic vs chance plays, guaranteed-clear failures. `luajit tools/live_audit/play_realisation.lua tools/live_audit/seeds_2026-09-28.txt` (one seeds file per live session, e.g. `seeds_2026-10-01.txt`). 2026-10-01: found the Obelisk pre-score reset (the last deterministic play under 0.8x) |
 | **`owner_continue_trace.lua`** **[sim]** | what does the engine do FROM a human's position? Continues the sim from any recorded blind start (Small/Big/Boss, real boss) with full traces, plus ablations (`CONT_MONEY` / `CONT_DECK=std` / `CONT_JOKERS=<boards>`) that swap one part of the human position for the engine's typical one. Paired by world seed. 2026-10-23: exposed the full-board reroll inflation, the never-expiring economy commitment and SAVE-at-high-risk |
-| **`arm.sh`** | the resumable A/B arm runner (see CLAUDE.md "Running batches") |
+| **`arm.sh`** | the resumable A/B arm runner (see CONTRIBUTING.md, "The simulator and A/B verdicts") |
 
 ## Search / ceiling
 
@@ -83,7 +87,7 @@ Almost everything here reads **existing** telemetry and costs nothing to run. On
 | tool | question |
 |---|---|
 | **`yield_gaps.lua`** | how long does each live recommendation take, and how long can it run between slice boundaries (= the worst animation stutter)? `luajit tools/yield_gaps.lua [--per N]` over the newest recorded decisions per kind. 2026-10-02: shop ~5 s (max 10 s) total; gap p99 3-6 ms, max ~50 ms |
-| **`flagged.lua`** | which decisions did the owner flag in-game (F5)? `luajit tools/flagged.lua [--list] [--flag "<id>"] [--replay]` -- one flag holds the last ~12 decisions (the key is usually pressed AFTER the misplay; `steps_before` 0 = on screen at the press), each a full fixture-format state; `--replay` re-decides them with the current engine |
+| **`flagged.lua`** | which decisions were saved to `bes_flagged.jsonl` (a misplay flagged in-game, or the automatic save of a lost run)? `luajit tools/flagged.lua [--list] [--flag "<id>"] [--replay]` -- one flag holds the last ~12 decisions (the key is usually pressed AFTER the misplay; `steps_before` 0 = on screen at the press), each a full fixture-format state; `--replay` re-decides them with the current engine |
 | **`slice_check.lua`** | is time-sliced advice identical to synchronous advice, with no yield inside a C call? Run it after touching any engine loop; exit 1 on a mismatch |
 
 ## Getting a change into the live game
@@ -99,7 +103,7 @@ Almost everything here reads **existing** telemetry and costs nothing to run. On
 
 | tool | question |
 |---|---|
-| **`selfplay_watchdog.sh`** | keep the in-game self-player running overnight: relaunches Balatro with the one-shot `bes_autostart` file on a crash / stall / loop, closes SteelSeries capture and protects memory, stops at `BES_SELFPLAY_STOP` (default 07:00), hands over ("NEEDS MANUAL") after 3 failed relaunches. Launch it HIDDEN (CLAUDE.md) |
+| **`selfplay_watchdog.sh`** | keep the in-game self-player running overnight: relaunches Balatro with the one-shot `bes_autostart` file on a crash / stall / loop, closes SteelSeries capture and protects memory, stops at `BES_SELFPLAY_STOP` (default 07:00), hands over ("NEEDS MANUAL") after 3 failed relaunches. Launch it hidden (no console window) so it is not closed by accident |
 | **`game_click.ps1`** | take manual control of the live game: screenshot + click at 1280x720 coordinates (F-keys sent as keys do not reach LOVE) |
 | **`selfplay_night.py`** | summary of a session: runs, deaths, boards, buys, self-player actions, think-time gaps, failures (`python tools/selfplay_night.py <runs_line_offset> <autoplay_line_offset>`) |
 
