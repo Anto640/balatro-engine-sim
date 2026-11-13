@@ -20,6 +20,7 @@ local BossEffect = require("engine.boss_effect")
 local Decision   = require("engine.decision_engine")
 local GS         = require("model.game_state")
 local JokerTick  = require("sim.joker_tick")
+local SimState   = require("sim.state")
 local JokerData  = require("engine.joker_data")
 local JokerFx    = require("engine.joker_effects")
 local Cards      = require("util.cards")
@@ -298,44 +299,8 @@ end
 
 -- ---- in-blind helpers -------------------------------------------------------
 
--- Build the POD GameState the engine consumes for ONE decision inside a blind.
-local function build_gs(run, blind, hand, draw_pile, eff)
-  local gs = GS.new{
-    meta = { ante = run.ante, round = run.round, state = "SELECTING_HAND", seed_hash = tostring(run.seed) },
-    deck = run.deck,
-    remaining = draw_pile,          -- undrawn cards still in the draw pile this blind
-    hand = hand,
-    jokers = run.jokers,
-    consumables = run.consumables,
-    economy = run.economy,
-    -- what The Fool would copy. The world has tracked this as run._last_consumable all along
-    -- (for its own c_fool branch) but never showed it to the ENGINE, so in-sim the Fool's
-    -- copy-target search could only ever see held/in-pack cards -- the mirror image of the
-    -- live bug where it was valued with no target at all.
-    last_tarot_planet = run._last_consumable and
-      { key = run._last_consumable.key, name = run._last_consumable.name } or nil,
-    blind = {
-      name = blind.name or blind.type, target_chips = blind.target, chips_scored = blind.scored,
-      boss = (blind.type == "Boss"), blind_type = blind.type,
-      boss_effect_key = blind.boss_key,
-      hands_left = blind.hands_left, discards_left = blind.discards_left,
-      base_hands = blind.base_hands, base_discards = blind.base_discards,
-      discards_used = blind._first_discard_done and 1 or 0,   -- Burnt Joker: is the next discard the first?
-      played_hand_types = blind.played_types,   -- K2: hand types played THIS blind (Card Sharp)
-      first_hand_type = blind._pstate and blind._pstate.first,   -- the Mouth lock
-    },
-    run = {
-      hand_levels = run.hand_levels, vouchers_owned = run.vouchers_owned, tags = run.tags,
-      hand_size = blind.hand_size, consumable_slots = run.consumable_slots,
-      joker_slots = run.joker_slots, boss_key = blind.boss_key,
-      hand_type_plays = run.hand_type_plays,     -- K1: per-type run play counts (Supernova)
-      hands_played = run.hands_played,            -- K2: total hands played (Loyalty)
-      build_plan = run.build_plan,                 -- Phase 5: sticky archetype commitment
-    },
-  }
-  if eff then gs.boss_effect = eff end   -- hand_eval honours boss scoring debuffs
-  return gs
-end
+-- The POD GameState the engine consumes for ONE decision inside a blind: sim/state.lua.
+local build_gs = SimState.blind
 
 -- Remove the played/discarded `sel` cards from `hand` by identity.
 local function remove_cards(hand, sel)

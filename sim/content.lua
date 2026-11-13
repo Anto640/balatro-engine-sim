@@ -20,6 +20,7 @@ local GS              = require("model.game_state")
 local Json            = require("util.json")
 local JokerTick       = require("sim.joker_tick")
 local BuildPlan       = require("engine.build_plan")
+local SimState        = require("sim.state")
 local Probe           = require("sim.probe")   -- Phase A ceiling probe; inert without a config
 
 local Content = {}
@@ -548,43 +549,8 @@ local function credit(run)
 end
 local function can_afford(run, c) return dollars(run) + credit(run) >= (c or 0) end
 
--- Build the POD gs the shop/pack advisors consume.
--- BES_LIVE_CAP_BUG=1 (experiment only; inert otherwise): hand the ADVISORS the interest cap the way the LIVE
--- game reports it -- in DOLLARS (25/50/100) instead of the sim's interest units (5/10/20) -- so the sim can
--- measure what the live-only unit bug costs (the engine's reroll/pack spending keys off cap*5). A COPY, so the
--- world's own interest payouts are untouched.
-local LIVE_CAP_BUG = Flags.off("BES_LIVE_CAP_BUG")
-local function advisor_economy(run)
-  if not LIVE_CAP_BUG then return run.economy end
-  local e = {}
-  for k, v in pairs(run.economy) do e[k] = v end
-  e.interest_cap = (run.economy.interest_cap or 5) * 5
-  return e
-end
-
-local function shop_gs(run, shop, pack)
-  return GS.new{
-    meta = { ante = run.ante, round = run.round, state = "SHOP", seed_hash = tostring(run.seed) },
-    deck = run.deck, jokers = run.jokers, consumables = run.consumables,
-    economy = advisor_economy(run),
-    -- the round's resource BUDGET, as the live shop state carries it (state_extraction reads the last blind:
-    -- base_discards 4 / discards_left 4 on a red deck). Without it GS.new defaulted both to 0, so every shop
-    -- valuation that reads the discard budget (Banner/Mystic Summit expected discards, Burnt, Burglar, the
-    -- resource table, seals, hand frequencies) saw a ZERO-discard game in the sim but 4 live (2026-09-26).
-    blind = { base_hands = run.base_hands, base_discards = run.base_discards,
-              hands_left = run.base_hands, discards_left = run.base_discards, discards_used = 0,
-              next_blind = run._next_blind },   -- the blind after this shop (live: state_extraction's next_blind)
-    run = { hand_levels = run.hand_levels, vouchers_owned = run.vouchers_owned, tags = run.tags,
-            hand_size = run.hand_size, consumable_slots = run.consumable_slots,
-            joker_slots = run.joker_slots, boss_key = run._next_boss,
-            hand_type_plays = run.hand_type_plays, hands_played = run.hands_played,
-            build_plan = run.build_plan,    -- K1/K2 + Phase 5 persistent archetype
-            pending_swap = run._pending_swap,   -- a paired trade's sale was made; its buy is due (SA.paired_trade)
-            ante_back = run._ante_back },       -- a pending Hieroglyph/Petroglyph replay (SA.final_shop)
-    shop = shop, pack = pack,
-  }
-end
-
+-- The POD gs the shop/pack advisors consume: sim/state.lua (shared with the in-blind and skip states).
+local shop_gs = SimState.shop
 -- A4: faithful voucher effects. Previously ~3 of 16 were modelled (the rest inert) and
 -- Hieroglyph had the WRONG SIGN (+1 hand instead of -1). Resource vouchers mutate run state
 -- directly; shop-generation vouchers set flags read by gen_shop/gen_joker/pricing/reroll.

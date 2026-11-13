@@ -9,6 +9,7 @@
 -- Confidence numbers are documented heuristics (calibrated in M3).
 
 local Flags = require("engine.flags")
+local DecisionState = require("engine.decision_state")
 local HandEval = require("engine.hand_eval")
 local Heuristics = require("engine.heuristics")
 local DiscardValue = require("engine.discard_value")
@@ -584,9 +585,7 @@ function DE.decide(gs, opts)
   -- "beats the blind 12537>=10000" but really scores 6786). replay_fixture/sim set
   -- boss_effect before calling us; the live caller does not. Derive it here (the single
   -- in-blind scoring chokepoint) so every caller is faithful. Pure: BossEffect.of is pure.
-  if not gs.boss_effect and b.boss and b.boss_effect_key then
-    gs.boss_effect = BossEffect.of(b.boss_effect_key)
-  end
+  DecisionState.derive(gs)
   local hands_left = b.hands_left or 1
   local discards_left = b.discards_left or 0
   local remaining = remaining_target(gs)

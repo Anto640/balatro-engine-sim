@@ -53,7 +53,7 @@ local Simulation = try_require("engine.simulation")
 local ShopAdvisor = try_require("engine.shop_advisor")
 local SkipAdvisor = try_require("engine.skip_advisor")
 local PackOpenAdvisor = try_require("engine.pack_open_advisor")
-local BuildPlan = try_require("engine.build_plan")  -- live persistence of the archetype commitment
+local DecisionState = try_require("engine.decision_state")  -- derived + carried state (build commitment, Mouth lock, paired trade)
 local Overlay  = try_require("ui.overlay")
 local HUDPanel = try_require("ui.hud_panel")
 local Highlights = try_require("ui.highlights")  -- in-world tags on the recommended card / item / button
@@ -170,55 +170,10 @@ end
 -- planet credit, build fit) disagreed with live -- live Z9ZPREGI sold Raised Fist (Sly core to a Full House plan),
 -- the replay sold Sly. BES.emit_fixture now records this same state.
 function BES.run_state_for(gs)
-  local out = {}
-  if BuildPlan and gs.run then
-    local seed = (gs.meta and gs.meta.seed_hash) or ""
-    local plan = (seed == BES._build_seed) and BES._build_plan or nil
-    if gs.shop then
-      local ok_bp, p = pcall(BuildPlan.advance, gs, plan)   -- pure: returns a new plan, never edits `plan`
-      if ok_bp then plan = p end
-    end
-    out.plan_key, out.plan = seed, plan
-  end
-  if gs.blind then
-    local fkey = tostring(gs.meta and gs.meta.seed_hash) .. ":" .. tostring(gs.meta and gs.meta.round)
-    local first = (BES._first_hand_key == fkey) and BES._first_hand or nil
-    local b = gs.blind
-    if not first and b.hands_played_round == 1 and b.last_hand_played
-       and b.played_hand_types and b.played_hand_types[b.last_hand_played] then
-      first = b.last_hand_played
-    end
-    out.first_key, out.first_hand = fkey, first
-  end
-  -- PAIRED TRADE in progress (SA.paired_trade, 2026-10-03): the last advice sold a joker FOR a shop joker and that
-  -- joker is now gone, so its buy is due -- the shop must still see the trade, or it re-prices the buy alone and can
-  -- leave the slot empty. Lapses when the offer leaves the shop or the round changes.
-  if gs.shop and gs.run then
-    local seed = (gs.meta and gs.meta.seed_hash) or ""
-    local round = gs.meta and gs.meta.round
-    local p = BES._pending_swap
-    if p and (p.seed ~= seed or p.round ~= round) then p = nil end
-    local last = BES.last
-    local lb = last and last.ranked and last.ranked.best
-    if lb and lb.type == "SELL_JOKER" and lb.pending_swap and lb.target and last.gs
-       and #(gs.jokers or {}) < #(last.gs.jokers or {}) then
-      local gone = true
-      for _, j in ipairs(gs.jokers or {}) do
-        if j == lb.target or (lb.target.id ~= nil and j.id == lb.target.id) then gone = false end
-      end
-      if gone then
-        p = { key = lb.pending_swap.key, edition = lb.pending_swap.edition, up = lb.pending_swap.up,
-              sold_fv = lb.pending_swap.sold_fv, seed = seed, round = round }
-      end
-    end
-    if p then
-      local offered = false
-      for _, sj in ipairs(gs.shop.jokers or {}) do if sj.key == p.key then offered = true end end
-      if not offered then p = nil end
-    end
-    out.pending_set, out.pending = true, p
-  end
-  return out
+  if not DecisionState then return {} end
+  return DecisionState.carry(gs, { build_seed = BES._build_seed, build_plan = BES._build_plan,
+    first_hand_key = BES._first_hand_key, first_hand = BES._first_hand,
+    pending_swap = BES._pending_swap, last = BES.last })
 end
 
 function BES.evaluate(with_sim, gs)
@@ -232,18 +187,10 @@ function BES.evaluate(with_sim, gs)
 
   -- carried run state (build commitment, Mouth lock): see BES.run_state_for
   local rs = BES.run_state_for(gs)
-  if rs.plan_key then
-    BES._build_seed, BES._build_plan = rs.plan_key, rs.plan
-    gs.run.build_plan = rs.plan   -- so BP.commitment/planet_credit see it (shop AND blind)
-  end
-  if rs.first_key then
-    BES._first_hand_key, BES._first_hand = rs.first_key, rs.first_hand
-    gs.blind.first_hand_type = rs.first_hand
-  end
-  if rs.pending_set then
-    BES._pending_swap = rs.pending
-    gs.run.pending_swap = rs.pending
-  end
+  if rs.plan_key then BES._build_seed, BES._build_plan = rs.plan_key, rs.plan end   -- so BP.commitment/planet_credit see it (shop AND blind)
+  if rs.first_key then BES._first_hand_key, BES._first_hand = rs.first_key, rs.first_hand end
+  if rs.pending_set then BES._pending_swap = rs.pending end
+  if DecisionState then DecisionState.attach(gs, rs) end
 
   -- An open booster pack: recommend which revealed items to take, and in what
   -- order (chained effects), or to skip the pack (deck bloat). The cheap pass
@@ -787,9 +734,7 @@ function BES.emit_fixture(gs)
   -- the carried run state the evaluation will attach (this runs before it): without it no fixture recorded the
   -- build plan or the Mouth lock, and replays disagreed with live (BES.run_state_for)
   local rs = BES.run_state_for(gs)
-  if rs.plan_key then gs.run.build_plan = rs.plan end
-  if rs.first_key then gs.blind.first_hand_type = rs.first_hand end
-  if rs.pending_set then gs.run.pending_swap = rs.pending end
+  if DecisionState then DecisionState.attach(gs, rs) end
   local fx = ReplayFixture.fixture_of(gs, choice, BES._fix.idx, kind)
   -- timestamp (same clock as bes_runs.jsonl) so a fixture can be JOINED to the human's ACTUAL
   -- action -- the joker_gain/loss/consumable/blind_result with the smallest t greater than this.

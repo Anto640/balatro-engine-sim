@@ -13,7 +13,7 @@
 -- PURE: no G, no globals. Loadable in the live mod (core.* is on the mod searcher) and headless.
 
 local Json       = require("util.json")
-local BossEffect = require("engine.boss_effect")
+local DS         = require("engine.decision_state")
 
 local RF = {}
 
@@ -163,9 +163,7 @@ function RF.rehydrate(fix)
   r.tags = r.tags or {}
   r.hand_size = r.hand_size or 8
   r.consumable_slots = r.consumable_slots or 2
-  local b = gs.blind
-  if b.boss and b.boss_effect_key then gs.boss_effect = BossEffect.of(b.boss_effect_key) end
-  return gs
+  return DS.derive(gs)
 end
 
 return RF
