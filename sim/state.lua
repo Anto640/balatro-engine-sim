@@ -16,16 +16,7 @@ local SimState = {}
 -- kind -> { "section.field" = true }: facts the live state carries that this sim state does not.
 SimState.GAPS = {
   shop = {},
-  skip = {
-    ["meta.round"] = true, ["meta.state"] = true, ["meta.seed_hash"] = true,
-    ["consumables"] = true,
-    ["last_tarot_planet"] = true,
-    ["run.vouchers_owned"] = true, ["run.tags"] = true, ["run.hand_size"] = true,
-    ["run.consumable_slots"] = true,
-    ["run.joker_slots"] = true,       -- tag valuation falls back to 5 slots
-    ["run.hand_type_plays"] = true,
-    ["run.hands_played"] = true,
-  },
+  skip = {},
 }
 
 -- BES_LIVE_CAP_BUG=1 (experiment only; inert otherwise): hand the ADVISORS the interest cap the way the LIVE
