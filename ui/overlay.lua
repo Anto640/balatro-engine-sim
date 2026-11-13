@@ -15,7 +15,7 @@ Overlay.state = {
   ev       = "",
   winp     = "",
   reorder  = "",
-  reason   = "Press F8 to evaluate.",
+  reason   = "Waiting for a decision.",
   -- structured numbers for the panel's tags (nil = not applicable)
   cost = nil, banked = nil, conf_pct = nil, sim_backed = false,
   ev_pct = nil, ev_label = nil, win_pct = nil, run_pct = nil,

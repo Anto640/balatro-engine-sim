@@ -284,7 +284,7 @@ function Panel.tooltip()
           badge("Auto-restart", ap and ap.auto_restart),
         } },
         { n = G.UIT.R, config = { align = "cm" }, nodes = {
-          text("F11 self-play   F6 auto-restart   F5 flag a misplay   F9 hide", 0.26, G.C.UI.TEXT_INACTIVE),
+          text("F11 self-play   F6 auto-restart   F9 hide", 0.26, G.C.UI.TEXT_INACTIVE),
         } },
       } },
     } },
