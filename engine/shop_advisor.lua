@@ -1425,7 +1425,7 @@ function SA.recommend(gs, opts)
               -- PLAN the swap toward the core too: on a full board of additive commons, a
               -- core piece (xmult that multiplies the base) is a real upgrade even if its
               -- raw marginal only edges the weakest -- and a redundant flat is damped.
-              local g = buy_fv_delta(gs, sj, swap_mopts) + (BuildPlan.fit(gs, sj, build, invest))
+              local g = buy_fv_delta(gs, sj, swap_mopts) + (BuildPlan.fit(gs, sj, build, invest)) / SA.W_FV   -- fit is in shop utility (as on a buy); this sum is FV
               if g > upgrade then upgrade, up_name = g, (sj.name or sj.key) end
               if Flags.global("BES_SWAP_TRACE") then Flags.global("BES_SWAP_TRACE")[#Flags.global("BES_SWAP_TRACE") + 1] =
                 { sold = j.key, ci = worst_c, buy = sj.key, g = g, cost = sj.cost, worst = true } end
@@ -1502,7 +1502,7 @@ function SA.recommend(gs, opts)
               -- a trade whose buy leans on the joker sold for it is no trade (Eval.trade_leans_on; live Z9ZPREGI)
               if ok_s and (cur == nil or cur > 0 or (SA.swap_admits_zero(sj.key) and buy_fv_delta(gs, sj, swap_mopts) > 0))
                  and not Eval.trade_leans_on(gs, i, sj, mopts) then
-                local g = buy_fv_delta(gs, sj, swap_mopts) + (BuildPlan.fit(gs, sj, build, invest))
+                local g = buy_fv_delta(gs, sj, swap_mopts) + (BuildPlan.fit(gs, sj, build, invest)) / SA.W_FV   -- fit is in shop utility (as on a buy); this sum is FV
                 local up = g - keep
                 -- diagnostic only (tools/swap_bar_probe.lua): every full-board trade the bar weighed
                 if Flags.global("BES_SWAP_TRACE") then Flags.global("BES_SWAP_TRACE")[#Flags.global("BES_SWAP_TRACE") + 1] =
