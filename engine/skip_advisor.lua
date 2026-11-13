@@ -4,6 +4,7 @@
 -- visit, and the unused-hand money you'd bank. Boss blinds can't be skipped.
 -- PURE.
 
+local Flags = require("engine.flags")
 local Tags = require("engine.tags")
 local Mechanics = require("engine.mechanics")
 local Generators = require("engine.generators")
@@ -32,7 +33,7 @@ SK.SKIP_MARGIN = 1.25
 -- the engine's ~1.6 skips per run measured neither help nor harm, and the owner rates most of them as bad play. Owner:
 -- "once winrate gets a lot higher we can revisit it so it thinks for itself rather than being forced out of
 -- skipping." BES_SKIP_FREE=1 restores the engine's own skip judgement.
-SK.SKIP_FREE = os.getenv and os.getenv("BES_SKIP_FREE") == "1"
+SK.SKIP_FREE = Flags.off("BES_SKIP_FREE")
 SK.SKIP_ALLOWED = { tag_investment = 1 }   -- tag key -> last ante a skip for it is allowed
 SK.TYPICAL_JOKER_COST = 5   -- \$ a shop joker costs (as SA.TYPICAL_JOKER_COST)
 
@@ -41,7 +42,7 @@ SK.TYPICAL_JOKER_COST = 5   -- \$ a shop joker costs (as SA.TYPICAL_JOKER_COST)
 -- a5 (2026-10-02): at ~88% risk it skipped BOTH blinds (Economy tag $25 vs a flat ~$12 for playing, then Standard),
 -- reached the boss with $50 and no shop since ante 4, and died at 0.79. k = 3 puts the line where the largest money
 -- tag ($25) stops beating a full board's play at ~70% risk.
-SK.RISK_SHOP_MULT = tonumber(os.getenv and os.getenv("BES_SKIP_RISK") or "") or 0
+SK.RISK_SHOP_MULT = Flags.num("BES_SKIP_RISK", 0)
 
 -- Deterministic per-state RNG so the measured tag values (Orbital, pack tags) are
 -- stable across re-evaluations of the same blind-select.

@@ -11,6 +11,7 @@
 -- each card's quality TOWARD the target (off-suit cards score low) and value
 -- removing a below-mean card by how much it lifts every future draw. PURE.
 
+local Flags = require("engine.flags")
 local Cards = require("util.cards")
 local JokerData = require("engine.joker_data")
 local BuildPlan = require("engine.build_plan")   -- requires joker_data only; no cycle
@@ -168,7 +169,7 @@ end
 -- start) +0.424 p 0.03, but the same 8 spread over the ranks -0.163 (thinr8, -0.588 vs thin8, p 0.001): deck QUALITY
 -- pays, and at the rich10_until2 cash rate it is worth ~4x what this heuristic credits. Scales removal value and (in
 -- consumable_value) the rank / enhancement tarots' measured per-hand gain.
-DP.DECKQ_MULT = tonumber(os.getenv and os.getenv("BES_DECKQ_MULT") or "") or 1
+DP.DECKQ_MULT = Flags.num("BES_DECKQ_MULT", 1)
 
 -- Rank the deck's cards by how worth-removing they are (best removal first).
 -- Returns (sorted list of { card, idx, value }, target).

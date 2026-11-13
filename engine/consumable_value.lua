@@ -4,6 +4,7 @@
 -- real score gain from leveling it. Leveling a hand you rarely make is worth
 -- little; leveling your bread-and-butter hand is worth a lot. PURE.
 
+local Flags = require("engine.flags")
 local HandEval = require("engine.hand_eval")
 local Mechanics = require("engine.mechanics")
 local JokerValue = require("engine.joker_value")
@@ -17,7 +18,7 @@ local BuildPlan = require("engine.build_plan")
 local CV = {}
 
 -- Sim cheap-path: global MC sample cap (_G.BES_MC_CAP); nil in production -> unchanged.
-local function mc(n) local c = rawget(_G, "BES_MC_CAP"); if c and n > c then return c end; return n end
+local mc = Flags.mc_cap
 
 -- A hand level PERSISTS for the rest of the run, and planets stack -- the most reliable
 -- scaling axis. Valuing a planet at its ONE-level gain made the engine never level (sim:
@@ -61,7 +62,7 @@ local function mc(n) local c = rawget(_G, "BES_MC_CAP"); if c and n > c then ret
 -- which priced the same level at today's share (decision audit 2026-10-12: Celestial packs bought at antes 1-4 lost to
 -- the engine's own alternatives, 16 better / 6 worse).
 CV.LATER_SHARE = { { 0, 0 }, { 0.33, 0.17 }, { 0.50, 0.28 }, { 0.67, 0.32 }, { 0.77, 0.51 }, { 1.0, 0.55 } }
-CV.LATER_SHARE_ALL = os.getenv and os.getenv("BES_LATER_SHARE") == "1"
+CV.LATER_SHARE_ALL = Flags.off("BES_LATER_SHARE")
 function CV.later_share(s)
   local t = CV.LATER_SHARE
   s = math.max(0, math.min(1, s or 0))
@@ -83,7 +84,7 @@ function CV.level_share(f) return CV.LATER_SHARE_ALL and CV.later_share(f) or f 
 -- ramp averaged over the engine's planet uses by ante, arm etag_7: 161/184/250/278/264/218/136/101 at antes 1-8), so
 -- only the timing changes, not how much the engine levels overall (removing the ramp outright = the engine stops
 -- levelling; a derived sum was -0.272 in Aug).
-CV.LEVEL_FLAT = os.getenv and os.getenv("BES_LEVEL_FLAT") == "1"
+CV.LEVEL_FLAT = Flags.off("BES_LEVEL_FLAT")
 CV.LEVEL_SCALE_FLAT = 2.67
 function CV.level_scale(gs)
   if CV.LEVEL_FLAT then return CV.LEVEL_SCALE_FLAT end
@@ -479,7 +480,7 @@ end
 -- the rounds left at the shop's dollar rate, weighted by the chance of reaching each ante (the money-joker stream,
 -- shop_advisor SA.income_stream_util), instead of a one-joker-income rate. Reaches Devil, Talisman, Magician and
 -- Standard-pack cards through this one function.
-CV.CARD_INCOME = os.getenv and os.getenv("BES_CARD_INCOME") == "1"
+CV.CARD_INCOME = Flags.off("BES_CARD_INCOME")
 local function card_income_frac(gs, d)
   if not CV.CARD_INCOME then return VU.round_income_frac(gs, d) end
   local ok, SA = pcall(require, "engine.shop_advisor")
@@ -957,7 +958,7 @@ end
 -- Share of the run's hands a card changed by a tarot is in: `n` changed cards of the deck, each drawn into a hand
 -- with probability hand size / deck size, plus the one hand it is used in spread over the hands left (CV.card_value).
 -- BES_TAROT_PER_HAND=0 restores the one-hand reading (A/B).
-CV.TAROT_PER_HAND = not (os.getenv and os.getenv("BES_TAROT_PER_HAND") == "0")
+CV.TAROT_PER_HAND = Flags.on("BES_TAROT_PER_HAND")
 CV.HANDS_PER_BLIND = 2.5
 function CV.tarot_presence(gs, n)
   local deck = math.max(1, #(gs.deck or {}))

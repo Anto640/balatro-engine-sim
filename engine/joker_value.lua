@@ -8,6 +8,7 @@
 -- The joker_data `tier` is used ONLY as a fallback prior for jokers we cannot
 -- simulate yet (no scoring model). PURE.
 
+local Flags = require("engine.flags")
 local HandEval = require("engine.hand_eval")
 local Jokers = require("engine.joker_effects")
 
@@ -17,10 +18,10 @@ local JV = {}
 -- to trade a little decision precision for ~Nx speed). nil in production -> unchanged.
 -- BES_MC_MULT (sim A/B, 2026-10-19): multiply every measurement's sample count -- the test of whether the shop's
 -- measurement NOISE binds (live shop states flip their recommendation between rng seeds about half the time). 1 = off.
-JV.MC_MULT = tonumber(os.getenv and os.getenv("BES_MC_MULT") or "") or 1
+JV.MC_MULT = Flags.num("BES_MC_MULT", 1)
 local function mc(n)
   if JV.MC_MULT ~= 1 then n = math.max(1, math.floor(n * JV.MC_MULT + 0.5)) end
-  local c = rawget(_G, "BES_MC_CAP"); if c and n > c then return c end; return n
+  return Flags.mc_cap(n)
 end
 
 JV.MIN_DECK = 5     -- need at least this many cards to sample meaningful hands
@@ -81,7 +82,7 @@ end
 -- numbers: one seed per sample, so with/without stay paired) which EACH board then digs for the expected discards used
 -- (budget x the live-measured 0.63). Dug hands are cached per (board, deck, seed), so the shared current board is dug
 -- once per decision.
-JV.DIG_HANDS = os.getenv("BES_DIG_HANDS") == "1"
+JV.DIG_HANDS = Flags.off("BES_DIG_HANDS")
 JV.DISCARD_BUDGET_USED = 0.63     -- live-measured share of the discard budget used (see CV.DISCARD_BUDGET_USED)
 local DIG_CACHE, DIG_N = {}, 0
 local function card_key(c)
@@ -175,13 +176,13 @@ JV._sample_hand = sample_hand
 -- so every candidate in a decision is compared on the SAME hands (lower relative noise), and the current board's
 -- best play on deal k is computed ONCE (content-keyed cache) instead of once per measured candidate -- the bulk of
 -- the shop's cost (score_delta is ~2/3 of sim runtime; half of it re-scores the unchanged base board).
-JV.CRN_DEALS = os.getenv("BES_CRN_DEALS") == "1"
+JV.CRN_DEALS = Flags.off("BES_CRN_DEALS")
 -- DECISION-SCOPED CRN (2026-10-19, BES_CRN_DECISION=1, sim A/B): the same, but the deals are drawn FRESH for each
 -- decision (a salt from the decision's own rng), so candidates in one shop are compared on identical hands while
 -- different decisions still see different hands -- the content-seeded version above reused one deck's deals for the
 -- whole run and lost (crnd_7, wins 59 -> 44). Live shop states flip their recommendation between rng seeds about
 -- half the time; most of that is candidates measured on different deals.
-JV.CRN_DECISION = os.getenv("BES_CRN_DECISION") == "1"
+JV.CRN_DECISION = Flags.off("BES_CRN_DECISION")
 JV._salt = nil
 local function crn_on() return JV.CRN_DEALS or JV._salt ~= nil end
 -- open a decision scope (returns the previous salt, to restore with JV.end_decision); inert unless CRN_DECISION
@@ -245,7 +246,7 @@ JV._crn_hand = crn_hand
 --     current one -- its +Mult anchor was always 1.00 (fresh: 1.27-2.31 on six live shops).
 -- "ability" adds the measured joker's ability; "full" also the board's abilities, the deck's content and the context.
 -- SHIPPED "full" 2026-10-20 (ck2_7 vs sx_7: wins 60 -> 60, -0.006, p 0.95; correctness). BES_CACHE_KEY=old restores the old key.
-JV.CACHE_KEY = (os.getenv and os.getenv("BES_CACHE_KEY")) or "full"
+JV.CACHE_KEY = Flags.str("BES_CACHE_KEY", "full")
 if JV.CACHE_KEY == "old" then JV.CACHE_KEY = nil end
 local DK_MEMO = setmetatable({}, { __mode = "k" })
 local function full_ctx_key(gs, deck, hs)

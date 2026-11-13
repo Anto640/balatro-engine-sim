@@ -8,6 +8,7 @@
 -- PURE: consumes a GameState, no G access -> fully unit-testable headless.
 -- Confidence numbers are documented heuristics (calibrated in M3).
 
+local Flags = require("engine.flags")
 local HandEval = require("engine.hand_eval")
 local Heuristics = require("engine.heuristics")
 local DiscardValue = require("engine.discard_value")
@@ -190,7 +191,7 @@ DE.SURV_SAMPLES = 60
 -- IN-BLIND MONEY FARM (engine/farm.lua, owner 2026-10-17): with a money joker on the board, play non-clearing hands
 -- down to a reserve and discard only paying cards, then clear. Taken only when the farm line's rollout clears about
 -- as often as the engine's own choice (FARM_TOL) and nets more money than the unused-hand dollars it gives up.
-DE.FARM = (os.getenv and os.getenv("BES_FARM")) ~= "0"
+DE.FARM = Flags.on("BES_FARM")
 DE.FARM_SAMPLES = 40
 DE.FARM_TOL = 0.02
 DE.FARM_MARGIN = 1
@@ -198,7 +199,7 @@ DE.FARM_RESERVES = { 1, 2 }
 DE.SURV_MARGIN  = 0.06
 -- LAST HAND, P(CLEAR) FIRST (audit 2026-10-10, arm audit_lastclear vs fsh: +0.050 p 0.07, wins 48 -> 50, death ante
 -- 5 later / 0 earlier, 149/160 identical). Switch BES_LAST_CLEAR=0 restores the capped-E[frac] arbitration.
-DE.LAST_CLEAR = not (os.getenv and os.getenv("BES_LAST_CLEAR") == "0")
+DE.LAST_CLEAR = Flags.on("BES_LAST_CLEAR")
 DE.LAST_CLEAR_MARGIN = 0.03
 -- DIG BIAS (2026-08-31): REFUTED + reverted (kept 0 for the audit trail). The human DISCARDS 57% of
 -- in-blind decisions vs the engine's 41%, but a uniform +0.05 dig credit moved the engine only to 42%
@@ -225,7 +226,7 @@ DE.DEFER_SURV_TOL = 0.15
 -- 0.62 and the run died at 235/300. Both the greedy choice and the rollout continuation dig until ONE hand clears the
 -- remainder; a player banks a hand that is on PACE (>= remaining / hands left) and keeps the discards. So when the
 -- rollouts say playing is at least as safe, and the play is on pace, play.
-DE.PACE_PLAY = os.getenv and os.getenv("BES_PACE_PLAY") == "1"
+DE.PACE_PLAY = Flags.off("BES_PACE_PLAY")
 DE.PACE_TIE = 0.01
 
 -- ---- SURPLUS DIG (probe, 2026-08-12) ----------------------------------------------------
@@ -265,7 +266,7 @@ DE.AGGRO_MIN_HANDS = 3      -- require this many hands left (>= 2 spare after th
 DE.AGGRO_SAMPLES = 120      -- sharper survival estimate for the aggressive gate (2x the normal rollout)
 DE.DIG_MIN_HANDS = 1        -- require at least this many hands left (a discard costs no hand)
 DE.DIG_KEEP_GUARANTEE = true -- only pitch cards OUTSIDE the guaranteed play, so it stays guaranteed
-DE.DIG_KEEP_SCORING = os.getenv == nil or os.getenv("BES_DIG_KEEP_ALL") ~= "1"   -- money dig protects only the scoring cards (2026-10-04)
+DE.DIG_KEEP_SCORING = not Flags.off("BES_DIG_KEEP_ALL")   -- money dig protects only the scoring cards (2026-10-04)
 -- Pitch only cards whose DiscardValue.keep_value is below this. Ordering alone is not enough:
 -- a dig may legally throw 5 cards, so "cheapest first" still ends up discarding a Gold card
 -- once the chaff runs out. Any enhancement or edition adds >= 25 and any non-Purple seal >= 15,
@@ -292,8 +293,8 @@ DE.MILK_MONEY_MARGIN = 2    -- min extra $ (E[money]) the milk must farm to just
 -- MONEY-FARMING PROBE (docs/PLAN_2026-10-07_money_farming.md phase 0 step 2; off unless set): loosen the milk gate to
 -- ask whether farming HARDER converts. BES_MILK_TOL / BES_MILK_MARGIN override the two constants above.
 do
-  local tol = os.getenv and tonumber(os.getenv("BES_MILK_TOL") or "")
-  local margin = os.getenv and tonumber(os.getenv("BES_MILK_MARGIN") or "")
+  local tol = Flags.num("BES_MILK_TOL")
+  local margin = Flags.num("BES_MILK_MARGIN")
   if tol then DE.MILK_SURV_TOL = tol end
   if margin then DE.MILK_MONEY_MARGIN = margin end
 end
@@ -356,7 +357,7 @@ DE.GEN_USE = {
 -- so they sat there for the rest of the run and blocked the slot. Neither grows by waiting: the Wheel's 1-in-4 edition
 -- (measured, CV.wheel_value) needs a joker without an edition; the Fool recreates the LAST Tarot/Planet used (never a
 -- Fool), priced as that card. Valued here, used when positive.
-DE.HELD_USE = not (os.getenv and os.getenv("BES_HELD_USE") == "0")   -- A/B switch
+DE.HELD_USE = Flags.on("BES_HELD_USE")   -- A/B switch
 local function held_card_use_value(gs, c, need)
   if not DE.HELD_USE then return nil end
   local seed = (#(gs.deck or {}) * 40503 + c.key:byte(3) * 131 + 29) % 2147483647
@@ -1349,7 +1350,7 @@ function DE.decide(gs, opts)
   end
 
   -- ---- FARM: milk the board's money jokers before clearing (engine/farm.lua) ----
-  if _G.BES_FARM_DEBUG then io.stderr:write(string.format("FARMCHK best %s cards %d forced %s hl %d rem %d zero %s md %s milk %s lever %s\n",
+  if Flags.global("BES_FARM_DEBUG") then io.stderr:write(string.format("FARMCHK best %s cards %d forced %s hl %d rem %d zero %s md %s milk %s lever %s\n",
     tostring(best and best.type), best and best.cards and #best.cards or -1, tostring(forced_play), hands_left, remaining,
     tostring(play_scores_zero), tostring(best and best.money_dig), tostring(best and best.milk), tostring(Farm.has_lever(gs)))) end
   if DE.FARM and best and (best.type == "PLAY" or best.type == "DISCARD") and best.cards and #best.cards > 0
@@ -1368,7 +1369,7 @@ function DE.decide(gs, opts)
         local fa = (st.kind == "DISCARD") and { kind = "DISCARD", cards = st.cards } or { kind = "PLAY", sel = st.sel }
         local vf = Simulation.survive_after(gs, fa, DE.FARM_SAMPLES, lcg(seed), { farm = true, reserve = r })
         local net = (vf.money or 0) - (vn.money or 0) - ((vn.banked or 0) - (vf.banked or 0)) * Mechanics.HAND_REWARD
-        if _G.BES_FARM_DEBUG then io.stderr:write(string.format("FARM r%d %s vf.clear %.2f vn.clear %.2f vf$ %.1f vn$ %.1f banked %.1f/%.1f net %.1f hl %d dl %d rem %d\n",
+        if Flags.global("BES_FARM_DEBUG") then io.stderr:write(string.format("FARM r%d %s vf.clear %.2f vn.clear %.2f vf$ %.1f vn$ %.1f banked %.1f/%.1f net %.1f hl %d dl %d rem %d\n",
           r, st.kind, vf.clear, vn.clear, vf.money or 0, vn.money or 0, vf.banked or 0, vn.banked or 0, net, hands_left, discards_left, remaining)) end
         if vf.clear >= vn.clear - DE.FARM_TOL and net > DE.FARM_MARGIN and (not pick or net > pick.net) then
           pick = { st = st, vf = vf, vn = vn, net = net, r = r }

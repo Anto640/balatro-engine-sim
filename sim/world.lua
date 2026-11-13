@@ -13,6 +13,7 @@
 -- This file: run setup + the IN-BLIND round simulator (deal, play/discard, score,
 -- boss effects). Economy/ante-advance and shop generation live in their own steps.
 
+local Flags = require("engine.flags")
 local HandEval   = require("engine.hand_eval")
 local Mechanics  = require("engine.mechanics")
 local BossEffect = require("engine.boss_effect")
@@ -120,7 +121,7 @@ World.lcg = lcg
 -- derived from (seed, purpose, position) is the same in both arms whatever was drawn before: the deck for blind r,
 -- the shop for visit r, the k-th reroll / pack / sale of that visit. A changed decision now only changes what it
 -- touches. BES_CRN=0 restores the single stream (to reproduce pre-CRN arms).
-World.CRN = not (os.getenv and os.getenv("BES_CRN") == "0")
+World.CRN = Flags.on("BES_CRN")
 World.STREAM = { ante = 1, tag = 2, blind = 3, shop = 4, reroll = 5, pack = 6, perkeo = 7, sell = 8, slot = 9, probe = 10 }
 -- (a * b) mod m without losing precision in a double (a, b < 2^31): split b into 16-bit halves
 local function mulmod(a, b, m)
@@ -1194,7 +1195,7 @@ function World.play_blind(run, blind)
     -- IN-BLIND DECISION AUDIT (tools/decision_audit.lua, alt "flip"): at the k-th play-or-discard decision of the run that
     -- has a discard available, replace the engine's choice by its best-ranked alternative of the OTHER kind (its best
     -- play instead of a dig, its best dig instead of a play), then let it play on. Inert unless _G.BES_FORCE_INBLIND is set.
-    local FI = _G.BES_FORCE_INBLIND
+    local FI = Flags.global("BES_FORCE_INBLIND")
     -- DISCARD-CHOICE audit (mode "dswap"): the k-th discard the engine makes is replaced by its runner-up discard SET
     -- (DiscardValue's next-best measured set that differs); with FI.placebo the discard is kept and later randomness
     -- re-rolled. Counts only discard decisions, so a flip and its placebo hit the same decision.

@@ -14,17 +14,18 @@
 --
 -- Sim-only (the live overlay never runs it). Enabled by a probe config (`lookahead`); inert otherwise.
 
+local Flags = require("engine.flags")
 local Driver = require("sim.driver")
 local World  = require("sim.world")
 
 local LA = {}
 LA.UNTIL_ANTE = 3     -- search the shops of antes 1..3 (the early board decides runs: MCTS_PLAN Phase 1)
 LA.SAMPLES    = 4     -- sampled futures per candidate (same salts across candidates: common random numbers)
-LA.HORIZON    = tonumber(os.getenv and os.getenv("BES_LA_HORIZON") or "") or 1   -- antes beyond the current one to play
+LA.HORIZON    = Flags.num("BES_LA_HORIZON", 1)   -- antes beyond the current one to play
 -- leaf among SURVIVING futures: "pace" = the pace model's projected margin at ante 8 (hand-set growth constants);
 -- "cap" = the board's MEASURED capacity over the next boss's requirement at the horizon -- no projection, so every
 -- candidate is judged at the same point by what its board actually scores (owner: the projection is arbitrary)
-LA.LEAF       = (os.getenv and os.getenv("BES_LA_LEAF")) or "pace"
+LA.LEAF       = Flags.str("BES_LA_LEAF", "pace")
 LA.MARGIN     = 0.02  -- an alternative must beat the engine's own choice by this much (noise guard)
 LA.SALT       = 900001
 

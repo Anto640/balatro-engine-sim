@@ -6,6 +6,7 @@
 -- tarot in the SHOP can be valued by what it would do for your deck this blind.
 -- PURE. Must NOT require consumable_value (which requires this module).
 
+local Flags = require("engine.flags")
 local Cards = require("util.cards")
 local HandEval = require("engine.hand_eval")
 local Mechanics = require("engine.mechanics")
@@ -144,7 +145,7 @@ T.CARD_PERM_CREDIT = 0.03
 -- derives that target (DeckPlan.target: committed ranks / flush suit / faces) and prices Hanged Man toward it, but the
 -- cards it actually hit were build-blind (lowest chips; highest rank onto lowest). Under the switch all three aim by
 -- DeckPlan.card_quality toward the target.
-T.BUILD_TARGET = not (os.getenv and os.getenv("BES_BUILD_TARGET") == "0")   -- SHIPPED (bt_7 vs fsl_7: 62 vs 64 wins, -0.005, 103 tied); =0 disables
+T.BUILD_TARGET = Flags.on("BES_BUILD_TARGET")   -- SHIPPED (bt_7 vs fsl_7: 62 vs 64 wins, -0.005, 103 tied); =0 disables
 local function build_target(gs)
   if not (T.BUILD_TARGET and gs and gs.deck and #gs.deck > 0) then return nil end
   local DP = require("engine.deck_plan")

@@ -10,6 +10,7 @@
 -- Pools are taken from the engine's OWN catalogues (joker_data, consumable_value planets,
 -- packs sizing) so the generator and the advisor can never disagree about what exists.
 
+local Flags = require("engine.flags")
 local JokerData       = require("engine.joker_data")
 local ConsumableValue = require("engine.consumable_value")
 local Packs           = require("engine.packs")
@@ -552,7 +553,7 @@ local function can_afford(run, c) return dollars(run) + credit(run) >= (c or 0) 
 -- game reports it -- in DOLLARS (25/50/100) instead of the sim's interest units (5/10/20) -- so the sim can
 -- measure what the live-only unit bug costs (the engine's reroll/pack spending keys off cap*5). A COPY, so the
 -- world's own interest payouts are untouched.
-local LIVE_CAP_BUG = os.getenv("BES_LIVE_CAP_BUG") == "1"
+local LIVE_CAP_BUG = Flags.off("BES_LIVE_CAP_BUG")
 local function advisor_economy(run)
   if not LIVE_CAP_BUG then return run.economy end
   local e = {}
@@ -1163,7 +1164,7 @@ local function shop_loop(run, shop, rng, crn_n)
     end
     -- DECISION AUDIT (tools/decision_audit.lua): replace the engine's FIRST action at one shop visit by its
     -- runner-up / third choice / leaving the shop, then let the engine play on. Inert unless _G.BES_FORCE is set.
-    local F = _G.BES_FORCE
+    local F = Flags.global("BES_FORCE")
     if F and not F.done and guard == 1 and run._shop_visit == F.visit and F.alt == "placebo" then
       F.done = true   -- PLACEBO: keep the engine's choice, re-roll every later random stream
       run._salt = F.salt or 7777

@@ -13,6 +13,7 @@
 -- tier is the right "what might appear" estimate); tarot/spectral/standard use
 -- documented per-item heuristics, with money items valued by actual dollars.
 
+local Flags = require("engine.flags")
 local Mechanics = require("engine.mechanics")
 local ConsumableValue = require("engine.consumable_value")
 local JokerData = require("engine.joker_data")
@@ -71,7 +72,7 @@ end
 -- when at least n-j+1 draws are <= x, so P(Y_j <= x) = sum_{i=n-j+1..n} C(n,i) F(x)^i (1-F(x))^(n-i).
 -- SHIPPED 2026-09-29: exact by default. A/B vs fin20 wins 21 -> 32, fresh seeds 31 -> 33; pooled 320 wins 52 -> 65,
 -- sign 155/121 (p ~0.04), positive on both pools. BES_EXACT_PICK=0 restores the 40-trial simulation.
-P.EXACT_PICK = not (os.getenv and os.getenv("BES_EXACT_PICK") == "0")
+P.EXACT_PICK = Flags.on("BES_EXACT_PICK")
 local function binom(n, i)
   local c = 1
   for t = 1, i do c = c * (n - i + t) / t end
@@ -193,17 +194,17 @@ end
 -- How many jokers the measured pool draws. At 8 the reroll value swings +-57% between seeds and causes 35% of all
 -- seed-dependent pick flips (seed-flip probe 2026-09-28); 32 fixes the most flips for ~+6% shop time. Env
 -- BES_POOL_DRAWS for the A/B (audit plan 4.1); default unchanged until it is measured.
-P.POOL_DRAWS = tonumber(os.getenv and os.getenv("BES_POOL_DRAWS") or "") or 8
+P.POOL_DRAWS = Flags.num("BES_POOL_DRAWS", 8)
 -- BES_POOL_DRAWS=all: measure EVERY joker once, weighted by its rarity, instead of sampling -- no draw noise at all
 -- (owner 2026-09-29, after pool32 was neutral out-of-sample). Costs ~150 measurements per pool.
 -- SHIPPED 2026-09-29 (all jokers, 2 deals each): wins up on all four pools (fin20 21->29, fin20_7 31->33; on the current
 -- engine stone 24->28, xpick_7 33->41; pooled current 57->69, reach-8 86->88), progress n.s. both ways -- an accuracy
 -- change (same pack value, less draw noise), shipped as not significantly negative. BES_POOL_DRAWS=<n> restores sampling.
-local _pd = os.getenv and os.getenv("BES_POOL_DRAWS")
+local _pd = Flags.str("BES_POOL_DRAWS")
 P.POOL_ALL = (_pd == nil or _pd == "" or _pd == "all")
 -- Deals per joker in ALL mode (BES_POOL_SAMPLES; unset = the caller's samples, as the sampled pool). 1 makes the full
 -- pool ~150 single-deal measurements, about a third of its shop overhead, for the live overlay.
-P.POOL_ALL_SAMPLES = tonumber(os.getenv and os.getenv("BES_POOL_SAMPLES") or "") or 2
+P.POOL_ALL_SAMPLES = Flags.num("BES_POOL_SAMPLES", 2)
 
 -- MEASURED pool: sample M jokers (rarity-weighted) and measure each against YOUR
 -- deck via JokerValue. This makes "what a Buffoon pack might give" a calculation

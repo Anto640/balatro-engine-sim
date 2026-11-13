@@ -6,6 +6,7 @@
 -- stronger hand, instead of playing two average ones, when that scores more.
 -- PURE.
 
+local Flags = require("engine.flags")
 local HandEval = require("engine.hand_eval")
 local Cards = require("util.cards")
 local Progress = require("util.progress")   -- the live Thinking bar (inert unless armed)
@@ -13,7 +14,7 @@ local Progress = require("util.progress")   -- the live Thinking bar (inert unle
 local DV = {}
 
 -- Sim cheap-path: global MC sample cap (_G.BES_MC_CAP); nil in production -> unchanged.
-local function mc(n) local c = rawget(_G, "BES_MC_CAP"); if c and n > c then return c end; return n end
+local mc = Flags.mc_cap
 
 DV.MIN_DECK = 5
 -- RAMEN (2026-10-04, owner-confirmed death UAPB3XY9: four digs threw 18 cards and destroyed Ramen mid-blind). Ramen

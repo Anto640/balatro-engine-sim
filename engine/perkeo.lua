@@ -12,9 +12,10 @@
 --   * the sim gives a copier-on-Perkeo its second copy (the owner reorders at shop end).
 -- The seed is the first non-Negative held card in SEED_ORDER (a selection order, not a value). PURE.
 
+local Flags = require("engine.flags")
 local P = {}
 
-P.SWITCH = os.getenv and os.getenv("BES_PERKEO") == "1"
+P.SWITCH = Flags.off("BES_PERKEO")
 P.SEED_ORDER = { "c_hanged_man", "c_magician", "c_death", "c_strength", "c_temperance", "c_hermit", "c_empress",
   "c_devil", "c_lovers", "c_justice", "c_chariot", "c_heirophant", "c_hierophant", "c_tower" }
 local RANK = {}

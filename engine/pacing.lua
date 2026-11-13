@@ -12,6 +12,7 @@
 -- xmult/scaling/income board projects above it. So "you need xmult/scaling to keep
 -- pace" still falls out of the model. Magnitudes are calibrated, not gospel.
 
+local Flags = require("engine.flags")
 local Mechanics = require("engine.mechanics")
 local JokerValue = require("engine.joker_value")
 local JokerData = require("engine.joker_data")
@@ -109,12 +110,12 @@ P.RISK_SLOPE = -1.164
 -- default re-fitted on today's engine -- it says the 09-23 fit overstates risk (ante-4 intercept 1.28 -> -0.64).
 P.RISK_Q25 = { intercept = { -1.683, -1.243, -0.799, 0.033, -0.015, 0.884 }, slope = -0.927 }
 P.RISK_MEAN_REFIT = { intercept = { -2.382, -2.075, -1.496, -0.643, -0.686, 0.107 }, slope = -0.816 }
-P.RISK_MODE = (os.getenv and os.getenv("BES_PACE_RISK")) or "default"   -- "refit" -> RISK_MEAN_REFIT (A/B only)
+P.RISK_MODE = Flags.str("BES_PACE_RISK", "default")   -- "refit" -> RISK_MEAN_REFIT (A/B only)
 -- A/B result 2026-09-28 vs fin18: making the risk read LESS pessimistic always lost -- pace20 51->39 wins, pq25 50->38,
 -- refit 50->32 (p 0.006, sign 32/67) -- and making it MORE pessimistic lost too (rs07, shift +0.7: 50->38, p 0.026).
 -- The shipped fit is a local optimum for the shop's thresholds: leave it unless the thresholds are refit jointly.
 -- RISK_SHIFT (logit units, env BES_PACE_RISK_SHIFT, default 0) stays as an A/B switch.
-P.RISK_SHIFT = tonumber(os.getenv and os.getenv("BES_PACE_RISK_SHIFT") or "") or 0
+P.RISK_SHIFT = Flags.num("BES_PACE_RISK_SHIFT", 0)
 function P.risk(ante, margin, mode)
   local a = math.max(1, math.min(6, math.floor(ante or 1)))
   local ic, sl = P.RISK_INTERCEPT, P.RISK_SLOPE
@@ -125,20 +126,20 @@ function P.risk(ante, margin, mode)
 end
 
 -- Capacity read: "mean" = mean of P.SAMPLES single deals (default); "q25" = mean of the best 25% of 20 deals.
-P.CAP_MODE = (os.getenv and os.getenv("BES_PACE_CAP")) or "mean"
+P.CAP_MODE = Flags.str("BES_PACE_CAP", "mean")
 
 -- Samples for the capacity read. At 5, the "can't clear the next boss" flag (urgent) flips by rng seed on a
 -- marginal board -- live LBUI8IK1 a1: margin 0.46-1.79 across seeds, urgent 15/20, and the shop swung between
 -- "buy power" (Celestial +4.7) and "bank $6" (-4.9) on the same state. At 20: margin 0.80-1.40, urgent 18/20.
 -- Env override BES_PACE_SAMPLES for the sim A/B.
-P.SAMPLES = tonumber(os.getenv and os.getenv("BES_PACE_SAMPLES") or "") or 5
+P.SAMPLES = Flags.num("BES_PACE_SAMPLES", 5)
 
 -- BOSS-AWARE urgency (A/B switch BES_PACE_BOSS=1, default off). `urgent` ("can't clear the next boss -> buy power
 -- now") checks capacity against a GENERIC 2x boss with 4 hands, but the upcoming boss is known (gs.run.boss_key): The
 -- Wall needs 4x, The Needle allows ONE hand, Flint halves the base, suit/face bosses zero those cards. Sim pa2+pa2_7
 -- boss death rates near ante 4: Water 18%, Wall 17%, Mouth 15%, Needle 14% vs Wheel/Arm ~6%. With the switch on,
 -- the next boss is ALSO checked at its real requirement, hands and effect; failing it sets urgent.
-P.BOSS_AWARE = (os.getenv and os.getenv("BES_PACE_BOSS")) == "1"
+P.BOSS_AWARE = Flags.off("BES_PACE_BOSS")
 local function boss_short(gs, ante, hands, avg, opts)
   local key = gs.run and gs.run.boss_key
   if not key then return false end

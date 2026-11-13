@@ -22,6 +22,7 @@
 --   samples          -- MC sample count used
 -- }
 
+local Flags = require("engine.flags")
 local HandEval = require("engine.hand_eval")
 local HoldFuel = require("engine.hold_fuel")
 local Heuristics = require("engine.heuristics")
@@ -115,8 +116,8 @@ local ONE_OFF_HAND = {
 -- (play vs dig, farm, milk, Mouth types) judges its first moves by this continuation. Under the switch the in-blind
 -- rollouts (survive_current / survive_after) dig with the measured DiscardValue policy -- the same dig the engine plays
 -- (pol.dig, already used by the shop's fresh-blind estimates); on the owner's blinds 0.43 -> 0.92, 0.20 -> 0.75.
-Sim.ROLLOUT_DIG = os.getenv and os.getenv("BES_ROLLOUT_DIG") == "1"
-Sim.ROLLOUT_DIG_POL = { dig = true, dig_samples = tonumber(os.getenv and os.getenv("BES_ROLLOUT_DIG_SAMPLES") or "") or 2 }
+Sim.ROLLOUT_DIG = Flags.off("BES_ROLLOUT_DIG")
+Sim.ROLLOUT_DIG_POL = { dig = true, dig_samples = Flags.num("BES_ROLLOUT_DIG_SAMPLES", 2) }
 local function rollout(gs, start_hand, pile, target, chips0, hands, discards, hand_size, rng, eff, first, milk, pol)
   local farm = (type(milk) == "table" and milk.farm) and milk or nil
   if farm then milk = false end

@@ -12,6 +12,7 @@
 -- hypergeometric / Monte-Carlo probabilities; the rest of the pipeline is
 -- unchanged. PURE: consumes a GameState, no G access.
 
+local Flags = require("engine.flags")
 local Cards = require("util.cards")
 local GS = require("model.game_state")
 local HandEval = require("engine.hand_eval")
@@ -213,7 +214,7 @@ function H.discard_econ(gs, cards)
   end
   return d, table.concat(notes, ", ")
 end
-H.FARM_SEALS = not (os.getenv and os.getenv("BES_FARM_SEALS") == "0")
+H.FARM_SEALS = Flags.on("BES_FARM_SEALS")
 H.PURPLE_TAROT_DOLLARS = 3
 
 -- Best set of cards to discard purely for MONEY (independent of draw targets).

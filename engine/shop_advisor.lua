@@ -9,6 +9,7 @@
 -- tests pin DIRECTION (buy strong over save, never buy unaffordable, reserve
 -- guard forces save), not magic constants.
 
+local Flags = require("engine.flags")
 local Eval = require("engine.eval_function")
 local Downside = require("engine.joker_downside")
 local JokerData = require("engine.joker_data")
@@ -139,7 +140,7 @@ SA.ENDGAME_SPEND = 0.25      -- income_factor multiplier when endgame-urgent (sp
 -- power, so its costs and gains are zero; the spend is decided by what each item adds for the boss.
 -- A/B switch BES_FINAL_SHOP=0 restores the old pricing.
 SA.WIN_ANTE = 8
-SA.FINAL_SHOP = not (os.getenv and os.getenv("BES_FINAL_SHOP") == "0")
+SA.FINAL_SHOP = Flags.on("BES_FINAL_SHOP")
 -- Two exceptions keep the old pricing: a joker that SCORES from the money held (Bull +2 Chips per $1, Bootstraps +2 Mult
 -- per $5 -- arm fs seed 35003 spent \$25 -> \$4 under Bootstraps and fell from 0.97 to 0.37 of the boss), and a pending
 -- Hieroglyph/Petroglyph replay in the sim (run.ante_back: the ante is played again, so this is not the last shop; live
@@ -155,7 +156,7 @@ function SA.final_shop(gs)
   end
   return true
 end
-SA.ECON_FLOOR = tonumber(os.getenv and os.getenv("BES_ECON_FLOOR") or "") or 10   -- keep ~2 interest dollars working (early-game base; see SA.econ_floor); env: A/B
+SA.ECON_FLOOR = Flags.num("BES_ECON_FLOOR", 10)   -- keep ~2 interest dollars working (early-game base; see SA.econ_floor); env: A/B
 SA.ECON_FLOOR_RATE = 0.5  -- FV charged per dollar pushed below the floor (tunable:
                           -- raise to curb the spend-to-$0 spiral harder, lower if it
                           -- gets too stingy on a genuinely strong cheap buy)
@@ -167,7 +168,7 @@ SA.ECON_FLOOR_RATE = 0.5  -- FV charged per dollar pushed below the floor (tunab
 -- free to spend (the interest-cap value-buy fix), so good vouchers/jokers are unaffected; only sub-cap
 -- dip-to-poverty buys are damped. Capped at the real interest cap: holding PAST it is option-value banking
 -- (a separate, unsolved lever -- docs/archive/conversion_baseline.txt), not attempted here.
-SA.ECON_FLOOR_STEP = tonumber(os.getenv and os.getenv("BES_ECON_FLOOR_STEP") or "") or 5   -- $ the floor rises per ante over the base; env: A/B
+SA.ECON_FLOOR_STEP = Flags.num("BES_ECON_FLOOR_STEP", 5)   -- $ the floor rises per ante over the base; env: A/B
 function SA.econ_floor(gs)
   local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
   -- real interest cap in DOLLARS (self-contained -- cap_int_of is declared later in the file):
@@ -183,7 +184,7 @@ end
 -- runs sold contributing scorers (Gros Michel, Scholar) at $42 for sideways jokers and
 -- died. Require the new joker to beat the sold one by this much FUTURE-VALUE before a
 -- swap is credited, so only a CLEAR upgrade disrupts a working board.
-SA.UPGRADE_MARGIN = tonumber(os.getenv and os.getenv("BES_UPGRADE_MARGIN") or "") or 1.2   -- env: swap-bar A/B
+SA.UPGRADE_MARGIN = Flags.num("BES_UPGRADE_MARGIN", 1.2)   -- env: swap-bar A/B
 -- A funder joker is "dead" (freely sellable to fund anything) only when it contributes at or
 -- below this FV -- the SAME threshold the SELL_JOKER path uses for its `dead` decision (worst_c
 -- <= 0.1). Anything above it is a FUNCTIONAL joker and may only be sold to fund a CLEARLY better
@@ -196,8 +197,8 @@ SA.DEAD_FUNDER_FV = 0.1
 -- jokers). A WEAK filler swaps ~freely for a keystone; a STRONG joker is protected super-linearly
 -- so a working board is never churned. Now that W3 makes acquired keystones COMPOUND, this
 -- acquisition lever is re-tested on the W3 world. Slope tuned to the mechanism (probe), not seeds.
-SA.SWAP_KEEP_SLOPE = tonumber(os.getenv and os.getenv("BES_SWAP_SLOPE") or "") or 0.5   -- env: swap-bar A/B
-SA.SWAP_SAMPLES = tonumber(os.getenv and os.getenv("BES_SWAP_SAMPLES") or "")   -- env: deals per swap measurement (A/B)
+SA.SWAP_KEEP_SLOPE = Flags.num("BES_SWAP_SLOPE", 0.5)   -- env: swap-bar A/B
+SA.SWAP_SAMPLES = Flags.num("BES_SWAP_SAMPLES")   -- env: deals per swap measurement (A/B)
 -- PAIRED TRADE eligibility: jokers whose whole value is their SCORE NOW -- what JV.swap_delta measures. Both sides
 -- must be plain scorers with no downside and no money of their own: arm pt (2026-10-03, wins 35 -> 17, p~0) let a
 -- money joker's \$/round (0.8 FV per \$) swamp a real score value of ~0.2-0.6 FV (sold Ice Cream for Mail-In Rebate,
@@ -205,7 +206,7 @@ SA.SWAP_SAMPLES = tonumber(os.getenv and os.getenv("BES_SWAP_SAMPLES") or "")   
 -- OUT: plain flat scorers (scalers, xmult/retrigger cores and utility keep their own protections).
 -- BES_LEVEL_AMP_ALWAYS=1 restores the B1 level amplifier on top of the measured board context (A/B of the 2026-10-05
 -- double-count fix).
-SA.LEVEL_AMP_ALWAYS = os.getenv and os.getenv("BES_LEVEL_AMP_ALWAYS") == "1"
+SA.LEVEL_AMP_ALWAYS = Flags.off("BES_LEVEL_AMP_ALWAYS")
 SA.PAIRED_SAMPLES = 12
 -- SWAP ADMISSION (2026-10-20, BES_SWAP_ADMIT=1, sim A/B). On a full board (the norm from ante 3) both trade paths only
 -- weigh an offer whose single-deal score delta is > 0. Every scaling xmult starts at x1 and every round-state xmult
@@ -217,7 +218,7 @@ SA.PAIRED_SAMPLES = 12
 -- offer whose own valuation is POSITIVE is admitted: BuildPlan.fit adds a flat bonus for the xmult tag, and an unfed
 -- Throwback (worth 0 under the skip policy) otherwise cleared a weak joker's bar on that bonus alone (test_shop 31b).
 -- SHIPPED ON 2026-10-20 with the full cache key (ck2_7 vs sx_7: wins 60 -> 60, neutral). BES_SWAP_ADMIT=0 disables.
-SA.SWAP_ADMIT = not (os.getenv and os.getenv("BES_SWAP_ADMIT") == "0")
+SA.SWAP_ADMIT = Flags.on("BES_SWAP_ADMIT")
 function SA.swap_admits_zero(key)
   return SA.SWAP_ADMIT and (JokerData.is_xmult(key) or JokerData.has_tag(key, "retrigger") or JokerData.has_tag(key, "copy"))
 end
@@ -278,7 +279,7 @@ SA.REROLL_APPETITE_RICH = 0.7    -- above-cap appetite (was 1.0 -- maximal eager
 -- seed-dependent picks). SHIPPED 32 (2026-09-30): rr32 vs stone wins 24 -> 32, reach-8 42 -> 48; rr32_7 vs xpick_7
 -- wins 33 -> 34, reach-8 44 -> 51; pooled wins 57 -> 66, reach-8 86 -> 99, progress n.s. -- the same reroll value
 -- with less draw noise, +9% shop deals. BES_REROLL_DRAWS=6 restores the old pool. (BES_POOL_DRAWS never reached here.)
-SA.REROLL_DRAWS = tonumber(os.getenv and os.getenv("BES_REROLL_DRAWS") or "") or 32
+SA.REROLL_DRAWS = Flags.num("BES_REROLL_DRAWS", 32)
 -- TRIED AND REVERTED (2026-08-11, WINRATE_V3_PLAN §5d): a full-board FEASIBILITY gate on the
 -- reroll. The reroll is priced off the JOKER a fresh shop would surface (`e_best`), but only
 -- money was checked for feasibility -- never whether a SLOT exists for it. Measured: 98% of
@@ -382,9 +383,9 @@ SA.econ_floor_penalty = econ_floor_penalty
 -- by the measured chance of reaching that ante (Vouchers.REACH); and an income buy is not charged the econ-floor
 -- penalty, whose purpose (keep a reserve) an income source serves. FREE-SLOT buys only: money jokers displacing scorers
 -- in trades is the shape that failed before (paired trades, wins 35 -> 17).
-SA.INCOME_STREAM = os.getenv and os.getenv("BES_INCOME_STREAM") == "1"
-SA.VOUCHER_STREAM = os.getenv and os.getenv("BES_VOUCHER_STREAM") == "1"   -- interest-cap vouchers as streams (below)
-SA.INCOME_STREAM_SCALE = tonumber(os.getenv and os.getenv("BES_INCOME_SCALE") or "") or 1.0   -- bracket the size (arm inch = 0.5)
+SA.INCOME_STREAM = Flags.off("BES_INCOME_STREAM")
+SA.VOUCHER_STREAM = Flags.off("BES_VOUCHER_STREAM")   -- interest-cap vouchers as streams (below)
+SA.INCOME_STREAM_SCALE = Flags.num("BES_INCOME_SCALE", 1.0)   -- bracket the size (arm inch = 0.5)
 function SA.income_stream_util(gs, per_round)
   if not per_round or per_round <= 0 then return 0 end
   local a = math.max(1, math.min(8, math.floor((gs and gs.meta and gs.meta.ante) or 1)))
@@ -442,7 +443,7 @@ end
 -- dollar cost 3 utility, the price of \$10 of goods (COST_WEIGHT 0.3), and three times what the shop pays for a money
 -- joker's \$1/round (VU.ROUND_INCOME_UTIL). The switch prices it as the \$/round stream it is: ROUND_INCOME_UTIL per
 -- \$/round, keeping the horizon's end-of-run fade (interest_horizon / INTEREST_HORIZON).
-SA.INTEREST_UNITS = os.getenv and os.getenv("BES_INTEREST_UNITS") == "1"
+SA.INTEREST_UNITS = Flags.off("BES_INTEREST_UNITS")
 function SA.interest_weight(gs)
   if not SA.INTEREST_UNITS then return SA.interest_horizon(gs) end
   return VU.ROUND_INCOME_UTIL * SA.interest_horizon(gs) / SA.INTEREST_HORIZON
@@ -478,7 +479,7 @@ SA.free_discount = free_discount
 -- ante 8 of the ante-3 rate), but the shop charged and paid every other dollar at the flat ante-3 rate -- in one
 -- expression a Hermit's \$20 gain was ante-aware and its \$3 price was not. The switch puts the shop's dollar on the
 -- same curve.
-SA.DOLLAR_ANTE = os.getenv and os.getenv("BES_DOLLAR_ANTE") == "1"
+SA.DOLLAR_ANTE = Flags.off("BES_DOLLAR_ANTE")
 function SA.dollar_scale(gs)
   if not SA.DOLLAR_ANTE then return 1 end
   return VU.dollar_frac(gs) / VU.BASE_FRAC
@@ -760,7 +761,7 @@ local function full_board_swap_bar(gs, mopts)
   -- 67/76, wins 21) against +0.056 (sign 74/68, wins 24) without it -- it cut rerolls ~60%, and a reroll
   -- also surfaces packs/consumables that this joker-only e_best never prices (the same mechanism that
   -- reverted the 2026-08-11 reroll feasibility gate). Kept as an opt-in experiment: BES_SWAP_BAR=1.
-  if not (_G.BES_SWAP_BAR or (os.getenv and os.getenv("BES_SWAP_BAR") == "1")) then return nil end
+  if not (Flags.global("BES_SWAP_BAR") or (Flags.off("BES_SWAP_BAR"))) then return nil end
   if ShopState.slots_free(gs) > 0 then return nil end
   local best
   for i, jk in ipairs(gs.jokers or {}) do
@@ -1008,7 +1009,7 @@ function SA.recommend(gs, opts)
   -- floor hid a ~450-a-hand Walkie Talkie behind a ~1900-a-hand Gros Michel -- live UAPB3XY9 flag 4b)
   local trade_mopts = {}
   for k, v in pairs(swap_mopts) do trade_mopts[k] = v end
-  trade_mopts.plain_unfloored = not (os.getenv and os.getenv("BES_TRADE_FLOORED") == "1")   -- A/B switch
+  trade_mopts.plain_unfloored = not (Flags.off("BES_TRADE_FLOORED"))   -- A/B switch
   local swap_bar_memo
   local function swap_bar()   -- lazy + memoised: only the full-board reroll / Buffoon paths need it
     if swap_bar_memo == nil then swap_bar_memo = full_board_swap_bar(gs, mopts) or false end
@@ -1170,7 +1171,7 @@ function SA.recommend(gs, opts)
     }
     -- WS-3 instrumentation (gated): expose the value decomposition so a replay can see WHICH term
     -- funds a buy (sgain=current-board score, econ=money, fit=planning, cost terms). Pure/read-only.
-    if _G.BES_VALUE_DEBUG then
+    if Flags.global("BES_VALUE_DEBUG") then
       entry.dbg = { key = sj.key, ante = (gs.meta and gs.meta.ante) or 1, cat = JokerData.resolve(sj.key).cat,
         sgain = sgain, sgain_w = w_score * sgain * 5, syn = w_score * syn, fit = w_score * fit,
         first = w_score * first_scorer, econ_w = econ_term,
@@ -1427,7 +1428,7 @@ function SA.recommend(gs, opts)
       reason = string.format("Reroll ($%d) — expected best ~%.0f%% of a boss hand (+%.0f%% over current; %s).",
         rcost, math.max(0, e_best) * 100, improvement * 100, bar and (gate .. "; net of replacing your weakest") or gate),
     }
-    if _G.BES_VALUE_DEBUG then   -- read-only decomposition (same pattern as the BUY_JOKER dbg)
+    if Flags.global("BES_VALUE_DEBUG") then   -- read-only decomposition (same pattern as the BUY_JOKER dbg)
       rentry.dbg = { e_best = e_best, best_offer = best_offer, improvement = improvement, eff = eff_improvement,
         appetite = appetite, escalation = escalation, realizable = realizable, w_score = w_score,
         gain = appetite * escalation * realizable * SA.REROLL_DISCOUNT * w_score * 5 * eff_improvement,
@@ -1574,7 +1575,7 @@ function SA.recommend(gs, opts)
               -- raw marginal only edges the weakest -- and a redundant flat is damped.
               local g = buy_fv_delta(gs, sj, swap_mopts) + (BuildPlan.fit(gs, sj, build, invest))
               if g > upgrade then upgrade, up_name = g, (sj.name or sj.key) end
-              if _G.BES_SWAP_TRACE then _G.BES_SWAP_TRACE[#_G.BES_SWAP_TRACE + 1] =
+              if Flags.global("BES_SWAP_TRACE") then Flags.global("BES_SWAP_TRACE")[#Flags.global("BES_SWAP_TRACE") + 1] =
                 { sold = j.key, ci = worst_c, buy = sj.key, g = g, cost = sj.cost, worst = true } end
             end
           end
@@ -1594,7 +1595,7 @@ function SA.recommend(gs, opts)
         -- better replacement. Charged ONCE here (was the flat 2*C); pure sales charge it once below.
         local keep_c = joker_contribution(gs, worst_i, trade_mopts)
         local keep = keep_c * (1 + SA.SWAP_KEEP_SLOPE * keep_c)
-        if _G.BES_SWAP_TRACE then for _, t in ipairs(_G.BES_SWAP_TRACE) do
+        if Flags.global("BES_SWAP_TRACE") then for _, t in ipairs(Flags.global("BES_SWAP_TRACE")) do
           if t.worst and not t.keep then t.keep = keep + sell_margin end end end
         upgrade = math.max(0, upgrade - keep - sell_margin)
       end
@@ -1652,7 +1653,7 @@ function SA.recommend(gs, opts)
                 local g = buy_fv_delta(gs, sj, swap_mopts) + (BuildPlan.fit(gs, sj, build, invest))
                 local up = g - keep
                 -- diagnostic only (tools/swap_bar_probe.lua): every full-board trade the bar weighed
-                if _G.BES_SWAP_TRACE then _G.BES_SWAP_TRACE[#_G.BES_SWAP_TRACE + 1] =
+                if Flags.global("BES_SWAP_TRACE") then Flags.global("BES_SWAP_TRACE")[#Flags.global("BES_SWAP_TRACE") + 1] =
                   { sold = jk.key, ci = ci, keep = keep, buy = sj.key, g = g, cost = sj.cost } end
                 if up > 0 and (not best_t or up > best_t.up) then
                   best_t = { up = up, i = i, sj = sj, cash = cash_i }

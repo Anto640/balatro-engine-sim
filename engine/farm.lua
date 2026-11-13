@@ -16,6 +16,7 @@
 -- The caller (decision_engine) only takes the farm line when the rollout shows the blind still clears about as often.
 -- PURE.
 
+local Flags = require("engine.flags")
 local HandEval     = require("engine.hand_eval")
 local Heuristics   = require("engine.heuristics")
 local HoldFuel     = require("engine.hold_fuel")
@@ -40,7 +41,7 @@ end
 -- seals ($3 each time scored) and Purple seals (a Tarot when discarded, slot permitting) -- are levers too. Under the
 -- switch they turn the farm on, a Purple-seal discard pays (Heuristics.discard_econ), and a cycle play may score Gold-seal
 -- cards (a played card returns to the deck after the blind, so playing it costs nothing but this hand).
-Farm.SEALS = not (os.getenv and os.getenv("BES_FARM_SEALS") == "0")   -- SHIPPED 2026-10-21 (fsl_7); =0 disables
+Farm.SEALS = Flags.on("BES_FARM_SEALS")   -- SHIPPED 2026-10-21 (fsl_7); =0 disables
 local function slot_free(gs)
   return #(gs.consumables or {}) < ((gs.run and gs.run.consumable_slots) or 2)
 end

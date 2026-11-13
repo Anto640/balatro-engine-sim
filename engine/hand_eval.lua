@@ -17,6 +17,7 @@
 -- (see effective_jokers) so a copy participates in EVERY phase at the copier's
 -- position -- per-card, held, retrigger and on_hand -- not just on_hand.
 
+local Flags = require("engine.flags")
 local Cards = require("util.cards")
 local Jokers = require("engine.joker_effects")
 
@@ -625,12 +626,12 @@ end
 -- At or below the budget nothing changes at all, so the simulator (hand size 8 in the
 -- overwhelming majority of states) and every previously captured run stay byte-identical.
 HandEval.HAND_BUDGET = 8
-HandEval.PRUNE_KICKERS = (os.getenv and os.getenv("BES_PRUNE")) ~= "0"   -- best_play kicker pruning (BES_PRUNE=0 off)
+HandEval.PRUNE_KICKERS = Flags.on("BES_PRUNE")   -- best_play kicker pruning (BES_PRUNE=0 off)
 -- best_play_target too (2026-10-18): a CLEARING play's tie-break (equal score and money) now also prefers the fewer /
 -- cheaper cards, as the non-clearing tiers already did -- it kept whichever tied play the enumeration met first, often
 -- one with a kicker -- and kickers are then pruned the same way. A behaviour change (which tied clear is played);
 -- BES_PRUNE_TARGET=0 restores the old tie-break and the full enumeration.
-HandEval.PRUNE_TARGET = (os.getenv and os.getenv("BES_PRUNE_TARGET")) ~= "0"
+HandEval.PRUNE_TARGET = Flags.on("BES_PRUNE_TARGET")
 
 -- The `budget` most play-relevant cards. Built CONSTRUCTIVELY rather than by an additive score:
 -- a weighted ranking cannot guarantee that five cards of one suit survive together, so it can

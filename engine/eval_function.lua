@@ -6,6 +6,7 @@
 --
 -- Weights are heuristic; tests pin ORDERING and BOUNDS, not magic numbers.
 
+local Flags = require("engine.flags")
 local Cards = require("util.cards")
 local JokerData = require("engine.joker_data")
 local Downside = require("engine.joker_downside")
@@ -202,7 +203,7 @@ local ACC_HANDS_PER_BLIND = 2.5
 -- of a boss hand and realized ~0.11 one and two antes later. So each ante's counter is weighted by the same decay a
 -- flat (additive) or xmult share shows: ramp = sum_k ((k+.5)/K) d^k / sum_k d^k instead of 0.5.
 -- shipped 2026-10-10 with BES_SCALER_TIME (audit_scalerfix +0.166 / sf_7 +0.068; pooled n=320 +0.117, wins 96 -> 106); =0 disables
-Eval.SCALER_TIME = not (os.getenv and os.getenv("BES_SCALER_TIME") == "0")
+Eval.SCALER_TIME = Flags.on("BES_SCALER_TIME")
 Eval.SCALER_DECAY_ADD = 0.43
 Eval.SCALER_DECAY_X   = 0.67
 function Eval.time_ramp(gs, kind)
@@ -349,7 +350,7 @@ function Eval.discard_budget_scale(gs)
 end
 
 -- shipped 2026-10-10 together with Eval.SCALER_TIME (see there); BES_EVENT_RATES=0 disables
-Eval.MEASURED_EVENT_RATES = not (os.getenv and os.getenv("BES_EVENT_RATES") == "0")
+Eval.MEASURED_EVENT_RATES = Flags.on("BES_EVENT_RATES")
 local function event_rate(gs, e)
   local fuel = e.feed_fuel
   -- AUDIT 2026-10-10 (BES_EVENT_RATES=1): the planet / tarot / sell rates were guesses (0.03-0.15 per scoring hand);
@@ -393,7 +394,7 @@ local function event_rate(gs, e)
   elseif fuel == "skip" then
     -- the owner's temporary skip policy (engine/skip_advisor: only the ante-1 Investment tag; BES_SKIP_FREE=1 restores
     -- the engine's own skips) means no blind is skipped from here on, so Throwback is never fed (2026-10-20)
-    if not (os.getenv and os.getenv("BES_SKIP_FREE") == "1") then return 0 end
+    if not (Flags.off("BES_SKIP_FREE")) then return 0 end
     return 0.03
   elseif fuel == "pack_skip" then
     return 0.04
@@ -686,7 +687,7 @@ end
 -- Scaling ONLY the multipliers up to 3x distorted the ranking against everything left unscaled: Acrobat (last-hand
 -- x3) bought 11 -> 18, Blueprint (a copier, unscaled) 14 -> 8. The typical-board-ratio measurement stands; applying
 -- it to one class alone does not. Opt-in for experiments: BES_XMULT_FWD=1.
-Eval.XMULT_FWD = os.getenv and os.getenv("BES_XMULT_FWD") == "1"
+Eval.XMULT_FWD = Flags.off("BES_XMULT_FWD")
 function Eval.xmult_forward_scale(gs, key, opts)
   if not Eval.XMULT_FWD then return 1 end
   if not JokerData.is_xmult(key) or JokerData.is_scaling(key) or not Eval.floor_free(key) then return 1 end
@@ -1195,7 +1196,7 @@ end
 -- So the floor stays for any joker that FIRES; it is dropped only for a joker measured to do NOTHING on
 -- this deck (a Mime with no held effect to retrigger, a suit joker whose suit is absent): m == 0 on every
 -- paired sample, after the refine re-measure -- the Y1U5TZWJ case, and nothing broader.
-Eval.NO_TIER_FLOOR = os.getenv and os.getenv("BES_NO_TIER_FLOOR") == "1"   -- A/B switch: floor-free for all modelled jokers
+Eval.NO_TIER_FLOOR = Flags.off("BES_NO_TIER_FLOOR")   -- A/B switch: floor-free for all modelled jokers
 -- A hand-conditional xmult (Duo/Trio/Family/Order/Tribe) whose trigger hand this RUN has already played is not
 -- inert, whatever the samples read (2026-10-01, live DZHHCFQ1 a6: The Family played two Four of a Kinds -- 133733
 -- and 72816, the second a clear only with its x4 -- then measured 0 on 6 undug deals, lost its floor as "inert"
@@ -1417,7 +1418,7 @@ end
 -- xmult-only scaling (x1), which inflated one class against the rest.
 -- ON by default since 2026-09-25: z1 vs y1 +0.108 (sign 77/59, reach-7 +11), replicated out of sample (BES_SEED_OFF=7:
 -- +0.098, sign 68/64, wins 26 -> 32, reach-7 +7); pooled ~+0.10 over 320 pairs, never negative. BES_FWD_ALL=0 disables.
-Eval.FWD_ALL = not (os.getenv and os.getenv("BES_FWD_ALL") == "0")
+Eval.FWD_ALL = Flags.on("BES_FWD_ALL")
 Eval.LEVEL_GROWTH = { 0, 0.17, 1.26, 3.0, 6.7, 10.5, 16.7, 18.3 }
 Eval.TOP_HAND_LEVEL_SHARE = 0.5
 local function interp_ante(tbl, a)
@@ -1469,8 +1470,8 @@ Eval.LIMITED_LIFE = { j_selzer = true, j_ramen = true, j_ice_cream = true, j_pop
 -- vs the engine's 1.8 + 1.0 while it keeps ~1.5 flat jokers. A/B switches: BES_FWD_AT = how far along the remaining
 -- run the projection sits (0.5 = midpoint, 1.0 = the ante-8 boss); BES_FWD_W = the weight on that projected reading
 -- (0.5 = the even average of now and later).
-Eval.FWD_AT = tonumber(os.getenv and os.getenv("BES_FWD_AT") or "") or 0.5
-Eval.FWD_W  = tonumber(os.getenv and os.getenv("BES_FWD_W") or "") or 0.5
+Eval.FWD_AT = Flags.num("BES_FWD_AT", 0.5)
+Eval.FWD_W  = Flags.num("BES_FWD_W", 0.5)
 local function fwd_point(ante) return ante + (8 - ante) * Eval.FWD_AT end
 function Eval.forward_measure(ctx_gs, j, m, opts)
   opts = opts or {}
@@ -1729,17 +1730,17 @@ end
 -- wins 43 -> 38 -- no positive evidence for a magnitude change, so the flat rate stayed the default.
 -- DEFAULT ON since 2026-10-25 (owner), together with BP.ECON_EXIT: owner positions 79 -> 82%, X778 a4 61 -> 91%;
 -- regression emx_7 vs shp_7 wins 64 -> 65, 147/160 tied. BES_MONEY_ANTE=0 restores the flat rate.
-Eval.MONEY_ANTE = (os.getenv and os.getenv("BES_MONEY_ANTE")) ~= "0"
+Eval.MONEY_ANTE = Flags.on("BES_MONEY_ANTE")
 Eval.MONEY_LAST_ANTE = 8
 -- FV points per \$/round of joker income. 0.8 FV = 0.32 boss-hand fraction = 1.6 shop utility, while the shop BUYS that
 -- same income at VU.ROUND_INCOME_UTIL = 1.0 utility (2026-10-06 unit audit) -- so a money joker was worth 1.6x more to keep
 -- than to buy, and in a trade its income outweighed a scorer at that rate (memory: paired trades went 35 -> 17 wins on
 -- this scale). Priced at the buy rate (0.5 FV) since 2026-10-07: arms u4 vs u1 +0.206 (p 0.008), fresh seeds +0.033,
 -- pooled n=320 +0.119 (p 0.075), wins 88 -> 90, reach-8 118 -> 127. BES_ECON_FV=0 restores the old 0.8.
-Eval.ECON_FV = (os.getenv and os.getenv("BES_ECON_FV") == "0") and 0.8
+Eval.ECON_FV = (Flags.str("BES_ECON_FV") == "0") and 0.8
   or (VU.ROUND_INCOME_UTIL / VU.FRAC_UTIL * VU.FV_PER_FRAC)
 function Eval.money_weight(gs)
-  if _G.BES_MONEY_ANTE == false or (_G.BES_MONEY_ANTE == nil and not Eval.MONEY_ANTE) then return 1 end
+  if Flags.global("BES_MONEY_ANTE") == false or (Flags.global("BES_MONEY_ANTE") == nil and not Eval.MONEY_ANTE) then return 1 end
   local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
   if ante <= VU.REF_ANTE then return 1 end
   local left = math.max(1, Eval.MONEY_LAST_ANTE + 1 - ante)
@@ -2075,7 +2076,7 @@ local CONDITIONAL_ECON = {
 -- ante 1.1) and Golden Ticket in 147 (ante 1.4) for Jolly / Ice Cream / Odd Todd: each money joker was priced alone --
 -- Ticket a flat \$3 with or without Gold cards to pay on, Midas only the \$3 its Gold faces pay HELD. Together they are a
 -- money engine (Midas makes Gold faces, Ticket pays \$4 per scored Gold card, a copier doubles it).
-Eval.MONEY_COMBO = not (os.getenv and os.getenv("BES_MONEY_COMBO") == "0")   -- SHIPPED (bpc_7 vs bp1_7 on the owner board: wins 119 -> 132, +0.156); =0 disables
+Eval.MONEY_COMBO = Flags.on("BES_MONEY_COMBO")   -- SHIPPED (bpc_7 vs bp1_7 on the owner board: wins 119 -> 132, +0.156); =0 disables
 Eval.TICKET_PAY = 4
 Eval.SCORED_PER_ROUND = 6        -- cards scored a round: ~1.6-1.9 hands x ~3.5 scoring cards (sim blind_result), + farm
 Eval.MIDAS_CONVERT = 0.5         -- share of the deck's non-Gold faces Midas turns Gold over the next few rounds
@@ -2160,7 +2161,7 @@ end
 -- Rough Gem; plus Golden Ticket's \$4 per scored Gold card, which the world pays outside ev.money), x the plays a round
 -- spends (half its hands, as To Do List's model). Only for a buy into a FREE slot (econ_value's measured_income), as
 -- for Mail-In / To Do: weighing money against scorers in trades is the shape that lost before (bn, pt).
-Eval.PLAY_MONEY = os.getenv and os.getenv("BES_PLAY_MONEY") == "1"
+Eval.PLAY_MONEY = Flags.off("BES_PLAY_MONEY")
 Eval.PLAY_MONEY_JOKER = { j_business = true, j_rough_gem = true, j_ticket = true }
 Eval.PLAY_MONEY_SAMPLES = 8
 local PM_RETRIG = { j_sock_and_buskin = true, j_hanging_chad = true, j_seltzer = true, j_dusk = true, j_hack = true,
@@ -2338,7 +2339,7 @@ Eval.NEG_SLOT_FLOOR = 0.5    -- late-game / no-runway residual (matches the old 
 --   mode "freed" (Ectoplasm): a joker you HOLD becomes negative -> a genuinely free slot appears: a future joker.
 -- The current fill does NOT scale it (owner 2026-10-12: "you will basically always have the slots full at some point
 -- soon" -- engine boards average 5+ jokers by ante 4 in won and lost runs alike), so a slot = one future joker.
-Eval.NEG_SLOT_MEASURED = not (os.getenv and os.getenv("BES_NEG_SLOT") == "0")
+Eval.NEG_SLOT_MEASURED = Flags.on("BES_NEG_SLOT")
 function Eval.negative_slot_fv(gs, opts)
   if Eval.NEG_SLOT_MEASURED then
     opts = opts or {}

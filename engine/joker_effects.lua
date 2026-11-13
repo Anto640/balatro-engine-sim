@@ -29,6 +29,7 @@
 -- ability sub-field names are game-version dependent -- marked VERIFY; scaled()
 -- tries the common ones and falls back to a no-op default.
 
+local Flags = require("engine.flags")
 local Cards = require("util.cards")
 local JokerData = require("engine.joker_data")
 
@@ -103,7 +104,7 @@ J.j_rough_gem   = suit_joker("Diamonds", { dollars = 1 })  -- money only (no sco
 -- REPOINT switch (BES_REPOINT=1, default off; sim/world.lua then banks it from ev.money instead of its flat count), so a
 -- money-objective reorder can point a copier at it for a farm hand (owner X778PBYT/SEMXURN5: Blueprint on Golden Ticket
 -- for the money hands, then on Photograph for the clear).
-J.REPOINT = not (os.getenv and os.getenv("BES_REPOINT") == "0")   -- SHIPPED (bp1_7 vs bp0_7 on the owner board: +0.157, wins 116 -> 119, reach-8 123 -> 130); =0 disables
+J.REPOINT = Flags.on("BES_REPOINT")   -- SHIPPED (bp1_7 vs bp0_7 on the owner board: +0.157, wins 116 -> 119, reach-8 123 -> 130); =0 disables
 if J.REPOINT then
   J.j_ticket = { on_card_scored = function(card)
     if card.enhancement == "m_gold" then return { dollars = 4 } end

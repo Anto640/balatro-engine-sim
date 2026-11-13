@@ -19,6 +19,7 @@
 --   * future_value contributes 1.5 * (tier*0.5) = 0.75*tier FV points per joker.
 --   => 1 boss-hand fraction ~ (0.75/0.3) = 2.5 FV points.
 
+local Flags = require("engine.flags")
 local Mechanics = require("engine.mechanics")
 
 local VU = {}
@@ -87,7 +88,7 @@ end
 -- cap (P2: at the cap a dollar is just spendable, so sell econ / don't over-generate).
 VU.INTEREST_LOOKAHEAD_MAX = 12   -- rounds of interest an early gain is credited for (bounded)
 VU.INTEREST_DISCOUNT      = 0.5  -- interest isn't guaranteed (may be spent, may die) -> halve it
-VU.INTEREST_UNITS = os.getenv and os.getenv("BES_INTEREST_UNITS") == "1"   -- see income_frac
+VU.INTEREST_UNITS = Flags.off("BES_INTEREST_UNITS")   -- see income_frac
 function VU.income_frac(gs, d)
   d = d or 0
   local base = VU.dollars_to_frac(gs, d)
