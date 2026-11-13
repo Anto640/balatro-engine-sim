@@ -1219,7 +1219,7 @@ function Eval.is_inert(key, m, gs)
 end
 function Eval.tier_floor_frac(key)
   local f = (JokerData.has_tag(key, "retrigger") or JokerData.has_tag(key, "enh:steel")) and 0.9 or 0.6
-  return f * (JokerData.resolve(key).tier or 3) * 0.3
+  return f * JokerData.tier(key) * JokerData.TIER_FRAC
 end
 -- m: a score_delta already taken on ctx_gs at opts.samples. Returns m, re-measured at REFINE_SAMPLES
 -- when it reads below the old floor for a floor-free joker (only then: the cost lands on the jokers
@@ -1280,7 +1280,7 @@ local function jp_from_measure(gs, key, edition, m, opts, owned)
     -- at 1.800 and made that Mult the cheapest thing to sell. ADVICE_REVIEW R8, where exactly that
     -- happened and cost the run at the ante-4 boss. Identity (x1) for every non-generator.
     local fit = Generators.output_fit(gs, key, owned) * Generators.fire_rate(gs, key)
-    return (e.tier or 3) * 0.5 * proj * fit + edition_jp(edition, true), false
+    return JokerData.prior_jp_of(e) * proj * fit + edition_jp(edition, true), false
   end
   -- RESETTING scaler (Ride the Bus): a fresh one measures 0, so the tier FLOOR used to decide its value
   -- (tier 7 -> priced above Runner). Instead value it MEASURED at its low geometric equilibrium and skip
@@ -1714,7 +1714,7 @@ function Eval.joker_power(gs, opts)
     local e = JokerData.resolve(j.key)
     -- scaling jokers are projected forward (worth far more late); flat jokers
     -- have projection 1.0, so this is a no-op for them.
-    s = s + (e.tier or 3) * 0.5 * Eval.scaling_projection(gs, j.key)
+    s = s + JokerData.prior_jp_of(e) * Eval.scaling_projection(gs, j.key)
     s = s + edition_jp(j.edition, true)
   end
   return s

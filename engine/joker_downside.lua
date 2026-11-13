@@ -20,7 +20,7 @@ local function clamp(x, lo, hi) return math.max(lo, math.min(hi, x)) end
 -- Rough future-value upside of a joker by key, mirroring eval_function's
 -- per-joker term (future_value adds ~1.5 * tier*0.5 = 0.75*tier). Used to price
 -- "what this joker threatens to destroy".
-local function own_value(key) return (JokerData.resolve(key).tier or 3) * 0.75 end
+local function own_value(key) return JokerData.tier(key) * JokerData.TIER_FV end
 
 -- Jokers that DEPEND on enhanced cards staying in the deck. Vampire eats those
 -- enhancements, so its real cost is how much these others rely on them.

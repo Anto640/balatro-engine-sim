@@ -98,8 +98,7 @@ CV.MIN_DECK = 5
 -- accounting (Hex/Ankh). The data tier is deck-agnostic but enough to stop the
 -- engine recommending a card that wipes a built board.
 function CV.joker_worth(gs, j)
-  local e = JokerData.resolve(j and j.key)
-  return (e.tier or 3) * 0.3
+  return JokerData.tier_prior(j and j.key)
 end
 
 local function shuffled(list, rng)

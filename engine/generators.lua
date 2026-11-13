@@ -68,15 +68,26 @@ end
 G.OUTPUT = {
   j_riff_raff = { out = "joker", n = 2, room_credit = 0.1 },  -- 2 random Commons on blind select
 }
+-- Fraction of a generator's output that actually LANDS (multiplier in [0,1]). Each output dropping into a FREE
+-- slot counts full; each that needs room MADE (use a held consumable, or sell a joker) is credited at
+-- meta.room_credit (default G.ROOM_DISCOUNT: disrupting what you hold has a real cost); anything beyond what room
+-- can hold overflows to 0. Shared by the joker generators here and the tarot / spectral generators in a pack.
+G.ROOM_DISCOUNT = 0.5
+function G.fit(meta, free, roomable)
+  local n = meta.n
+  if n <= 0 then return 1 end
+  local credit = meta.room_credit or G.ROOM_DISCOUNT
+  local landed = math.min(free, n)
+  local made = math.min(math.max(0, n - free), math.max(0, roomable))
+  return (landed + credit * made) / n
+end
 function G.output_fit(gs, key, owned)
   local meta = G.OUTPUT[key]
   if not meta or meta.n <= 0 then return 1 end
   local free = math.max(0, G.output_room_free(gs, key, owned))
   -- room can be MADE by selling a joker; count only jokers other than the generator itself
   local roomable = math.max(0, #((gs and gs.jokers) or {}) - (owned and 1 or 0))
-  local landed = math.min(free, meta.n)
-  local made = math.min(math.max(0, meta.n - free), roomable)
-  return (landed + (meta.room_credit or 0.5) * made) / meta.n
+  return G.fit(meta, free, roomable)
 end
 
 -- Expected FIRING rate of a CONDITIONAL generator, as a multiplier in [0,1] applied alongside output_fit.

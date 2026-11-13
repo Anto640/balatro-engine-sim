@@ -18,6 +18,8 @@ local VU = require("engine.value_units")
 local Cards = require("util.cards")
 local Progress = require("util.progress")   -- the live Thinking bar (inert unless armed)
 local BuildPlan = require("engine.build_plan")
+local Generators = require("engine.generators")
+local JokerWorth = require("engine.joker_worth")
 
 local PO = {}
 
@@ -91,15 +93,7 @@ local GEN = {
 -- consumable, or sell a joker) is discounted -- disrupting what you hold has a real
 -- cost; anything beyond what room can hold overflows to 0. So a generator whose
 -- output can't fit is valued down and a better-fitting pick can win instead.
-local GEN_ROOM_DISCOUNT = 0.5
-local function gen_fit(meta, free, roomable)
-  local n = meta.n
-  if n <= 0 then return 1 end
-  local credit = meta.room_credit or GEN_ROOM_DISCOUNT   -- output-quality-aware (see GEN)
-  local landed = math.min(free, n)
-  local made = math.min(math.max(0, n - free), math.max(0, roomable))
-  return (landed + credit * made) / n
-end
+local gen_fit = Generators.fit
 
 -- value a single revealed item -> value(fraction), measured(bool)
 -- cheap=true skips ALL Monte-Carlo measurement and uses the documented priors
@@ -117,13 +111,13 @@ local function value_item(gs, it, need, freq, base, rng, cheap, hctx)
       -- SAME basis as the shop buy: max(measured, analytic conditional-xmult, tier-prior floor)/need,
       -- so a Trio/Tribe/Duo picked from a Buffoon pack is valued for the core it is, not the ~0 its
       -- noisy 6-sample delta reads on a weak board (which used to let a flat common out-rank it).
-      local frac, measured = Eval.joker_pick_frac(gs, it.joker, need, { samples = 6, rng = rng })
+      local frac, measured = JokerWorth.of(gs, it.joker, "pick", { need = need, samples = 6, rng = rng })
       -- negative edition is a free +1 permanent slot: price it board-awarely (GRAND_AUDIT P1)
       local ed = (it.joker.edition == "negative") and Eval.negative_slot_fv(gs) or Eval.edition_score_bonus(it.joker.edition, false)
       return frac + ed, measured
     end
     local ed = (it.joker.edition == "negative") and Eval.negative_slot_fv(gs) or Eval.edition_score_bonus(it.joker.edition, true)
-    return (JokerData.resolve(it.key).tier or 3) * 0.3 + ed, false
+    return JokerData.tier_prior(it.key) + ed, false
   elseif it.set == "Planet" then
     local hand = ConsumableValue.PLANET_KEY_HAND[it.key]
     if cheap then return 0.3 + BuildPlan.planet_credit(gs, hand), false end
@@ -186,12 +180,9 @@ local function owned_sell_bars(gs, mopts)
     -- max(UPGRADE_MARGIN, keep_bias) -- so a pick must CLEARLY beat what it replaces (a 6-sample reading of
     -- the same joker varies by ~3 FV; without hysteresis it swapped Lusty Joker for another Lusty Joker).
     if not eternal then
-      local ok, SA = pcall(require, "engine.shop_advisor")
-      local slope = ok and SA.SWAP_KEEP_SLOPE or 0.5
-      local margin = ok and SA.UPGRADE_MARGIN or 1.2
-      local c = math.max(0, (Eval.joker_marginal_fv(gs, i, mopts)))
+      local c = math.max(0, (JokerWorth.of(gs, i, "own", mopts)))
       local kb = BuildPlan.keep_bias(j.key, gs, Eval.joker_fires(gs, i, mopts)) or 0
-      local fv = c * (1 + slope * c) + math.max(margin, kb)
+      local fv = JokerWorth.keep_bar(c, kb)
       bars[#bars + 1] = { i = i, name = (j.name or j.key), bar = fv }
     end
   end
@@ -502,7 +493,7 @@ function PO.recommend(gs, opts)
     local picks = {}
     for _, pk in ipairs(valued) do
       if pk.it.set == "Joker" and pk.it.joker then
-        local fv = Eval.add_joker_marginal_fv(gs, pk.it.joker, mopts)
+        local fv = JokerWorth.of(gs, pk.it.joker, "add", mopts)
         picks[#picks + 1] = { pk = pk, fv = fv }
         if not jpick or fv > jpick_fv then jpick, jpick_fv = pk, fv end
       end

@@ -284,6 +284,15 @@ end
 JokerData.UNMODELLED = {
   j_matador = "pays only when your played hand triggers the boss blind's ability — the engine has no boss-trigger model, so it can't value it or play to use it",
 }
+-- THE TIER PRIOR. A joker's tier is a deck-agnostic prior for its strength, used only where nothing was
+-- measured or modelled (and as the floor under a measurement). One definition, in each unit a caller needs:
+--   a boss-hand FRACTION (tier x 0.3), joker-power points (tier x 0.5), future-value points (tier x 0.75).
+JokerData.TIER_FRAC, JokerData.TIER_JP, JokerData.TIER_FV = 0.3, 0.5, 0.75
+function JokerData.tier(key) return JokerData.resolve(key).tier or 3 end
+function JokerData.prior_of(entry) return (entry.tier or 3) * 0.3 end        -- from a catalogue entry
+function JokerData.prior_jp_of(entry) return (entry.tier or 3) * 0.5 end
+function JokerData.tier_prior(key) return (JokerData.resolve(key).tier or 3) * 0.3 end
+
 function JokerData.is_unmodelled(key) return key ~= nil and JokerData.UNMODELLED[key] ~= nil end
 
 function JokerData.has_tag(key, tag)

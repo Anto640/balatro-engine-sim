@@ -12,6 +12,7 @@
 
 local JokerValue = require("engine.joker_value")
 local Eval       = require("engine.eval_function")
+local JokerWorth = require("engine.joker_worth")
 local VU         = require("engine.value_units")
 local Mechanics  = require("engine.mechanics")
 
@@ -51,7 +52,7 @@ function Dagger.plan(gs, opts)
       local gain = JokerValue.score_delta(gs, { key = "j_ceremonial", name = "Ceremonial Dagger",
         ability = { mult = m, extra = {} } }, { rng = rng, samples = mopts.samples }) or 0
       local drop = JokerValue.remove_delta(gs, i, mopts) or 0
-      local fv = Eval.joker_marginal_fv(gs, i, mopts) or 0
+      local fv = JokerWorth.of(gs, i, "own", mopts) or 0
       local loss = math.max(drop, VU.fv_to_frac(math.max(0, fv)) * need)
       local net = gain - loss * Dagger.FEED_MARGIN
       if net > 0 and (not best_net or net > best_net) then best, best_net = i, net end

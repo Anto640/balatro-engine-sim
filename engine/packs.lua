@@ -186,7 +186,7 @@ local function joker_pool_prior(gs)
   local items = {}
   for _, k in ipairs(sorted_keys(JokerData.ALL)) do
     local e = JokerData.ALL[k]
-    items[#items + 1] = { v = (e.tier or 3) * 0.3, w = RARITY_W[e.rarity] or 0.5 }
+    items[#items + 1] = { v = JokerData.prior_of(e), w = RARITY_W[e.rarity] or 0.5 }
   end
   return items
 end
@@ -239,7 +239,7 @@ local function joker_pool(gs, opts)
     local ns = (all and P.POOL_ALL_SAMPLES) or opts.samples or 3
     local m = JokerValue.score_delta(gs, { key = it.k, ability = { extra = {} } },
                                      { samples = ns, rng = rng, crn_offset = 100 + (i - 1) * ns })
-    local v = m and (m / need) or ((it.e.tier or 3) * 0.3)
+    local v = m and (m / need) or JokerData.prior_of(it.e)
     -- B5: these M items are ALREADY a rarity-weighted SAMPLE (draw() above), so expected_pick
     -- must draw among them with EQUAL weight. Storing the rarity weight here re-applied it,
     -- making the effective pick probability ~w^2 -- clipping the rare tail (Rares ~0.25% instead
@@ -408,14 +408,14 @@ function P.expected_joker_of_rarity(gs, rarity, opts)
   if #pool == 0 then return nil end
   local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
   if not deck or #deck < 5 then
-    local s = 0; for _, k in ipairs(pool) do s = s + (JokerData.ALL[k].tier or 3) * 0.3 end
+    local s = 0; for _, k in ipairs(pool) do s = s + JokerData.prior_of(JokerData.ALL[k]) end
     return s / #pool
   end
   local M = math.min(opts.measure_count or 6, #pool)
   local total = 0
   for i = 1, M do
     local k = pool[math.floor(rng() * #pool) + 1]
-    local prior = (JokerData.ALL[k].tier or 3) * 0.3
+    local prior = JokerData.prior_of(JokerData.ALL[k])
     local m = JokerValue.score_delta(gs, { key = k, ability = { extra = {} } },
                                      { samples = opts.samples or 3, rng = rng })
     -- floor the measurement by a fraction of the tier prior: a CONDITIONAL rare (Baron
