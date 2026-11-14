@@ -285,7 +285,7 @@ end
 function JV.score_delta(gs, joker, opts)
   if not JV.can_measure(gs, joker) then return nil end
   opts = opts or {}
-  local rng = opts.rng or math.random
+  local rng = opts.rng or Rng.fixed()
   local samples = mc(opts.samples or 8)
   local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
   local hs = math.min((gs.run and gs.run.hand_size) or 8, #deck)
@@ -374,7 +374,7 @@ function JV.swap_delta(gs, idx, joker, opts)
   local jokers = gs.jokers or {}
   if not jokers[idx] then return nil end
   opts = opts or {}
-  local rng = opts.rng or math.random
+  local rng = opts.rng or Rng.fixed()
   local samples = mc(opts.samples or 12)
   local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
   if not deck or #deck < JV.MIN_DECK then return nil end
@@ -417,7 +417,7 @@ end
 -- see. Returns nil if there's no deck to sample.
 function JV.remove_delta(gs, idx, opts)
   opts = opts or {}
-  local rng = opts.rng or math.random
+  local rng = opts.rng or Rng.fixed()
   local samples = mc(opts.samples or 8)
   local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
   if not deck or #deck < JV.MIN_DECK then return nil end
@@ -454,7 +454,7 @@ end
 -- baseline of "how much you score per hand right now".
 function JV.avg_score(gs, opts)
   opts = opts or {}
-  local rng = opts.rng or math.random
+  local rng = opts.rng or Rng.fixed()
   local samples = mc(opts.samples or 8)
   local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
   if not deck or #deck < JV.MIN_DECK then return nil end
@@ -493,7 +493,7 @@ end
 -- (AUC 0.870 vs 0.817 for the mean of 5 deals the pacing model used).
 function JV.top_score(gs, opts)
   opts = opts or {}
-  local rng = opts.rng or math.random
+  local rng = opts.rng or Rng.fixed()
   local samples = opts.samples or 20
   local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
   if not deck or #deck < JV.MIN_DECK then return nil end
@@ -521,7 +521,7 @@ end
 function JV.deck_buff_delta(gs, ref, opts)
   opts = opts or {}
   ref = ref or 10
-  local rng = opts.rng or math.random
+  local rng = opts.rng or Rng.fixed()
   local samples = mc(opts.samples or 8)
   local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
   if not deck or #deck < JV.MIN_DECK then return nil end

@@ -13,6 +13,7 @@
 -- tier is the right "what might appear" estimate); tarot/spectral/standard use
 -- documented per-item heuristics, with money items valued by actual dollars.
 
+local Rng = require("util.rng")
 local Flags = require("engine.flags")
 local Mechanics = require("engine.mechanics")
 local ConsumableValue = require("engine.consumable_value")
@@ -104,7 +105,7 @@ P._expected_pick_exact = expected_pick_exact
 
 function P.expected_pick(items, n, k, rng)
   if #items == 0 then return 0 end
-  rng = rng or math.random
+  rng = rng or Rng.fixed()
   k = math.min(k, n)
   local total = 0
   for _, it in ipairs(items) do total = total + (it.w or 1) end
@@ -215,7 +216,7 @@ local function joker_pool(gs, opts)
   opts = opts or {}
   local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
   if not deck or #deck < 5 then return joker_pool_prior(gs) end
-  local rng = opts.rng or math.random
+  local rng = opts.rng or Rng.fixed()
   local need = per_hand_need(gs)
   local keys, total = {}, 0
   for _, k in ipairs(sorted_keys(JokerData.ALL)) do
@@ -400,7 +401,7 @@ end
 function P.expected_joker_of_rarity(gs, rarity, opts)
   opts = opts or {}
   local need = per_hand_need(gs)
-  local rng = opts.rng or math.random
+  local rng = opts.rng or Rng.fixed()
   local pool = {}
   for _, k in ipairs(sorted_keys(JokerData.ALL)) do
     if k ~= "j_gluttenous_joker" and JokerData.ALL[k].rarity == rarity then pool[#pool + 1] = k end

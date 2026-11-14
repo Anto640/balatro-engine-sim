@@ -22,6 +22,7 @@
 --   samples          -- MC sample count used
 -- }
 
+local Rng = require("util.rng")
 local Flags = require("engine.flags")
 local HandEval = require("engine.hand_eval")
 local HoldFuel = require("engine.hold_fuel")
@@ -47,10 +48,6 @@ local function shuffled(list, rng)
     a[i], a[j] = a[j], a[i]
   end
   return a
-end
-
-local function default_rng()
-  return math.random()
 end
 
 -- shallow gs clone with a replaced hand (Heuristics.best_discard reads gs.hand)
@@ -359,7 +356,7 @@ end
 -- across frames (the live overlay runs it inside a coroutine). It does NOT touch
 -- the RNG or the count, so results are identical whether or not it's supplied.
 function Sim.survive_current(gs, samples, rng, yield)
-  rng = rng or default_rng
+  rng = rng or Rng.fixed()
   samples = samples or 200
   local b = gs.blind or {}
   local target = b.target_chips or 0
@@ -394,7 +391,7 @@ end
 -- clear to farm $ across more hands) instead of clear-ASAP. Use it to VALUE a milk line -- `frac`
 -- still reports whether the deferred clear lands, so the caller can gate on survival.
 function Sim.survive_after(gs, first, samples, rng, milk)
-  rng = rng or default_rng
+  rng = rng or Rng.fixed()
   samples = samples or 60
   local b = gs.blind or {}
   local target = b.target_chips or 0
@@ -428,7 +425,7 @@ end
 -- Probability of clearing a FRESH blind (full deck, base hands, empty start).
 -- `eff` (optional) is the boss effect for that blind (only the Boss has one).
 function Sim.survive_fresh(gs, target, base_hands, base_discards, samples, rng, eff, yield, pol)
-  rng = rng or default_rng
+  rng = rng or Rng.fixed()
   samples = samples or 200
   if target <= 0 then return 1 end
   local hs = hand_size_of(gs)
@@ -448,7 +445,7 @@ end
 -- Mean fraction of `target` reached (capped at 1) on a fresh blind with EXPLICIT resources, the policy
 -- chasing that target (so discards are used to DIG, as in play). Smooth where a clear rate saturates.
 function Sim.blind_output_frac(gs, hands, discards, samples, rng, eff, pol, target)
-  rng = rng or default_rng
+  rng = rng or Rng.fixed()
   samples = samples or 24
   local hs = hand_size_of(gs)
   hands, discards, hs = BossEffect.resources(eff, hands, discards, hs)
@@ -538,7 +535,7 @@ end
 function Sim.simulate(gs, opts)
   opts = opts or {}
   local samples = opts.samples or 150
-  local rng = opts.rng or default_rng
+  local rng = opts.rng or Rng.fixed()
   local yield = opts.yield   -- optional: called per sample for frame time-slicing
 
   local win = Sim.survive_current(gs, samples, rng, yield)

@@ -26,6 +26,28 @@ return function(t)
   t.eq(Rng.stream(1)(), (16807 - 1) / 2147483646, "stream: the minimal-standard generator")
   t.eq(Rng.stream(0)(), Rng.stream(Rng.M - 1)(), "stream: a zero seed is lifted to a valid state")
 
+  -- a sampler given no stream is still reproducible
+  t.eq(Rng.fixed()(), Rng.fixed()(), "fixed: the same stream every time")
+
+  -- the rule: nothing in the engine draws from math.random (comments aside)
+  do
+    local root = (arg and arg[0] and arg[0]:gsub("[^/\\]*$", "") or "") .. "../engine/"
+    for _, name in ipairs({ "consumable_value", "discard_value", "joker_value", "packs", "tarot", "vouchers",
+        "simulation", "decision_engine", "shop_advisor", "pack_open_advisor", "skip_advisor", "eval_function",
+        "joker_income", "joker_worth", "hand_eval", "heuristics", "search", "dagger", "farm", "pacing",
+        "build_plan" }) do
+      local fh = io.open(root .. name .. ".lua", "r")
+      if fh then
+        local bad
+        for line in fh:lines() do
+          if line:gsub("%-%-.*$", ""):find("math%.random") then bad = line; break end
+        end
+        fh:close()
+        t.ok(bad == nil, "engine/" .. name .. ".lua draws from math.random; pass a stream or use Rng.fixed()")
+      end
+    end
+  end
+
   -- the rule: generators are built here, not re-written inline (tarot.lua's is unified in a later change)
   local here = arg and arg[0] and arg[0]:gsub("[^/\\]*$", "") or ""
   for _, rel in ipairs({ "engine/dagger.lua", "engine/decision_engine.lua", "engine/pack_open_advisor.lua",

@@ -14,6 +14,7 @@
 -- (so deckless callers/tests see just the base prior). opts: {rng, cache, samples,
 -- at_risk}.
 
+local Rng = require("util.rng")
 local CV = require("engine.consumable_value")
 local Packs = require("engine.packs")
 local JV = require("engine.joker_value")
@@ -202,7 +203,7 @@ local function extra_discard_fv(gs, opts)
   opts = opts or {}
   local deck = gs.deck
   if not deck or #deck < 10 then return 0 end
-  local rng = opts.rng or math.random
+  local rng = opts.rng or Rng.fixed()
   local n = math.min(opts.samples or 6, 8)
   local hs = (gs.run and gs.run.hand_size) or 8
   local total = 0
@@ -256,7 +257,7 @@ local function hand_size_gain_paired_fv(gs, opts)
   opts = opts or {}
   local deck = gs.deck
   if not deck or #deck < 10 then return 0 end
-  local rng = opts.rng or math.random
+  local rng = opts.rng or Rng.fixed()
   local n = 24   -- one card can swing a deal a lot (a flush, or a held card breaking Blackboard), so 24 deals
   local hs = (gs.run and gs.run.hand_size) or 8
   local total = 0

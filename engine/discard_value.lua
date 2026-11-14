@@ -6,6 +6,7 @@
 -- stronger hand, instead of playing two average ones, when that scores more.
 -- PURE.
 
+local Rng = require("util.rng")
 local Flags = require("engine.flags")
 local HandEval = require("engine.hand_eval")
 local Cards = require("util.cards")
@@ -83,7 +84,7 @@ end
 -- many replacements), averaged over draws from the deck.
 function DV.measured(gs, discard, opts)
   opts = opts or {}
-  local rng = opts.rng or math.random
+  local rng = opts.rng or Rng.fixed()
   local samples = mc(opts.samples or 10)
   local hand = gs.hand or {}
   local pile = draw_pile(gs)

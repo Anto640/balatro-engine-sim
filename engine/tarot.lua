@@ -6,6 +6,7 @@
 -- tarot in the SHOP can be valued by what it would do for your deck this blind.
 -- PURE. Must NOT require consumable_value (which requires this module).
 
+local Rng = require("util.rng")
 local Flags = require("engine.flags")
 local Cards = require("util.cards")
 local HandEval = require("engine.hand_eval")
@@ -669,7 +670,7 @@ end
 function T.shop_value(gs, key, opts)
   if not (T.ENH[key] or T.SUIT[key] or T.RANK[key]) then return nil end
   opts = opts or {}
-  local rng = opts.rng or math.random
+  local rng = opts.rng or Rng.fixed()
   local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
   if not deck or #deck < 5 then return nil end
   local hs = math.min((gs.run and gs.run.hand_size) or 8, #deck)

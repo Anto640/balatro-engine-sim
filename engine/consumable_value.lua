@@ -508,7 +508,7 @@ function CV.card_add_value(gs, card, opts)
   if not deck or #deck < CV.MIN_DECK then return nil end
   local need = opts.need or 1
   local samples = mc(opts.samples or 12)
-  local rng = opts.rng or math.random
+  local rng = opts.rng or Rng.fixed()
   local hs = math.min((gs.run and gs.run.hand_size) or 8, #deck)
 
   -- PAIRED (2026-09-26). E[best play | deck + card] - E[best play | deck] is exactly
@@ -687,7 +687,7 @@ function CV.hand_convert_value(gs, need, mode, opts)
   need = (need and need > 0) and need or 1
   local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
   if not deck or #deck < CV.MIN_DECK then return 0 end
-  local rng = opts.rng or math.random
+  local rng = opts.rng or Rng.fixed()
   local hs = math.min((gs.run and gs.run.hand_size) or 8, #deck)
   local samples = mc(opts.samples or 8)
   local seed = #deck * 40503 + 91
@@ -910,7 +910,7 @@ function CV.wheel_value(gs, need, rng)
   if #elig == 0 then return 0 end
   local deck = (gs.deck and #gs.deck > 0) and gs.deck or gs.hand
   if not deck or #deck < CV.MIN_DECK then return 0 end
-  rng = rng or math.random
+  rng = rng or Rng.fixed()
   local hs = math.min((gs.run and gs.run.hand_size) or 8, #deck)
   local total, n = 0, 0
   for _ = 1, 6 do
