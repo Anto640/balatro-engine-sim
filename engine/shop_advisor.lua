@@ -816,32 +816,12 @@ SA.pack_need = pack_need
 
 -- ---- candidate generation ---------------------------------------------------
 
-function SA.recommend(gs, opts)
-  opts = opts or {}
-  local reserve = opts.reserve or 0
-  local shop = gs.shop
-  local actions = {}
-
-  -- Plan the end-of-shop bankroll ONCE: the interest-optimal end target and the
-  -- shop-wide free budget every buy below draws against (see SA.bankroll_plan).
-  local plan = SA.bankroll_plan(gs, { reserve = reserve })
-
-  -- baseline: SAVE (value 0; everything else is scored relative to this). Surface
-  -- the planned target + interest-free headroom so the "spend down to the cap"
-  -- play is visible.
-  actions[#actions + 1] = {
-    type = "SAVE", cost = 0, value = 0,
-    reason = SA.final_shop(gs)
-      and "Leave the shop -- nothing left here helps the final boss (money left over is worth nothing now)."
-      or string.format("Bank $%d for interest (+$%d/round).%s",
-      dollars(gs), interest_at(dollars(gs), cap_int_of(gs)),   -- true cap, not the 5x-over-stated live value
-      plan.budget > 0 and string.format(" $%d is interest-free — free to spend.", plan.budget) or ""),
-  }
-
-  if not shop then
-    return { best = actions[1], alternatives = {}, reason = actions[1].reason }
-  end
-
+-- ---- the shop situation ------------------------------------------------------
+-- Everything the candidate generators below share for ONE shop decision, worked out once: the measurement
+-- options and their shared RNG / cache, the score-vs-economy weights for this board and boss, and what a
+-- dollar costs here. The generators only read it, apart from the fields at the end of the table, which
+-- they fill as they run (in the order recommend() calls them).
+local function shop_situation(gs, opts, reserve, plan)
   -- one deterministic RNG shared by every measured valuation this call
   local rng = opts.rng or lcg(state_seed(gs))
   -- shared measurement cache + options for the deck-aware joker_power valuations
@@ -931,19 +911,6 @@ function SA.recommend(gs, opts)
   local budget_c = math.max(0, dollars(gs) - math.max(real_cap_d, math.min(reserve, dollars(gs))))
   local function net_cost_c(c) return income_factor * (interest_penalty_c(c) + spend_power_cost(c, budget_c, cost_w)) end
 
-  -- Real shop data is messier than test fixtures (modded items, unexpected nils).
-  -- Run each candidate category in its own pcall so one bad item degrades to
-  -- "that category skipped" instead of crashing the whole shop recommendation.
-  local warns = {}
-  local function try(fn) local ok, e = pcall(fn); if not ok then warns[#warns + 1] = tostring(e) end end
-  -- progress for the live Thinking bar: one step per shop item, then the reroll / sell / sell-to-buy passes
-  Progress.span(#(shop.jokers or {}) + #(shop.consumables or {}) + #(shop.vouchers or {}) + #(shop.boosters or {}) + 3)
-
-  -- Every priced shop item (affordable OR not), so the SELL_TO_BUY pass can fund a
-  -- wanted-but-unaffordable buy by selling a low-value owned item. Affordable ones are
-  -- ALSO pushed to `actions` below; unaffordable ones live only here.
-  local priced = {}
-
   -- BUY_JOKER -- value = situational(scoring it adds, money it makes) - interest
   -- Does the board have ANY effective scorer (flat/xmult) yet? A board of only ungrown
   -- scalers + econ + utility CANNOT score and dies regardless of play -- the sim: 36% of
@@ -957,279 +924,313 @@ function SA.recommend(gs, opts)
     local c = JokerData.resolve(j.key).cat
     if c == "flat_mult" or c == "flat_chips" or c == "xmult" then n_board_scorers = n_board_scorers + 1 end
   end
-  local no_scorer = (n_board_scorers == 0)
 
-  -- Track the best scoring item the shop ALREADY offers (affordable), so reroll
-  -- can be valued as the IMPROVEMENT over it, not in isolation.
-  local best_offer = 0
-  -- per-ITEM pcall: a single odd joker can't drop the whole buy list (which is
-  -- what made Abstract/Acrobat vanish when one shop joker threw).
-  for _, sj in ipairs(shop.jokers or {}) do Progress.step(); try(function()
-    -- UNMODELLED joker: the engine can't value it or tell you how to use it, so never recommend
-    -- SPENDING to acquire it (skip it entirely -- not even as a SELL_TO_BUY funding target). Owner
-    -- directive 2026-08-30; currently only Matador (JokerData.UNMODELLED).
-    if JokerData.is_unmodelled(sj.key) then return end
-    local cost = sj.cost or 0
-    local sgain = JokerWorth.of(gs, sj, "buy", { rng = rng, pace = pace })       -- measured (or prior); pace damps scaler projection
-    local econ = Eval.joker_money(gs, sj.key, (slots_free or 0) > 0)   -- $/round, DECK-AWARE (+ Chaos's reroll saving); measured income only into a free slot
-      * Eval.money_weight(gs)   -- worth less as fewer rounds remain (Eval.money_weight)
-      * VU.ROUND_INCOME_UTIL    -- utility per \$/round (the one rate every \$/round stream uses)
-    -- first-scorer priority: a board with no scorer NEEDS one that scores NOW (flat); a
-    -- board with only ONE still wants a second (survivors carry ~2 flat scorers, deaths ~1),
-    -- so graduate the bonus -- strong at 0, smaller at 1, gone at 2+.
-    local first_scorer = 0
-    if sgain > 0 then
-      local c = JokerData.resolve(sj.key).cat
-      if c == "flat_mult" or c == "flat_chips" then
-        if n_board_scorers == 0 then first_scorer = SA.FIRST_SCORER_BONUS
-        elseif n_board_scorers == 1 then first_scorer = SA.FIRST_SCORER_BONUS * 0.4 end
-      end
-    end
-    local syn, note = synergy_bonus(gs, sj)             -- copy/econ deck synergy
-    -- situational downside (hand-size/hand loss, joker destruction, decay) so a
-    -- harmful joker is passed over WHEN the situation makes it bad -- but still
-    -- bought when its scoring/economy gain outweighs the cost.
-    local down = Eval.joker_downside(gs, sj)
-    local fit, fnote = BuildPlan.fit(gs, sj, build, invest)  -- planning: build the core / avoid dilution
-    local econ_term, floor_term = w_econ * econ, econ_floor_penalty(gs, cost)
-    if SA.INCOME_STREAM and econ > 0 and (slots_free or 0) > 0 then
-      econ_term = SA.income_stream_util(gs, econ / VU.ROUND_INCOME_UTIL)   -- econ carries ROUND_INCOME_UTIL; undo it
-      floor_term = 0
-    end
-    local value = w_score * (sgain * 5 + syn + fit + first_scorer) + econ_term - w_score * down
-      - net_cost_c(cost) - floor_term
-    -- the second half of a PAIRED TRADE whose sale was already made (SA.paired_trade): the slot was emptied FOR this
-    -- joker, so buying it is worth what the trade measured (the sold joker's value + the measured gain), not the
-    -- floored, dilution-damped value of a fresh buy -- which would leave the engine having sold a joker for nothing.
-    local pend = gs.run and gs.run.pending_swap
-    if pend and pend.key == sj.key and (pend.edition or false) == (sj.edition or false) then
-      value = math.max(value, SA.W_FV * ((pend.sold_fv or 0) + (pend.up or 0)))
-    end
-    local why = note and (" — " .. note)
-      or (fnote and (" — " .. fnote))
-      or (down > 0 and " — but has a situational downside")
-      or (econ > 0 and string.format(" — +$%d/round", econ) or "")
-    local entry = {
-      type = "BUY_JOKER", target = sj, cost = cost, value = value, need_jslot = true,
-      name = sj.name or sj.key or "joker",
-      reason = string.format("Buy %s ($%d) — adds ~%.0f%% of a boss hand%s.",
-        sj.name or sj.key or "joker", cost, math.max(0, sgain) * 100, why),
-    }
-    -- WS-3 instrumentation (gated): expose the value decomposition so a replay can see WHICH term
-    -- funds a buy (sgain=current-board score, econ=money, fit=planning, cost terms). Pure/read-only.
-    if Flags.global("BES_VALUE_DEBUG") then
-      entry.dbg = { key = sj.key, ante = (gs.meta and gs.meta.ante) or 1, cat = JokerData.resolve(sj.key).cat,
-        sgain = sgain, sgain_w = w_score * sgain * 5, syn = w_score * syn, fit = w_score * fit,
-        first = w_score * first_scorer, econ_w = econ_term,
-        down = w_score * down, net_cost = net_cost_c(cost), floor = floor_term, value = value }
-    end
-    priced[#priced + 1] = entry
-    local leaves = dollars(gs) - cost
-    if ShopState.affordable(gs, cost, credit) and leaves >= reserve - credit and slots_free > 0 then
-      best_offer = math.max(best_offer, sgain)
-      actions[#actions + 1] = entry
-    end
-  end) end
+  return {
+    gs = gs, shop = gs.shop, reserve = reserve, plan = plan,
+    rng = rng, mopts = mopts, swap_mopts = swap_mopts, trade_mopts = trade_mopts,
+    swap_bar = swap_bar, surv = surv,
+    credit = credit, slots_free = slots_free,
+    secure = secure, w_score = w_score, w_econ = w_econ, pace = pace, boss_adv = boss_adv, final = final,
+    cap = cap, reserve_target = reserve_target, cost_w = cost_w, dollar_u = dollar_u,
+    net_cost = net_cost, net_cost_c = net_cost_c,
+    build = build, invest = invest, n_board_scorers = n_board_scorers,
+    cneed = Mechanics.boss_per_hand_need(gs),
+    -- free consumable slots: you can buy a tarot/planet to HOLD for future use as
+    -- long as you have a slot (planets/tarots are timing-independent in value).
+    free_cslots = ((gs.run and gs.run.consumable_slots) or 2) - #(gs.consumables or {}),
 
-  -- BUY_CONSUMABLE (standalone tarots/planets/spectrals in the shop). Money
-  -- tarots (Hermit/Temperance) are valued in REAL dollars -- this is what makes
-  -- "buy & use the Hermit for free money" get recommended.
-  local cneed = Mechanics.boss_per_hand_need(gs)
-  -- free consumable slots: you can buy a tarot/planet to HOLD for future use as
-  -- long as you have a slot (planets/tarots are timing-independent in value).
-  local free_cslots = ((gs.run and gs.run.consumable_slots) or 2) - #(gs.consumables or {})
-  -- only sample hand-frequencies (for planet value) if there are planets to value
-  -- `cctx` is the per-hand board context from the same sampling pass. Without it a loose
-  -- planet is priced against the hand's bare base and understates 1.4-19x (CV.level_gain).
-  local cfreq, cctx = nil, nil
-  try(function() for _, it in ipairs(shop.consumables or {}) do if it.set == "Planet" then cfreq, cctx = ConsumableValue.hand_frequencies(gs, { samples = 8, rng = rng }); break end end end)
-  for _, it in ipairs(shop.consumables or {}) do Progress.step(); try(function()
-    local cost = OwnedSynergy.consumable_free(gs, it.set) and 0 or (it.cost or 3) -- Astronomer: planets free
-    local vfrac, gain, note = ConsumableValue.card_value(gs, it.set, it.key, cfreq, cneed, rng, nil, cctx)
-    -- B1 leveling axis: a hand level raises the base the board's xmult multiply, so amplify a
-    -- Planet's value by the board's core (1.0 with no xmult -> no early over-buy).
-    if it.set == "Planet" then
-      local hand = ConsumableValue.PLANET_KEY_HAND[it.key]
-      -- level_need is a flat "you should level SOMETHING" nudge (fires when you have an xmult core but
-      -- low total levels). Steer it to a hand you actually MAKE: gate by this planet's make-frequency so
-      -- a Mars/Four-of-a-Kind planet on a deck that never makes it (freq 0) gets NO nudge, while a
-      -- Pluto/Pair planet on a pair-heavy deck (freq ~0.9) keeps the full nudge. planet_credit already
-      -- gates to the committed hand (the "building toward it" case); vfrac is already freq-based.
-      local hfreq = (cfreq and cfreq[hand]) or 0
-      local freq_gate = math.min(1, hfreq / SA.PLANET_LEVEL_FREQ)
-      -- the B1 amplifier is an ESTIMATE of the board's xmult; with the measured board context (cctx) CV.level_gain
-      -- already rides the real xmult (exact to <1%), so amplifying again double-counted it (2026-10-05)
-      local amp = (cctx and not SA.LEVEL_AMP_ALWAYS) and 1.0 or BuildPlan.level_amplifier(gs)
-      vfrac = vfrac * amp + BuildPlan.level_need(gs) * freq_gate
-        + BuildPlan.planet_credit(gs, hand)
+    -- filled by the generators:
+    actions = {},      -- every candidate action (SAVE first)
+    -- Every priced shop item (affordable OR not), so the SELL_TO_BUY pass can fund a
+    -- wanted-but-unaffordable buy by selling a low-value owned item. Affordable ones are
+    -- ALSO pushed to `actions`; unaffordable ones live only here.
+    priced = {},
+    -- The best scoring item the shop ALREADY offers (affordable), so a reroll
+    -- can be valued as the IMPROVEMENT over it, not in isolation.
+    best_offer = 0,
+    cfreq = nil, cctx = nil,   -- hand frequencies + per-hand board context (sample_planet_frequencies)
+    warns = {},        -- errors a generator threw (try)
+  }
+end
+
+-- Real shop data is messier than test fixtures (modded items, unexpected nils).
+-- Run each candidate category in its own pcall so one bad item degrades to
+-- "that category skipped" instead of crashing the whole shop recommendation.
+local function try(S, fn, item)
+  local ok, e = pcall(fn, S, item)
+  if not ok then S.warns[#S.warns + 1] = tostring(e) end
+end
+
+-- ---- candidate generators: each adds its actions to S.actions ----------------
+-- BUY_JOKER -- value = situational(scoring it adds, money it makes) - interest
+local function offer_joker(S, sj)
+  local gs, rng, pace, slots_free, n_board_scorers = S.gs, S.rng, S.pace, S.slots_free, S.n_board_scorers
+  local build, invest, w_econ, w_score, net_cost_c = S.build, S.invest, S.w_econ, S.w_score, S.net_cost_c
+  local priced, credit, reserve, actions = S.priced, S.credit, S.reserve, S.actions
+  -- UNMODELLED joker: the engine can't value it or tell you how to use it, so never recommend
+  -- SPENDING to acquire it (skip it entirely -- not even as a SELL_TO_BUY funding target). Owner
+  -- directive 2026-08-30; currently only Matador (JokerData.UNMODELLED).
+  if JokerData.is_unmodelled(sj.key) then return end
+  local cost = sj.cost or 0
+  local sgain = JokerWorth.of(gs, sj, "buy", { rng = rng, pace = pace })       -- measured (or prior); pace damps scaler projection
+  local econ = Eval.joker_money(gs, sj.key, (slots_free or 0) > 0)   -- $/round, DECK-AWARE (+ Chaos's reroll saving); measured income only into a free slot
+    * Eval.money_weight(gs)   -- worth less as fewer rounds remain (Eval.money_weight)
+    * VU.ROUND_INCOME_UTIL    -- utility per \$/round (the one rate every \$/round stream uses)
+  -- first-scorer priority: a board with no scorer NEEDS one that scores NOW (flat); a
+  -- board with only ONE still wants a second (survivors carry ~2 flat scorers, deaths ~1),
+  -- so graduate the bonus -- strong at 0, smaller at 1, gone at 2+.
+  local first_scorer = 0
+  if sgain > 0 then
+    local c = JokerData.resolve(sj.key).cat
+    if c == "flat_mult" or c == "flat_chips" then
+      if n_board_scorers == 0 then first_scorer = SA.FIRST_SCORER_BONUS
+      elseif n_board_scorers == 1 then first_scorer = SA.FIRST_SCORER_BONUS * 0.4 end
     end
-    -- a consumable that CREATES a joker (Judgement) has its OUTPUT measured deck-aware
-    -- (expected random joker), floored at the flat prior -- "Calculated, not static". (B1: the x5
-    -- JOKER-scale is now applied by the base path below, so this no longer pre-multiplies.)
-    -- ⚠ A FULL board IS a barrier for a RANDOM joker: making room means SELLING a joker you chose to
-    -- keep, and a random creation rarely beats it -- a poor trade (owner: "it says take Judgement when
-    -- it doesn't have any free joker slots"). So credit the creation LOW when no joker slot is free
-    -- (mirrors pack_open_advisor's output-quality room_credit). A free slot keeps full value.
-    if SA.CREATES_JOKER[it.key] then
-      local created = Packs.expected_shop_joker(gs, 1, { rng = rng, samples = 4 }) or 0
-      if (slots_free or 0) <= 0 then
-        -- the low full-board credit IS the value: taking max() with card_value (which only haircuts x0.7) let a
-        -- Judgement bought on a full board read as nearly a free joker -- live NUJ9ENYU a5 (2026-10-02, owner-
-        -- confirmed flag 5) bought one at 5/5 and it sat unusable in the tray for the rest of the run. With no free
-        -- slot it does nothing until a joker is sold, and it can be bought THEN: no score value now.
-        vfrac = 0
-      else
-        vfrac = math.max(vfrac, created)
-      end
-    end
-    local sbonus, snote = OwnedSynergy.consumable_bonus(gs, it.set) -- Constellation/Satellite/Perkeo
-    local value, verb
-    -- B1: a standalone tarot/planet/spectral's SCORE value (vfrac) is in boss-hand-fraction
-    -- units -- the SAME scale as a joker's scoring_gain and a pack's pv -- so it MUST use the
-    -- same x5 (JOKER_SCORE_WEIGHT) bridge the joker/pack/reroll paths use. Without it, a loose
-    -- Jupiter was worth exactly 1/5 of the identical Jupiter inside a Celestial pack, which is
-    -- why standalone planets were ~never bought and the leveling channel died at the source.
-    -- (The DOLLAR term below is real money -- already in utility units -- so it is NOT x5'd.)
-    if gain and gain > 0 then
-      -- GAIN via income_frac (bankroll-aware: money climbing toward the interest cap compounds,
-      -- human-economy-policy P4) x the frac->utility bridge; COST stays in raw dollar utility so
-      -- the cost side is unchanged (the §28 guard -- don't make buys look pricier when poor).
-      value = w_score * SA.JOKER_SCORE_WEIGHT * (vfrac + sbonus)
-        + (final and 0 or VU.income_frac(gs, gain)) * SA.JOKER_SCORE_WEIGHT - cost * dollar_u  -- net money (none in the final shop)
-      verb = "Buy & use"
+  end
+  local syn, note = synergy_bonus(gs, sj)             -- copy/econ deck synergy
+  -- situational downside (hand-size/hand loss, joker destruction, decay) so a
+  -- harmful joker is passed over WHEN the situation makes it bad -- but still
+  -- bought when its scoring/economy gain outweighs the cost.
+  local down = Eval.joker_downside(gs, sj)
+  local fit, fnote = BuildPlan.fit(gs, sj, build, invest)  -- planning: build the core / avoid dilution
+  local econ_term, floor_term = w_econ * econ, econ_floor_penalty(gs, cost)
+  if SA.INCOME_STREAM and econ > 0 and (slots_free or 0) > 0 then
+    econ_term = SA.income_stream_util(gs, econ / VU.ROUND_INCOME_UTIL)   -- econ carries ROUND_INCOME_UTIL; undo it
+    floor_term = 0
+  end
+  local value = w_score * (sgain * 5 + syn + fit + first_scorer) + econ_term - w_score * down
+    - net_cost_c(cost) - floor_term
+  -- the second half of a PAIRED TRADE whose sale was already made (SA.paired_trade): the slot was emptied FOR this
+  -- joker, so buying it is worth what the trade measured (the sold joker's value + the measured gain), not the
+  -- floored, dilution-damped value of a fresh buy -- which would leave the engine having sold a joker for nothing.
+  local pend = gs.run and gs.run.pending_swap
+  if pend and pend.key == sj.key and (pend.edition or false) == (sj.edition or false) then
+    value = math.max(value, SA.W_FV * ((pend.sold_fv or 0) + (pend.up or 0)))
+  end
+  local why = note and (" — " .. note)
+    or (fnote and (" — " .. fnote))
+    or (down > 0 and " — but has a situational downside")
+    or (econ > 0 and string.format(" — +$%d/round", econ) or "")
+  local entry = {
+    type = "BUY_JOKER", target = sj, cost = cost, value = value, need_jslot = true,
+    name = sj.name or sj.key or "joker",
+    reason = string.format("Buy %s ($%d) — adds ~%.0f%% of a boss hand%s.",
+      sj.name or sj.key or "joker", cost, math.max(0, sgain) * 100, why),
+  }
+  -- WS-3 instrumentation (gated): expose the value decomposition so a replay can see WHICH term
+  -- funds a buy (sgain=current-board score, econ=money, fit=planning, cost terms). Pure/read-only.
+  if Flags.global("BES_VALUE_DEBUG") then
+    entry.dbg = { key = sj.key, ante = (gs.meta and gs.meta.ante) or 1, cat = JokerData.resolve(sj.key).cat,
+      sgain = sgain, sgain_w = w_score * sgain * 5, syn = w_score * syn, fit = w_score * fit,
+      first = w_score * first_scorer, econ_w = econ_term,
+      down = w_score * down, net_cost = net_cost_c(cost), floor = floor_term, value = value }
+  end
+  priced[#priced + 1] = entry
+  local leaves = dollars(gs) - cost
+  if ShopState.affordable(gs, cost, credit) and leaves >= reserve - credit and slots_free > 0 then
+    S.best_offer = math.max(S.best_offer, sgain)
+    actions[#actions + 1] = entry
+  end
+end
+
+local function offer_consumable(S, it)
+  local gs, cfreq, cneed, rng, cctx, slots_free = S.gs, S.cfreq, S.cneed, S.rng, S.cctx, S.slots_free
+  local w_score, final, dollar_u, net_cost_c, priced = S.w_score, S.final, S.dollar_u, S.net_cost_c, S.priced
+  local credit, reserve, free_cslots, actions = S.credit, S.reserve, S.free_cslots, S.actions
+  local cost = OwnedSynergy.consumable_free(gs, it.set) and 0 or (it.cost or 3) -- Astronomer: planets free
+  local vfrac, gain, note = ConsumableValue.card_value(gs, it.set, it.key, cfreq, cneed, rng, nil, cctx)
+  -- B1 leveling axis: a hand level raises the base the board's xmult multiply, so amplify a
+  -- Planet's value by the board's core (1.0 with no xmult -> no early over-buy).
+  if it.set == "Planet" then
+    local hand = ConsumableValue.PLANET_KEY_HAND[it.key]
+    -- level_need is a flat "you should level SOMETHING" nudge (fires when you have an xmult core but
+    -- low total levels). Steer it to a hand you actually MAKE: gate by this planet's make-frequency so
+    -- a Mars/Four-of-a-Kind planet on a deck that never makes it (freq 0) gets NO nudge, while a
+    -- Pluto/Pair planet on a pair-heavy deck (freq ~0.9) keeps the full nudge. planet_credit already
+    -- gates to the committed hand (the "building toward it" case); vfrac is already freq-based.
+    local hfreq = (cfreq and cfreq[hand]) or 0
+    local freq_gate = math.min(1, hfreq / SA.PLANET_LEVEL_FREQ)
+    -- the B1 amplifier is an ESTIMATE of the board's xmult; with the measured board context (cctx) CV.level_gain
+    -- already rides the real xmult (exact to <1%), so amplifying again double-counted it (2026-10-05)
+    local amp = (cctx and not SA.LEVEL_AMP_ALWAYS) and 1.0 or BuildPlan.level_amplifier(gs)
+    vfrac = vfrac * amp + BuildPlan.level_need(gs) * freq_gate
+      + BuildPlan.planet_credit(gs, hand)
+  end
+  -- a consumable that CREATES a joker (Judgement) has its OUTPUT measured deck-aware
+  -- (expected random joker), floored at the flat prior -- "Calculated, not static". (B1: the x5
+  -- JOKER-scale is now applied by the base path below, so this no longer pre-multiplies.)
+  -- ⚠ A FULL board IS a barrier for a RANDOM joker: making room means SELLING a joker you chose to
+  -- keep, and a random creation rarely beats it -- a poor trade (owner: "it says take Judgement when
+  -- it doesn't have any free joker slots"). So credit the creation LOW when no joker slot is free
+  -- (mirrors pack_open_advisor's output-quality room_credit). A free slot keeps full value.
+  if SA.CREATES_JOKER[it.key] then
+    local created = Packs.expected_shop_joker(gs, 1, { rng = rng, samples = 4 }) or 0
+    if (slots_free or 0) <= 0 then
+      -- the low full-board credit IS the value: taking max() with card_value (which only haircuts x0.7) let a
+      -- Judgement bought on a full board read as nearly a free joker -- live NUJ9ENYU a5 (2026-10-02, owner-
+      -- confirmed flag 5) bought one at 5/5 and it sat unusable in the tray for the rest of the run. With no free
+      -- slot it does nothing until a joker is sold, and it can be bought THEN: no score value now.
+      vfrac = 0
     else
-      value = w_score * SA.JOKER_SCORE_WEIGHT * (vfrac + sbonus) - net_cost_c(cost)
-      verb = "Buy & hold"   -- keep in a consumable slot for the optimal moment
+      vfrac = math.max(vfrac, created)
     end
-    local tnote = Tarot.target_note(gs, it.key)   -- which deck card(s) to apply it to
-    local entry = {
-      type = "BUY_CONSUMABLE", target = it, cost = cost, value = value, need_cslot = true,
-      name = it.name or it.key or "card",
-      -- structured so the overlay can lift the target into the BIG move line
-      -- ("Buy Empress — apply to your 2 highest-value cards"), not just the reason.
-      -- nil for non-targeting tarots (Hermit/Judgement), so they stay clean.
-      target_note = tnote,
-      reason = string.format("%s %s ($%d) — %s%s%s.", verb, it.name or it.key or "card", cost, note,
-        (tnote and (" — " .. tnote) or ""),
-        (snote ~= "" and (" [+" .. snote .. "]") or "")),
-    }
-    priced[#priced + 1] = entry
-    local leaves = dollars(gs) - cost
-    if ShopState.affordable(gs, cost, credit) and leaves >= reserve - credit and free_cslots > 0 then
-      actions[#actions + 1] = entry
-    end
-  end) end
+  end
+  local sbonus, snote = OwnedSynergy.consumable_bonus(gs, it.set) -- Constellation/Satellite/Perkeo
+  local value, verb
+  -- B1: a standalone tarot/planet/spectral's SCORE value (vfrac) is in boss-hand-fraction
+  -- units -- the SAME scale as a joker's scoring_gain and a pack's pv -- so it MUST use the
+  -- same x5 (JOKER_SCORE_WEIGHT) bridge the joker/pack/reroll paths use. Without it, a loose
+  -- Jupiter was worth exactly 1/5 of the identical Jupiter inside a Celestial pack, which is
+  -- why standalone planets were ~never bought and the leveling channel died at the source.
+  -- (The DOLLAR term below is real money -- already in utility units -- so it is NOT x5'd.)
+  if gain and gain > 0 then
+    -- GAIN via income_frac (bankroll-aware: money climbing toward the interest cap compounds,
+    -- human-economy-policy P4) x the frac->utility bridge; COST stays in raw dollar utility so
+    -- the cost side is unchanged (the §28 guard -- don't make buys look pricier when poor).
+    value = w_score * SA.JOKER_SCORE_WEIGHT * (vfrac + sbonus)
+      + (final and 0 or VU.income_frac(gs, gain)) * SA.JOKER_SCORE_WEIGHT - cost * dollar_u  -- net money (none in the final shop)
+    verb = "Buy & use"
+  else
+    value = w_score * SA.JOKER_SCORE_WEIGHT * (vfrac + sbonus) - net_cost_c(cost)
+    verb = "Buy & hold"   -- keep in a consumable slot for the optimal moment
+  end
+  local tnote = Tarot.target_note(gs, it.key)   -- which deck card(s) to apply it to
+  local entry = {
+    type = "BUY_CONSUMABLE", target = it, cost = cost, value = value, need_cslot = true,
+    name = it.name or it.key or "card",
+    -- structured so the overlay can lift the target into the BIG move line
+    -- ("Buy Empress — apply to your 2 highest-value cards"), not just the reason.
+    -- nil for non-targeting tarots (Hermit/Judgement), so they stay clean.
+    target_note = tnote,
+    reason = string.format("%s %s ($%d) — %s%s%s.", verb, it.name or it.key or "card", cost, note,
+      (tnote and (" — " .. tnote) or ""),
+      (snote ~= "" and (" [+" .. snote .. "]") or "")),
+  }
+  priced[#priced + 1] = entry
+  local leaves = dollars(gs) - cost
+  if ShopState.affordable(gs, cost, credit) and leaves >= reserve - credit and free_cslots > 0 then
+    actions[#actions + 1] = entry
+  end
+end
 
-  -- BUY_VOUCHER (permanent meta-upgrade; valued by engine/vouchers)
-  for _, v in ipairs(shop.vouchers or {}) do Progress.step(); try(function()
-    local cost = v.cost or 10
-    local vval, vecon, vname, vnote = Vouchers.value(gs, v.key,
-      { rng = rng, cache = mopts.cache, samples = 6, at_risk = not secure })
-    vval = vval * SA.VOUCHER_FV_UTIL   -- FV points -> utility (the joker buy's scale)
-    local value = w_score * vval + w_econ * vecon * VU.ROUND_INCOME_UTIL - net_cost_c(cost)
-    -- an INTEREST-CAP voucher (Seed Money / Money Tree) under SA.VOUCHER_STREAM: its extra interest is a \$/round stream
-    -- that takes no joker slot, so it is priced as the money it pays over the rounds left (SA.income_stream_util) --
-    -- the slot cost that made the same pricing lose for money jokers (inc / inch) does not apply. (Was one round-income
-    -- unit, ~3 one-off dollars per \$/round: a \$4/round Seed Money at \$45 read +1.2, below an Arcana pack; the
-    -- owner's capture runs 2026-10-20 bought it at \$45 and Money Tree at \$75.) A/B switch BES_VOUCHER_STREAM=1.
-    if SA.VOUCHER_STREAM and Vouchers.INTEREST[v.key] and vecon > 0 then
-      value = w_score * vval + SA.income_stream_util(gs, vecon) - net_cost_c(cost)
-    end
-    -- a DISCOUNT voucher: the dollars it saves over the rest of the run, priced like the dollars it costs
-    -- (SA.COST_WEIGHT per dollar, w_econ for the situation), see Vouchers.savings_dollars
-    local saved = Vouchers.savings_dollars(gs, v.key)
-    if saved then
-      value = w_score * vval + w_econ * cost_w * saved - net_cost_c(cost)
-      vnote = string.format("%s -- saves ~$%d over the rest of the run", vnote or "discount", math.floor(saved + 0.5))
-    end
-    local entry = {
-      type = "BUY_VOUCHER", target = v, cost = cost, value = value, name = vname,
-      reason = string.format("Buy %s ($%d) — %s.", vname, cost, vnote or "permanent upgrade"),
-    }
-    priced[#priced + 1] = entry
-    local leaves = dollars(gs) - cost
-    if ShopState.affordable(gs, cost, credit) and leaves >= reserve - credit then
-      actions[#actions + 1] = entry
-    end
-  end) end
+-- BUY_VOUCHER (permanent meta-upgrade; valued by engine/vouchers)
+local function offer_voucher(S, v)
+  local gs, rng, mopts, secure, w_score, w_econ = S.gs, S.rng, S.mopts, S.secure, S.w_score, S.w_econ
+  local net_cost_c, cost_w, priced, credit, reserve = S.net_cost_c, S.cost_w, S.priced, S.credit, S.reserve
+  local actions = S.actions
+  local cost = v.cost or 10
+  local vval, vecon, vname, vnote = Vouchers.value(gs, v.key,
+    { rng = rng, cache = mopts.cache, samples = 6, at_risk = not secure })
+  vval = vval * SA.VOUCHER_FV_UTIL   -- FV points -> utility (the joker buy's scale)
+  local value = w_score * vval + w_econ * vecon * VU.ROUND_INCOME_UTIL - net_cost_c(cost)
+  -- an INTEREST-CAP voucher (Seed Money / Money Tree) under SA.VOUCHER_STREAM: its extra interest is a \$/round stream
+  -- that takes no joker slot, so it is priced as the money it pays over the rounds left (SA.income_stream_util) --
+  -- the slot cost that made the same pricing lose for money jokers (inc / inch) does not apply. (Was one round-income
+  -- unit, ~3 one-off dollars per \$/round: a \$4/round Seed Money at \$45 read +1.2, below an Arcana pack; the
+  -- owner's capture runs 2026-10-20 bought it at \$45 and Money Tree at \$75.) A/B switch BES_VOUCHER_STREAM=1.
+  if SA.VOUCHER_STREAM and Vouchers.INTEREST[v.key] and vecon > 0 then
+    value = w_score * vval + SA.income_stream_util(gs, vecon) - net_cost_c(cost)
+  end
+  -- a DISCOUNT voucher: the dollars it saves over the rest of the run, priced like the dollars it costs
+  -- (SA.COST_WEIGHT per dollar, w_econ for the situation), see Vouchers.savings_dollars
+  local saved = Vouchers.savings_dollars(gs, v.key)
+  if saved then
+    value = w_score * vval + w_econ * cost_w * saved - net_cost_c(cost)
+    vnote = string.format("%s -- saves ~$%d over the rest of the run", vnote or "discount", math.floor(saved + 0.5))
+  end
+  local entry = {
+    type = "BUY_VOUCHER", target = v, cost = cost, value = value, name = vname,
+    reason = string.format("Buy %s ($%d) — %s.", vname, cost, vnote or "permanent upgrade"),
+  }
+  priced[#priced + 1] = entry
+  local leaves = dollars(gs) - cost
+  if ShopState.affordable(gs, cost, credit) and leaves >= reserve - credit then
+    actions[#actions + 1] = entry
+  end
+end
 
-  -- BUY_PACK (booster packs). Valued by what the pack grants, calculated where
-  -- possible: Celestial uses the measured best-hand level gain; Buffoon is a
-  -- joker pick (weighted by whether we need scoring); others are estimated.
-  for _, pk in ipairs(shop.boosters or {}) do Progress.step(); try(function()
-    local kind = Packs.size_of(pk.key or pk.name)             -- joker/tarot/planet/...
-    local sbonus, snote = OwnedSynergy.pack_bonus(gs, kind)   -- jokers you own that fire on opening
-    local cost = OwnedSynergy.pack_free(gs, kind) and 0 or (pk.cost or 4) -- Astronomer: Celestial free
-    local pv, pnote = pack_value(gs, pk, rng, kind == "joker" and swap_bar() or nil)
-    -- B1: a Celestial pack is leveling -> amplify by the board's core (see BUY_CONSUMABLE).
-    -- (2026-10-05, live UAPB3XY9 flag 7) the Celestial POOL is already valued against the measured board context
-    -- (Packs planet_pool -> CV.level_gain with bctx: the board's real xmult), so the B1 estimate x1.9 per xmult joker
-    -- counted the board twice (Celestial 0.43 -> 0.85, out-ranking an Arcana at 0.52). Only the no-deck path, which
-    -- has no board context, still takes it.
-    if kind == "planet" then
-      local amp = (gs.deck and #gs.deck >= 5 and not SA.LEVEL_AMP_ALWAYS) and 1.0 or BuildPlan.level_amplifier(gs)
-      pv = pv * amp + BuildPlan.level_need(gs)
-    end
-    -- pv is in "fraction of a boss hand" units, the SAME scale as a joker's
-    -- scoring_gain and the reroll's expected joker -- so it must use the same
-    -- x5 weighting those do, otherwise packs are valued at 1/5 their worth and
-    -- a reroll/buy always wins (a $4 Buffoon never beats a $5 reroll).
-    -- Gate the POOL value by how much we still need it (free slot, deck-shaping,
-    -- pacing margin) so packs are bought on need, not reflexively; owned-synergy
-    -- (sbonus) fires regardless and is left undamped.
-    local need, nnote = pack_need(gs, kind, secure, pace, slots_free)
-    -- PACK POVERTY DISCIPLINE (SA.PACK_POVERTY_DAMP): below the max-interest bankroll, bank rather
-    -- than gamble on a pack. `dollar_cap` is the $ that maxes interest, computed convention-robustly
-    -- so it is $25/50/100 on BOTH the live overlay (interest_cap = the dollar threshold) and the sim
-    -- (interest_cap = int-dollars, x5) -- see the reverted interest_cap unit fix. Urgent survival and
-    -- owned-synergy (sbonus) are never damped.
-    local dollar_cap = (cap >= 25) and cap or (cap * 5)
-    local pack_money = 1.0
-    -- CELESTIAL EXEMPTION (docs/archive/conversion_baseline.txt): leveling a COMMITTED hand is a DIRECTED build
-    -- action, not a speculative gamble on a pool -- it is the ONE channel where engine and winner
-    -- agree EXACTLY (0 discordant pairs, WINRATE_V3_PLAN 5s), and the conversion investigation named
-    -- UNDER-LEVELING as the concrete gap (3 of 4 engine-followed losses died with an xmult core over
-    -- a level-1 base). So a planet pack is exempt from the poverty damp -- but ONLY in the FINISHING
-    -- WINDOW (BP.level_push_active: committed hand + banked >= $20 + ante >= 4). Gating it there is
-    -- deliberate: un-damping a planet pack while genuinely POOR (< $20, early) would re-open the §28
-    -- spending-when-poor harm the damp exists to prevent (ecap3 -0.945). In the finishing window the
-    -- bank is at/near the interest cap and the core+economy already stand, so converting it to levels
-    -- is exactly the winners' play -- and the damp there is only mild anyway (0.69-1.0), so this is a
-    -- safe, narrow correctness gate, not a licence to gamble when broke.
-    local directed_level = (kind == "planet") and BuildPlan.level_push_active(gs)
-    if not final and not directed_level and not (pace and pace.urgent) and dollars(gs) < dollar_cap and dollar_cap > 0 then
-      -- steeper than linear (^1.6): the human buys few packs until NEAR the cap, then ramps up
-      -- (measured 6% poor -> ~20% rich), so the damp must bite hardest well below the cap and
-      -- fade only as the bankroll approaches it.
-      local frac = dollars(gs) / dollar_cap
-      pack_money = clamp(frac ^ 1.6, SA.PACK_POVERTY_DAMP, 1.0)
-    end
-    local value = w_score * 5 * (pv * need * pack_money + sbonus) - net_cost(cost) - econ_floor_penalty(gs, cost)
-    local entry = {
-      type = "BUY_PACK", target = pk, cost = cost, value = value,
-      name = Packs.display_name(pk.key or pk.name, pk.name),
-      reason = string.format("Open %s ($%d) — %s%s%s.",
-        Packs.display_name(pk.key or pk.name, pk.name), cost, pnote,
-        (nnote and (" — " .. nnote) or ""),
-        (snote ~= "" and (" [+" .. snote .. "]") or "")),
-    }
-    priced[#priced + 1] = entry
-    local leaves = dollars(gs) - cost
-    if ShopState.affordable(gs, cost, credit) and leaves >= reserve - credit then
-      actions[#actions + 1] = entry
-    end
-  end) end
+-- BUY_PACK (booster packs). Valued by what the pack grants, calculated where
+-- possible: Celestial uses the measured best-hand level gain; Buffoon is a
+-- joker pick (weighted by whether we need scoring); others are estimated.
+local function offer_pack(S, pk)
+  local gs, rng, swap_bar, secure, pace, slots_free = S.gs, S.rng, S.swap_bar, S.secure, S.pace, S.slots_free
+  local cap, final, w_score, net_cost, priced, credit = S.cap, S.final, S.w_score, S.net_cost, S.priced, S.credit
+  local reserve, actions = S.reserve, S.actions
+  local kind = Packs.size_of(pk.key or pk.name)             -- joker/tarot/planet/...
+  local sbonus, snote = OwnedSynergy.pack_bonus(gs, kind)   -- jokers you own that fire on opening
+  local cost = OwnedSynergy.pack_free(gs, kind) and 0 or (pk.cost or 4) -- Astronomer: Celestial free
+  local pv, pnote = pack_value(gs, pk, rng, kind == "joker" and swap_bar() or nil)
+  -- B1: a Celestial pack is leveling -> amplify by the board's core (see BUY_CONSUMABLE).
+  -- (2026-10-05, live UAPB3XY9 flag 7) the Celestial POOL is already valued against the measured board context
+  -- (Packs planet_pool -> CV.level_gain with bctx: the board's real xmult), so the B1 estimate x1.9 per xmult joker
+  -- counted the board twice (Celestial 0.43 -> 0.85, out-ranking an Arcana at 0.52). Only the no-deck path, which
+  -- has no board context, still takes it.
+  if kind == "planet" then
+    local amp = (gs.deck and #gs.deck >= 5 and not SA.LEVEL_AMP_ALWAYS) and 1.0 or BuildPlan.level_amplifier(gs)
+    pv = pv * amp + BuildPlan.level_need(gs)
+  end
+  -- pv is in "fraction of a boss hand" units, the SAME scale as a joker's
+  -- scoring_gain and the reroll's expected joker -- so it must use the same
+  -- x5 weighting those do, otherwise packs are valued at 1/5 their worth and
+  -- a reroll/buy always wins (a $4 Buffoon never beats a $5 reroll).
+  -- Gate the POOL value by how much we still need it (free slot, deck-shaping,
+  -- pacing margin) so packs are bought on need, not reflexively; owned-synergy
+  -- (sbonus) fires regardless and is left undamped.
+  local need, nnote = pack_need(gs, kind, secure, pace, slots_free)
+  -- PACK POVERTY DISCIPLINE (SA.PACK_POVERTY_DAMP): below the max-interest bankroll, bank rather
+  -- than gamble on a pack. `dollar_cap` is the $ that maxes interest, computed convention-robustly
+  -- so it is $25/50/100 on BOTH the live overlay (interest_cap = the dollar threshold) and the sim
+  -- (interest_cap = int-dollars, x5) -- see the reverted interest_cap unit fix. Urgent survival and
+  -- owned-synergy (sbonus) are never damped.
+  local dollar_cap = (cap >= 25) and cap or (cap * 5)
+  local pack_money = 1.0
+  -- CELESTIAL EXEMPTION (docs/archive/conversion_baseline.txt): leveling a COMMITTED hand is a DIRECTED build
+  -- action, not a speculative gamble on a pool -- it is the ONE channel where engine and winner
+  -- agree EXACTLY (0 discordant pairs, WINRATE_V3_PLAN 5s), and the conversion investigation named
+  -- UNDER-LEVELING as the concrete gap (3 of 4 engine-followed losses died with an xmult core over
+  -- a level-1 base). So a planet pack is exempt from the poverty damp -- but ONLY in the FINISHING
+  -- WINDOW (BP.level_push_active: committed hand + banked >= $20 + ante >= 4). Gating it there is
+  -- deliberate: un-damping a planet pack while genuinely POOR (< $20, early) would re-open the §28
+  -- spending-when-poor harm the damp exists to prevent (ecap3 -0.945). In the finishing window the
+  -- bank is at/near the interest cap and the core+economy already stand, so converting it to levels
+  -- is exactly the winners' play -- and the damp there is only mild anyway (0.69-1.0), so this is a
+  -- safe, narrow correctness gate, not a licence to gamble when broke.
+  local directed_level = (kind == "planet") and BuildPlan.level_push_active(gs)
+  if not final and not directed_level and not (pace and pace.urgent) and dollars(gs) < dollar_cap and dollar_cap > 0 then
+    -- steeper than linear (^1.6): the human buys few packs until NEAR the cap, then ramps up
+    -- (measured 6% poor -> ~20% rich), so the damp must bite hardest well below the cap and
+    -- fade only as the bankroll approaches it.
+    local frac = dollars(gs) / dollar_cap
+    pack_money = clamp(frac ^ 1.6, SA.PACK_POVERTY_DAMP, 1.0)
+  end
+  local value = w_score * 5 * (pv * need * pack_money + sbonus) - net_cost(cost) - econ_floor_penalty(gs, cost)
+  local entry = {
+    type = "BUY_PACK", target = pk, cost = cost, value = value,
+    name = Packs.display_name(pk.key or pk.name, pk.name),
+    reason = string.format("Open %s ($%d) — %s%s%s.",
+      Packs.display_name(pk.key or pk.name, pk.name), cost, pnote,
+      (nnote and (" — " .. nnote) or ""),
+      (snote ~= "" and (" [+" .. snote .. "]") or "")),
+  }
+  priced[#priced + 1] = entry
+  local leaves = dollars(gs) - cost
+  if ShopState.affordable(gs, cost, credit) and leaves >= reserve - credit then
+    actions[#actions + 1] = entry
+  end
+end
 
-  Progress.step()
-  -- REROLL: pay to replace the shop's offerings. Worth its price only when (a)
-  -- you can still afford to BUY the joker it surfaces (rerolling your last $5 to
-  -- $0 buys nothing), and (b) the expected new joker beats what's already here.
-  -- APPETITE gates how willing we are to reroll at all: low by default (a fresh
-  -- shop is free next round), HIGH when you're ABOVE the interest cap (extra $
-  -- earns no interest, so churning is nearly free), and raised when survival is
-  -- AT RISK (you need to find help or you die). So rerolling on a thin, safe
-  -- bankroll is discouraged; rerolling when rich or desperate is allowed.
-  try(function()
+-- REROLL: pay to replace the shop's offerings. Worth its price only when (a)
+-- you can still afford to BUY the joker it surfaces (rerolling your last $5 to
+-- $0 buys nothing), and (b) the expected new joker beats what's already here.
+-- APPETITE gates how willing we are to reroll at all: low by default (a fresh
+-- shop is free next round), HIGH when you're ABOVE the interest cap (extra $
+-- earns no interest, so churning is nearly free), and raised when survival is
+-- AT RISK (you need to find help or you die). So rerolling on a thin, safe
+-- bankroll is discouraged; rerolling when rich or desperate is allowed.
+local function offer_reroll(S)
+  local gs, shop, credit, reserve, swap_bar, rng = S.gs, S.shop, S.credit, S.reserve, S.swap_bar, S.rng
+  local best_offer, reserve_target, final, secure = S.best_offer, S.reserve_target, S.final, S.secure
+  local w_score, net_cost, actions, priced = S.w_score, S.net_cost, S.actions, S.priced
   -- Chaos the Clown gives a free reroll; Flash Card gains mult per reroll.
   local rcost = OwnedSynergy.reroll_free(gs) and 0 or shop.reroll_cost
   local rbonus, rnote = OwnedSynergy.reroll_bonus(gs)
@@ -1300,20 +1301,22 @@ function SA.recommend(gs, opts)
       end
     end
   end
-  end)
+end
 
-  Progress.step()
-  -- SELL_JOKER. Value the weakest sellable joker against the three circumstances
-  -- that justify a sale, all in the future-value currency (W_FV-weighted):
-  --   (1) UPGRADE  -- slots are full and the shop has a better joker that the
-  --                   freed slot (+ the sale cash) lets you buy.
-  --   (2) CASH     -- you need money now (survival at risk / nearly broke) more
-  --                   than this joker's marginal contribution.
-  --   (3) DEAD/HARM-- it contributes ~nothing, or is a decaying/downside joker
-  --                   (SELL_NUDGE) better banked before it turns to nothing.
-  -- A healthy contributing joker yields a negative value here, so it is only
-  -- recommended when one of the circumstances actually outweighs what's lost.
-  try(function()
+-- SELL_JOKER. Value the weakest sellable joker against the three circumstances
+-- that justify a sale, all in the future-value currency (W_FV-weighted):
+--   (1) UPGRADE  -- slots are full and the shop has a better joker that the
+--                   freed slot (+ the sale cash) lets you buy.
+--   (2) CASH     -- you need money now (survival at risk / nearly broke) more
+--                   than this joker's marginal contribution.
+--   (3) DEAD/HARM-- it contributes ~nothing, or is a decaying/downside joker
+--                   (SELL_NUDGE) better banked before it turns to nothing.
+-- A healthy contributing joker yields a negative value here, so it is only
+-- recommended when one of the circumstances actually outweighs what's lost.
+local function offer_joker_sale(S)
+  local gs, slots_free, secure, mopts, surv, dollar_u = S.gs, S.slots_free, S.secure, S.mopts, S.surv, S.dollar_u
+  local shop, reserve, invest, swap_mopts, build = S.shop, S.reserve, S.invest, S.swap_mopts, S.build
+  local trade_mopts, actions, rng = S.trade_mopts, S.actions, S.rng
   local swap_trace = Flags.global("BES_SWAP_TRACE")   -- diagnostic only (tools/swap_bar_probe.lua)
   if #(gs.jokers or {}) > 0 then
     -- Only pay for the deck-aware leave-one-out ranking when a sale is plausibly on
@@ -1587,351 +1590,379 @@ function SA.recommend(gs, opts)
       end
     end
   end
-  end)
+end
 
-  -- F6: an income tarot is also a funding option. Hermit normally waits until
-  -- its +$20 cap, but cashing it early can be correct when the resulting money
-  -- unlocks a concrete, measured high-value purchase. Price that decision against
-  -- the payout preserved by holding it: an early Hermit gives up (20-current_gain)
-  -- future dollars; Temperance's current payout is stable in this shop, so using
-  -- it to fund a purchase gives up no additional payout. This is deliberately tied
-  -- to a specific `priced` item rather than a generic "cash is good" threshold.
-  try(function()
-    local best
-    for _, c in ipairs(gs.consumables or {}) do
-      local gain, future_gain
-      if c.key == "c_hermit" then
-        gain = math.min(math.max(0, dollars(gs)), Tarot.HERMIT_MAX_GAIN)
-        future_gain = Tarot.HERMIT_MAX_GAIN
-      elseif c.key == "c_temperance" then
-        gain = 0
-        for _, j in ipairs(gs.jokers or {}) do gain = gain + (j.sell_value or 0) end
-        gain = math.min(gain, 50)
-        future_gain = gain
-      end
-      if gain and gain > 0 then
-        for _, p in ipairs(priced) do
-          local affordable_now = ShopState.affordable(gs, p.cost, credit)
-            and (dollars(gs) - p.cost) >= reserve - credit
-          local jfree = slots_free
-          local cfree = free_cslots + 1 -- using the tarot frees its held slot
-          local slot_ok = (not p.need_jslot or jfree > 0) and (not p.need_cslot or cfree > 0)
-          local final = dollars(gs) + gain - p.cost
-          if not affordable_now and slot_ok and final >= reserve - credit then
-            local option_cost = math.max(0, future_gain - gain) * dollar_u
-            local funded = p.value - option_cost
-            if (not best) or funded > best.value then
-              best = { value = funded, c = c, p = p, gain = gain, option_cost = option_cost }
-            end
+-- F6: an income tarot is also a funding option. Hermit normally waits until
+-- its +$20 cap, but cashing it early can be correct when the resulting money
+-- unlocks a concrete, measured high-value purchase. Price that decision against
+-- the payout preserved by holding it: an early Hermit gives up (20-current_gain)
+-- future dollars; Temperance's current payout is stable in this shop, so using
+-- it to fund a purchase gives up no additional payout. This is deliberately tied
+-- to a specific `priced` item rather than a generic "cash is good" threshold.
+local function offer_income_tarot_funding(S)
+  local gs, priced, credit, reserve, slots_free = S.gs, S.priced, S.credit, S.reserve, S.slots_free
+  local free_cslots, dollar_u, actions = S.free_cslots, S.dollar_u, S.actions
+  local best
+  for _, c in ipairs(gs.consumables or {}) do
+    local gain, future_gain
+    if c.key == "c_hermit" then
+      gain = math.min(math.max(0, dollars(gs)), Tarot.HERMIT_MAX_GAIN)
+      future_gain = Tarot.HERMIT_MAX_GAIN
+    elseif c.key == "c_temperance" then
+      gain = 0
+      for _, j in ipairs(gs.jokers or {}) do gain = gain + (j.sell_value or 0) end
+      gain = math.min(gain, 50)
+      future_gain = gain
+    end
+    if gain and gain > 0 then
+      for _, p in ipairs(priced) do
+        local affordable_now = ShopState.affordable(gs, p.cost, credit)
+          and (dollars(gs) - p.cost) >= reserve - credit
+        local jfree = slots_free
+        local cfree = free_cslots + 1 -- using the tarot frees its held slot
+        local slot_ok = (not p.need_jslot or jfree > 0) and (not p.need_cslot or cfree > 0)
+        local final = dollars(gs) + gain - p.cost
+        if not affordable_now and slot_ok and final >= reserve - credit then
+          local option_cost = math.max(0, future_gain - gain) * dollar_u
+          local funded = p.value - option_cost
+          if (not best) or funded > best.value then
+            best = { value = funded, c = c, p = p, gain = gain, option_cost = option_cost }
           end
         end
       end
     end
-    if best and best.value > 0 then
+  end
+  if best and best.value > 0 then
+    actions[#actions + 1] = {
+      type = "USE_CONSUMABLE", target = best.c, use_names = { best.c.key },
+      kind = "income", gain = best.gain, value = best.value, then_buy = best.p,
+      reason = string.format(
+        "Use %s (+$%d) to afford %s -- its measured gain beats waiting for a larger payout.",
+        best.c.name or best.c.key, best.gain, best.p.name or "the shop item"),
+    }
+  end
+end
+
+-- STANDALONE income-consumable use (2026-08-26 advice-review, #3). The block above only
+-- surfaces a held Hermit/Temperance when it FUNDS an unaffordable buy -- so the human sat on
+-- a Hermit all game with >$20 and it was never suggested. But an income consumable at its MAX
+-- payout has ZERO opportunity cost to holding (the payout can't grow), while holding it risks
+-- the slot (a pack tarot overwrites it) and, worse, spending FIRST shrinks it (Hermit doubles
+-- CURRENT money, so buy-then-Hermit nets strictly less than Hermit-then-buy). So once it is
+-- maxed, recommend using it NOW, before any spend. Valued at the free money it banks
+-- (gain * DOLLAR_UTIL), which for a maxed Hermit is $20*0.3 = 6.0 -- a strong, top-of-list action.
+local function offer_income_tarot_use(S)
+  local gs, actions, dollar_u = S.gs, S.actions, S.dollar_u
+  for _, c in ipairs(gs.consumables or {}) do
+    local gain, future_gain
+    if c.key == "c_hermit" then
+      gain = math.min(math.max(0, dollars(gs)), Tarot.HERMIT_MAX_GAIN)
+      future_gain = Tarot.HERMIT_MAX_GAIN
+    elseif c.key == "c_temperance" then
+      local s = 0
+      for _, j in ipairs(gs.jokers or {}) do s = s + (j.sell_value or 0) end
+      gain = math.min(s, 50)
+      future_gain = 50          -- Temperance grows with your jokers; only "maxed" at the $50 cap
+    end
+    -- fire ONLY when the payout is at its ceiling (holding can gain nothing more)
+    if gain and gain > 0 and gain >= future_gain - 1e-9 then
       actions[#actions + 1] = {
-        type = "USE_CONSUMABLE", target = best.c, use_names = { best.c.key },
-        kind = "income", gain = best.gain, value = best.value, then_buy = best.p,
+        type = "USE_CONSUMABLE", target = c, use_names = { c.key }, kind = "income",
+        gain = gain, value = gain * dollar_u,
         reason = string.format(
-          "Use %s (+$%d) to afford %s -- its measured gain beats waiting for a larger payout.",
-          best.c.name or best.c.key, best.gain, best.p.name or "the shop item"),
+          "Use %s now (+$%d, free) -- its payout is maxed, so holding it only risks the slot; use it BEFORE you spend.",
+          c.name or c.key, gain),
       }
     end
-  end)
+  end
+end
 
-  -- STANDALONE income-consumable use (2026-08-26 advice-review, #3). The block above only
-  -- surfaces a held Hermit/Temperance when it FUNDS an unaffordable buy -- so the human sat on
-  -- a Hermit all game with >$20 and it was never suggested. But an income consumable at its MAX
-  -- payout has ZERO opportunity cost to holding (the payout can't grow), while holding it risks
-  -- the slot (a pack tarot overwrites it) and, worse, spending FIRST shrinks it (Hermit doubles
-  -- CURRENT money, so buy-then-Hermit nets strictly less than Hermit-then-buy). So once it is
-  -- maxed, recommend using it NOW, before any spend. Valued at the free money it banks
-  -- (gain * DOLLAR_UTIL), which for a maxed Hermit is $20*0.3 = 6.0 -- a strong, top-of-list action.
-  try(function()
-    for _, c in ipairs(gs.consumables or {}) do
-      local gain, future_gain
-      if c.key == "c_hermit" then
-        gain = math.min(math.max(0, dollars(gs)), Tarot.HERMIT_MAX_GAIN)
-        future_gain = Tarot.HERMIT_MAX_GAIN
-      elseif c.key == "c_temperance" then
-        local s = 0
-        for _, j in ipairs(gs.jokers or {}) do s = s + (j.sell_value or 0) end
-        gain = math.min(s, 50)
-        future_gain = 50          -- Temperance grows with your jokers; only "maxed" at the $50 cap
-      end
-      -- fire ONLY when the payout is at its ceiling (holding can gain nothing more)
-      if gain and gain > 0 and gain >= future_gain - 1e-9 then
-        actions[#actions + 1] = {
-          type = "USE_CONSUMABLE", target = c, use_names = { c.key }, kind = "income",
-          gain = gain, value = gain * dollar_u,
-          reason = string.format(
-            "Use %s now (+$%d, free) -- its payout is maxed, so holding it only risks the slot; use it BEFORE you spend.",
-            c.name or c.key, gain),
-        }
-      end
+-- SELL_TO_BUY -- fund a wanted-but-unaffordable shop item by selling a low-value
+-- owned joker / held consumable. For each priced item we can't afford, find the
+-- funder whose sale (a) covers the gap (cash + frees the right slot) and (b) gives
+-- up the least, then value the whole plan: the item gained, PLUS the cash raised,
+-- MINUS what the funder was worth to keep. Recommends the SALE (step 1) when that
+-- beats saving -- so "$1 short of a Buffoon pack, holding a Jupiter" sells the
+-- Jupiter instead of saving (and only when the maths actually favour it).
+local function offer_sell_to_buy(S)
+  local gs, mopts, surv, cfreq, cctx, rng, cneed = S.gs, S.mopts, S.surv, S.cfreq, S.cctx, S.rng, S.cneed
+  local w_score, dollar_u, priced, credit, reserve = S.w_score, S.dollar_u, S.priced, S.credit, S.reserve
+  local slots_free, free_cslots, actions = S.slots_free, S.free_cslots, S.actions
+  local funders = {}
+  for i, j in ipairs(gs.jokers or {}) do
+    local ab = j.ability
+    local eternal = type(ab) == "table" and (ab.eternal or (type(ab.extra) == "table" and ab.extra.eternal))
+    if not eternal then
+      -- core protection here too: a weak-board xmult/scaler measures a small keep-loss, so
+      -- SELL_TO_BUY would fund a purchase by dumping the future core. Add BP.keep_bias to its
+      -- loss so the disposable additive filler is chosen as the funder instead. (This is the
+      -- path that was actually churning 43% of bought xmult -- the SELL_JOKER guard missed it.)
+      -- ANTI-CHURN (2026-08-26, live run 9UZ3Q5Q5): a NON-SCORING utility joker (Burglar grants
+      -- hands, doesn't score) measures ~0 on joker_marginal_fv, so it looked like free funding and
+      -- got bought then SOLD the SAME shop visit to buy a LOWER-rated joker. Floor the loss by the
+      -- joker's TIER so a decent piece (tier>3) isn't treated as disposable; true filler (tier<=3)
+      -- stays freely sellable. TIER_FUNDER_FLOOR is in the same units as keep_bias/marginal_fv.
+      local tier = (JokerData.resolve(j.key).tier or 0)
+      local fires = Eval.joker_fires(gs, i, mopts)
+      -- (R12) the tier floor is for jokers whose worth the scorer can't see; a modelled joker MEASURED
+      -- to do nothing on this deck (fires == false: a Mime with nothing to retrigger) gets none
+      local floor = (fires == false) and 0 or math.max(0, tier - 3) * SA.TIER_FUNDER_FLOOR
+      local contribution = JokerWorth.of(gs, i, "own", mopts)
+      funders[#funders + 1] = { kind = "joker", name = j.name or j.key, target = j,
+        cash = j.sell_value or 1, idx = i,
+        contribution = contribution, live = funder_is_live(gs, j, contribution),
+        loss = math.max(contribution, floor) + BuildPlan.keep_bias(j.key, gs, fires)
+          + ((surv() and surv().penalty(i)) or 0) }
     end
-  end)
-
-  Progress.step()
-  -- SELL_TO_BUY -- fund a wanted-but-unaffordable shop item by selling a low-value
-  -- owned joker / held consumable. For each priced item we can't afford, find the
-  -- funder whose sale (a) covers the gap (cash + frees the right slot) and (b) gives
-  -- up the least, then value the whole plan: the item gained, PLUS the cash raised,
-  -- MINUS what the funder was worth to keep. Recommends the SALE (step 1) when that
-  -- beats saving -- so "$1 short of a Buffoon pack, holding a Jupiter" sells the
-  -- Jupiter instead of saving (and only when the maths actually favour it).
-  try(function()
-    local funders = {}
-    for i, j in ipairs(gs.jokers or {}) do
-      local ab = j.ability
-      local eternal = type(ab) == "table" and (ab.eternal or (type(ab.extra) == "table" and ab.extra.eternal))
-      if not eternal then
-        -- core protection here too: a weak-board xmult/scaler measures a small keep-loss, so
-        -- SELL_TO_BUY would fund a purchase by dumping the future core. Add BP.keep_bias to its
-        -- loss so the disposable additive filler is chosen as the funder instead. (This is the
-        -- path that was actually churning 43% of bought xmult -- the SELL_JOKER guard missed it.)
-        -- ANTI-CHURN (2026-08-26, live run 9UZ3Q5Q5): a NON-SCORING utility joker (Burglar grants
-        -- hands, doesn't score) measures ~0 on joker_marginal_fv, so it looked like free funding and
-        -- got bought then SOLD the SAME shop visit to buy a LOWER-rated joker. Floor the loss by the
-        -- joker's TIER so a decent piece (tier>3) isn't treated as disposable; true filler (tier<=3)
-        -- stays freely sellable. TIER_FUNDER_FLOOR is in the same units as keep_bias/marginal_fv.
-        local tier = (JokerData.resolve(j.key).tier or 0)
-        local fires = Eval.joker_fires(gs, i, mopts)
-        -- (R12) the tier floor is for jokers whose worth the scorer can't see; a modelled joker MEASURED
-        -- to do nothing on this deck (fires == false: a Mime with nothing to retrigger) gets none
-        local floor = (fires == false) and 0 or math.max(0, tier - 3) * SA.TIER_FUNDER_FLOOR
-        local contribution = JokerWorth.of(gs, i, "own", mopts)
-        funders[#funders + 1] = { kind = "joker", name = j.name or j.key, target = j,
-          cash = j.sell_value or 1, idx = i,
-          contribution = contribution, live = funder_is_live(gs, j, contribution),
-          loss = math.max(contribution, floor) + BuildPlan.keep_bias(j.key, gs, fires)
-            + ((surv() and surv().penalty(i)) or 0) }
-      end
-    end
-    if #(gs.consumables or {}) > 0 then
-      local hfreq, hctx = cfreq, cctx
-      if not hfreq then
-        for _, c in ipairs(gs.consumables) do
-          if c.set == "Planet" then hfreq, hctx = ConsumableValue.hand_frequencies(gs, { samples = 8, rng = rng }); break end
-        end
-      end
+  end
+  if #(gs.consumables or {}) > 0 then
+    local hfreq, hctx = cfreq, cctx
+    if not hfreq then
       for _, c in ipairs(gs.consumables) do
-        local vfrac, gain = ConsumableValue.card_value(gs, c.set, c.key, hfreq, cneed, rng, nil, hctx)
-        if c.set == "Planet" then
-          vfrac = (vfrac or 0) + BuildPlan.planet_credit(gs, ConsumableValue.PLANET_KEY_HAND[c.key])
-        end
-        -- value a held joker-creator's OUTPUT deck-aware (B1: the x5 scale is applied on the
-        -- loss line below, matching the buy path -- no longer pre-multiplied here).
-        if SA.CREATES_JOKER[c.key] then
-          local created = Packs.expected_shop_joker(gs, 1, { rng = rng, samples = 4 }) or 0
-          vfrac = math.max(vfrac or 0, created)
-        end
-        -- B1: the keep-loss is on the same x5 JOKER scale as the buy path, so a held Planet is
-        -- NOT the cheapest funder any more (it used to be valued at 1/5 and got churned to fund
-        -- a pack -- dismantling the leveling fuel the run was accruing).
-        funders[#funders + 1] = { kind = "consumable", name = c.name or c.key, target = c,
-          cash = c.sell_cost or 1, loss = w_score * SA.JOKER_SCORE_WEIGHT * (vfrac or 0) + dollar_u * (gain or 0) }
+        if c.set == "Planet" then hfreq, hctx = ConsumableValue.hand_frequencies(gs, { samples = 8, rng = rng }); break end
       end
     end
-
-    local best
-    for _, p in ipairs(priced) do
-      local affordable_now = ShopState.affordable(gs, p.cost, credit) and (dollars(gs) - p.cost) >= reserve - credit
-      if not affordable_now then
-        for _, f in ipairs(funders) do
-          -- NEVER sell your LAST board joker to fund a NON-joker buy (pack/voucher/tarot):
-          -- it leaves you jokerless, which is fatal early (sim: 12 board-emptying sells over
-          -- 7/40 runs -- e.g. seed 5003 sold its only joker for a Celestial pack, entered
-          -- ante 2 with 0 jokers + $0, died). The SELL_JOKER only_scorer guard (B2) didn't
-          -- cover this path. A joker-for-joker swap (p.need_jslot) keeps a board, so it's fine.
-          local empties_board = f.kind == "joker" and #(gs.jokers or {}) <= 1 and not p.need_jslot
-          -- ANTI-CHURN GATE (2026-08-27 MALEJYHW; GENERALISED 2026-08-31). A joker funder may only
-          -- be sold to fund a JOKER buy that CLEARLY upgrades it (add-marginal beats keep-marginal by
-          -- JokerWorth.UPGRADE_MARGIN), and may NEVER fund a non-joker -- UNLESS it is DEAD (disposable filler).
-          -- Originally this only applied to `funder_is_live` (econ/edition) jokers, so plain scorers
-          -- fell through and got churned lateral/worse (Clever->Mystic->Bloodstone across three shops).
-          -- SA.stb_funder_allowed now applies it to every functional joker. `dead` scorers still fund
-          -- freely (the standalone "only cash-sell a DEAD joker" principle). Add-marginal is measured
-          -- only when the buy needs a joker slot (the only case where it can be a legal upgrade).
-          local live_ok = true
-          if f.kind == "joker" then
-            local add_m = p.need_jslot and JokerWorth.of(gs, p.target, "add", mopts) or 0
-            live_ok = SA.stb_funder_allowed(f.contribution, add_m, p.need_jslot, f.live)
-          end
-          if f.target ~= p.target and not empties_board and live_ok then  -- don't sell the very thing you're buying
-            local jfree = slots_free + (f.kind == "joker" and 1 or 0)
-            local cfree = free_cslots + (f.kind == "consumable" and 1 or 0)
-            local slot_ok = (not p.need_jslot or jfree > 0) and (not p.need_cslot or cfree > 0)
-            local final = dollars(gs) + f.cash - p.cost     -- bankroll after sell then buy
-            if slot_ok and final >= reserve - credit then
-              -- p.value already nets the buy's worth minus its cost; add the cash the
-              -- sale raises and subtract what the funder was worth to keep.
-              --
-              -- REPLACEMENT CHARGE (WINRATE_V3_PLAN §10). SELL_TO_BUY is **81%** of the engine's
-              -- ante-1..2 sell advice (170 of 209), and it sells jokers of mean tier 4.30 -- the
-              -- same quality as what it buys -- where the 7-win human sells 0.12/run of tier 3.00
-              -- junk. Selling a joker to fund a NON-joker frees a slot the engine demonstrably
-              -- REFILLS (board 2.9 -> 4.6 -> 5.0 across antes 2-4 in every arm measured), so the
-              -- sale is temporary: it raises ~$2.5 and the refill costs ~$5. The purchase price is
-              -- sunk and correctly ignored here, but the REFILL is not sunk and was unpriced --
-              -- which is why the engine churned ~$5.6/run away before ante 3, Hanging Chad (in all
-              -- seven human wins) among the casualties.
-              --
-              -- Charged ONLY when the buy does not itself take the slot: a joker-for-joker swap
-              -- refills it immediately, so it owes nothing. Exempt in the endgame, where there is
-              -- no runway left to refill. Uses SA.TYPICAL_JOKER_COST -- the constant the engine
-              -- already keeps for exactly this quantity -- so no new number is introduced.
-              -- Lesion evidence: nochurn2 +0.114, nochurn3 +0.177 (dose-responsive), and the
-              -- incremental step nochurn3-vs-nochurn2 is sign 36/19, p 0.031, on a low-cascade
-              -- comparison (105 of 154 seeds tied, sd 0.765).
-              local net_cash = f.cash
-              if f.kind == "joker" and not p.need_jslot
-                 and (((gs.meta or {}).ante) or 1) < SA.ENDGAME_ANTE then
-                net_cash = f.cash - SA.TYPICAL_JOKER_COST
-              end
-              local funded = p.value + dollar_u * net_cash - f.loss
-              if (not best) or funded > best.value then best = { value = funded, f = f, p = p } end
-            end
-          end
-        end
+    for _, c in ipairs(gs.consumables) do
+      local vfrac, gain = ConsumableValue.card_value(gs, c.set, c.key, hfreq, cneed, rng, nil, hctx)
+      if c.set == "Planet" then
+        vfrac = (vfrac or 0) + BuildPlan.planet_credit(gs, ConsumableValue.PLANET_KEY_HAND[c.key])
       end
-    end
-    if best and best.value > 0 then
-      actions[#actions + 1] = {
-        type = "SELL_TO_BUY", target = best.f.target, cost = 0, value = best.value,
-        sell_kind = best.f.kind, then_buy = best.p,
-        reason = string.format("Sell %s (+$%d) to afford %s — the gain beats keeping it.",
-          best.f.name, best.f.cash, best.p.name or "the shop item"),
-      }
-    end
-  end)
-
-  -- USE A HELD PLANET NOW (live BQ63E388, 2026-09-26: planets were bought and HELD until the next blind). A level is
-  -- permanent, so using it now loses nothing -- and holding it takes a consumable slot and keeps that planet out of
-  -- the shop pool (the game does not offer a card you already hold), the very planet the engine wanted more of.
-  -- Holding has value only with Observatory (a held planet gives x1.5 to its hand) or Perkeo (copies a held card
-  -- at shop end), so those keep the old behaviour.
-  try(function()
-    local vo = (gs.run and gs.run.vouchers_owned) or {}
-    local held_value = vo.v_observatory and true or false          -- live: a set { key = true }
-    for _, k in ipairs(vo) do if k == "v_observatory" then held_value = true end end   -- sim: a list
-    -- Perkeo: under BES_PERKEO its copy target is the hidden seed (engine/perkeo.lua), so every OTHER held planet is used
-    if not require("engine.perkeo").SWITCH then
-      for _, j in ipairs(gs.jokers or {}) do if j.key == "j_perkeo" then held_value = true end end
-    end
-    if held_value then return end
-    local hfreq, hctx
-    for _, c in ipairs(gs.consumables or {}) do
-      if c.set == "Planet" or c.key == "c_black_hole" then
-        if not hfreq then hfreq, hctx = ConsumableValue.hand_frequencies(gs, { rng = rng }) end
-        local vfrac = ConsumableValue.card_value(gs, c.set or "Planet", c.key, hfreq, cneed, rng, nil, hctx) or 0
-        local hand = ConsumableValue.PLANET_KEY_HAND[c.key]
-        if hand then vfrac = vfrac + BuildPlan.planet_credit(gs, hand) end
-        actions[#actions + 1] = {
-          type = "USE_CONSUMABLE", target = c, cost = 0, use_keys = { c.key }, hand_type = hand,
-          value = math.max(1e-3, w_score * SA.JOKER_SCORE_WEIGHT * vfrac),
-          reason = string.format("Use %s now — the level is permanent, and holding it blocks a slot and keeps that planet out of the shop.",
-            c.name or c.key),
-        }
-      end
-    end
-  end)
-
-  -- USE A HELD JOKER-MAKER WHEN A SLOT IS FREE (owner 2026-10-03, flag 5: "judgement could've been used in between
-  -- selling a joker for a new one while the slots open"). A held Judgement does nothing until a joker slot opens;
-  -- when one is free it is worth the joker it makes. Not while a paired trade's buy is due -- that slot is taken.
-  try(function()
-    if (slots_free or 0) <= 0 or (gs.run and gs.run.pending_swap) then return end
-    for _, c in ipairs(gs.consumables or {}) do
+      -- value a held joker-creator's OUTPUT deck-aware (B1: the x5 scale is applied on the
+      -- loss line below, matching the buy path -- no longer pre-multiplied here).
       if SA.CREATES_JOKER[c.key] then
         local created = Packs.expected_shop_joker(gs, 1, { rng = rng, samples = 4 }) or 0
-        if created > 0 then
-          actions[#actions + 1] = {
-            type = "USE_CONSUMABLE", target = c, cost = 0, use_keys = { c.key },
-            value = w_score * SA.JOKER_SCORE_WEIGHT * created,
-            reason = string.format("Use %s now — a joker slot is free for the joker it makes.", c.name or c.key),
-          }
-        end
-        break
+        vfrac = math.max(vfrac or 0, created)
       end
-    end
-  end)
-
-  -- ---- rank ----
-  -- Tie-break toward the safest action so a break-even buy never beats SAVE.
-  local PRIO = { SAVE = 0, SELL_JOKER = 1, SELL_TO_BUY = 1, USE_CONSUMABLE = 1,
-                 REROLL = 1, BUY_VOUCHER = 2, BUY_JOKER = 2, BUY_PACK = 2,
-                 BUY_CONSUMABLE = 2 }
-  table.sort(actions, function(a, b)
-    if math.abs(a.value - b.value) > 1e-9 then return a.value > b.value end
-    local pa, pb = PRIO[a.type] or 3, PRIO[b.type] or 3
-    if pa ~= pb then return pa < pb end
-    -- final DETERMINISTIC tie-break: equal value AND equal priority (e.g. BUY_PACK vs
-    -- BUY_VOUCHER, both PRIO 2) would otherwise leave table.sort order undefined ->
-    -- process-dependent. Order by type then target name so the pick is reproducible.
-    if a.type ~= b.type then return a.type < b.type end
-    local an = (a.target and (a.target.name or a.target.key)) or ""
-    local bn = (b.target and (b.target.name or b.target.key)) or ""
-    return tostring(an) < tostring(bn)
-  end)
-
-  -- PACK-FIRST sequencing (2026-08-26 advice-review #5). The human's rule: open packs BEFORE
-  -- committing cash. If the top pick is a shop BUY but there is ALSO a positive-value pack that
-  -- fits alongside it (both affordable together, so you'll do BOTH this shop anyway), lead with the
-  -- pack: it is non-committal information -- the pick may contain the very joker/consumable that
-  -- makes the buy redundant ("bought Hiker then a Buffoon"), and spending first can shrink a later
-  -- money-tarot's payout. NON-LOSSY by construction: it only ever fires when the buy remains
-  -- affordable after opening the pack, so the buy is never forfeited -- only its ORDER changes.
-  do
-    local top = actions[1]
-    if top and (top.type == "BUY_JOKER" or top.type == "BUY_VOUCHER" or top.type == "BUY_CONSUMABLE") then
-      local buy_cost = top.cost or 0
-      local best_pack, best_idx
-      for i, a in ipairs(actions) do
-        if a.type == "BUY_PACK" and (a.value or 0) > 0
-           and (dollars(gs) - (a.cost or 0) - buy_cost) >= (reserve - credit) then
-          if not best_pack or (a.value or 0) > (best_pack.value or 0) then best_pack, best_idx = a, i end
-        end
-      end
-      if best_pack and best_idx > 1 then
-        table.remove(actions, best_idx)
-        table.insert(actions, 1, best_pack)
-        best_pack.reason = (best_pack.reason or "") .. string.format(
-          "  [Open this BEFORE buying %s — a pack is free info (it may make the buy redundant) and you can afford both.]",
-          (top.target and (top.target.name or top.target.key)) or "the shop item")
-      end
+      -- B1: the keep-loss is on the same x5 JOKER scale as the buy path, so a held Planet is
+      -- NOT the cheapest funder any more (it used to be valued at 1/5 and got churned to fund
+      -- a pack -- dismantling the leveling fuel the run was accruing).
+      funders[#funders + 1] = { kind = "consumable", name = c.name or c.key, target = c,
+        cash = c.sell_cost or 1, loss = w_score * SA.JOKER_SCORE_WEIGHT * (vfrac or 0) + dollar_u * (gain or 0) }
     end
   end
 
-  -- BUY-BEFORE-REROLL (2026-09-26, live seed 5XX3FFG3: rerolled away an Emperor valued +1.95 and a Strength
-  -- valued +1.15 because the reroll ranked higher). A reroll REPLACES every joker/tarot/planet in the shop
-  -- slots, so a positive-value slot item it outranks is simply destroyed -- the two are not alternatives
-  -- when you can afford both. If the top pick is a paid or free REROLL and a positive slot buy still leaves
-  -- the reroll affordable (same reserve test the reroll itself passed), buy it first; the next evaluation
-  -- re-decides the reroll on the smaller bankroll. A joker buy must leave a joker slot free (the reroll is
-  -- looking for a joker); packs and vouchers survive a reroll, so they are left alone.
-  do
-    local top = actions[1]
-    if top and top.type == "REROLL" then
-      local rc = top.cost or 0
-      local pick, pick_idx
-      for i, a in ipairs(actions) do
-        local swap_ok = a.type == "SELL_JOKER" and a.swap_for and (a.value or 0) > 0
-        and (dollars(gs) + (a.swap_cash or 0) - (a.swap_for.cost or 0) - rc) >= (reserve - credit)
-      if swap_ok or ((a.type == "BUY_JOKER" or a.type == "BUY_CONSUMABLE") and (a.value or 0) > 0
-           and (a.type ~= "BUY_JOKER" or (slots_free or 0) >= 2)
-           and (dollars(gs) - (a.cost or 0) - rc) >= (reserve - credit)) then
-          if not pick or a.value > pick.value then pick, pick_idx = a, i end
+  local best
+  for _, p in ipairs(priced) do
+    local affordable_now = ShopState.affordable(gs, p.cost, credit) and (dollars(gs) - p.cost) >= reserve - credit
+    if not affordable_now then
+      for _, f in ipairs(funders) do
+        -- NEVER sell your LAST board joker to fund a NON-joker buy (pack/voucher/tarot):
+        -- it leaves you jokerless, which is fatal early (sim: 12 board-emptying sells over
+        -- 7/40 runs -- e.g. seed 5003 sold its only joker for a Celestial pack, entered
+        -- ante 2 with 0 jokers + $0, died). The SELL_JOKER only_scorer guard (B2) didn't
+        -- cover this path. A joker-for-joker swap (p.need_jslot) keeps a board, so it's fine.
+        local empties_board = f.kind == "joker" and #(gs.jokers or {}) <= 1 and not p.need_jslot
+        -- ANTI-CHURN GATE (2026-08-27 MALEJYHW; GENERALISED 2026-08-31). A joker funder may only
+        -- be sold to fund a JOKER buy that CLEARLY upgrades it (add-marginal beats keep-marginal by
+        -- JokerWorth.UPGRADE_MARGIN), and may NEVER fund a non-joker -- UNLESS it is DEAD (disposable filler).
+        -- Originally this only applied to `funder_is_live` (econ/edition) jokers, so plain scorers
+        -- fell through and got churned lateral/worse (Clever->Mystic->Bloodstone across three shops).
+        -- SA.stb_funder_allowed now applies it to every functional joker. `dead` scorers still fund
+        -- freely (the standalone "only cash-sell a DEAD joker" principle). Add-marginal is measured
+        -- only when the buy needs a joker slot (the only case where it can be a legal upgrade).
+        local live_ok = true
+        if f.kind == "joker" then
+          local add_m = p.need_jslot and JokerWorth.of(gs, p.target, "add", mopts) or 0
+          live_ok = SA.stb_funder_allowed(f.contribution, add_m, p.need_jslot, f.live)
         end
-      end
-      if pick and pick_idx > 1 then
-        table.remove(actions, pick_idx)
-        table.insert(actions, 1, pick)
-        pick.reason = (pick.reason or "") .. (pick.swap_for
-          and "  [Do this BEFORE rerolling — a reroll would replace the joker it makes room for.]"
-          or "  [Buy this BEFORE rerolling — a reroll replaces it, and you can afford both.]")
+        if f.target ~= p.target and not empties_board and live_ok then  -- don't sell the very thing you're buying
+          local jfree = slots_free + (f.kind == "joker" and 1 or 0)
+          local cfree = free_cslots + (f.kind == "consumable" and 1 or 0)
+          local slot_ok = (not p.need_jslot or jfree > 0) and (not p.need_cslot or cfree > 0)
+          local final = dollars(gs) + f.cash - p.cost     -- bankroll after sell then buy
+          if slot_ok and final >= reserve - credit then
+            -- p.value already nets the buy's worth minus its cost; add the cash the
+            -- sale raises and subtract what the funder was worth to keep.
+            --
+            -- REPLACEMENT CHARGE (WINRATE_V3_PLAN §10). SELL_TO_BUY is **81%** of the engine's
+            -- ante-1..2 sell advice (170 of 209), and it sells jokers of mean tier 4.30 -- the
+            -- same quality as what it buys -- where the 7-win human sells 0.12/run of tier 3.00
+            -- junk. Selling a joker to fund a NON-joker frees a slot the engine demonstrably
+            -- REFILLS (board 2.9 -> 4.6 -> 5.0 across antes 2-4 in every arm measured), so the
+            -- sale is temporary: it raises ~$2.5 and the refill costs ~$5. The purchase price is
+            -- sunk and correctly ignored here, but the REFILL is not sunk and was unpriced --
+            -- which is why the engine churned ~$5.6/run away before ante 3, Hanging Chad (in all
+            -- seven human wins) among the casualties.
+            --
+            -- Charged ONLY when the buy does not itself take the slot: a joker-for-joker swap
+            -- refills it immediately, so it owes nothing. Exempt in the endgame, where there is
+            -- no runway left to refill. Uses SA.TYPICAL_JOKER_COST -- the constant the engine
+            -- already keeps for exactly this quantity -- so no new number is introduced.
+            -- Lesion evidence: nochurn2 +0.114, nochurn3 +0.177 (dose-responsive), and the
+            -- incremental step nochurn3-vs-nochurn2 is sign 36/19, p 0.031, on a low-cascade
+            -- comparison (105 of 154 seeds tied, sd 0.765).
+            local net_cash = f.cash
+            if f.kind == "joker" and not p.need_jslot
+               and (((gs.meta or {}).ante) or 1) < SA.ENDGAME_ANTE then
+              net_cash = f.cash - SA.TYPICAL_JOKER_COST
+            end
+            local funded = p.value + dollar_u * net_cash - f.loss
+            if (not best) or funded > best.value then best = { value = funded, f = f, p = p } end
+          end
+        end
       end
     end
   end
+  if best and best.value > 0 then
+    actions[#actions + 1] = {
+      type = "SELL_TO_BUY", target = best.f.target, cost = 0, value = best.value,
+      sell_kind = best.f.kind, then_buy = best.p,
+      reason = string.format("Sell %s (+$%d) to afford %s — the gain beats keeping it.",
+        best.f.name, best.f.cash, best.p.name or "the shop item"),
+    }
+  end
+end
+
+-- USE A HELD PLANET NOW (live BQ63E388, 2026-09-26: planets were bought and HELD until the next blind). A level is
+-- permanent, so using it now loses nothing -- and holding it takes a consumable slot and keeps that planet out of
+-- the shop pool (the game does not offer a card you already hold), the very planet the engine wanted more of.
+-- Holding has value only with Observatory (a held planet gives x1.5 to its hand) or Perkeo (copies a held card
+-- at shop end), so those keep the old behaviour.
+local function offer_held_planet_use(S)
+  local gs, rng, cneed, actions, w_score = S.gs, S.rng, S.cneed, S.actions, S.w_score
+  local vo = (gs.run and gs.run.vouchers_owned) or {}
+  local held_value = vo.v_observatory and true or false          -- live: a set { key = true }
+  for _, k in ipairs(vo) do if k == "v_observatory" then held_value = true end end   -- sim: a list
+  -- Perkeo: under BES_PERKEO its copy target is the hidden seed (engine/perkeo.lua), so every OTHER held planet is used
+  if not require("engine.perkeo").SWITCH then
+    for _, j in ipairs(gs.jokers or {}) do if j.key == "j_perkeo" then held_value = true end end
+  end
+  if held_value then return end
+  local hfreq, hctx
+  for _, c in ipairs(gs.consumables or {}) do
+    if c.set == "Planet" or c.key == "c_black_hole" then
+      if not hfreq then hfreq, hctx = ConsumableValue.hand_frequencies(gs, { rng = rng }) end
+      local vfrac = ConsumableValue.card_value(gs, c.set or "Planet", c.key, hfreq, cneed, rng, nil, hctx) or 0
+      local hand = ConsumableValue.PLANET_KEY_HAND[c.key]
+      if hand then vfrac = vfrac + BuildPlan.planet_credit(gs, hand) end
+      actions[#actions + 1] = {
+        type = "USE_CONSUMABLE", target = c, cost = 0, use_keys = { c.key }, hand_type = hand,
+        value = math.max(1e-3, w_score * SA.JOKER_SCORE_WEIGHT * vfrac),
+        reason = string.format("Use %s now — the level is permanent, and holding it blocks a slot and keeps that planet out of the shop.",
+          c.name or c.key),
+      }
+    end
+  end
+end
+
+-- USE A HELD JOKER-MAKER WHEN A SLOT IS FREE (owner 2026-10-03, flag 5: "judgement could've been used in between
+-- selling a joker for a new one while the slots open"). A held Judgement does nothing until a joker slot opens;
+-- when one is free it is worth the joker it makes. Not while a paired trade's buy is due -- that slot is taken.
+local function offer_held_joker_maker_use(S)
+  local slots_free, gs, rng, actions, w_score = S.slots_free, S.gs, S.rng, S.actions, S.w_score
+  if (slots_free or 0) <= 0 or (gs.run and gs.run.pending_swap) then return end
+  for _, c in ipairs(gs.consumables or {}) do
+    if SA.CREATES_JOKER[c.key] then
+      local created = Packs.expected_shop_joker(gs, 1, { rng = rng, samples = 4 }) or 0
+      if created > 0 then
+        actions[#actions + 1] = {
+          type = "USE_CONSUMABLE", target = c, cost = 0, use_keys = { c.key },
+          value = w_score * SA.JOKER_SCORE_WEIGHT * created,
+          reason = string.format("Use %s now — a joker slot is free for the joker it makes.", c.name or c.key),
+        }
+      end
+      break
+    end
+  end
+end
+
+-- Hand frequencies for pricing a shop planet, sampled only when the shop offers one. `cctx` is the per-hand
+-- board context from the same sampling pass: without it a loose planet is priced against the hand's bare base
+-- and understates 1.4-19x (CV.level_gain).
+local function sample_planet_frequencies(S)
+  for _, it in ipairs(S.shop.consumables or {}) do
+    if it.set == "Planet" then
+      S.cfreq, S.cctx = ConsumableValue.hand_frequencies(S.gs, { samples = 8, rng = S.rng })
+      break
+    end
+  end
+end
+
+-- ---- rank ----
+-- Tie-break toward the safest action so a break-even buy never beats SAVE.
+local PRIO = { SAVE = 0, SELL_JOKER = 1, SELL_TO_BUY = 1, USE_CONSUMABLE = 1,
+               REROLL = 1, BUY_VOUCHER = 2, BUY_JOKER = 2, BUY_PACK = 2,
+               BUY_CONSUMABLE = 2 }
+local function by_value(a, b)
+  if math.abs(a.value - b.value) > 1e-9 then return a.value > b.value end
+  local pa, pb = PRIO[a.type] or 3, PRIO[b.type] or 3
+  if pa ~= pb then return pa < pb end
+  -- final DETERMINISTIC tie-break: equal value AND equal priority (e.g. BUY_PACK vs
+  -- BUY_VOUCHER, both PRIO 2) would otherwise leave table.sort order undefined ->
+  -- process-dependent. Order by type then target name so the pick is reproducible.
+  if a.type ~= b.type then return a.type < b.type end
+  local an = (a.target and (a.target.name or a.target.key)) or ""
+  local bn = (b.target and (b.target.name or b.target.key)) or ""
+  return tostring(an) < tostring(bn)
+end
+
+-- PACK-FIRST sequencing (2026-08-26 advice-review #5). The human's rule: open packs BEFORE
+-- committing cash. If the top pick is a shop BUY but there is ALSO a positive-value pack that
+-- fits alongside it (both affordable together, so you'll do BOTH this shop anyway), lead with the
+-- pack: it is non-committal information -- the pick may contain the very joker/consumable that
+-- makes the buy redundant ("bought Hiker then a Buffoon"), and spending first can shrink a later
+-- money-tarot's payout. NON-LOSSY by construction: it only ever fires when the buy remains
+-- affordable after opening the pack, so the buy is never forfeited -- only its ORDER changes.
+local function lead_with_pack(S)
+  local actions, gs, reserve, credit = S.actions, S.gs, S.reserve, S.credit
+  local top = actions[1]
+  if top and (top.type == "BUY_JOKER" or top.type == "BUY_VOUCHER" or top.type == "BUY_CONSUMABLE") then
+    local buy_cost = top.cost or 0
+    local best_pack, best_idx
+    for i, a in ipairs(actions) do
+      if a.type == "BUY_PACK" and (a.value or 0) > 0
+         and (dollars(gs) - (a.cost or 0) - buy_cost) >= (reserve - credit) then
+        if not best_pack or (a.value or 0) > (best_pack.value or 0) then best_pack, best_idx = a, i end
+      end
+    end
+    if best_pack and best_idx > 1 then
+      table.remove(actions, best_idx)
+      table.insert(actions, 1, best_pack)
+      best_pack.reason = (best_pack.reason or "") .. string.format(
+        "  [Open this BEFORE buying %s — a pack is free info (it may make the buy redundant) and you can afford both.]",
+        (top.target and (top.target.name or top.target.key)) or "the shop item")
+    end
+  end
+end
+
+-- BUY-BEFORE-REROLL (2026-09-26, live seed 5XX3FFG3: rerolled away an Emperor valued +1.95 and a Strength
+-- valued +1.15 because the reroll ranked higher). A reroll REPLACES every joker/tarot/planet in the shop
+-- slots, so a positive-value slot item it outranks is simply destroyed -- the two are not alternatives
+-- when you can afford both. If the top pick is a paid or free REROLL and a positive slot buy still leaves
+-- the reroll affordable (same reserve test the reroll itself passed), buy it first; the next evaluation
+-- re-decides the reroll on the smaller bankroll. A joker buy must leave a joker slot free (the reroll is
+-- looking for a joker); packs and vouchers survive a reroll, so they are left alone.
+local function buy_before_reroll(S)
+  local actions, gs, reserve, credit, slots_free = S.actions, S.gs, S.reserve, S.credit, S.slots_free
+  local top = actions[1]
+  if top and top.type == "REROLL" then
+    local rc = top.cost or 0
+    local pick, pick_idx
+    for i, a in ipairs(actions) do
+      local swap_ok = a.type == "SELL_JOKER" and a.swap_for and (a.value or 0) > 0
+      and (dollars(gs) + (a.swap_cash or 0) - (a.swap_for.cost or 0) - rc) >= (reserve - credit)
+    if swap_ok or ((a.type == "BUY_JOKER" or a.type == "BUY_CONSUMABLE") and (a.value or 0) > 0
+         and (a.type ~= "BUY_JOKER" or (slots_free or 0) >= 2)
+         and (dollars(gs) - (a.cost or 0) - rc) >= (reserve - credit)) then
+        if not pick or a.value > pick.value then pick, pick_idx = a, i end
+      end
+    end
+    if pick and pick_idx > 1 then
+      table.remove(actions, pick_idx)
+      table.insert(actions, 1, pick)
+      pick.reason = (pick.reason or "") .. (pick.swap_for
+        and "  [Do this BEFORE rerolling — a reroll would replace the joker it makes room for.]"
+        or "  [Buy this BEFORE rerolling — a reroll replaces it, and you can afford both.]")
+    end
+  end
+end
+
+-- Order the candidates and package the answer.
+local function ranked_result(S)
+  local actions, gs, plan, pace, boss_adv, warns = S.actions, S.gs, S.plan, S.pace, S.boss_adv, S.warns
+  table.sort(actions, by_value)
+  lead_with_pack(S)
+  buy_before_reroll(S)
 
   local best = actions[1]
   local alternatives = {}
@@ -1963,30 +1994,76 @@ function SA.recommend(gs, opts)
            pace = pace, pace_hint = pace and pace.reason }
 end
 
--- One-line summary for logs.
-function SA.summary(ranked)
-  if not ranked or not ranked.best then return "(no shop recommendation)" end
-  local a = ranked.best
-  return string.format("SHOP: %s | conf %d%% (heuristic) | %s", a.type,
-    math.floor((a.confidence or 0) * 100 + 0.5), a.reason or "")
+-- The ranked candidates for one shop: { best, alternatives, reason, plan, pace, ... }.
+local function recommend(gs, opts)
+  opts = opts or {}
+  local reserve = opts.reserve or 0
+  -- Plan the end-of-shop bankroll ONCE: the interest-optimal end target and the
+  -- shop-wide free budget every buy below draws against (see SA.bankroll_plan).
+  local plan = SA.bankroll_plan(gs, { reserve = reserve })
+
+  -- baseline: SAVE (value 0; everything else is scored relative to this). Surface
+  -- the planned target + interest-free headroom so the "spend down to the cap"
+  -- play is visible.
+  local save = {
+    type = "SAVE", cost = 0, value = 0,
+    reason = SA.final_shop(gs)
+      and "Leave the shop -- nothing left here helps the final boss (money left over is worth nothing now)."
+      or string.format("Bank $%d for interest (+$%d/round).%s",
+      dollars(gs), interest_at(dollars(gs), cap_int_of(gs)),   -- true cap, not the 5x-over-stated live value
+      plan.budget > 0 and string.format(" $%d is interest-free — free to spend.", plan.budget) or ""),
+  }
+  local shop = gs.shop
+  if not shop then return { best = save, alternatives = {}, reason = save.reason } end
+
+  local S = shop_situation(gs, opts, reserve, plan)
+  S.actions[1] = save
+  -- progress for the live Thinking bar: one step per shop item, then the reroll / sell / sell-to-buy passes
+  Progress.span(#(shop.jokers or {}) + #(shop.consumables or {}) + #(shop.vouchers or {}) + #(shop.boosters or {}) + 3)
+
+  -- per-ITEM pcall: a single odd joker can't drop the whole buy list (which is
+  -- what made Abstract/Acrobat vanish when one shop joker threw).
+  for _, sj in ipairs(shop.jokers or {}) do Progress.step(); try(S, offer_joker, sj) end
+  try(S, sample_planet_frequencies)
+  for _, it in ipairs(shop.consumables or {}) do Progress.step(); try(S, offer_consumable, it) end
+  for _, v in ipairs(shop.vouchers or {}) do Progress.step(); try(S, offer_voucher, v) end
+  for _, pk in ipairs(shop.boosters or {}) do Progress.step(); try(S, offer_pack, pk) end
+  Progress.step()
+  try(S, offer_reroll)
+  Progress.step()
+  try(S, offer_joker_sale)
+  try(S, offer_income_tarot_funding)
+  try(S, offer_income_tarot_use)
+  Progress.step()
+  try(S, offer_sell_to_buy)
+  try(S, offer_held_planet_use)
+  try(S, offer_held_joker_maker_use)
+
+  return ranked_result(S)
 end
 
 -- DECISION-SCOPED CRN (BES_CRN_DECISION=1, sim A/B; see JokerValue.CRN_DECISION): every measurement inside one
 -- recommend() shares one fresh set of deals, salted from this state's own seed (deterministic -> no live flicker).
-local recommend_unscoped = SA.recommend
-function SA.recommend(gs, opts)
-  if not JokerValue.CRN_DECISION then return recommend_unscoped(gs, opts) end
+local function recommend_crn_scoped(gs, opts)
+  if not JokerValue.CRN_DECISION then return recommend(gs, opts) end
   local prev = JokerValue.begin_decision((opts and opts.rng) or lcg(state_seed(gs) + 31337))
-  local r = { pcall(recommend_unscoped, gs, opts) }
+  local r = { pcall(recommend, gs, opts) }
   JokerValue.end_decision(prev)
   if not r[1] then error(r[2], 0) end
   return (table.unpack or unpack)(r, 2, table.maxn(r))
 end
 
 -- PERKEO SEED (engine/perkeo.lua, BES_PERKEO=1): the held copy target is never spent by the shop
-local recommend_seeded = SA.recommend
 function SA.recommend(gs, opts)
-  return require("engine.perkeo").with_seed_hidden(gs, recommend_seeded, opts)
+  return require("engine.perkeo").with_seed_hidden(gs, recommend_crn_scoped, opts)
+end
+
+-- One-line summary for logs.
+function SA.summary(ranked)
+  if not ranked or not ranked.best then return "(no shop recommendation)" end
+  local a = ranked.best
+  return string.format("SHOP: %s | conf %d%% (heuristic) | %s", a.type,
+    math.floor((a.confidence or 0) * 100 + 0.5), a.reason or "")
 end
 
 return SA
