@@ -21,6 +21,7 @@ local Pacing      = require("engine.pacing")
 local Eval        = require("engine.eval_function")
 local Json        = require("util.json")
 local SkipAdvisor = require("engine.skip_advisor")
+local Advice      = require("engine.advice")
 local GS          = require("model.game_state")
 local SimState    = require("sim.state")
 local ShopAdvisor = require("engine.shop_advisor")
@@ -286,7 +287,7 @@ function Driver.run(seed, opts)
         -- `invest1` (owner 2026-10-12: "only takes like investment tag ante 1 and that's it"): every other skip refused
         if ok and sk and run.probe and run.probe.skip_only
            and not (run.probe.skip_only[blind.skip_tag] and run.ante <= (run.probe.skip_only_until or 99)) then sk = nil end
-        if ok and sk and sk.recommend == "SKIP" then
+        if ok and sk and Advice.from_skip(sk).type == "SKIP" then
           if content.apply_tag then content.apply_tag(run, blind.skip_tag, run.rng) end
           World.skip_tick(run)   -- A1: Throwback +0.25x per skipped blind
           run._blinds_skipped = (run._blinds_skipped or 0) + 1   -- A5: Speed Tag counter (after payout)

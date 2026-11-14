@@ -543,7 +543,7 @@ local function type_ok(ch, t)
   -- SELL_JOKER is allowed in a pack: a joker pick into a FULL board needs room made first, and you
   -- CAN sell jokers while a booster is open (the make-room sell the engine now recommends as its own step).
   -- USE_CONSUMABLE in a pack: use a held planet to free a consumable slot for a card-making tarot pick
-  if ch == "pack" then return t == "PICK" or t == "SKIP" or t == "SKIP_PACK" or t == "USE_CONSUMABLE" or (t and t:find("^SELL")) end
+  if ch == "pack" then return t == "PICK" or t == "SKIP" or t == "USE_CONSUMABLE" or (t and t:find("^SELL")) end
   if ch == "blind_select" then return t == "CONTINUE" or t == "SKIP" or t == "PLAY" end
   return true
 end
@@ -633,7 +633,7 @@ local function do_shop(G, best, logger)
   return false
 end
 local function do_pack(G, best, logger)
-  if best == nil or best.type == "SKIP" or best.type == "SKIP_PACK" then
+  if best == nil or best.type == "SKIP" then
     log(logger, "skip pack"); return click(G, "skip_booster", logger)
   end
   local target = best.target or best
@@ -715,7 +715,7 @@ function Autoplay.tick(last, logger)
   -- shop freshness false-negative (a no-joker shop where the $/item-count parity never re-synced) left
   -- SAVE blocked forever, and the deadlock-breaker below was unreachable behind the freshness `return`.
   local nontargeted = best.type == "SAVE" or best.type == "REROLL" or best.type == "CONTINUE"
-    or best.type == "SKIP" or best.type == "SKIP_PACK"
+    or best.type == "SKIP"
   -- EXCEPT leaving/rerolling a SHOP: that decision is only right for the stock it was made on, and the first
   -- evaluation of a shop sees it EMPTY (the game stocks it a moment later) -- executing that "Bank $X" left shops
   -- the engine would have bought from (live LBUI8IK1). The deadlock above came from the same root: a stock that

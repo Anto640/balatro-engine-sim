@@ -78,7 +78,7 @@ function H.plan(a)
     targets(a.target_cards)
   elseif t == "REROLL" then button({ "reroll_shop" })
   elseif t == "SAVE" then button({ "toggle_shop" })                     -- "Next Round"
-  elseif t == "SKIP" or t == "SKIP_PACK" then button({ "skip_booster", "skip_blind" })
+  elseif t == "SKIP" then button({ "skip_booster", "skip_blind" })
   elseif t == "CONTINUE" then
     button({ "select_blind" })
     if a.arrange then numbered({ "jokers" }, a.arrange, "GOLD") end   -- Ceremonial Dagger arrangement
