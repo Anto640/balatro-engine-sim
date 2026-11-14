@@ -473,8 +473,14 @@ Content.next_card_id = next_card_id
 local HAND_TO_PLANET = {}
 for pk, hn in pairs(ConsumableValue.PLANET_KEY_HAND or {}) do HAND_TO_PLANET[hn] = pk end
 local function most_leveled_hand(run)
+  -- sorted, so two equally-leveled hands resolve the same way in every process (pairs() order is not stable
+  -- across processes: the same seed opened a different first planet on a rerun, 3 of 160 seeds)
+  local names = {}
+  for h in pairs(run.hand_levels or {}) do names[#names + 1] = h end
+  table.sort(names)
   local best, blvl = nil, 1
-  for h, lv in pairs(run.hand_levels or {}) do
+  for _, h in ipairs(names) do
+    local lv = run.hand_levels[h]
     if (lv.level or 1) > blvl then best, blvl = h, lv.level or 1 end
   end
   return best
