@@ -164,6 +164,10 @@ function T.thin_targets(hand, n, gs)
     for _, c in ipairs(cand) do qv[c] = q(c) end
     table.sort(cand, function(a, b)
       if qv[a] ~= qv[b] then return qv[a] < qv[b] end
+      -- quality tie (K/Q/J/T all score 10 chips) -> cut the LOWER rank, as the build-blind order below does;
+      -- without this the card id decided, and an on-suit King went before a Ten
+      local ra, rb = Cards.rank_id(a) or 0, Cards.rank_id(b) or 0
+      if ra ~= rb then return ra < rb end
       return (a.id or 0) < (b.id or 0)
     end)
     local out = {}

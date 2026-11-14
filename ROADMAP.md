@@ -11,8 +11,7 @@ changes are measured, see [`CONTRIBUTING.md`](CONTRIBUTING.md).
   comparisons, not as an in-game win rate. Trajectory: ~1% in August, ~6% late September, ~28% early October.
 - **Live:** the in-game self-player (F11) has been run unattended for whole nights; two recent nights won 9 of 26 and
   4 of 26 runs. These live runs are reviewed decision by decision; most fixes since September came from them.
-- **Tests:** 1860 headless unit tests, all green; 637 simulator-suite tests, 2 failing (the Hanged Man check in
-  `tests/test_world.lua` expects the lowest cards removed; it predates the November refactor and is not yet traced).
+- **Tests:** 1860 headless unit tests and 637 simulator-suite tests, all green.
 - **Expert reference:** a capture of 8 runs by a strong human player (7 wins) with the engine's recommendations logged
   next to each decision (`data/bes_runs_live_2026-08-12.jsonl`). Per-decision agreement with that player is high; the
   gap is in the trajectory, not in any single choice.
