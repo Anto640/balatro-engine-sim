@@ -27,7 +27,7 @@ assets. It is a single-player aid and self-player: don't use it in Balatro Multi
   Castle / Mail-In round targets read live; a shallow look-ahead search at early shops (`sim/lookahead.lua`, sim-only,
   tested and closed: no gain at this depth). Measured: +$10/round money lifts the sim win rate 36% -> 81%, but forcing
   money jokers does not pay.
-- **Tests:** 1666 headless unit tests + 637 simulator-suite tests, all green.
+- **Tests:** 1860 headless unit tests, all green; 637 simulator-suite tests, 2 known failures (see `ROADMAP.md`).
 - Current state, known limits and open ideas: **[`ROADMAP.md`](ROADMAP.md)**.
 
 ## About this project
@@ -103,14 +103,20 @@ A/B verdict standard and the gotchas.
 ## Layout
 
 ```
-core/     state_extraction (reads G), run telemetry, replay fixtures, change signatures
+core/     state_extraction (reads G), run telemetry, run_record (fields shared with the simulator),
+          replay fixtures, change signatures
 model/    game_state / shop_state PODs
 engine/   hand_eval (scoring), joker_effects / joker_data / joker_value (measured jokers),
-          eval_function (run strength, forward valuation), decision_engine / discard_value /
-          ordering / simulation (in-blind play), shop_advisor, pack_open_advisor, consumable_value,
-          tarot, packs, vouchers, tags, skip_advisor, build_plan, pacing, boss_effect, ...
+          joker_worth (the one "what is this joker worth" entry), eval_function (run strength,
+          forward valuation), decision_engine / discard_value / ordering / simulation (in-blind play),
+          shop_advisor, pack_open_advisor, consumable_value, tarot, packs, vouchers, tags, skip_advisor,
+          build_plan, pacing, boss_effect, ...
+          decision_state (derives and carries what an advisor needs beyond the raw snapshot),
+          advice (an advisor's answer as the next action), flags (the only reader of experiment switches)
 ui/       advice state (overlay), native HUD panel, in-world highlights, autoplay (the self-player)
-sim/      world (rules referee), content (shops/packs/tags), driver (run loop)
+sim/      world (rules referee), content (shops/packs/tags), state (builds the engine's decision state
+          from a run), driver (run loop)
+util/     rng (the per-state seeded random streams), cards, json, log
 tools/    batch runners, analysis and replay tools (see tools/README.md)
 tests/    headless unit + simulator suites
 ```

@@ -523,3 +523,17 @@ envelope−best = **+0.690** and best−floor = **+0.773**. Near-symmetric dispe
 NOISE. **85% of seeds change outcome under tiny policy perturbations**, and the sim is deterministic, so
 this is chaotic policy sensitivity, not measurement error. **Never read max-over-k as an oracle**, and
 expect sd ~1.9 (MDE ~0.42 at n=160) for anything touching the shop loop.
+
+**2026-11-14 architecture sweep (six module extractions + three fixes; arms on the offset-7 pool, n=160).**
+New modules: `engine/flags`, `engine/decision_state` + `sim/state`, `engine/joker_worth`, `engine/advice`,
+`core/run_record`, `util/rng`. Measured against `refA_7` (the code before the sweep, 64 wins / 77 reach-8):
+- `fix3_7` = the refactors + the Fool's copy target in the sim shop state + the full run state at the sim's skip
+  decision + the build-plan fit in the swap paths on the buy scale: **wins 65, reach-8 80, progress +0.061 (p 0.28),
+  101 seeds tied**. Kept; `fix3_7` is the baseline arm.
+- `all_7` = that + ONE shared per-state seed for every advisor (`Rng.state_seed`): **wins 52, reach-8 72; versus
+  `fix3_7` 31 wins lost / 18 gained (McNemar p 0.085), progress -0.163 (sd 2.27, p 0.36)**. It re-rolls every sampled
+  decision, so much of this is a fresh draw, but it has no expected upside: NOT merged. Each advisor keeps its own
+  seed formula; only the generator is shared.
+- Found on the way: the simulator was NOT byte-reproducible. `most_leveled_hand` (the Telescope's planet) broke ties
+  by `pairs()` order, so 3 of 160 seeds differed between two runs of the same commit (outcomes equal). Fixed with
+  sorted iteration. Byte-identity checks between commits must also mask `engine.git_sha` in each run's first record.

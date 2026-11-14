@@ -83,9 +83,22 @@ So:
 
 ## Rules that are easy to break
 
-- **Determinism.** Live advice is recomputed on every state change. Anything that samples must use a per-state seeded
-  RNG (see the `lcg` / `*_seed` helpers in `shop_advisor`, `decision_engine`, `pack_open_advisor`, `search`). Global
-  `math.random` makes the panel flicker between ticks; treat that as a bug.
+- **Determinism.** Live advice is recomputed on every state change. Anything that samples must draw from a stream
+  seeded by the state it is deciding on, built with `util/rng.lua` (`Rng.stream(seed)`; each advisor keeps its own
+  `*_seed(gs)` formula). Don't write a generator inline (a test checks for it) and never use global `math.random`: it
+  makes the panel flicker between ticks.
+- **No choice may depend on `pairs()` order.** Iteration order over string keys differs between processes, so a
+  tie broken by it makes two runs of the same seed disagree. Sort the keys first (the simulator's Telescope planet
+  did this wrong until November 2026, which made arms differ on a few seeds).
+- **Experiment switches go through `engine/flags.lua`.** It is the only file in `engine/` and `sim/` that reads the
+  environment or a `BES_*` global (a test enforces it), and `Flags.list()` is the inventory of every switch.
+- **Build decision states through `engine/decision_state.lua`.** The live mod, the simulator (`sim/state.lua`) and
+  fixture replay all call `DecisionState.derive`, which adds the derived and carried fields (the boss effect, the
+  build commitment). `DecisionState.CONTRACT` lists what each decision kind reads; a fact the simulator does not yet
+  carry is listed in `SimState.GAPS`, and closing a gap is a behaviour change to measure as its own arm.
+- **Ask `JokerWorth.of(gs, joker, side)` what a joker is worth** (`engine/joker_worth.lua`; sides `buy`, `pick`,
+  `add`, `own`) instead of calling a valuation path directly: the sides differ in unit and in whether the edition is
+  included, and the module's header says which.
 - **Time-sliced evaluation.** Live recommendations run in a coroutine that yields at `HandEval`'s slice boundaries so
   the game keeps animating. A new heavy loop that scores without going through `each_subset` must call
   `HandEval.yield_tick()`, and nothing may score inside a C callback (a `table.sort` comparator, `gsub`): a yield there
