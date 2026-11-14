@@ -23,11 +23,15 @@ if SMODS and SMODS.load_file then
   -- actually ours by loading it -- if it isn't, we return nil and let other
   -- mods' requires proceed untouched.
   local NS = { util = true, model = true, core = true, engine = true, ui = true }
+  -- Our mod id, captured NOW: SMODS.load_file without an id works only while the mod is first loading
+  -- (SMODS.current_mod), so a module first required LATER -- engine/perkeo, at the first decision -- was "not
+  -- found" and every recommendation failed (live 2026-11-14). With the id it loads at any time.
+  local MOD_ID = SMODS.current_mod and SMODS.current_mod.id
   local function bes_searcher(name)
     local top = name:match("^([%w_]+)%.")
     if not (top and NS[top]) then return nil end
     local path = name:gsub("%.", "/") .. ".lua"
-    local ok, chunk = pcall(SMODS.load_file, path)
+    local ok, chunk = pcall(SMODS.load_file, path, MOD_ID)
     if not ok or type(chunk) ~= "function" then return nil end -- not one of ours
     return chunk                                               -- Lua calls it to build the module
   end

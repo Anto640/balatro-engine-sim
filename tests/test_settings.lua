@@ -34,6 +34,16 @@ return function(t)
     S.toggle_panel(); S.apply(ctx)
     t.eq(overlay.visible, true, "F9 again shows it")
 
+    -- F9 SAVES the setting (Steamodded only saves on leaving the Mods menu, so the panel came back off)
+    local smods, saved_mod = _G.SMODS, nil
+    _G.SMODS = { save_mod_config = function(m) saved_mod = m; return true end }
+    local shown = S.toggle_panel()
+    _G.SMODS = smods
+    t.eq(saved_mod, mod, "F9 saves the mod's config")
+    t.eq(mod.config.show_panel, shown, "and the saved table carries the new value")
+    S.toggle_panel(); S.apply(ctx)
+    t.eq(overlay.visible, true, "panel back on for the rest of the suite")
+
     -- the speed cycle callback
     S.on_speed({ to_key = 1, to_val = "x4" })
     t.eq(cfg.fast_speed, 4, "option cycle sets the speed")

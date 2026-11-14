@@ -27,7 +27,7 @@ assets. It is a single-player aid and self-player: don't use it in Balatro Multi
   Castle / Mail-In round targets read live; a shallow look-ahead search at early shops (`sim/lookahead.lua`, sim-only,
   tested and closed: no gain at this depth). Measured: +$10/round money lifts the sim win rate 36% -> 81%, but forcing
   money jokers does not pay.
-- **Tests:** 1860 headless unit tests + 637 simulator-suite tests, all green.
+- **Tests:** 1872 headless unit tests + 637 simulator-suite tests, all green.
 - Current state, known limits and open ideas: **[`ROADMAP.md`](ROADMAP.md)**.
 
 ## About this project

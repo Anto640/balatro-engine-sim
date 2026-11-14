@@ -19,6 +19,7 @@ function S.init(mod)
   local cfg = (mod and type(mod.config) == "table") and mod.config or {}
   for k, v in pairs(S.DEFAULTS) do if cfg[k] == nil then cfg[k] = v end end
   if mod then mod.config = cfg end
+  S.mod = mod
   S.cfg = cfg
   S._applied_panel = nil
   return cfg
@@ -41,10 +42,12 @@ function S.apply(ctx)
   if ctx.scheduler then ctx.scheduler.think_mode = c.think_mode or S.DEFAULTS.think_mode end
 end
 
--- F9: flip the panel setting (S.apply shows / hides it next frame).
+-- F9: flip the panel setting (S.apply shows / hides it next frame) and SAVE it. Steamodded saves the config only
+-- when the Mods menu is left, so a panel switched on with F9 was off again at the next launch (live 2026-11-14).
 function S.toggle_panel()
   if not S.cfg then return nil end
   S.cfg.show_panel = not S.cfg.show_panel
+  if S.mod and SMODS and SMODS.save_mod_config then pcall(SMODS.save_mod_config, S.mod) end
   return S.cfg.show_panel
 end
 
