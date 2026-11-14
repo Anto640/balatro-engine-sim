@@ -479,9 +479,7 @@ end
 CV.CARD_INCOME = Flags.off("BES_CARD_INCOME")
 local function card_income_frac(gs, d)
   if not CV.CARD_INCOME then return VU.round_income_frac(gs, d) end
-  local ok, SA = pcall(require, "engine.shop_advisor")
-  if not (ok and SA.income_stream_util) then return VU.round_income_frac(gs, d) end
-  return SA.income_stream_util(gs, d) / VU.FRAC_UTIL
+  return require("engine.shop_advisor").income_stream_util(gs, d) / VU.FRAC_UTIL
 end
 
 function CV.card_econ_value(gs, card, rng)
@@ -730,9 +728,7 @@ end
 -- full board is a modest haircut, not zero. Was a flat 1.2.
 function CV.soul_value(gs, need, opts)
   opts = opts or {}
-  local ok, Packs = pcall(require, "engine.packs")
-  if not ok or not Packs.expected_joker_of_rarity then return CV.SPECTRAL_BASE.c_soul or 1.2 end
-  local v = Packs.expected_joker_of_rarity(gs, "Legendary", opts)
+  local v = require("engine.packs").expected_joker_of_rarity(gs, "Legendary", opts)
   if not v then return CV.SPECTRAL_BASE.c_soul or 1.2 end
   local slots = (gs.run and gs.run.joker_slots) or 5
   local free = slots - #(gs.jokers or {})
@@ -955,9 +951,237 @@ function CV.tarot_presence(gs, n)
   local deck = math.max(1, #(gs.deck or {}))
   local hs = (gs.run and gs.run.hand_size) or 8
   local p = math.min(1, (n or 1) * hs / deck)
-  local okE, Eval = pcall(require, "engine.eval_function")
-  local hands = (okE and Eval.blinds_remaining) and math.max(1, Eval.blinds_remaining(gs) * CV.HANDS_PER_BLIND) or 20
+  local hands = math.max(1, require("engine.eval_function").blinds_remaining(gs) * CV.HANDS_PER_BLIND)
   return math.min(1, p + 1 / hands)
+end
+
+-- CV.card_value for one planet: value (boss-hand fraction), dollars, label.
+local function planet_value(gs, key, freq, need, rng, hand_ctx)
+  local hand = CV.PLANET_KEY_HAND[key]
+  if hand then
+    -- freq for the hand this planet levels. If a freq table was provided, an
+    -- ABSENT hand means you never make it (0), not "unknown" -- so don't apply the
+    -- 0.4 prior there. If no freq was provided, compute it from the deck; only a
+    -- deckless state falls back to the 0.4 prior.
+    local f, bctx
+    if freq then
+      f = freq[hand] or 0
+      bctx = hand_ctx    -- supplied alongside `freq`; both come from hand_frequencies
+    else
+      local hf; hf, bctx = CV.hand_frequencies(gs, { samples = 8, rng = rng })
+      f = hf and (hf[hand] or 0) or 0.4
+    end
+    return CV.level_scale(gs) * (CV.level_share(f) * CV.level_gain(gs, hand, 1, bctx)) / need, 0, "level " .. hand
+  end
+  return 0.3, 0, "planet"
+end
+
+-- CV.card_value for one tarot: value (boss-hand fraction), dollars, label.
+local function tarot_value(gs, key, need, rng, samples)
+  if key == "c_emperor" and in_emperor then return 0, 0, "tarot" end
+  if key == "c_hermit" then
+    local g = math.min(dollars(gs), 20)        -- doubles money, max +$20
+    return 0, g, string.format("double money +$%d", g)
+  elseif key == "c_temperance" then
+    local s = 0
+    for _, j in ipairs(gs.jokers or {}) do s = s + (j.sell_value or 0) end
+    s = math.min(s, 50)
+    return 0, s, string.format("+$%d joker sell value", s)
+  elseif key == "c_hanged_man" then
+    -- The Hanged Man destroys up to 2 SELECTED cards -> targeted thinning of
+    -- your worst (off-suit / low) cards toward the run's deck target.
+    local v, tgt = DeckPlan.delete_value(gs, 2, "best")
+    return v, 0, (tgt.archetype == "flush" and "cut 2 off-suit cards" or "thin 2 weakest cards")
+  end
+  -- GENERATOR tarots (2026-09-26, owner: no flat scores; live 5XX3FFG3 took High Priestess at a flat 0.40 over a
+  -- Strength that fit the board). Priced by what they make, landed in the consumable slots they need:
+  if key == "c_high_priestess" or key == "c_emperor" then
+    -- inside an open pack the pack advisor applies the landing itself (gen_fit, with make-room credit)
+    local landed = gs.pack and 2 or CV.created_consumables_land(gs, key, 2)
+    if landed <= 0 then return 0, 0, "no free consumable slot for its output" end
+    local mean = (key == "c_high_priestess") and CV.mean_random_planet(gs, rng) or CV.mean_random_tarot(gs, rng)
+    return landed * mean * (CV.GEN_USE_RATE[key] or 1), 0, string.format("%d random %s", landed, key == "c_high_priestess" and "planets" or "tarots")
+  elseif key == "c_judgement" then
+    local v = require("engine.packs").expected_shop_joker(gs, 1, { rng = rng, samples = 4 }) or 0
+    local free = ((gs.run and gs.run.joker_slots) or 5) - #(gs.jokers or {})
+    return v * (free >= 1 and 1 or 0.7), 0, "a random joker"          -- same full-board haircut as Soul
+  elseif key == "c_wheel_of_fortune" then
+    return CV.wheel_value(gs, need, rng), 0, "1 in 4: an edition on a random joker"
+  end
+  -- suit-conversion tarots: flush-plan-aware (only worth much when their fixed
+  -- suit is your flush direction; a tarot fighting another-suit flush is ~0).
+  if Tarot.SUIT[key] then
+    local v, note = CV.suit_tarot_value(gs, key, need, { rng = rng, samples = samples or 6 })
+    if v then return v, 0, note or "suit tarot" end
+  end
+  -- enhancement tarots: value by the SCORE they'd add to your deck this blind
+  -- (measured) -- this is what makes "buy the Empress to use in the blind" get
+  -- valued for your actual hand, not a flat number.
+  local sv = Tarot.shop_value(gs, key, { rng = rng, samples = samples or 12 })   -- 6 read the same card 0.08..0.37
+  if sv then
+    -- the MEASUREMENT stands even when it is ~0 (2026-09-26: a measured 0 used to fall back to the flat prior,
+    -- so a tarot that scored nothing on this deck beat one measured slightly positive -- Empress 0.20 flat vs a
+    -- measured 0.04). Money enhancements add their $ (Devil's Gold, Magician's Lucky), which a score delta
+    -- cannot see.
+    local econ = 0
+    local spec = Tarot.ENH[key]
+    if spec then econ = spec.n * CV.card_econ_value(gs, { enhancement = spec.enh }, rng) end
+    -- PER-HAND, like a joker (2026-10-04, owner on live UAPB3XY9: "it seems to take tower very often despite it
+    -- doing very very little"). `sv` is the gain on the hand the card is USED in -- the changed card is in that hand
+    -- by construction. A joker's fraction counts on EVERY hand; a changed card counts only on the hands it is drawn
+    -- into (hand size / deck size per card) plus that one use spread over the hands left. Without this a one-hand
+    -- gain sat on the joker scale ~5x too high: The Tower read 0.61 of a boss hand and out-ranked jokers and money.
+    local frac = math.max(0, sv) / need
+    if CV.TAROT_PER_HAND then frac = frac * CV.tarot_presence(gs, (spec and spec.n) or (Tarot.RANK[key] and 2) or 1) end
+    frac = frac * require("engine.deck_plan").DECKQ_MULT   -- deck-quality calibration test (BES_DECKQ_MULT)
+    return frac + econ, 0, string.format("enhance ~+%d score", math.floor(math.max(0, sv)))
+  end
+  return CV.TAROT_BASE[key] or 0.15, 0, "tarot"
+end
+
+-- CV.card_value for one spectral: value (boss-hand fraction), dollars, label.
+local function spectral_value(gs, key, need, rng, samples)
+  if key == "c_immolate" then
+    -- Immolate destroys 5 RANDOM cards for +$20: random thinning (can cut good
+    -- cards on a strong deck -> negative) plus the money.
+    local v = DeckPlan.delete_value(gs, 5, "random")
+    return v, 20, "destroy 5 random for +$20"
+  end
+  if key == "c_hex" or key == "c_ankh" then
+    -- Hex polychromes ONE random joker + DESTROYS all others; Ankh copies one + destroys the rest.
+    -- Value the STRATEGIC play: engineer the effect onto your STRONGEST joker by SELLING the weaker
+    -- ones FIRST (then the random pick can only be the best) -- so Ankh = a 2nd copy of your best
+    -- joker (~re-adds its worth, since a duplicate roughly restacks its effect) and Hex = polychrome
+    -- the best (~+50% of its effect). Either destroys the OTHERS, so subtract their worth -- but if
+    -- you sell the weak ones first that cost is small; the net only turns negative when you hold
+    -- several strong jokers worth keeping. (Live run Z9PBGTL2: Ankh was advised at 0 jokers, where
+    -- it copies nothing -- that must be ~0.)
+    local jokers = gs.jokers or {}
+    local n = #jokers
+    if n == 0 then
+      return 0, 0, (key == "c_hex" and "no joker to polychrome" or "no joker to copy — does nothing")
+    end
+    local worths = {}
+    for _, j in ipairs(jokers) do worths[#worths + 1] = CV.joker_worth(gs, j) end
+    table.sort(worths, function(a, b) return a > b end)
+    local strongest = worths[1] or 0
+    local others = 0
+    for i = 2, #worths do others = others + worths[i] end
+    local gain = (key == "c_ankh") and strongest or (strongest * 0.5)  -- 2nd copy vs +x1.5 polychrome
+    local nsell = n - 1
+    local note
+    if key == "c_ankh" then
+      note = (nsell > 0)
+        and string.format("gain a 2nd copy of your best joker — SELL your %d weaker joker(s) FIRST so Ankh doubles the BEST (else it copies a random one)", nsell)
+        or "gain a 2nd copy of your joker"
+    else
+      note = (nsell > 0)
+        and string.format("polychrome your best joker (+x1.5 mult) — but DESTROYS %d other joker(s); sell them first if keeping the best is worth it", nsell)
+        or "polychrome your joker (+x1.5 mult)"
+    end
+    return gain - others, 0, note
+  end
+  if key == "c_wraith" then
+    -- the free rare joker, MINUS the purchasing power forfeited by zeroing your $.
+    -- (2026-09-26: the Rare joker is MEASURED like Soul's Legendary, and the wiped $ is priced by the same
+    -- conversion a money tarot's gain uses -- were flat 0.8 and 0.04/$)
+    local d = math.max(0, (gs.economy and gs.economy.dollars) or 0)
+    local rare = require("engine.packs").expected_joker_of_rarity(gs, "Rare", { rng = rng, samples = samples }) or CV.WRAITH_JOKER
+    local free = ((gs.run and gs.run.joker_slots) or 5) - #(gs.jokers or {})
+    local v = rare * (free >= 1 and 1 or 0.7) - VU.income_frac(gs, d)
+    return v, 0, string.format("spawns a rare Joker but ZEROES your $%d", d)
+  end
+  if key == "c_ouija" then
+    -- converts ALL cards to one random rank (helps pairs/Flush House, KILLS straights)
+    -- and PERMANENTLY costs -1 hand size -- a real ongoing downside. Charge it, so an
+    -- Ouija isn't reflexively picked over a harmless spectral (the player's Ouija-vs-
+    -- Incantation case). The charge is now MEASURED off the deck (CV.hand_size_cost)
+    -- instead of the flat 0.3 that was fitted to net this one card to ~0.
+    local hcost = CV.hand_size_cost(gs, need, { rng = rng, samples = samples }) or CV.HAND_SIZE_COST
+    return CV.hand_convert_value(gs, need, "rank", { rng = rng, samples = samples }) - hcost, 0,
+      "one rank, but -1 hand size (permanent)"
+  end
+  if key == "c_ectoplasm" then
+    -- Ectoplasm puts NEGATIVE on a RANDOM joker (+1 permanent joker slot) and PERMANENTLY
+    -- costs -1 hand size, stacking with every previous use.
+    --
+    -- It used to fall through to a flat SPECTRAL_BASE prior of 0.7 -- the third-highest
+    -- spectral, behind only The Soul and Black Hole -- with the downside charged at ZERO,
+    -- while the structurally identical Ouija branch directly above charged its identical
+    -- -1 hand size. The FACTS layer has always paid the cost (sim/world.lua reduces
+    -- hand_size), so the sim was being charged for a decision the engine priced blind.
+    -- Owner report, ADVICE_REVIEW R6. Three corrections, none of them a new constant:
+    --
+    -- 1. NO ELIGIBLE JOKER -> the edition lands nowhere and the card does nothing, but you
+    --    still eat the hand size. (Same shape as the Hex/Ankh n == 0 guard above, which came
+    --    from the same class of live misplay. A joker that is ALREADY negative cannot take
+    --    it either -- see the edition check in sim/world.lua.)
+    -- 2. The slot is priced by the engine's OWN calibrated slot model, Eval.negative_slot_fv
+    --    (board- and runway-aware), not by a flat prior. That model knows a slot is worth
+    --    little at ante 8 and most when the board is full -- neither of which 0.7 could see.
+    -- 3. ⭐ THE SLOT IS CONTINGENT, WHICH IS THE OWNER'S ACTUAL POINT. negative_slot_fv prices
+    --    a PERMANENT slot -- what Antimatter or a Negative joker you chose to buy gives you.
+    --    Ectoplasm's slot rides on a RANDOM joker and leaves the moment you sell it. So the
+    --    benefit is sellable while the cost never is, and the credit is scaled by how much of
+    --    the board the plan actually intends to KEEP -- BP.keep_bias >= BP.CORE_KEEP, the
+    --    codebase's own keeper predicate, which is already commitment-aware (an on-plan joker
+    --    counts as a keeper even if it is a plain common). A board of disposable commons
+    --    therefore reads ZERO benefit against a permanent cost -- "took Ectoplasm on a joker
+    --    which is pointless" -- while a board of cores reads full.
+    --    ⚠ The graded alternative (crediting each joker kb/CORE_KEEP) was written first and
+    --    REJECTED on measurement: it pays a flat common SCORER_KEEP/CORE_KEEP = 48%, which left
+    --    a board of three junk commons at +0.97 -- ABOVE the flat 0.7 this fix replaces, i.e.
+    --    it would have made the reported misplay MORE likely, not less.
+    local Eval = require("engine.eval_function")   -- lazy: eval_function requires US at load time
+    local hcost = CV.hand_size_cost(gs, need, { rng = rng, samples = samples }) or CV.HAND_SIZE_COST
+    local eligible, stick = 0, 0
+    for _, j in ipairs(gs.jokers or {}) do
+      if j.edition ~= "negative" then
+        eligible = eligible + 1
+        if BuildPlan.is_keeper(j.key, gs) then stick = stick + 1 end
+      end
+    end
+    if eligible == 0 then
+      return -hcost, 0, "no joker can take Negative — pure -1 hand size (permanent)"
+    end
+    local slot = Eval.negative_slot_fv(gs, { mode = "freed", rng = rng }) * (stick / eligible)
+    local note = (stick > 0)
+      and "Negative on a random joker (+1 slot) at a permanent -1 hand size"
+      or "-1 hand size (permanent) for a slot on a joker you'd sell — the slot goes with it"
+    return slot - hcost, 0, note
+  end
+  if key == "c_black_hole" then
+    -- +1 level to EVERY hand -- fully MEASURED by Packs.black_hole_value (freq x level_gain, deck-aware,
+    -- leveling-persistence scaled). It used to read a flat 0.9 here and 0.5 in the use-table -- three
+    -- prices for one card. Lazy require: packs requires US at load time (same cycle-break as Eval above).
+    do
+      local bh = require("engine.packs").black_hole_value(gs, { rng = rng, samples = samples })
+      if bh and bh > 0 then return bh, 0, "+1 level to EVERY hand (measured)" end
+    end
+    return CV.SPECTRAL_BASE.c_black_hole or 0.9, 0, "+1 level to every hand"
+  end
+  if SEAL_SPECTRAL[key] then
+    local seal = SEAL_SPECTRAL[key]
+    local v = CV.seal_spectral_value(gs, seal, need, { rng = rng, samples = samples })
+    return v, 0, string.format("adds a %s seal to your best card", seal)
+  end
+  if key == "c_sigil" then
+    return CV.sigil_value(gs, need, { rng = rng, samples = samples }), 0, "converts ~a hand to one suit (flush enabler)"
+  end
+  if key == "c_soul" then
+    return CV.soul_value(gs, need, { rng = rng, samples = samples }), 0, "creates a random Legendary joker"
+  end
+  if key == "c_cryptid" then
+    return CV.cryptid_value(gs, need, { rng = rng, samples = samples }), 0, "2 copies of your best card"
+  end
+  if key == "c_aura" then
+    return CV.aura_value(gs, need, { rng = rng, samples = samples }), 0, "a random edition on your best card"
+  end
+  if ADD_SPECTRAL_SPEC[key] then
+    local v = CV.add_spectral_value(gs, key, need, { rng = rng, samples = samples })
+    return v, 0, "destroy 1 card, add enhanced cards"
+  end
+  return CV.SPECTRAL_BASE[key] or 0.3, 0, "spectral"
 end
 
 function CV.card_value(gs, set, key, freq, need, rng, samples, hand_ctx)
@@ -967,229 +1191,9 @@ function CV.card_value(gs, set, key, freq, need, rng, samples, hand_ctx)
   -- and pack_open_advisor does that richer search (and zeroes it there if it finds nothing).
   -- Zeroing unconditionally here would delete the Fool before that search ever ran.
   if key == "c_fool" and not gs.pack and not CV.fool_target(gs) then return 0, 0 end
-  if set == "Planet" then
-    local hand = CV.PLANET_KEY_HAND[key]
-    if hand then
-      -- freq for the hand this planet levels. If a freq table was provided, an
-      -- ABSENT hand means you never make it (0), not "unknown" -- so don't apply the
-      -- 0.4 prior there. If no freq was provided, compute it from the deck; only a
-      -- deckless state falls back to the 0.4 prior.
-      local f, bctx
-      if freq then
-        f = freq[hand] or 0
-        bctx = hand_ctx    -- supplied alongside `freq`; both come from hand_frequencies
-      else
-        local hf; hf, bctx = CV.hand_frequencies(gs, { samples = 8, rng = rng })
-        f = hf and (hf[hand] or 0) or 0.4
-      end
-      return CV.level_scale(gs) * (CV.level_share(f) * CV.level_gain(gs, hand, 1, bctx)) / need, 0, "level " .. hand
-    end
-    return 0.3, 0, "planet"
-  elseif set == "Tarot" then
-    if key == "c_emperor" and in_emperor then return 0, 0, "tarot" end
-    if key == "c_hermit" then
-      local g = math.min(dollars(gs), 20)        -- doubles money, max +$20
-      return 0, g, string.format("double money +$%d", g)
-    elseif key == "c_temperance" then
-      local s = 0
-      for _, j in ipairs(gs.jokers or {}) do s = s + (j.sell_value or 0) end
-      s = math.min(s, 50)
-      return 0, s, string.format("+$%d joker sell value", s)
-    elseif key == "c_hanged_man" then
-      -- The Hanged Man destroys up to 2 SELECTED cards -> targeted thinning of
-      -- your worst (off-suit / low) cards toward the run's deck target.
-      local v, tgt = DeckPlan.delete_value(gs, 2, "best")
-      return v, 0, (tgt.archetype == "flush" and "cut 2 off-suit cards" or "thin 2 weakest cards")
-    end
-    -- GENERATOR tarots (2026-09-26, owner: no flat scores; live 5XX3FFG3 took High Priestess at a flat 0.40 over a
-    -- Strength that fit the board). Priced by what they make, landed in the consumable slots they need:
-    if key == "c_high_priestess" or key == "c_emperor" then
-      -- inside an open pack the pack advisor applies the landing itself (gen_fit, with make-room credit)
-      local landed = gs.pack and 2 or CV.created_consumables_land(gs, key, 2)
-      if landed <= 0 then return 0, 0, "no free consumable slot for its output" end
-      local mean = (key == "c_high_priestess") and CV.mean_random_planet(gs, rng) or CV.mean_random_tarot(gs, rng)
-      return landed * mean * (CV.GEN_USE_RATE[key] or 1), 0, string.format("%d random %s", landed, key == "c_high_priestess" and "planets" or "tarots")
-    elseif key == "c_judgement" then
-      local ok, Packs = pcall(require, "engine.packs")
-      local v = ok and Packs.expected_shop_joker and Packs.expected_shop_joker(gs, 1, { rng = rng, samples = 4 }) or 0
-      local free = ((gs.run and gs.run.joker_slots) or 5) - #(gs.jokers or {})
-      return v * (free >= 1 and 1 or 0.7), 0, "a random joker"          -- same full-board haircut as Soul
-    elseif key == "c_wheel_of_fortune" then
-      return CV.wheel_value(gs, need, rng), 0, "1 in 4: an edition on a random joker"
-    end
-    -- suit-conversion tarots: flush-plan-aware (only worth much when their fixed
-    -- suit is your flush direction; a tarot fighting another-suit flush is ~0).
-    if Tarot.SUIT[key] then
-      local v, note = CV.suit_tarot_value(gs, key, need, { rng = rng, samples = samples or 6 })
-      if v then return v, 0, note or "suit tarot" end
-    end
-    -- enhancement tarots: value by the SCORE they'd add to your deck this blind
-    -- (measured) -- this is what makes "buy the Empress to use in the blind" get
-    -- valued for your actual hand, not a flat number.
-    local sv = Tarot.shop_value(gs, key, { rng = rng, samples = samples or 12 })   -- 6 read the same card 0.08..0.37
-    if sv then
-      -- the MEASUREMENT stands even when it is ~0 (2026-09-26: a measured 0 used to fall back to the flat prior,
-      -- so a tarot that scored nothing on this deck beat one measured slightly positive -- Empress 0.20 flat vs a
-      -- measured 0.04). Money enhancements add their $ (Devil's Gold, Magician's Lucky), which a score delta
-      -- cannot see.
-      local econ = 0
-      local spec = Tarot.ENH[key]
-      if spec then econ = spec.n * CV.card_econ_value(gs, { enhancement = spec.enh }, rng) end
-      -- PER-HAND, like a joker (2026-10-04, owner on live UAPB3XY9: "it seems to take tower very often despite it
-      -- doing very very little"). `sv` is the gain on the hand the card is USED in -- the changed card is in that hand
-      -- by construction. A joker's fraction counts on EVERY hand; a changed card counts only on the hands it is drawn
-      -- into (hand size / deck size per card) plus that one use spread over the hands left. Without this a one-hand
-      -- gain sat on the joker scale ~5x too high: The Tower read 0.61 of a boss hand and out-ranked jokers and money.
-      local frac = math.max(0, sv) / need
-      if CV.TAROT_PER_HAND then frac = frac * CV.tarot_presence(gs, (spec and spec.n) or (Tarot.RANK[key] and 2) or 1) end
-      frac = frac * require("engine.deck_plan").DECKQ_MULT   -- deck-quality calibration test (BES_DECKQ_MULT)
-      return frac + econ, 0, string.format("enhance ~+%d score", math.floor(math.max(0, sv)))
-    end
-    return CV.TAROT_BASE[key] or 0.15, 0, "tarot"
-  elseif set == "Spectral" then
-    if key == "c_immolate" then
-      -- Immolate destroys 5 RANDOM cards for +$20: random thinning (can cut good
-      -- cards on a strong deck -> negative) plus the money.
-      local v = DeckPlan.delete_value(gs, 5, "random")
-      return v, 20, "destroy 5 random for +$20"
-    end
-    if key == "c_hex" or key == "c_ankh" then
-      -- Hex polychromes ONE random joker + DESTROYS all others; Ankh copies one + destroys the rest.
-      -- Value the STRATEGIC play: engineer the effect onto your STRONGEST joker by SELLING the weaker
-      -- ones FIRST (then the random pick can only be the best) -- so Ankh = a 2nd copy of your best
-      -- joker (~re-adds its worth, since a duplicate roughly restacks its effect) and Hex = polychrome
-      -- the best (~+50% of its effect). Either destroys the OTHERS, so subtract their worth -- but if
-      -- you sell the weak ones first that cost is small; the net only turns negative when you hold
-      -- several strong jokers worth keeping. (Live run Z9PBGTL2: Ankh was advised at 0 jokers, where
-      -- it copies nothing -- that must be ~0.)
-      local jokers = gs.jokers or {}
-      local n = #jokers
-      if n == 0 then
-        return 0, 0, (key == "c_hex" and "no joker to polychrome" or "no joker to copy — does nothing")
-      end
-      local worths = {}
-      for _, j in ipairs(jokers) do worths[#worths + 1] = CV.joker_worth(gs, j) end
-      table.sort(worths, function(a, b) return a > b end)
-      local strongest = worths[1] or 0
-      local others = 0
-      for i = 2, #worths do others = others + worths[i] end
-      local gain = (key == "c_ankh") and strongest or (strongest * 0.5)  -- 2nd copy vs +x1.5 polychrome
-      local nsell = n - 1
-      local note
-      if key == "c_ankh" then
-        note = (nsell > 0)
-          and string.format("gain a 2nd copy of your best joker — SELL your %d weaker joker(s) FIRST so Ankh doubles the BEST (else it copies a random one)", nsell)
-          or "gain a 2nd copy of your joker"
-      else
-        note = (nsell > 0)
-          and string.format("polychrome your best joker (+x1.5 mult) — but DESTROYS %d other joker(s); sell them first if keeping the best is worth it", nsell)
-          or "polychrome your joker (+x1.5 mult)"
-      end
-      return gain - others, 0, note
-    end
-    if key == "c_wraith" then
-      -- the free rare joker, MINUS the purchasing power forfeited by zeroing your $.
-      -- (2026-09-26: the Rare joker is MEASURED like Soul's Legendary, and the wiped $ is priced by the same
-      -- conversion a money tarot's gain uses -- were flat 0.8 and 0.04/$)
-      local d = math.max(0, (gs.economy and gs.economy.dollars) or 0)
-      local ok, Packs = pcall(require, "engine.packs")
-      local rare = ok and Packs.expected_joker_of_rarity and Packs.expected_joker_of_rarity(gs, "Rare", { rng = rng, samples = samples }) or CV.WRAITH_JOKER
-      local free = ((gs.run and gs.run.joker_slots) or 5) - #(gs.jokers or {})
-      local v = rare * (free >= 1 and 1 or 0.7) - VU.income_frac(gs, d)
-      return v, 0, string.format("spawns a rare Joker but ZEROES your $%d", d)
-    end
-    if key == "c_ouija" then
-      -- converts ALL cards to one random rank (helps pairs/Flush House, KILLS straights)
-      -- and PERMANENTLY costs -1 hand size -- a real ongoing downside. Charge it, so an
-      -- Ouija isn't reflexively picked over a harmless spectral (the player's Ouija-vs-
-      -- Incantation case). The charge is now MEASURED off the deck (CV.hand_size_cost)
-      -- instead of the flat 0.3 that was fitted to net this one card to ~0.
-      local hcost = CV.hand_size_cost(gs, need, { rng = rng, samples = samples }) or CV.HAND_SIZE_COST
-      return CV.hand_convert_value(gs, need, "rank", { rng = rng, samples = samples }) - hcost, 0,
-        "one rank, but -1 hand size (permanent)"
-    end
-    if key == "c_ectoplasm" then
-      -- Ectoplasm puts NEGATIVE on a RANDOM joker (+1 permanent joker slot) and PERMANENTLY
-      -- costs -1 hand size, stacking with every previous use.
-      --
-      -- It used to fall through to a flat SPECTRAL_BASE prior of 0.7 -- the third-highest
-      -- spectral, behind only The Soul and Black Hole -- with the downside charged at ZERO,
-      -- while the structurally identical Ouija branch directly above charged its identical
-      -- -1 hand size. The FACTS layer has always paid the cost (sim/world.lua reduces
-      -- hand_size), so the sim was being charged for a decision the engine priced blind.
-      -- Owner report, ADVICE_REVIEW R6. Three corrections, none of them a new constant:
-      --
-      -- 1. NO ELIGIBLE JOKER -> the edition lands nowhere and the card does nothing, but you
-      --    still eat the hand size. (Same shape as the Hex/Ankh n == 0 guard above, which came
-      --    from the same class of live misplay. A joker that is ALREADY negative cannot take
-      --    it either -- see the edition check in sim/world.lua.)
-      -- 2. The slot is priced by the engine's OWN calibrated slot model, Eval.negative_slot_fv
-      --    (board- and runway-aware), not by a flat prior. That model knows a slot is worth
-      --    little at ante 8 and most when the board is full -- neither of which 0.7 could see.
-      -- 3. ⭐ THE SLOT IS CONTINGENT, WHICH IS THE OWNER'S ACTUAL POINT. negative_slot_fv prices
-      --    a PERMANENT slot -- what Antimatter or a Negative joker you chose to buy gives you.
-      --    Ectoplasm's slot rides on a RANDOM joker and leaves the moment you sell it. So the
-      --    benefit is sellable while the cost never is, and the credit is scaled by how much of
-      --    the board the plan actually intends to KEEP -- BP.keep_bias >= BP.CORE_KEEP, the
-      --    codebase's own keeper predicate, which is already commitment-aware (an on-plan joker
-      --    counts as a keeper even if it is a plain common). A board of disposable commons
-      --    therefore reads ZERO benefit against a permanent cost -- "took Ectoplasm on a joker
-      --    which is pointless" -- while a board of cores reads full.
-      --    ⚠ The graded alternative (crediting each joker kb/CORE_KEEP) was written first and
-      --    REJECTED on measurement: it pays a flat common SCORER_KEEP/CORE_KEEP = 48%, which left
-      --    a board of three junk commons at +0.97 -- ABOVE the flat 0.7 this fix replaces, i.e.
-      --    it would have made the reported misplay MORE likely, not less.
-      local Eval = require("engine.eval_function")   -- lazy: eval_function requires US at load time
-      local hcost = CV.hand_size_cost(gs, need, { rng = rng, samples = samples }) or CV.HAND_SIZE_COST
-      local eligible, stick = 0, 0
-      for _, j in ipairs(gs.jokers or {}) do
-        if j.edition ~= "negative" then
-          eligible = eligible + 1
-          if BuildPlan.is_keeper(j.key, gs) then stick = stick + 1 end
-        end
-      end
-      if eligible == 0 then
-        return -hcost, 0, "no joker can take Negative — pure -1 hand size (permanent)"
-      end
-      local slot = Eval.negative_slot_fv(gs, { mode = "freed", rng = rng }) * (stick / eligible)
-      local note = (stick > 0)
-        and "Negative on a random joker (+1 slot) at a permanent -1 hand size"
-        or "-1 hand size (permanent) for a slot on a joker you'd sell — the slot goes with it"
-      return slot - hcost, 0, note
-    end
-    if key == "c_black_hole" then
-      -- +1 level to EVERY hand -- fully MEASURED by Packs.black_hole_value (freq x level_gain, deck-aware,
-      -- leveling-persistence scaled). It used to read a flat 0.9 here and 0.5 in the use-table -- three
-      -- prices for one card. Lazy require: packs requires US at load time (same cycle-break as Eval above).
-      local ok, Packs = pcall(require, "engine.packs")
-      if ok and Packs.black_hole_value then
-        local bh = Packs.black_hole_value(gs, { rng = rng, samples = samples })
-        if bh and bh > 0 then return bh, 0, "+1 level to EVERY hand (measured)" end
-      end
-      return CV.SPECTRAL_BASE.c_black_hole or 0.9, 0, "+1 level to every hand"
-    end
-    if SEAL_SPECTRAL[key] then
-      local seal = SEAL_SPECTRAL[key]
-      local v = CV.seal_spectral_value(gs, seal, need, { rng = rng, samples = samples })
-      return v, 0, string.format("adds a %s seal to your best card", seal)
-    end
-    if key == "c_sigil" then
-      return CV.sigil_value(gs, need, { rng = rng, samples = samples }), 0, "converts ~a hand to one suit (flush enabler)"
-    end
-    if key == "c_soul" then
-      return CV.soul_value(gs, need, { rng = rng, samples = samples }), 0, "creates a random Legendary joker"
-    end
-    if key == "c_cryptid" then
-      return CV.cryptid_value(gs, need, { rng = rng, samples = samples }), 0, "2 copies of your best card"
-    end
-    if key == "c_aura" then
-      return CV.aura_value(gs, need, { rng = rng, samples = samples }), 0, "a random edition on your best card"
-    end
-    if ADD_SPECTRAL_SPEC[key] then
-      local v = CV.add_spectral_value(gs, key, need, { rng = rng, samples = samples })
-      return v, 0, "destroy 1 card, add enhanced cards"
-    end
-    return CV.SPECTRAL_BASE[key] or 0.3, 0, "spectral"
+  if set == "Planet" then return planet_value(gs, key, freq, need, rng, hand_ctx)
+  elseif set == "Tarot" then return tarot_value(gs, key, need, rng, samples)
+  elseif set == "Spectral" then return spectral_value(gs, key, need, rng, samples)
   end
   return 0.1, 0, "card"
 end

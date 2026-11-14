@@ -161,8 +161,7 @@ local TAG = {
   tag_coupon     = { name = "Coupon",     val = function() return 8 end },          -- free shop items
   -- adds a voucher to the next shop that still has to be BOUGHT: worth it only if affordable then (engine/vouchers)
   tag_voucher    = { name = "Voucher",    val = function(gs, o)
-    local ok, V = pcall(require, "engine.vouchers")
-    local v = ok and has_deck(gs) and V.tag_voucher_dollars(gs, o) or nil
+    local v = has_deck(gs) and require("engine.vouchers").tag_voucher_dollars(gs, o) or nil
     return (type(v) == "number") and v or 0 end },
   tag_d6         = { name = "D6",         val = function() return 4 end },          -- $0 rerolls
   tag_speed      = { name = "Speed",      val = function() return 5 end },          -- $5/skip this run

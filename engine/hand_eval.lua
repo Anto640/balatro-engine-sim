@@ -310,8 +310,7 @@ local function base_for(gs, ht)
   -- boss: The Arm lowers the played hand one level BEFORE it scores (floored at level 1); the world makes the drop
   -- permanent after the play (sim-rules audit #7: it used to apply only after scoring, and the engine ignored it)
   if gs.boss_effect and gs.boss_effect.level_down and lvl and (lvl.level or 1) > 1 then
-    local ok, Mech = pcall(require, "engine.mechanics")
-    local inc = ok and Mech.HAND_PLANET and Mech.HAND_PLANET[ht]
+    local inc = require("engine.mechanics").HAND_PLANET[ht]
     if inc then
       chips = math.max(inc.base_chips or 0, chips - (inc.dchips or 0))
       mult = math.max(inc.base_mult or 0, mult - (inc.dmult or 0))

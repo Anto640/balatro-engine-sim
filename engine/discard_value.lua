@@ -150,8 +150,7 @@ function DV.measured(gs, discard, opts)
   end
   local mean = total / samples
   if ramen_frac > 0 then
-    local okE, Eval = pcall(require, "engine.eval_function")
-    local blinds = (okE and Eval.blinds_remaining) and math.max(0, Eval.blinds_remaining(gs)) or 0
+    local blinds = math.max(0, require("engine.eval_function").blinds_remaining(gs))
     mean = mean - mean * ramen_frac * blinds * DV.HANDS_PER_BLIND * DV.RAMEN_FUTURE_WEIGHT
   end
   return mean

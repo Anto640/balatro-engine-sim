@@ -74,14 +74,14 @@ end
 function V.telescope_gain_per_pack(gs, opts)
   local freq, bctx = CV.hand_frequencies(gs, opts)
   if not freq then return 0 end
-  local okB, BuildPlan = pcall(require, "engine.build_plan")
+  local BuildPlan = require("engine.build_plan")
   local plays = (gs.run and gs.run.hand_type_plays) or {}
   local n0 = need(gs)
   local vals = {}
   local function add(h)
     local f = freq[h] or 0
     local v = (f > 0) and (f * CV.level_gain(gs, h, 1, bctx)) or 0
-    if okB and BuildPlan.planet_credit then v = v + BuildPlan.planet_credit(gs, h) * n0 end
+    v = v + BuildPlan.planet_credit(gs, h) * n0
     vals[#vals + 1] = v / n0
   end
   for _, h in ipairs(VISIBLE_HANDS) do add(h) end
@@ -243,9 +243,7 @@ end
 -- What the extra resource earns THROUGH the board and deck (money jokers, discard-fed scalers, Gold / seal cards),
 -- in FV points (Eval.resource_side_frac). Owner 2026-10-06: these vouchers "can help make more money/tarots/scaling".
 function V.resource_side_fv(gs, what, opts)
-  local ok, Eval = pcall(require, "engine.eval_function")
-  if not (ok and Eval.resource_side_frac) then return 0 end
-  local ok2, f = pcall(Eval.resource_side_frac, gs, with_more(gs, what), opts or {})
+  local ok2, f = pcall(require("engine.eval_function").resource_side_frac, gs, with_more(gs, what), opts or {})
   return (ok2 and type(f) == "number") and VU.frac_to_fv(math.max(0, f)) or 0
 end
 

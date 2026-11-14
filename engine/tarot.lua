@@ -472,8 +472,8 @@ function T.best_targets(gs, key, pool)
   -- SPECTRAL — a seal/edition on 1 card: the highest-value card that doesn't already have one.
   local sp = T.SPECTRAL_TARGET[key]
   if sp and sp.kind == "copy" and gs then   -- Cryptid: the card whose two copies are worth most, money included
-    local okC, CV = pcall(require, "engine.consumable_value")
-    if okC and CV.best_copy_target then
+    local CV = require("engine.consumable_value")
+    do
       local Mech = require("engine.mechanics")
       local s0 = 0; for _, c in ipairs(pool) do s0 = (s0 * 31 + (c.id or 0)) % 2147483647 end
       local st = s0 > 0 and s0 or 1
@@ -564,9 +564,7 @@ end
 function T.money_enh_dollars(gs, key)
   local spec = T.ENH[key]
   if not (spec and spec.enh == "m_gold") then return 0 end
-  local okC, CV = pcall(require, "engine.consumable_value")
-  local okE, Eval = pcall(require, "engine.eval_function")
-  if not (okC and okE and CV.card_round_rates and Eval.blinds_remaining) then return 0 end
+  local CV, Eval = require("engine.consumable_value"), require("engine.eval_function")
   local rr = CV.card_round_rates(gs)
   return 3 * (rr.held_end or 0) * math.max(1, Eval.blinds_remaining(gs)) * (spec.n or 1)
 end
