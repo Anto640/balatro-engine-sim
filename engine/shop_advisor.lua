@@ -12,6 +12,7 @@
 local Rng = require("util.rng")
 local Flags = require("engine.flags")
 local Eval = require("engine.eval_function")
+local Income = require("engine.joker_income")
 local JokerWorth = require("engine.joker_worth")
 local Downside = require("engine.joker_downside")
 local JokerData = require("engine.joker_data")
@@ -547,7 +548,7 @@ end
 --   (3) any non-base edition (polychrome/holo/foil/negative is kept value on a decaying base).
 -- (2026-08-27, live run MALEJYHW.)
 local function funder_is_live(gs, j, contribution)
-  if Eval.econ_value(gs, j.key) > 0 then return true end
+  if Income.econ_value(gs, j.key) > 0 then return true end
   if JokerData.has_tag(j.key, "consumable") and JokerData.has_tag(j.key, "economy") then return true end
   -- (4) a CARD-GENERATION joker (Vagabond/Cartomancer: makes Tarots/Planets each qualifying hand) holds
   -- its value in its OUTPUT, so its scoring marginal reads ~0 and it looks "dead" -- but dumping it after
@@ -609,7 +610,7 @@ end
 -- back makes spending in the shop cheaper -- you can spend down more freely.
 function SA.estimate_blind_income(gs)
   local inc = 0
-  for _, j in ipairs(gs.jokers or {}) do inc = inc + Eval.econ_value(gs, j.key) end
+  for _, j in ipairs(gs.jokers or {}) do inc = inc + Income.econ_value(gs, j.key) end
   local gold_seal, gold_card = 0, 0
   for _, c in ipairs(gs.deck or {}) do
     if c.seal == "Gold" then gold_seal = gold_seal + 1 end

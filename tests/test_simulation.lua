@@ -5,6 +5,7 @@
 local Prob = require("engine.probability")
 local Sim = require("engine.simulation")
 local Eval = require("engine.eval_function")
+local Income = require("engine.joker_income")
 local GS = require("model.game_state")
 local card, joker = GS.card, GS.joker
 
@@ -419,12 +420,12 @@ return function(t)
 
     -- Rough Gem ($1 per Diamond scored) earns more on a Diamonds deck, ~nothing
     -- without diamonds -- not the flat prior.
-    t.ok(Eval.econ_value(dia, "j_rough_gem") > Eval.econ_value(nod, "j_rough_gem"),
+    t.ok(Income.econ_value(dia, "j_rough_gem") > Income.econ_value(nod, "j_rough_gem"),
       "Rough Gem earns more on a Diamonds-heavy deck (deck-aware econ)")
-    t.eq(Eval.econ_value(nod, "j_rough_gem"), 0, "Rough Gem earns nothing with no Diamonds")
+    t.eq(Income.econ_value(nod, "j_rough_gem"), 0, "Rough Gem earns nothing with no Diamonds")
 
     -- Golden Joker (+$ flat at round end) is unconditional: deck doesn't change it.
-    t.eq(Eval.econ_value(dia, "j_golden"), Eval.econ_value(nod, "j_golden"),
+    t.eq(Income.econ_value(dia, "j_golden"), Income.econ_value(nod, "j_golden"),
       "Golden Joker econ is deck-independent (unconditional)")
 
     -- MULTIPLICATIVE ECONOMY (2026-08-13). econ_power is a SUM of static per-joker figures,
@@ -436,15 +437,15 @@ return function(t)
       for i = 1, 20 do faces[i] = card{ id = i, rank_id = 12, suit = "Spades" } end  -- all Queens
       local plain = GS.new{ deck = faces, jokers = { { key = "j_reserved_parking" } } }
       local oops  = GS.new{ deck = faces, jokers = { { key = "j_reserved_parking" }, { key = "j_oops" } } }
-      t.ok(Eval.econ_value(oops, "j_reserved_parking") > Eval.econ_value(plain, "j_reserved_parking"),
+      t.ok(Income.econ_value(oops, "j_reserved_parking") > Income.econ_value(plain, "j_reserved_parking"),
         "Oops! All 6s doubles a probability-gated money joker's income")
-      t.eq(Eval.econ_value(oops, "j_golden"), Eval.econ_value(plain, "j_golden"),
+      t.eq(Income.econ_value(oops, "j_golden"), Income.econ_value(plain, "j_golden"),
         "...but NOT a flat, non-probability econ joker (Golden Joker is unaffected)")
       -- Reserved Parking is face-density-aware, like Business Card
       local nofaces = {}
       for i = 1, 20 do nofaces[i] = card{ id = i, rank_id = 5, suit = "Spades" } end
       local lowdeck = GS.new{ deck = nofaces, jokers = { { key = "j_reserved_parking" } } }
-      t.ok(Eval.econ_value(plain, "j_reserved_parking") > Eval.econ_value(lowdeck, "j_reserved_parking"),
+      t.ok(Income.econ_value(plain, "j_reserved_parking") > Income.econ_value(lowdeck, "j_reserved_parking"),
         "Reserved Parking earns more on a face-heavy deck (deck-aware, was a flat prior)")
       -- and the deck-aware value must reach the BUY/SELL path, which read the raw catalogue
       -- number: a Rough Gem was priced identically on a 4-diamond deck and a 20-diamond one.
@@ -462,13 +463,13 @@ return function(t)
     for i = 1, 8 do many9[i] = card{ id = i, rank_id = 9, suit = "Spades" } end
     for i = 9, 20 do many9[i] = card{ id = i, rank_id = 5, suit = "Spades" } end
     for i = 1, 20 do no9[i] = card{ id = i, rank_id = 5, suit = "Spades" } end
-    t.ok(Eval.econ_value(GS.new{ deck = many9 }, "j_cloud_9") > Eval.econ_value(GS.new{ deck = no9 }, "j_cloud_9"),
+    t.ok(Income.econ_value(GS.new{ deck = many9 }, "j_cloud_9") > Income.econ_value(GS.new{ deck = no9 }, "j_cloud_9"),
       "Cloud 9 earns more with more 9s in the deck")
-    t.eq(Eval.econ_value(GS.new{ deck = no9 }, "j_cloud_9"), 0, "Cloud 9 earns nothing with no 9s")
+    t.eq(Income.econ_value(GS.new{ deck = no9 }, "j_cloud_9"), 0, "Cloud 9 earns nothing with no 9s")
 
     -- with NO deck the conditional jokers fall back to their flat prior (preserves
     -- existing deckless behaviour / tests).
-    t.eq(Eval.econ_value(GS.new{}, "j_rough_gem"), 4, "no deck -> Rough Gem uses its flat econ prior")
+    t.eq(Income.econ_value(GS.new{}, "j_rough_gem"), 4, "no deck -> Rough Gem uses its flat econ prior")
   end
 
   -- ---- time-slicing: opts.yield must NOT change the result -------------------

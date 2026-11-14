@@ -132,8 +132,8 @@ function G.blind_select_value(gs)
   for _, j in ipairs(gs.jokers or {}) do
     if JokerData.is_scaling(j.key) then nsc = nsc + 1 end
     local e = PLAY_FARM_ECON[j.key]
-    if e and j.key == "j_faceless" then   -- its MEASURED, board-aware income (Eval.econ_value), not a flat \$4
-      e = math.floor(require("engine.eval_function").econ_value(gs, j.key) + 0.5)
+    if e and j.key == "j_faceless" then   -- its MEASURED, board-aware income (Income.econ_value), not a flat \$4
+      e = math.floor(require("engine.joker_income").econ_value(gs, j.key) + 0.5)
       if e <= 0 then e = nil end
     end
     if e then add(e, (j.name or j.key) .. " farms ~$" .. e .. "/blind") end

@@ -51,7 +51,8 @@ return function(t)
   local files = {
     "advice", "build_plan", "boss_effect", "consumable_value", "dagger", "decision_engine", "decision_state",
     "deck_plan", "discard_fuel", "discard_value", "eval_function", "farm", "generators", "hand_eval", "heuristics",
-    "hold_fuel", "joker_data", "joker_downside", "joker_effects", "joker_value", "joker_worth", "mechanics",
+    "hold_fuel", "joker_data", "joker_downside", "joker_effects", "joker_income", "joker_value", "joker_worth",
+    "mechanics",
     "ordering", "owned_synergy", "pacing", "probability",
     "pack_open_advisor", "packs", "perkeo", "scaling_fuel", "search", "shop_advisor", "simulation", "skip_advisor",
     "tags", "tarot", "value_units", "vouchers",

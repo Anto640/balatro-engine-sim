@@ -10,6 +10,7 @@ local Tags = require("engine.tags")
 local Mechanics = require("engine.mechanics")
 local Generators = require("engine.generators")
 local Eval = require("engine.eval_function")
+local Income = require("engine.joker_income")
 local Pacing = require("engine.pacing")
 local Packs = require("engine.packs")
 local VU = require("engine.value_units")
@@ -73,7 +74,7 @@ function SK.recommend(gs, opts)
   -- Rough Gem / ...), deck-aware -- money you FORGO by skipping. The old flat hand_money missed a farming
   -- board entirely (owner R5: skipped a Meteor pack while forgoing Business-Card-style farming). econ_power
   -- is $/round the board generates, the same dollar scale as `reward`.
-  local joker_econ = Eval.econ_power(gs) or 0
+  local joker_econ = Income.econ_power(gs) or 0
   -- jokers that fire when you SELECT the blind (Cartomancer/Riff-Raff/Marble)
   -- are free value you forgo by skipping -> credit them to PLAYING.
   local gen_v, gen_note = Generators.blind_select_value(gs)

@@ -5,6 +5,7 @@
 
 local SA = require("engine.shop_advisor")
 local JokerWorth = require("engine.joker_worth")
+local Income = require("engine.joker_income")
 local GS = require("model.game_state")
 local card, joker = GS.card, GS.joker
 
@@ -256,7 +257,7 @@ return function(t)
   end
 
   -- Task 2: DECK-MODIFIER jokers are valued off their real channel, not the flat tier floor.
-  -- Midas Mask & Certificate pay in MONEY (Eval.econ_value), scoring jp ~0; Midas is FACE-DECK-AWARE
+  -- Midas Mask & Certificate pay in MONEY (Income.econ_value), scoring jp ~0; Midas is FACE-DECK-AWARE
   -- (the tier floor never varied by deck). Marble/DNA are deck-growth, measured via card_add_value with
   -- a reduced prior floor. Owner prior: Midas is the highest-value of the four.
   do
@@ -280,7 +281,7 @@ return function(t)
     end
     local function econ(deck, key)
       local gs = GSm.new{ deck = deck, meta = { ante = 3 }, jokers = {}, run = { hand_levels = {} } }
-      return Eval.econ_value(gs, key)
+      return Income.econ_value(gs, key)
     end
     local midas, cert = fv(balanced, "j_midas_mask"), fv(balanced, "j_certificate")
     local marble, dna = fv(balanced, "j_marble"), fv(balanced, "j_dna")
