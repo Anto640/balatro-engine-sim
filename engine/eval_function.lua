@@ -352,6 +352,7 @@ end
 
 -- shipped 2026-10-10 together with Eval.SCALER_TIME (see there); BES_EVENT_RATES=0 disables
 Eval.MEASURED_EVENT_RATES = Flags.on("BES_EVENT_RATES")
+Eval.SKIP_FREE = Flags.off("BES_SKIP_FREE")   -- the skip policy is lifted (engine/skip_advisor): Throwback can be fed
 local function event_rate(gs, e)
   local fuel = e.feed_fuel
   -- AUDIT 2026-10-10 (BES_EVENT_RATES=1): the planet / tarot / sell rates were guesses (0.03-0.15 per scoring hand);
@@ -395,7 +396,7 @@ local function event_rate(gs, e)
   elseif fuel == "skip" then
     -- the owner's temporary skip policy (engine/skip_advisor: only the ante-1 Investment tag; BES_SKIP_FREE=1 restores
     -- the engine's own skips) means no blind is skipped from here on, so Throwback is never fed (2026-10-20)
-    if not (Flags.off("BES_SKIP_FREE")) then return 0 end
+    if not Eval.SKIP_FREE then return 0 end
     return 0.03
   elseif fuel == "pack_skip" then
     return 0.04
@@ -498,7 +499,7 @@ function Eval.resource_side_frac(gs, gs2, opts)
   table.sort(order)
   for i, k in ipairs(order) do
     local g = groups[k]
-    local function r() local x = 7919 * i; return Rng.from_state(x) end
+    local function r() return Rng.stream(7919 * i) end
     local d = ConsumableValue.card_econ_value(gs2, g.card, r()) - ConsumableValue.card_econ_value(gs, g.card, r())
     total = total + g.n * d
   end
@@ -619,7 +620,7 @@ local function deck_modifier_jp(gs, key, opts)
   if not deck or #deck < JokerValue.MIN_DECK then return nil end
   local need = Mechanics.boss_per_hand_need(gs)
   local cav_opts = { samples = (opts.samples or 6), rng = opts.rng, need = need }
-  local floor = (JokerData.resolve(key).tier or 3) * DECK_MOD_FLOOR
+  local floor = JokerData.tier(key) * DECK_MOD_FLOOR
   if key == "j_marble" then
     -- Marble adds ~1 Stone per blind selected, so the deck's stone count ramps to blinds_remaining and the
     -- average per-hand benefit over the run is ~ (blinds_remaining/2) x the value of one added stone.
@@ -1281,7 +1282,7 @@ local function jp_from_measure(gs, key, edition, m, opts, owned)
     -- at 1.800 and made that Mult the cheapest thing to sell. ADVICE_REVIEW R8, where exactly that
     -- happened and cost the run at the ante-4 boss. Identity (x1) for every non-generator.
     local fit = Generators.output_fit(gs, key, owned) * Generators.fire_rate(gs, key)
-    return JokerData.prior_jp_of(e) * proj * fit + edition_jp(edition, true), false
+    return JokerData.tier(key) * JokerData.TIER_JP * proj * fit + edition_jp(edition, true), false
   end
   -- RESETTING scaler (Ride the Bus): a fresh one measures 0, so the tier FLOOR used to decide its value
   -- (tier 7 -> priced above Runner). Instead value it MEASURED at its low geometric equilibrium and skip
@@ -1635,7 +1636,7 @@ end
 -- find AND buy it yourself. Owner: ~2 base, higher when the build already has strong jokers worth doubling.
 local SHOWMAN_BEST_FRAC = 0.25
 function Eval.showman_jp(gs, opts)
-  local base = (JokerData.resolve("j_ring_master").tier or 2) * 0.5
+  local base = JokerData.tier("j_ring_master") * JokerData.TIER_JP
   local best = 0
   for i, j in ipairs(gs.jokers or {}) do
     if j.key ~= "j_ring_master" and not JokerData.is_unmodelled(j.key) then
@@ -1712,10 +1713,9 @@ function Eval.joker_power(gs, opts)
   end
   local s = 0
   for _, j in ipairs(gs.jokers or {}) do
-    local e = JokerData.resolve(j.key)
     -- scaling jokers are projected forward (worth far more late); flat jokers
     -- have projection 1.0, so this is a no-op for them.
-    s = s + JokerData.prior_jp_of(e) * Eval.scaling_projection(gs, j.key)
+    s = s + JokerData.tier(j.key) * JokerData.TIER_JP * Eval.scaling_projection(gs, j.key)
     s = s + edition_jp(j.edition, true)
   end
   return s
@@ -1738,10 +1738,10 @@ Eval.MONEY_LAST_ANTE = 8
 -- than to buy, and in a trade its income outweighed a scorer at that rate (memory: paired trades went 35 -> 17 wins on
 -- this scale). Priced at the buy rate (0.5 FV) since 2026-10-07: arms u4 vs u1 +0.206 (p 0.008), fresh seeds +0.033,
 -- pooled n=320 +0.119 (p 0.075), wins 88 -> 90, reach-8 118 -> 127. BES_ECON_FV=0 restores the old 0.8.
-Eval.ECON_FV = (Flags.str("BES_ECON_FV") == "0") and 0.8
+Eval.ECON_FV = (not Flags.on("BES_ECON_FV")) and 0.8
   or (VU.ROUND_INCOME_UTIL / VU.FRAC_UTIL * VU.FV_PER_FRAC)
 function Eval.money_weight(gs)
-  if Flags.global("BES_MONEY_ANTE") == false or (Flags.global("BES_MONEY_ANTE") == nil and not Eval.MONEY_ANTE) then return 1 end
+  if not Eval.MONEY_ANTE then return 1 end
   local ante = math.floor((gs and gs.meta and gs.meta.ante) or 1)
   if ante <= VU.REF_ANTE then return 1 end
   local left = math.max(1, Eval.MONEY_LAST_ANTE + 1 - ante)
@@ -1825,9 +1825,8 @@ Eval.TRADE_DEPENDENCE = 0.5
 -- would reshuffle every later Monte-Carlo sample of the decision (noise, and a cascade in a sim batch).
 local function trade_rng(i, key)
   local s = 7919 * i + 104729
-  for c in tostring(key):gmatch(".") do s = (s * 31 + c:byte()) % 2147483647 end
-  if s <= 0 then s = s + 2147483646 end
-  return Rng.from_state(s)
+  for c in tostring(key):gmatch(".") do s = (s * 31 + c:byte()) % Rng.M end
+  return Rng.stream(s)
 end
 function Eval.trade_leans_on(gs, i, sj, opts)
   if not (opts and opts.rng) or not can_measure(gs, opts) then return nil end
@@ -1967,8 +1966,7 @@ local function todo_income(gs)
   local deck = gs.deck
   if not deck or #deck < 8 then return nil end
   local hs = math.min((gs.run and gs.run.hand_size) or 8, #deck)
-  local s = (#deck * 7919 + 104729) % 2147483647
-  local rng = Rng.from_state(s)
+  local rng = Rng.stream(#deck * 7919 + 104729)
   local SAMPLES = 12
   local avail = 0
   for _ = 1, SAMPLES do
@@ -1990,8 +1988,7 @@ local function delayed_grat_income(gs)
   local hands = (gs.blind and gs.blind.base_hands) or 4
   local d = (gs.blind and (gs.blind.base_discards or gs.blind.discards_left)) or 3
   local need = Mechanics.blind_requirement(math.floor((gs.meta and gs.meta.ante) or 1), "Big")
-  local s = (#deck * 104729 + 7919) % 2147483647
-  local rng = Rng.from_state(s)
+  local rng = Rng.stream(#deck * 104729 + 7919)
   local SAMPLES, ok = 8, 0
   for _ = 1, SAMPLES do
     local ev = HandEval.best_play(gs, JokerValue._sample_hand(gs, deck, hs, rng))
@@ -2190,10 +2187,9 @@ function Eval.play_money_delta(gs, key)
   if memo[sig] then return memo[sig] end
   local HandEval = require("engine.hand_eval")
   local hs = math.min((gs.run and gs.run.hand_size) or 8, #deck)
-  local s = (#deck * 15485863 + #sig * 7919 + 104729) % 2147483647
-  for c = 1, #key do s = (s + key:byte(c) * 131 * c) % 2147483647 end
-  if s <= 0 then s = 1 end
-  local rng = Rng.from_state(s)
+  local s = (#deck * 15485863 + #sig * 7919 + 104729) % Rng.M
+  for c = 1, #key do s = (s + key:byte(c) * 131 * c) % Rng.M end
+  local rng = Rng.stream(Rng.seed(s))
   local base = gs.jokers or {}
   local with = {}
   for i, j in ipairs(base) do with[i] = j end
@@ -2349,8 +2345,8 @@ function Eval.negative_slot_fv(gs, opts)
     if opts.mode ~= "freed" and jfree <= 0 then return 0 end
     local rng = opts.rng
     if not rng then
-      local s = (math.floor((gs and gs.meta and gs.meta.ante) or 1) * 7919 + jfree * 104729 + #((gs and gs.deck) or {})) % 2147483646 + 1
-      rng = Rng.from_state(s)
+      local s = (math.floor((gs and gs.meta and gs.meta.ante) or 1) * 7919 + jfree * 104729 + #((gs and gs.deck) or {})) % (Rng.M - 1) + 1
+      rng = Rng.stream(s)
     end
     local Packs = require("engine.packs")
     local ok, e = pcall(Packs.expected_shop_joker, gs, 2, { rng = rng, samples = 3, measure_count = 4 })

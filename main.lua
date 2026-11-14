@@ -175,11 +175,10 @@ end
 -- recorded states carried the build plan and every replay of a commitment-dependent decision (sell protection,
 -- planet credit, build fit) disagreed with live -- live Z9ZPREGI sold Raised Fist (Sly core to a Full House plan),
 -- the replay sold Sly. BES.emit_fixture now records this same state.
+BES._carried = {}   -- DecisionState's memory between decisions: build commitment, Mouth lock, paired trade
 function BES.run_state_for(gs)
   if not DecisionState then return {} end
-  return DecisionState.carry(gs, { build_seed = BES._build_seed, build_plan = BES._build_plan,
-    first_hand_key = BES._first_hand_key, first_hand = BES._first_hand,
-    pending_swap = BES._pending_swap, last = BES.last })
+  return DecisionState.carry(gs, BES._carried, BES.last)
 end
 
 function BES.evaluate(with_sim, gs)
@@ -193,10 +192,10 @@ function BES.evaluate(with_sim, gs)
 
   -- carried run state (build commitment, Mouth lock): see BES.run_state_for
   local rs = BES.run_state_for(gs)
-  if rs.plan_key then BES._build_seed, BES._build_plan = rs.plan_key, rs.plan end   -- so BP.commitment/planet_credit see it (shop AND blind)
-  if rs.first_key then BES._first_hand_key, BES._first_hand = rs.first_key, rs.first_hand end
-  if rs.pending_set then BES._pending_swap = rs.pending end
-  if DecisionState then DecisionState.attach(gs, rs) end
+  if DecisionState then
+    DecisionState.remember(BES._carried, rs)
+    DecisionState.attach(gs, rs)   -- so BP.commitment / planet_credit see the plan (shop AND blind)
+  end
 
   -- An open booster pack: recommend which revealed items to take, and in what
   -- order (chained effects), or to skip the pack (deck bloat). The cheap pass

@@ -88,6 +88,7 @@ Almost everything here reads **existing** telemetry and costs nothing to run. On
 |---|---|
 | **`yield_gaps.lua`** | how long does each live recommendation take, and how long can it run between slice boundaries (= the worst animation stutter)? `luajit tools/yield_gaps.lua [--per N]` over the newest recorded decisions per kind. 2026-10-02: shop ~5 s (max 10 s) total; gap p99 3-6 ms, max ~50 ms |
 | **`flagged.lua`** | which decisions were saved to `bes_flagged.jsonl` (a misplay flagged in-game, or the automatic save of a lost run)? `luajit tools/flagged.lua [--list] [--flag "<id>"] [--replay]` -- one flag holds the last ~12 decisions (the key is usually pressed AFTER the misplay; `steps_before` 0 = on screen at the press), each a full fixture-format state; `--replay` re-decides them with the current engine |
+| **`advice_golden.lua`** | did a refactor change any advice? Re-decides ~1000 recorded live states (`bes_flagged.jsonl`: shop, pack, blind, skip) and prints a digest of each full answer; run it before and after, then `diff` the two files. Minutes, one process, no simulator. |
 | **`slice_check.lua`** | is time-sliced advice identical to synchronous advice, with no yield inside a C call? Run it after touching any engine loop; exit 1 on a mismatch |
 
 ## Getting a change into the live game

@@ -61,6 +61,7 @@ function Flags.global(name)
   return rawget(_G, name)
 end
 
+note("BES_MC_CAP", "global", nil)
 function Flags.mc_cap(n)
   local c = rawget(_G, "BES_MC_CAP")
   if c and n > c then return c end

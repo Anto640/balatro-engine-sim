@@ -180,15 +180,13 @@ function SA.econ_floor(gs)
   return math.min(cap_d, SA.ECON_FLOOR + SA.ECON_FLOOR_STEP * (ante - 1))
 end
 
--- Upgrade-swap hysteresis and the strength-proportional keep: engine/joker_worth.lua (keep_bar).
-SA.UPGRADE_MARGIN = JokerWorth.UPGRADE_MARGIN
+-- Upgrade-swap hysteresis and the strength-proportional keep: engine/joker_worth.lua (UPGRADE_MARGIN, keep_bar).
 -- A funder joker is "dead" (freely sellable to fund anything) only when it contributes at or
 -- below this FV -- the SAME threshold the SELL_JOKER path uses for its `dead` decision (worst_c
 -- <= 0.1). Anything above it is a FUNCTIONAL joker and may only be sold to fund a CLEARLY better
 -- joker (see SA.stb_funder_allowed), which is what stops the "buy a joker then sell it next shop
 -- for a lateral one" churn the owner has reported every run.
 SA.DEAD_FUNDER_FV = 0.1
-SA.SWAP_KEEP_SLOPE = JokerWorth.SWAP_KEEP_SLOPE
 SA.SWAP_SAMPLES = Flags.num("BES_SWAP_SAMPLES")   -- env: deals per swap measurement (A/B)
 -- PAIRED TRADE eligibility: jokers whose whole value is their SCORE NOW -- what JV.swap_delta measures. Both sides
 -- must be plain scorers with no downside and no money of their own: arm pt (2026-10-03, wins 35 -> 17, p~0) let a
@@ -198,6 +196,7 @@ SA.SWAP_SAMPLES = Flags.num("BES_SWAP_SAMPLES")   -- env: deals per swap measure
 -- BES_LEVEL_AMP_ALWAYS=1 restores the B1 level amplifier on top of the measured board context (A/B of the 2026-10-05
 -- double-count fix).
 SA.LEVEL_AMP_ALWAYS = Flags.off("BES_LEVEL_AMP_ALWAYS")
+SA.TRADE_FLOORED = Flags.off("BES_TRADE_FLOORED")   -- A/B switch: trades measure plain scorers with the tier floor
 SA.PAIRED_SAMPLES = 12
 -- SWAP ADMISSION (2026-10-20, BES_SWAP_ADMIT=1, sim A/B). On a full board (the norm from ante 3) both trade paths only
 -- weigh an offer whose single-deal score delta is > 0. Every scaling xmult starts at x1 and every round-state xmult
@@ -525,7 +524,7 @@ local function synergy_bonus(gs, sj)
   for _, tag in ipairs(e.tags) do
     if tag == "copy" then
       if have > 0 then bonus = bonus + 2.5; note = note or "copies your best joker"
-      elseif ShopState.slots_free(gs) >= 2 then note = "copies the next joker you buy"   -- SA.copier_future_frac
+      elseif ShopState.slots_free(gs) >= 2 then note = "copies the next joker you buy"   -- JokerWorth.copier_future_frac
       else bonus = bonus - 3.0; note = "no joker to copy yet" end
     elseif tag == "xmult" and have > 0 then
       bonus = bonus + 1.0
@@ -669,7 +668,7 @@ SA.funder_is_live = funder_is_live   -- exposed for tests
 -- The rule, for a joker funder (consumable funders are unaffected -- kind ~= "joker"):
 --   * a DEAD joker (contributes <= DEAD_FUNDER_FV and is not econ/edition-live) may fund anything;
 --   * a FUNCTIONAL joker may fund ONLY a joker buy (need_jslot) that CLEARLY upgrades it
---     (the buy's add-marginal beats the funder's keep-marginal by SA.UPGRADE_MARGIN) -- it may
+--     (the buy's add-marginal beats the funder's keep-marginal by JokerWorth.UPGRADE_MARGIN) -- it may
 --     never be dumped for a pack / voucher / tarot, and never for a lateral/worse joker.
 -- Pure arithmetic so it is unit-testable without Monte-Carlo (test_shop covers the table); the
 -- inline call passes the real measured contribution / add-marginal.
@@ -677,7 +676,7 @@ function SA.stb_funder_allowed(contribution, buy_add_marginal, need_jslot, live)
   local dead = (not live) and (contribution or 0) <= SA.DEAD_FUNDER_FV
   if dead then return true end                     -- disposable filler: fund anything
   if not need_jslot then return false end          -- a working joker never funds a non-joker
-  return (buy_add_marginal or 0) > (contribution or 0) + SA.UPGRADE_MARGIN  -- only a clear upgrade
+  return (buy_add_marginal or 0) > (contribution or 0) + JokerWorth.UPGRADE_MARGIN  -- only a clear upgrade
 end
 
 -- Estimated dollars generated DURING a blind, from money-making jokers (econ in
@@ -741,12 +740,13 @@ end
 -- SAME test the SELL_JOKER upgrade applies: keep = c*(1+SLOPE*c) plus sell_margin = max(UPGRADE_MARGIN,
 -- keep_bias). Returned in boss-hand FRACTION (the unit of the joker pool / reroll e_best). nil when a slot
 -- is free or nothing is sellable.
+SA.SWAP_BAR = Flags.off("BES_SWAP_BAR")   -- opt-in experiment (below)
 local function full_board_swap_bar(gs, mopts)
   -- ⚠ OFF BY DEFAULT (sim verdict 2026-09-24): with the bar, paired n=160 vs risk_after went -0.071 (sign
   -- 67/76, wins 21) against +0.056 (sign 74/68, wins 24) without it -- it cut rerolls ~60%, and a reroll
   -- also surfaces packs/consumables that this joker-only e_best never prices (the same mechanism that
   -- reverted the 2026-08-11 reroll feasibility gate). Kept as an opt-in experiment: BES_SWAP_BAR=1.
-  if not (Flags.global("BES_SWAP_BAR") or (Flags.off("BES_SWAP_BAR"))) then return nil end
+  if not SA.SWAP_BAR then return nil end
   if ShopState.slots_free(gs) > 0 then return nil end
   local best
   for i, jk in ipairs(gs.jokers or {}) do
@@ -812,13 +812,7 @@ end
 SA.pack_need = pack_need
 
 -- The buy-side joker valuation (the pace-damped projection, the discards a build holds, a copier's future target)
--- lives in engine/joker_worth.lua: JokerWorth.of(gs, sj, "buy", { rng =, pace = }). Re-exported for callers and tests.
-SA.PROJ_DAMP_URGENT, SA.PROJ_DAMP_BEHIND = JokerWorth.PROJ_DAMP_URGENT, JokerWorth.PROJ_DAMP_BEHIND
-SA.proj_damp = JokerWorth.proj_damp
-SA.DIG_HOLD_FRAC = JokerWorth.DIG_HOLD_FRAC
-SA.expected_discards_left = JokerWorth.expected_discards_left
-SA.COPIER_WAIT = JokerWorth.COPIER_WAIT
-SA.copier_future_frac = JokerWorth.copier_future_frac
+-- lives in engine/joker_worth.lua: JokerWorth.of(gs, sj, "buy", { rng =, pace = }).
 
 -- ---- candidate generation ---------------------------------------------------
 
@@ -861,7 +855,7 @@ function SA.recommend(gs, opts)
   -- floor hid a ~450-a-hand Walkie Talkie behind a ~1900-a-hand Gros Michel -- live UAPB3XY9 flag 4b)
   local trade_mopts = {}
   for k, v in pairs(swap_mopts) do trade_mopts[k] = v end
-  trade_mopts.plain_unfloored = not (Flags.off("BES_TRADE_FLOORED"))   -- A/B switch
+  trade_mopts.plain_unfloored = not SA.TRADE_FLOORED
   local swap_bar_memo
   local function swap_bar()   -- lazy + memoised: only the full-board reroll / Buffoon paths need it
     if swap_bar_memo == nil then swap_bar_memo = full_board_swap_bar(gs, mopts) or false end
@@ -1320,6 +1314,7 @@ function SA.recommend(gs, opts)
   -- A healthy contributing joker yields a negative value here, so it is only
   -- recommended when one of the circumstances actually outweighs what's lost.
   try(function()
+  local swap_trace = Flags.global("BES_SWAP_TRACE")   -- diagnostic only (tools/swap_bar_probe.lua)
   if #(gs.jokers or {}) > 0 then
     -- Only pay for the deck-aware leave-one-out ranking when a sale is plausibly on
     -- the table (board full, at risk, low on cash, or holding a decaying/nudge
@@ -1427,7 +1422,7 @@ function SA.recommend(gs, opts)
               -- raw marginal only edges the weakest -- and a redundant flat is damped.
               local g = buy_fv_delta(gs, sj, swap_mopts) + (BuildPlan.fit(gs, sj, build, invest)) / SA.W_FV   -- fit is in shop utility (as on a buy); this sum is FV
               if g > upgrade then upgrade, up_name = g, (sj.name or sj.key) end
-              if Flags.global("BES_SWAP_TRACE") then Flags.global("BES_SWAP_TRACE")[#Flags.global("BES_SWAP_TRACE") + 1] =
+              if swap_trace then swap_trace[#swap_trace + 1] =
                 { sold = j.key, ci = worst_c, buy = sj.key, g = g, cost = sj.cost, worst = true } end
             end
           end
@@ -1440,14 +1435,14 @@ function SA.recommend(gs, opts)
         -- three real human wins KEPT these while the engine kept advising selling them for
         -- junk (Trio->Loyalty, Brainstorm->Ramen). Require the replacement to beat the sold
         -- piece's PROTECTED value (keep_bias), so only a clear dominator disrupts the core.
-        local sell_margin = math.max(SA.UPGRADE_MARGIN,
+        local sell_margin = math.max(JokerWorth.UPGRADE_MARGIN,
           BuildPlan.keep_bias(gs.jokers[worst_i].key, gs, Eval.joker_fires(gs, worst_i, sell_mopts)))
-        -- STRENGTH-PROPORTIONAL keep (see SA.SWAP_KEEP_SLOPE): the keystone must beat the sold
+        -- STRENGTH-PROPORTIONAL keep (see JokerWorth.SWAP_KEEP_SLOPE): the keystone must beat the sold
         -- joker by C*(1 + SLOPE*C) -- weak filler swaps ~freely, a strong joker demands a much
         -- better replacement. Charged ONCE here (was the flat 2*C); pure sales charge it once below.
         local keep_c = joker_contribution(gs, worst_i, trade_mopts)
         local keep = JokerWorth.keep_strength(keep_c)
-        if Flags.global("BES_SWAP_TRACE") then for _, t in ipairs(Flags.global("BES_SWAP_TRACE")) do
+        if swap_trace then for _, t in ipairs(swap_trace) do
           if t.worst and not t.keep then t.keep = keep + sell_margin end end end
         upgrade = math.max(0, upgrade - keep - sell_margin)
       end
@@ -1505,7 +1500,7 @@ function SA.recommend(gs, opts)
                 local g = buy_fv_delta(gs, sj, swap_mopts) + (BuildPlan.fit(gs, sj, build, invest)) / SA.W_FV   -- fit is in shop utility (as on a buy); this sum is FV
                 local up = g - keep
                 -- diagnostic only (tools/swap_bar_probe.lua): every full-board trade the bar weighed
-                if Flags.global("BES_SWAP_TRACE") then Flags.global("BES_SWAP_TRACE")[#Flags.global("BES_SWAP_TRACE") + 1] =
+                if swap_trace then swap_trace[#swap_trace + 1] =
                   { sold = jk.key, ci = ci, keep = keep, buy = sj.key, g = g, cost = sj.cost } end
                 if up > 0 and (not best_t or up > best_t.up) then
                   best_t = { up = up, i = i, sj = sj, cash = cash_i }
@@ -1751,7 +1746,7 @@ function SA.recommend(gs, opts)
           local empties_board = f.kind == "joker" and #(gs.jokers or {}) <= 1 and not p.need_jslot
           -- ANTI-CHURN GATE (2026-08-27 MALEJYHW; GENERALISED 2026-08-31). A joker funder may only
           -- be sold to fund a JOKER buy that CLEARLY upgrades it (add-marginal beats keep-marginal by
-          -- SA.UPGRADE_MARGIN), and may NEVER fund a non-joker -- UNLESS it is DEAD (disposable filler).
+          -- JokerWorth.UPGRADE_MARGIN), and may NEVER fund a non-joker -- UNLESS it is DEAD (disposable filler).
           -- Originally this only applied to `funder_is_live` (econ/edition) jokers, so plain scorers
           -- fell through and got churned lateral/worse (Clever->Mystic->Bloodstone across three shops).
           -- SA.stb_funder_allowed now applies it to every functional joker. `dead` scorers still fund

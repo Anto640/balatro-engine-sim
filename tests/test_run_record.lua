@@ -18,6 +18,4 @@ return function(t)
   t.eq(m.Flush, nil, "hand_level_map: base-level hands are left out")
 
   t.eq(RunRecord.hand_level_map({ Flush = { level = 1 } }), nil, "hand_level_map: nothing leveled -> nil (live records omit it)")
-  local e = RunRecord.hand_level_map({ Flush = { level = 1 } }, true)
-  t.ok(type(e) == "table" and next(e) == nil, "hand_level_map: keep_empty -> an empty map (the simulator's records)")
 end

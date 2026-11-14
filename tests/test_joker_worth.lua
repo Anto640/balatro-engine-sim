@@ -18,8 +18,8 @@ return function(t)
   do
     local tier = JokerData.tier("j_joker")
     t.eq(JokerData.tier_prior("j_joker"), tier * 0.3, "tier prior: a boss-hand fraction (tier x 0.3)")
-    t.eq(JokerData.prior_of(JokerData.resolve("j_joker")), tier * 0.3, "prior_of: the same from a catalogue entry")
-    t.eq(JokerData.prior_jp_of(JokerData.resolve("j_joker")), tier * 0.5, "prior_jp_of: joker-power points")
+    t.eq(JokerData.TIER_JP, 0.5, "joker-power points per tier")
+    t.eq(JokerData.TIER_FV, 0.75, "future-value points per tier")
     t.eq(JokerData.tier("j_definitely_not_a_joker"), JokerData.resolve("j_definitely_not_a_joker").tier or 3,
          "tier: an unknown key takes the catalogue's fallback")
   end
@@ -47,6 +47,7 @@ return function(t)
   do
     t.eq(JokerWorth.proj_damp(nil), 1, "proj_damp: no pace model -> undamped")
     t.eq(JokerWorth.proj_damp({ on_pace = true }), 1, "proj_damp: on pace -> undamped")
+    t.ok(JokerWorth.proj_damp({ on_pace = false }) < 1, "proj_damp: behind pace -> damped")
     t.ok(JokerWorth.proj_damp({ urgent = true }) < JokerWorth.proj_damp({ on_pace = false }), "proj_damp: urgent damps hardest")
   end
 

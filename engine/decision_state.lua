@@ -35,64 +35,74 @@ function DS.derive(gs, eff)
 end
 
 -- ---- carried state ----------------------------------------------------------
--- What the next decision inherits, worked out from the new snapshot and the caller's memory:
---   mem = { build_seed, build_plan, first_hand_key, first_hand, pending_swap, last }
---   (`last` = the previous evaluation: { gs =, ranked = { best = } }, for the paired-trade inference)
--- Returns a table for DS.attach / DS.remember; never edits `mem` or the plan it holds.
---
+-- What the next decision inherits, worked out from the new snapshot, the caller's memory and its last evaluation:
+--   mem  = { build_seed, build_plan, first_hand_key, first_hand, pending_swap }   (what DS.remember writes)
+--   last = the previous evaluation: { gs =, ranked = { best = } }                 (for the paired-trade inference)
+-- Returns a table for DS.attach / DS.remember; never edits `mem` or the plan it holds. Each of the three carried
+-- facts sets its own key in the result only when the snapshot is of a kind that carries it, so a nil VALUE
+-- (no plan, no lock, the trade lapsed) is still attached and remembered.
+
+-- The build commitment: advanced in the shop, read everywhere; a new run (another seed) starts without one.
+local function carry_plan(gs, mem, out)
+  if not gs.run then return end
+  local seed = (gs.meta and gs.meta.seed_hash) or ""
+  local plan = (seed == mem.build_seed) and mem.build_plan or nil
+  if gs.shop then
+    local ok_bp, p = pcall(BuildPlan.advance, gs, plan)   -- pure: returns a new plan, never edits `plan`
+    if ok_bp then plan = p end
+  end
+  out.plan_key, out.plan = seed, plan
+end
+
 -- The Mouth lock: the game does not expose the locked hand type, so it is recorded here -- when exactly one hand
 -- has been played this round and the game has registered it, that is the lock. Keyed by run + round.
---
+local function carry_mouth_lock(gs, mem, out)
+  local b = gs.blind
+  if not b then return end
+  local fkey = tostring(gs.meta and gs.meta.seed_hash) .. ":" .. tostring(gs.meta and gs.meta.round)
+  local first = (mem.first_hand_key == fkey) and mem.first_hand or nil
+  if not first and b.hands_played_round == 1 and b.last_hand_played
+     and b.played_hand_types and b.played_hand_types[b.last_hand_played] then
+    first = b.last_hand_played
+  end
+  out.first_key, out.first_hand = fkey, first
+end
+
 -- A paired trade in progress (shop_advisor, 2026-10-03): the last advice sold a joker FOR a shop joker and that
 -- joker is now gone, so its buy is due -- the shop must still see the trade, or it re-prices the buy alone and can
 -- leave the slot empty. Lapses when the offer leaves the shop or the round changes.
-function DS.carry(gs, mem)
+local function carry_pending_swap(gs, mem, last, out)
+  if not (gs.shop and gs.run) then return end
+  local seed = (gs.meta and gs.meta.seed_hash) or ""
+  local round = gs.meta and gs.meta.round
+  local p = mem.pending_swap
+  if p and (p.seed ~= seed or p.round ~= round) then p = nil end
+  local lb = last and last.ranked and last.ranked.best
+  if lb and lb.type == "SELL_JOKER" and lb.pending_swap and lb.target and last.gs
+     and #(gs.jokers or {}) < #(last.gs.jokers or {}) then
+    local gone = true
+    for _, j in ipairs(gs.jokers or {}) do
+      if j == lb.target or (lb.target.id ~= nil and j.id == lb.target.id) then gone = false end
+    end
+    if gone then
+      p = { key = lb.pending_swap.key, edition = lb.pending_swap.edition, up = lb.pending_swap.up,
+            sold_fv = lb.pending_swap.sold_fv, seed = seed, round = round }
+    end
+  end
+  if p then
+    local offered = false
+    for _, sj in ipairs(gs.shop.jokers or {}) do if sj.key == p.key then offered = true end end
+    if not offered then p = nil end
+  end
+  out.pending_set, out.pending = true, p
+end
+
+function DS.carry(gs, mem, last)
   mem = mem or {}
   local out = {}
-  if gs.run then
-    local seed = (gs.meta and gs.meta.seed_hash) or ""
-    local plan = (seed == mem.build_seed) and mem.build_plan or nil
-    if gs.shop then
-      local ok_bp, p = pcall(BuildPlan.advance, gs, plan)   -- pure: returns a new plan, never edits `plan`
-      if ok_bp then plan = p end
-    end
-    out.plan_key, out.plan = seed, plan
-  end
-  if gs.blind then
-    local fkey = tostring(gs.meta and gs.meta.seed_hash) .. ":" .. tostring(gs.meta and gs.meta.round)
-    local first = (mem.first_hand_key == fkey) and mem.first_hand or nil
-    local b = gs.blind
-    if not first and b.hands_played_round == 1 and b.last_hand_played
-       and b.played_hand_types and b.played_hand_types[b.last_hand_played] then
-      first = b.last_hand_played
-    end
-    out.first_key, out.first_hand = fkey, first
-  end
-  if gs.shop and gs.run then
-    local seed = (gs.meta and gs.meta.seed_hash) or ""
-    local round = gs.meta and gs.meta.round
-    local p = mem.pending_swap
-    if p and (p.seed ~= seed or p.round ~= round) then p = nil end
-    local last = mem.last
-    local lb = last and last.ranked and last.ranked.best
-    if lb and lb.type == "SELL_JOKER" and lb.pending_swap and lb.target and last.gs
-       and #(gs.jokers or {}) < #(last.gs.jokers or {}) then
-      local gone = true
-      for _, j in ipairs(gs.jokers or {}) do
-        if j == lb.target or (lb.target.id ~= nil and j.id == lb.target.id) then gone = false end
-      end
-      if gone then
-        p = { key = lb.pending_swap.key, edition = lb.pending_swap.edition, up = lb.pending_swap.up,
-              sold_fv = lb.pending_swap.sold_fv, seed = seed, round = round }
-      end
-    end
-    if p then
-      local offered = false
-      for _, sj in ipairs(gs.shop.jokers or {}) do if sj.key == p.key then offered = true end end
-      if not offered then p = nil end
-    end
-    out.pending_set, out.pending = true, p
-  end
+  carry_plan(gs, mem, out)
+  carry_mouth_lock(gs, mem, out)
+  carry_pending_swap(gs, mem, last, out)
   return out
 end
 

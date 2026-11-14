@@ -4,6 +4,7 @@
 -- forces save, stronger joker outranks weaker), not heuristic magnitudes.
 
 local SA = require("engine.shop_advisor")
+local JokerWorth = require("engine.joker_worth")
 local GS = require("model.game_state")
 local card, joker = GS.card, GS.joker
 
@@ -14,18 +15,6 @@ local function find(ranked, typ)
 end
 
 return function(t)
-  -- ---- pace-gated scaling projection (ante 2-3 build-death fix) ----
-  do
-    -- on pace -> full projection (invest in what a scaler BECOMES)
-    t.eq(SA.proj_damp({ on_pace = true }), 1, "on pace -> scaler future value undamped")
-    -- behind but not urgent -> partial discount of ungrown future value
-    t.ok(SA.proj_damp({ on_pace = false }) < 1, "behind pace -> scaler projection damped")
-    -- can't clear the next boss -> future is ~irrelevant, value it near current worth
-    t.ok(SA.proj_damp({ urgent = true }) < SA.proj_damp({ on_pace = false }),
-      "urgent (near-term death) damps the scaler projection hardest")
-    t.eq(SA.proj_damp(nil), 1, "no pace model -> no damping (unchanged behaviour)")
-  end
-
   -- ---- §10 SELL_TO_BUY replacement charge -------------------------------
   -- Selling a JOKER to fund a NON-joker frees a slot the engine demonstrably refills, so the
   -- sale is temporary: it raises ~$2.5 and the refill costs ~$5. Pin that the charge exists,
@@ -52,7 +41,7 @@ return function(t)
     t.ok(not SA.stb_funder_allowed(C, C + 0.1, true, false),
       "functional scorer NOT sold to fund a lateral joker (Clever->Mystic churn blocked)")
     -- (b) a genuine upgrade clears the hysteresis margin -> ALLOWED
-    t.ok(SA.stb_funder_allowed(C, C + SA.UPGRADE_MARGIN + 0.5, true, false),
+    t.ok(SA.stb_funder_allowed(C, C + JokerWorth.UPGRADE_MARGIN + 0.5, true, false),
       "functional scorer MAY be sold to fund a clearly better joker")
     -- (c) a functional joker may NEVER fund a non-joker (pack/voucher/tarot), even a great one
     t.ok(not SA.stb_funder_allowed(C, 999, false, false),
@@ -1536,9 +1525,9 @@ return function(t)
         run = { hand_levels = {}, hand_size = 8, joker_slots = 5 }, economy = { dollars = 60, interest_cap = 5 },
         meta = { ante = 3, round = 1, state = "x", seed_hash = "" },
         shop = { jokers = {}, vouchers = {}, boosters = {}, reroll_cost = 5, joker_slots = 5 } }
-      _G.BES_VALUE_DEBUG = true; _G.BES_SWAP_BAR = true   -- opt-in experiment (off by default, sim-negative)
+      _G.BES_VALUE_DEBUG = true; SA.SWAP_BAR = true   -- opt-in experiment (off by default, sim-negative)
       local r = SA.recommend(gs, { rng = lcg(6) })
-      _G.BES_VALUE_DEBUG = nil; _G.BES_SWAP_BAR = nil
+      _G.BES_VALUE_DEBUG = nil; SA.SWAP_BAR = false
       local pool = { r.best }
       for _, a in ipairs(r.alternatives or {}) do pool[#pool + 1] = a end
       for _, a in ipairs(pool) do if a.type == "REROLL" and a.dbg then return a.dbg.e_best end end

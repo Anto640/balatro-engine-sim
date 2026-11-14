@@ -26,6 +26,7 @@ local Advice      = require("engine.advice")
 local GS          = require("model.game_state")
 local SimState    = require("sim.state")
 local ShopAdvisor = require("engine.shop_advisor")
+local JokerWorth  = require("engine.joker_worth")
 local Decision    = require("engine.decision_engine")
 local ConsumableV = require("engine.consumable_value")
 local JokerData   = require("engine.joker_data")   -- B1 feature vector
@@ -76,7 +77,7 @@ local function engine_meta()
   ENGINE_META = {
     git_sha = sha,
     sa = { econ_floor = ShopAdvisor.ECON_FLOOR, econ_floor_rate = ShopAdvisor.ECON_FLOOR_RATE,
-           upgrade_margin = ShopAdvisor.UPGRADE_MARGIN, reroll_min_improvement = ShopAdvisor.REROLL_MIN_IMPROVEMENT,
+           upgrade_margin = JokerWorth.UPGRADE_MARGIN, reroll_min_improvement = ShopAdvisor.REROLL_MIN_IMPROVEMENT,
            reroll_appetite_rich = ShopAdvisor.REROLL_APPETITE_RICH, w_fv = ShopAdvisor.W_FV,
            joker_score_weight = ShopAdvisor.JOKER_SCORE_WEIGHT, interest_horizon = ShopAdvisor.INTEREST_HORIZON,
            cost_weight = ShopAdvisor.COST_WEIGHT },
@@ -160,10 +161,6 @@ function Driver.features(run)
   return f
 end
 
--- shared with the live telemetry's records: core/run_record.lua
-local function joker_keys(run) return RunRecord.joker_keys(run.jokers) end
-local function hand_level_sum(run) return RunRecord.hand_level_sum(run.hand_levels) end
-
 -- per-joker detail (P5): key + edition + stickers. A negative-edition joker is
 -- slot-free (it doesn't consume a board slot), flagged so the analyzer can reason
 -- about effective board size.
@@ -181,17 +178,14 @@ local function joker_details(run)
   return Json.array(out)
 end
 
--- hand levels as a per-hand-type map (P5): { ["Pair"] = 3, ... }, only hands above
--- base level (keeps the record small). hand_level_sum is kept for backward compat.
-local function hand_level_map(run) return RunRecord.hand_level_map(run.hand_levels, true) end
-
 local function board(run)
   return { dollars = run.economy.dollars, njokers = #(run.jokers or {}),
-           jokers = Json.array(joker_keys(run)), hand_level_sum = hand_level_sum(run),
+           jokers = Json.array(RunRecord.joker_keys(run.jokers)), hand_level_sum = RunRecord.hand_level_sum(run.hand_levels),
            consumables = #(run.consumables or {}),
            -- enriched snapshot (P5)
            jokers_detail = joker_details(run),
-           hand_levels = hand_level_map(run),
+           -- per-hand-type levels above base (P5); the sim's records carry an empty map where live omits the field
+           hand_levels = RunRecord.hand_level_map(run.hand_levels) or {},
            vouchers = Json.array((function() local v = {}; for _, k in ipairs(run.vouchers_owned or {}) do v[#v + 1] = k end; return v end)()),
            build_plan = run.build_plan,
            hands = run.base_hands, discards = run.base_discards, hand_size = run.hand_size,
@@ -367,7 +361,7 @@ function Driver.run(seed, opts)
       if ante >= 8 then
         run.won = true
         emit({ kind = "win", gen_made = run._gen_made, gen_used = run._gen_used, ante = ante, dollars = run.economy.dollars,
-               njokers = #(run.jokers or {}), jokers = Json.array(joker_keys(run)) })
+               njokers = #(run.jokers or {}), jokers = Json.array(RunRecord.joker_keys(run.jokers)) })
         return { records = recs, won = true, death_ante = nil, seed = seed }
       end
       ante = ante + 1

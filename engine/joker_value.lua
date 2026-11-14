@@ -108,8 +108,7 @@ local function deal_dig(board_gs, deck, dkey, hs, seed)
   local key = board_sig(board_gs.jokers) .. "|" .. dkey .. "|" .. hs .. "|" .. D .. "|" .. seed
   local hit = DIG_CACHE[key]
   if hit then return hit end
-  local st = seed
-  local rng = Rng.from_state(st)
+  local rng = Rng.stream(seed)
   local sh = {}
   for i = 1, #deck do sh[i] = deck[i] end
   for i = #sh, 2, -1 do local r = math.floor(rng() * i) + 1; sh[i], sh[r] = sh[r], sh[i] end
@@ -202,8 +201,7 @@ local function crn_hand(deck, dkey, hs, k)
   local hk = hs * 1000 + k
   local h = per[hk]
   if h then return h end
-  local st = deal_seed(deck, dkey, k)
-  local rng = Rng.from_state(st)
+  local rng = Rng.stream(deal_seed(deck, dkey, k))
   local sh = {}
   for i = 1, #deck do sh[i] = deck[i] end
   for i = #sh, 2, -1 do local r = math.floor(rng() * i) + 1; sh[i], sh[r] = sh[r], sh[i] end

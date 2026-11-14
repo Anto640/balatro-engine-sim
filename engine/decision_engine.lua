@@ -357,10 +357,7 @@ DE.GEN_USE = {
 DE.HELD_USE = Flags.on("BES_HELD_USE")   -- A/B switch
 local function held_card_use_value(gs, c, need)
   if not DE.HELD_USE then return nil end
-  local seed = (#(gs.deck or {}) * 40503 + c.key:byte(3) * 131 + 29) % 2147483647
-  if seed <= 0 then seed = 1 end
-  local s = seed
-  local rng = Rng.from_state(s)
+  local rng = Rng.stream(#(gs.deck or {}) * 40503 + c.key:byte(3) * 131 + 29)
   if c.key == "c_wheel_of_fortune" then
     local v = ConsumableValue.wheel_value(gs, need, rng) or 0
     return v * need, "1 in 4: an edition on a joker without one"
@@ -400,10 +397,7 @@ local function generator_use(gs)
         -- once, not two ways. Deterministic per-state seed (the determinism rule: no math.random in a live
         -- advisor).
         if c.key == "c_black_hole" or c.key == "c_soul" then
-          local seed = (#(gs.deck or {}) * 40503 + c.key:byte(3) * 131 + 17) % 2147483647
-          if seed <= 0 then seed = 1 end
-          local s = seed
-          local rng = Rng.from_state(s)
+          local rng = Rng.stream(#(gs.deck or {}) * 40503 + c.key:byte(3) * 131 + 17)
           local vfrac = ConsumableValue.card_value(gs, "Spectral", c.key, nil, need, rng, 6)
           if vfrac and vfrac > 0 then val = vfrac * need end
         end

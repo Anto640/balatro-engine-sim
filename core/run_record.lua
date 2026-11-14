@@ -19,17 +19,14 @@ function RunRecord.hand_level_sum(hand_levels)
   return s
 end
 
--- name -> level, LEVELED hands only (the base-1 entries are noise in a log line).
--- With no leveled hand: nil, or an empty map when `keep_empty` (the simulator's records have always carried the
--- empty map and the live ones have always omitted the field; both are kept as they are).
-function RunRecord.hand_level_map(hand_levels, keep_empty)
+-- name -> level, LEVELED hands only (the base-1 entries are noise in a log line); nil when no hand is leveled.
+function RunRecord.hand_level_map(hand_levels)
   local m, any = {}, false
   for name, h in pairs(hand_levels or {}) do
     local lvl = h.level or 1
     if lvl > 1 then m[name] = lvl; any = true end
   end
-  if any or keep_empty then return m end
-  return nil
+  return any and m or nil
 end
 
 return RunRecord

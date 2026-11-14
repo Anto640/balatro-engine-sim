@@ -25,7 +25,6 @@ return function(t)
   -- the first draw is the Park-Miller step
   t.eq(Rng.stream(1)(), (16807 - 1) / 2147483646, "stream: the minimal-standard generator")
   t.eq(Rng.stream(0)(), Rng.stream(Rng.M - 1)(), "stream: a zero seed is lifted to a valid state")
-  t.eq(Rng.from_state(42)(), Rng.stream(42)(), "from_state: continues from a valid state")
 
   -- the rule: generators are built here, not re-written inline (tarot.lua's is unified in a later change)
   local here = arg and arg[0] and arg[0]:gsub("[^/\\]*$", "") or ""

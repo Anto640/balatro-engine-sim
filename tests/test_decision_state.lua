@@ -77,10 +77,10 @@ return function(t)
     local last = { gs = shop_gs({ sold, keep }, "j_blackboard"),
       ranked = { best = { type = "SELL_JOKER", target = sold, pending_swap = { key = "j_blackboard", sold_fv = 1.5 } } } }
 
-    local c = DS.carry(shop_gs({ keep }, "j_blackboard"), { last = last })
+    local c = DS.carry(shop_gs({ keep }, "j_blackboard"), {}, last)
     t.ok(c.pending ~= nil and c.pending.key == "j_blackboard", "carry: the sale was made -> the buy is pending")
 
-    local c2 = DS.carry(shop_gs({ sold, keep }, "j_blackboard"), { last = last })
+    local c2 = DS.carry(shop_gs({ sold, keep }, "j_blackboard"), {}, last)
     t.eq(c2.pending, nil, "carry: the joker is still owned -> nothing pending")
 
     local mem = DS.remember({}, c)
@@ -113,18 +113,6 @@ return function(t)
 
     local sgs = SimState.skip(run, { type = "Small", skip_tag = "tag_investment" })
     t.eq(table.concat(DS.missing(sgs, "skip"), ","), "", "sim skip state: complete")
-
-    -- every declared gap is a real one (an entry that no longer applies must be deleted, not left to rot)
-    for kind, gaps in pairs(SimState.GAPS) do
-      local gs = (kind == "shop") and shop or sgs
-      for path in pairs(gaps) do
-        local section, field = path:match("^(%w+)%.([%w_]+)$")
-        local v
-        if section then v = gs[section] and gs[section][field] else v = gs[path] end
-        local empty = (v == nil) or (type(v) == "table" and next(v) == nil)
-        t.ok(empty, "sim " .. kind .. " gap '" .. path .. "' is still a gap")
-      end
-    end
   end
 
   -- ---- a replayed fixture goes through the same derivation ----

@@ -42,11 +42,6 @@ Telemetry.GAME_OVER_STATES = { GAME_OVER = true }
 
 -- ---- frame derivation (pure: POD GameState -> light frame) -------------------
 
--- shared with the simulator's records: core/run_record.lua
-local function joker_keys(gs) return RunRecord.joker_keys(gs.jokers) end
-local function hand_level_sum(gs) return RunRecord.hand_level_sum(gs.run and gs.run.hand_levels) end
-local function hand_level_map(gs) return RunRecord.hand_level_map(gs.run and gs.run.hand_levels) end
-
 -- A frame is everything the state machine needs from one snapshot, and nothing
 -- that holds a live object. `ctx` (the gs itself) is forwarded to enrich only.
 -- NOTE on the three fields added 2026-08-14: `hand_type_plays` and `build_plan` are stored by
@@ -77,8 +72,8 @@ function Telemetry.frame_of(gs)
     base_hands = b.base_hands,
     base_discards = b.base_discards,
     njokers = #(gs.jokers or {}),
-    joker_keys = joker_keys(gs),
-    hand_level_sum = hand_level_sum(gs),
+    joker_keys = RunRecord.joker_keys(gs.jokers),               -- these three: core/run_record.lua, shared with the sim
+    hand_level_sum = RunRecord.hand_level_sum((gs.run or {}).hand_levels),
     consumables = #(gs.consumables or {}),
     has_hand = #(gs.hand or {}) > 0,
     hand = hand_cards(gs),   -- cards currently in hand (for per-hand PLAY/DISCARD reconstruction)
@@ -88,7 +83,7 @@ function Telemetry.frame_of(gs)
     -- is the central claim behind BP.play_direction. Both are already extracted; they were
     -- simply never carried into a record.
     hand_type_plays = (gs.run or {}).hand_type_plays,
-    hand_levels = hand_level_map(gs),
+    hand_levels = RunRecord.hand_level_map((gs.run or {}).hand_levels),
     build_plan = (gs.run or {}).build_plan,
   }
 end

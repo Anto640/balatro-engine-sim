@@ -71,7 +71,7 @@ function Advice.from_pack(po)
       cards = po.use_first.cards, target_cards = tcards,
       reason = chain
         and string.format("Use %s on %s first, then take %s and copy that Gold card (three Gold cards).",
-          po.use_first.name, Cards and Cards.label and Cards.label(po.use_first.cards[1]) or "a spare card", po.use_first.for_name or "the pick")
+          po.use_first.name, Cards.label(po.use_first.cards[1]), po.use_first.for_name or "the pick")
         or string.format("Use %s first to free a consumable slot for %s, then take it.",
           po.use_first.name, po.use_first.for_name or "the pick"),
       confidence = 0.7,

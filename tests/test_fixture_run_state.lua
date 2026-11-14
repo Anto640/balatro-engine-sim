@@ -21,7 +21,7 @@ return function(t)
     Log.level = "off"
     local plan = { kind = "hand", hand = "Full House", committed_ante = 3, strength = 5,
                    anchors = { "j_sly" }, upgraded = true }   -- upgraded: BP.advance keeps it as is
-    BES._build_seed, BES._build_plan = "SEEDX", plan
+    BES._carried.build_seed, BES._carried.build_plan = "SEEDX", plan
 
     -- a shop state: the fixture carries the plan the evaluation will use
     local shop = GS.new{
@@ -37,7 +37,7 @@ return function(t)
     t.ok(bp ~= nil, "the shop fixture records the build commitment")
     t.eq(bp and bp.hand, "Full House", "with the committed hand")
     t.eq(RF.rehydrate(fx).run.build_plan.hand, "Full House", "and replay sees it")
-    t.eq(BES._build_plan, plan, "writing the fixture does not move the live plan")
+    t.eq(BES._carried.build_plan, plan, "writing the fixture does not move the live plan")
 
     -- a Mouth blind after the first hand: the fixture carries the lock
     local blind = GS.new{

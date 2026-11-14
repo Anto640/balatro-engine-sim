@@ -49,15 +49,16 @@ return function(t)
   local here = arg and arg[0] and arg[0]:gsub("[^/\\]*$", "") or ""
   local root = here .. "../"
   local files = {
-    "build_plan", "boss_effect", "consumable_value", "dagger", "decision_engine", "deck_plan", "discard_fuel",
-    "discard_value", "eval_function", "farm", "generators", "hand_eval", "heuristics", "hold_fuel", "joker_data",
-    "joker_downside", "joker_effects", "joker_value", "mechanics", "ordering", "owned_synergy", "pacing",
+    "advice", "build_plan", "boss_effect", "consumable_value", "dagger", "decision_engine", "decision_state",
+    "deck_plan", "discard_fuel", "discard_value", "eval_function", "farm", "generators", "hand_eval", "heuristics",
+    "hold_fuel", "joker_data", "joker_downside", "joker_effects", "joker_value", "joker_worth", "mechanics",
+    "ordering", "owned_synergy", "pacing", "probability",
     "pack_open_advisor", "packs", "perkeo", "scaling_fuel", "search", "shop_advisor", "simulation", "skip_advisor",
     "tags", "tarot", "value_units", "vouchers",
   }
   local paths = {}
   for _, n in ipairs(files) do paths[#paths + 1] = "engine/" .. n .. ".lua" end
-  for _, n in ipairs({ "content", "driver", "joker_tick", "lookahead", "probe", "search", "world" }) do
+  for _, n in ipairs({ "content", "driver", "joker_tick", "lookahead", "probe", "search", "state", "world" }) do
     paths[#paths + 1] = "sim/" .. n .. ".lua"
   end
   local opened = 0
