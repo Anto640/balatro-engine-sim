@@ -977,6 +977,114 @@ local function referee_score(gs, sel, rng)
 end
 World._referee_score = referee_score
 
+-- IN-BLIND DECISION AUDIT (tools/decision_audit.lua, alt "flip"): at the k-th play-or-discard decision of the run that
+-- has a discard available, replace the engine's choice by its best-ranked alternative of the OTHER kind (its best
+-- play instead of a dig, its best dig instead of a play), then let it play on. Inert unless _G.BES_FORCE_INBLIND is set.
+local function audit_override(run, b, hand, draw_pile, gs, ranked)
+  local FI = Flags.global("BES_FORCE_INBLIND")
+  -- DISCARD-CHOICE audit (mode "dswap"): the k-th discard the engine makes is replaced by its runner-up discard SET
+  -- (DiscardValue's next-best measured set that differs); with FI.placebo the discard is kept and later randomness
+  -- re-rolled. Counts only discard decisions, so a flip and its placebo hit the same decision.
+  if FI and FI.mode == "dswap" and not FI.done and ranked and ranked.best and b.discards_left > 0
+     and ranked.best.type == "DISCARD" and ranked.best.cards and #ranked.best.cards > 0 then
+    run._ib_dd = (run._ib_dd or 0) + 1
+    if run._ib_dd == FI.k then
+      FI.done = true
+      local function lab(cs) local t = {}; for _, c in ipairs(cs or {}) do t[#t + 1] = card_brief(c) end; return t end
+      local rec = { kind = "forced", inblind = true, dswap = true, ante = run.ante, blind = b.type,
+        boss_key = b.boss_key, target = b.target, scored = b.scored, hands_left = b.hands_left,
+        discards_left = b.discards_left, hand = lab(hand),
+        best = { type = "DISCARD", cards = lab(ranked.best.cards), value = ranked.best.value } }
+      if FI.placebo then
+        run._salt = FI.salt or 7777
+        local pr = World.lcg(World.stream_seed(run, "blind", run.ante, run.round, 999))
+        for i = #draw_pile, 2, -1 do local j = math.floor(pr() * i) + 1; draw_pile[i], draw_pile[j] = draw_pile[j], draw_pile[i] end
+        rec.placebo = true; rec.forced = { type = "PLACEBO" }
+      else
+        local function key(cs)
+          local t = {}; for _, c in ipairs(cs or {}) do t[#t + 1] = tostring(c) end; table.sort(t); return table.concat(t, ",")
+        end
+        local mine = key(ranked.best.cards)
+        local all = {}
+        local s0 = (run.ante or 1) * 7919 + (FI.k or 0) * 104729
+        require("engine.discard_value").best(gs, { samples = 4, rng = World.lcg(s0), all = all })
+        table.sort(all, function(x, y) return x.value > y.value end)
+        local alt
+        for _, a in ipairs(all) do if key(a.cards) ~= mine and #a.cards < #hand then alt = a; break end end
+        rec.n_sets = #all
+        if alt then
+          rec.forced = { type = "DISCARD", cards = lab(alt.cards), value = alt.value }
+          ranked = { best = { type = "DISCARD", cards = alt.cards, value = alt.value }, alternatives = ranked.alternatives }
+        end
+      end
+      FI.record = rec
+    end
+  end
+  if FI and FI.mode ~= "dswap" and not FI.done and ranked and ranked.best and b.discards_left > 0
+     and (ranked.best.type == "PLAY" or ranked.best.type == "DISCARD") then
+    run._ib_dec = (run._ib_dec or 0) + 1
+    if run._ib_dec == FI.k and FI.placebo then
+      -- PLACEBO: keep the engine's choice, re-roll everything random from here (this blind's remaining draws too)
+      FI.done = true
+      run._salt = FI.salt or 7777
+      local pr = World.lcg(World.stream_seed(run, "blind", run.ante, run.round, 999))
+      for i = #draw_pile, 2, -1 do local j = math.floor(pr() * i) + 1; draw_pile[i], draw_pile[j] = draw_pile[j], draw_pile[i] end
+      FI.record = { kind = "forced", inblind = true, placebo = true, ante = run.ante, blind = b.type,
+        best = { type = ranked.best.type }, forced = { type = "PLACEBO" } }
+    elseif run._ib_dec == FI.k then
+      FI.done = true
+      local want = (ranked.best.type == "PLAY") and "DISCARD" or "PLAY"
+      local alt
+      for _, a2 in ipairs(ranked.alternatives or {}) do
+        if a2.type == want and a2.cards and #a2.cards > 0 then alt = a2; break end
+      end
+      if not alt and want == "DISCARD" then   -- the ranked list holds no dig: the engine's own best dig
+        local s0 = (run.ante or 1) * 7919 + (FI.k or 0) * 104729
+        local dv = require("engine.discard_value").best(gs, { samples = 4, rng = World.lcg(s0) })
+        if dv and dv.cards and #dv.cards > 0 and #dv.cards < #hand then alt = { type = "DISCARD", cards = dv.cards, value = dv.value } end
+      elseif not alt and want == "PLAY" then  -- ...or no play: its best scoring play
+        local ev, sel = HandEval.best_play(gs, hand)
+        if ev and sel and #sel > 0 then alt = { type = "PLAY", cards = sel, hand_type = ev.hand_type, value = ev.score } end
+      end
+      local function lab(cs) local t = {}; for _, c in ipairs(cs or {}) do t[#t + 1] = card_brief(c) end; return t end
+      FI.record = { kind = "forced", inblind = true, ante = run.ante, blind = b.type, boss_key = b.boss_key,
+        target = b.target, scored = b.scored, hands_left = b.hands_left, discards_left = b.discards_left,
+        best = { type = ranked.best.type, cards = lab(ranked.best.cards), hand_type = ranked.best.hand_type, value = ranked.best.value },
+        forced = alt and { type = alt.type, cards = lab(alt.cards), hand_type = alt.hand_type, value = alt.value } or nil }
+      if alt then ranked = { best = alt, alternatives = ranked.alternatives } end
+    end
+  end
+  return ranked
+end
+
+-- MONEY-GAP TELEMETRY (docs/PLAN_2026-10-07_money_farming.md; never read by a decision). The money cards still in
+-- the draw pile that the blind's UNUSED discards would have drawn (up to 5 cards a discard, in the pile's fixed
+-- draw order -- cards come off the END of draw_pile), and where the deck's Gold cards ended up.
+local function money_gap(run, b, draw_pile, dollars_start, held_gold)
+  local function is_money(c, what)
+    if what == "gold" then return c.enhancement == "m_gold" end
+    if what == "gseal" then return c.seal == "Gold" end
+    if what == "lucky" then return c.enhancement == "m_lucky" end
+    if what == "steel" then return c.enhancement == "m_steel" end
+  end
+  local mg = { spare_discards = b.discards_left or 0, spare_hands = b.hands_left or 0,
+               money = ((run.economy and run.economy.dollars) or 0) - dollars_start,
+               held_gold = held_gold, pile = #draw_pile }
+  local reach = math.min(#draw_pile, math.max(0, b.discards_left or 0) * 5)
+  for _, what in ipairs({ "gold", "gseal", "lucky", "steel" }) do
+    local deck_n, pile_n, reach_n = 0, 0, 0
+    for _, c in ipairs(run.deck) do if is_money(c, what) then deck_n = deck_n + 1 end end
+    for i, c in ipairs(draw_pile) do
+      if is_money(c, what) then
+        pile_n = pile_n + 1
+        if i > #draw_pile - reach then reach_n = reach_n + 1 end
+      end
+    end
+    mg["deck_" .. what], mg["pile_" .. what], mg["reach_" .. what] = deck_n, pile_n, reach_n
+  end
+  return mg
+end
+
 -- ---- play one blind ---------------------------------------------------------
 -- Plays `blind` to completion with the REAL decision engine and faithful mechanics.
 -- blind = { type = "Small"|"Big"|"Boss", target = chips, boss_key = key|nil, name? }
@@ -1154,82 +1262,7 @@ function World.play_blind(run, blind)
     -- READ-ONLY observer of the decision state + the incumbent's choice). INERT when
     -- unset (the default): no RNG, no mutation, zero effect on the run either way.
     if World._capture then World._capture(gs, ranked) end
-    -- IN-BLIND DECISION AUDIT (tools/decision_audit.lua, alt "flip"): at the k-th play-or-discard decision of the run that
-    -- has a discard available, replace the engine's choice by its best-ranked alternative of the OTHER kind (its best
-    -- play instead of a dig, its best dig instead of a play), then let it play on. Inert unless _G.BES_FORCE_INBLIND is set.
-    local FI = Flags.global("BES_FORCE_INBLIND")
-    -- DISCARD-CHOICE audit (mode "dswap"): the k-th discard the engine makes is replaced by its runner-up discard SET
-    -- (DiscardValue's next-best measured set that differs); with FI.placebo the discard is kept and later randomness
-    -- re-rolled. Counts only discard decisions, so a flip and its placebo hit the same decision.
-    if FI and FI.mode == "dswap" and not FI.done and ranked and ranked.best and b.discards_left > 0
-       and ranked.best.type == "DISCARD" and ranked.best.cards and #ranked.best.cards > 0 then
-      run._ib_dd = (run._ib_dd or 0) + 1
-      if run._ib_dd == FI.k then
-        FI.done = true
-        local function lab(cs) local t = {}; for _, c in ipairs(cs or {}) do t[#t + 1] = card_brief(c) end; return t end
-        local rec = { kind = "forced", inblind = true, dswap = true, ante = run.ante, blind = b.type,
-          boss_key = b.boss_key, target = b.target, scored = b.scored, hands_left = b.hands_left,
-          discards_left = b.discards_left, hand = lab(hand),
-          best = { type = "DISCARD", cards = lab(ranked.best.cards), value = ranked.best.value } }
-        if FI.placebo then
-          run._salt = FI.salt or 7777
-          local pr = World.lcg(World.stream_seed(run, "blind", run.ante, run.round, 999))
-          for i = #draw_pile, 2, -1 do local j = math.floor(pr() * i) + 1; draw_pile[i], draw_pile[j] = draw_pile[j], draw_pile[i] end
-          rec.placebo = true; rec.forced = { type = "PLACEBO" }
-        else
-          local function key(cs)
-            local t = {}; for _, c in ipairs(cs or {}) do t[#t + 1] = tostring(c) end; table.sort(t); return table.concat(t, ",")
-          end
-          local mine = key(ranked.best.cards)
-          local all = {}
-          local s0 = (run.ante or 1) * 7919 + (FI.k or 0) * 104729
-          require("engine.discard_value").best(gs, { samples = 4, rng = World.lcg(s0), all = all })
-          table.sort(all, function(x, y) return x.value > y.value end)
-          local alt
-          for _, a in ipairs(all) do if key(a.cards) ~= mine and #a.cards < #hand then alt = a; break end end
-          rec.n_sets = #all
-          if alt then
-            rec.forced = { type = "DISCARD", cards = lab(alt.cards), value = alt.value }
-            ranked = { best = { type = "DISCARD", cards = alt.cards, value = alt.value }, alternatives = ranked.alternatives }
-          end
-        end
-        FI.record = rec
-      end
-    end
-    if FI and FI.mode ~= "dswap" and not FI.done and ranked and ranked.best and b.discards_left > 0
-       and (ranked.best.type == "PLAY" or ranked.best.type == "DISCARD") then
-      run._ib_dec = (run._ib_dec or 0) + 1
-      if run._ib_dec == FI.k and FI.placebo then
-        -- PLACEBO: keep the engine's choice, re-roll everything random from here (this blind's remaining draws too)
-        FI.done = true
-        run._salt = FI.salt or 7777
-        local pr = World.lcg(World.stream_seed(run, "blind", run.ante, run.round, 999))
-        for i = #draw_pile, 2, -1 do local j = math.floor(pr() * i) + 1; draw_pile[i], draw_pile[j] = draw_pile[j], draw_pile[i] end
-        FI.record = { kind = "forced", inblind = true, placebo = true, ante = run.ante, blind = b.type,
-          best = { type = ranked.best.type }, forced = { type = "PLACEBO" } }
-      elseif run._ib_dec == FI.k then
-        FI.done = true
-        local want = (ranked.best.type == "PLAY") and "DISCARD" or "PLAY"
-        local alt
-        for _, a2 in ipairs(ranked.alternatives or {}) do
-          if a2.type == want and a2.cards and #a2.cards > 0 then alt = a2; break end
-        end
-        if not alt and want == "DISCARD" then   -- the ranked list holds no dig: the engine's own best dig
-          local s0 = (run.ante or 1) * 7919 + (FI.k or 0) * 104729
-          local dv = require("engine.discard_value").best(gs, { samples = 4, rng = World.lcg(s0) })
-          if dv and dv.cards and #dv.cards > 0 and #dv.cards < #hand then alt = { type = "DISCARD", cards = dv.cards, value = dv.value } end
-        elseif not alt and want == "PLAY" then  -- ...or no play: its best scoring play
-          local ev, sel = HandEval.best_play(gs, hand)
-          if ev and sel and #sel > 0 then alt = { type = "PLAY", cards = sel, hand_type = ev.hand_type, value = ev.score } end
-        end
-        local function lab(cs) local t = {}; for _, c in ipairs(cs or {}) do t[#t + 1] = card_brief(c) end; return t end
-        FI.record = { kind = "forced", inblind = true, ante = run.ante, blind = b.type, boss_key = b.boss_key,
-          target = b.target, scored = b.scored, hands_left = b.hands_left, discards_left = b.discards_left,
-          best = { type = ranked.best.type, cards = lab(ranked.best.cards), hand_type = ranked.best.hand_type, value = ranked.best.value },
-          forced = alt and { type = alt.type, cards = lab(alt.cards), hand_type = alt.hand_type, value = alt.value } or nil }
-        if alt then ranked = { best = alt, alternatives = ranked.alternatives } end
-      end
-    end
+    ranked = audit_override(run, b, hand, draw_pile, gs, ranked)   -- decision audits; inert unless a tool arms them
     local action = ranked and ranked.best
     if not action then break end
 
@@ -1383,30 +1416,7 @@ function World.play_blind(run, blind)
   -- `hand` at blind end are exactly the ones held. -- VERIFY $3 (wiki, Gold enhancement).
   local held_gold = 0
   for _, c in ipairs(hand) do if c.enhancement == "m_gold" then held_gold = held_gold + 1 end end
-  -- MONEY-GAP TELEMETRY (docs/PLAN_2026-10-07_money_farming.md; never read by a decision). The money cards still in
-  -- the draw pile that the blind's UNUSED discards would have drawn (up to 5 cards a discard, in the pile's fixed
-  -- draw order -- cards come off the END of draw_pile), and where the deck's Gold cards ended up.
-  local function is_money(c, what)
-    if what == "gold" then return c.enhancement == "m_gold" end
-    if what == "gseal" then return c.seal == "Gold" end
-    if what == "lucky" then return c.enhancement == "m_lucky" end
-    if what == "steel" then return c.enhancement == "m_steel" end
-  end
-  local mg = { spare_discards = b.discards_left or 0, spare_hands = b.hands_left or 0,
-               money = ((run.economy and run.economy.dollars) or 0) - dollars_start,
-               held_gold = held_gold, pile = #draw_pile }
-  local reach = math.min(#draw_pile, math.max(0, b.discards_left or 0) * 5)
-  for _, what in ipairs({ "gold", "gseal", "lucky", "steel" }) do
-    local deck_n, pile_n, reach_n = 0, 0, 0
-    for _, c in ipairs(run.deck) do if is_money(c, what) then deck_n = deck_n + 1 end end
-    for i, c in ipairs(draw_pile) do
-      if is_money(c, what) then
-        pile_n = pile_n + 1
-        if i > #draw_pile - reach then reach_n = reach_n + 1 end
-      end
-    end
-    mg["deck_" .. what], mg["pile_" .. what], mg["reach_" .. what] = deck_n, pile_n, reach_n
-  end
+  local mg = money_gap(run, b, draw_pile, dollars_start, held_gold)
   return {
     money_gap = mg,                                       -- telemetry only (tools/money_gap.lua)
     cleared = cleared, scored = b.scored, target = b.target, mr_bones_saved = mr_bones_saved,

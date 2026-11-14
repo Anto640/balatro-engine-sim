@@ -913,4 +913,46 @@ function Probe.policy_for(run)
   error("unknown probe policy: " .. tostring(p.policy))
 end
 
+-- ---- the shop overrides ---------------------------------------------------------
+-- What the shop loop applies to the engine's ranked answer, in this order. Each entry: the override (a Probe
+-- function taking (run, shop, ranked) and returning a replacement or nil) and when it is on (p = run.probe).
+local function ante(run) return run.ante or 1 end
+local SHOP_OVERRIDES = {
+  -- Phase A level-first: takes an affordable leveling offer the engine declined
+  { "level_first",    function(p) return p.level_first end },
+  -- PACK GREED lesion (§5z): take an affordable pack the engine declined; never displaces a joker buy
+  { "pack_greed",     function(p) return p.pack_greed end },
+  -- EARLY BOARD CAP lesion (§10): refuse a 4th/5th early joker so ante-1..2 cash keeps compounding. Promotes the
+  -- best non-joker alternative, so packs still get bought
+  { "early_cap",      function(p) return p.early_joker_cap end },
+  -- NO EARLY CHURN lesion (§10): block selling a non-junk joker early. Board size and every purchase path are
+  -- untouched, so there is no board-power confound
+  { "no_early_churn", function(p) return p.no_churn_until end },
+  -- Phase A HOARD lesion: refuse a purchase that would drop the bankroll below the floor
+  { "hoard",          function(p) return p.min_bank end },
+  -- XMULT-GREEDY lesion (2026-10-01 shop ceiling probe): a scripted multiplier-first build on top of the engine
+  { "xgreedy",        function(p) return p.xgreedy_until end },
+  -- OWNER ECON POLICY lesion: buy early money jokers, never sell them early
+  { "econ_policy",    function(p) return p.econ_buy_until end },
+  -- JOKER OUTCOME TEST: never acquire the probe's banned joker
+  { "nobuy",          function(p) return p.nobuy end },
+  -- REROLL OUTCOME TEST (2026-10-19): "noreroll_from<A>" = no rerolls from ante A on; the engine takes its best
+  -- non-reroll action with positive value instead (else leaves)
+  { "noreroll",       function(p, run) return p.noreroll_from and ante(run) >= p.noreroll_from end },
+  -- NO EARLY PLANETS probe (noplanet_until<A>)
+  { "noplanet",       function(p, run) return p.noplanet_until and ante(run) <= p.noplanet_until end },
+  -- MONEY CARDS probe: buy the listed consumables on sight
+  { "force_buy",      function(p) return p.force_take end },
+  -- VOUCHER HABIT (owner capture runs 2026-10-20): buy the voucher on sight
+  { "vbuy",           function(p) return p.vbuy or p.vbuy_all end },
+}
+function Probe.shop_override(run, shop, ranked)
+  local p = run.probe
+  if not p then return ranked end
+  for _, o in ipairs(SHOP_OVERRIDES) do
+    if o[2](p, run) then ranked = Probe[o[1]](run, shop, ranked) or ranked end
+  end
+  return ranked
+end
+
 return Probe

@@ -1051,74 +1051,9 @@ local function shop_loop(run, shop, rng, crn_n)
     if policy then ok, ranked = pcall(policy, run, shop)
     else ok, ranked = pcall(ShopAdvisor.recommend, gs, {}) end
     if not ok or not ranked or not ranked.best then break end
-    -- Phase A level-first OVERRIDE: takes an affordable leveling offer the engine declined.
-    -- Runs AFTER the advisor (so it can see what the engine wanted) and is inert without a probe.
-    if run.probe and run.probe.level_first then
-      local ov = Probe.level_first(run, shop, ranked)
-      if ov then ranked = ov end
-    end
-    -- PACK GREED lesion (§5z): take an affordable pack the engine declined. Runs AFTER the
-    -- advisor (so it only overrides what the engine actually chose) and never displaces a
-    -- joker buy. Inert without a probe config.
-    if run.probe and run.probe.pack_greed then
-      local pv = Probe.pack_greed(run, shop, ranked)
-      if pv then ranked = pv end
-    end
-    -- EARLY BOARD CAP lesion (§10): refuse a 4th/5th early joker so ante-1..2 cash keeps
-    -- compounding. Promotes the best non-joker alternative, so packs still get bought.
-    if run.probe and run.probe.early_joker_cap then
-      local ec = Probe.early_cap(run, shop, ranked)
-      if ec then ranked = ec end
-    end
-    -- NO EARLY CHURN lesion (§10): block selling a non-junk joker early. Board size and
-    -- every purchase path are untouched, so there is no board-power confound.
-    if run.probe and run.probe.no_churn_until then
-      local nc = Probe.no_early_churn(run, shop, ranked)
-      if nc then ranked = nc end
-    end
-    -- Phase A HOARD lesion: refuse a purchase that would drop the bankroll below the floor.
-    -- Fires in every shop of every run (see Probe.hoard); inert without a probe config.
-    if run.probe and run.probe.min_bank then
-      local hv = Probe.hoard(run, shop, ranked)
-      if hv then ranked = hv end
-    end
-    -- XMULT-GREEDY lesion (2026-10-01 shop ceiling probe): a scripted multiplier-first build on
-    -- top of the engine. Inert without a probe config.
-    if run.probe and run.probe.xgreedy_until then
-      local xv = Probe.xgreedy(run, shop, ranked)
-      if xv then ranked = xv end
-    end
-    -- OWNER ECON POLICY lesion: buy early money jokers, never sell them early. Inert without a probe config.
-    if run.probe and run.probe.econ_buy_until then
-      local ev = Probe.econ_policy(run, shop, ranked)
-      if ev then ranked = ev end
-    end
-    -- JOKER OUTCOME TEST: never acquire the probe's banned joker. Inert without a probe config.
-    if run.probe and run.probe.nobuy then
-      local nv = Probe.nobuy(run, shop, ranked)
-      if nv then ranked = nv end
-    end
-    -- REROLL OUTCOME TEST (2026-10-19): "noreroll_from<A>" = no rerolls from ante A on; the engine takes its best
-    -- non-reroll action with positive value instead (else leaves). Inert without a probe config.
-    if run.probe and run.probe.noreroll_from and (run.ante or 1) >= run.probe.noreroll_from then
-      local nv = Probe.noreroll(run, shop, ranked)
-      if nv then ranked = nv end
-    end
-    -- NO EARLY PLANETS probe (noplanet_until<A>). Inert without a probe config.
-    if run.probe and run.probe.noplanet_until and (run.ante or 1) <= run.probe.noplanet_until then
-      local nv = Probe.noplanet(run, shop, ranked)
-      if nv then ranked = nv end
-    end
-    -- MONEY CARDS probe: buy the listed consumables on sight. Inert without a probe config.
-    if run.probe and run.probe.force_take then
-      local fv = Probe.force_buy(run, shop, ranked)
-      if fv then ranked = fv end
-    end
-    -- VOUCHER HABIT (owner capture runs 2026-10-20): buy the voucher on sight. Inert without a probe config.
-    if run.probe and (run.probe.vbuy or run.probe.vbuy_all) then
-      local vv = Probe.vbuy(run, shop, ranked)
-      if vv then ranked = vv end
-    end
+    -- Scripted lesions and outcome tests on top of the engine's choice (sim/probe.lua SHOP_OVERRIDES). They run
+    -- AFTER the advisor, so each sees what the engine wanted; inert without a probe config.
+    ranked = Probe.shop_override(run, shop, ranked)
     -- LOOK-AHEAD (sim/lookahead.lua): compare the engine's top choices by playing each forward on sampled futures.
     -- Inert without the probe config, and never inside a look-ahead rollout (no recursion).
     if run.probe and run.probe.lookahead and not run._la_rollout and (run.ante or 1) <= (run.probe.lookahead_until or 3)
