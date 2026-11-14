@@ -13,6 +13,7 @@
 -- This file: run setup + the IN-BLIND round simulator (deal, play/discard, score,
 -- boss effects). Economy/ante-advance and shop generation live in their own steps.
 
+local Rng = require("util.rng")
 local Flags = require("engine.flags")
 local HandEval   = require("engine.hand_eval")
 local Mechanics  = require("engine.mechanics")
@@ -108,11 +109,7 @@ World.in_hand_order = in_hand_order
 -- world randomness (shuffles, later: shop rolls) so a run is fully reproducible from its
 -- seed. We don't need Balatro's pseudohash here -- only a correct uniform stream to
 -- sample the same DISTRIBUTIONS from.
-local function lcg(seed)
-  local s = math.floor(seed) % 2147483647
-  if s <= 0 then s = s + 2147483646 end
-  return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end
-end
+local function lcg(seed) return Rng.stream(math.floor(seed)) end
 World.lcg = lcg
 
 -- COMMON RANDOM NUMBERS (2026-10-05, owner: "how come there is noise if we compare the same seeds"). One run.rng

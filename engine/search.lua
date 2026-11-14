@@ -11,6 +11,7 @@
 -- DISCARD, and a few Monte-Carlo draw samples per branch. The leaf is a greedy
 -- finish. Deterministic: a state-seeded RNG when none is injected. PURE.
 
+local Rng = require("util.rng")
 local HandEval = require("engine.hand_eval")
 local Heuristics = require("engine.heuristics")
 
@@ -21,11 +22,7 @@ S.SAMPLES = 2     -- draw samples per chance node
 S.MARGIN = 0.1    -- only override the greedy choice when the search clearly
                   -- prefers the other action by this much fraction-of-target
 
-local function lcg(seed)
-  local s = seed % 2147483647
-  if s <= 0 then s = s + 2147483646 end
-  return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end
-end
+local lcg = Rng.stream
 
 local function copy_list(t) local o = {} for i = 1, #t do o[i] = t[i] end return o end
 
@@ -146,8 +143,7 @@ local function seed_of(gs)
   local b = gs.blind or {}
   local s = (#(gs.hand or {}) * 2654435761) + ((b.chips_scored or 0) * 40503)
     + ((b.hands_left or 0) * 1299709) + ((b.discards_left or 0) * 7919)
-  s = math.floor(math.abs(s)) % 2147483647
-  return (s <= 0) and 1 or s
+  return Rng.seed(s)
 end
 
 -- best_action(gs, opts) -> { play_value, discard_value, action }. Both values are

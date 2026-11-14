@@ -9,6 +9,7 @@
 -- tests pin DIRECTION (buy strong over save, never buy unaffordable, reserve
 -- guard forces save), not magic constants.
 
+local Rng = require("util.rng")
 local Flags = require("engine.flags")
 local Eval = require("engine.eval_function")
 local JokerWorth = require("engine.joker_worth")
@@ -289,20 +290,14 @@ local function clamp(x, lo, hi) return math.max(lo, math.min(hi, x)) end
 -- advisor would flip to reroll on noise. We derive a per-state seed and share a
 -- single deterministic RNG across every measured call in one recommend(), so a
 -- given shop always yields the same, internally-consistent recommendation.
-local function lcg(seed)
-  local s = seed % 2147483647
-  if s <= 0 then s = s + 2147483646 end
-  return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end
-end
+local lcg = Rng.stream
 local function state_seed(gs)
   local d = (gs.economy and gs.economy.dollars) or 0
   local s = (d * 2654435761)
     + (#(gs.deck or {}) * 40503)
     + (#(gs.jokers or {}) * 1299709)
     + (((gs.shop and gs.shop.reroll_cost) or 0) * 7919)
-  s = math.floor(math.abs(s)) % 2147483647
-  if s <= 0 then s = 1 end
-  return s
+  return Rng.seed(s)
 end
 
 -- Shallow gs clone with a replaced joker list (Eval only reads .jokers /

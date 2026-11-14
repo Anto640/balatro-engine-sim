@@ -6,6 +6,7 @@
 --
 -- Weights are heuristic; tests pin ORDERING and BOUNDS, not magic numbers.
 
+local Rng = require("util.rng")
 local Flags = require("engine.flags")
 local Cards = require("util.cards")
 local JokerData = require("engine.joker_data")
@@ -497,7 +498,7 @@ function Eval.resource_side_frac(gs, gs2, opts)
   table.sort(order)
   for i, k in ipairs(order) do
     local g = groups[k]
-    local function r() local x = 7919 * i; return function() x = (x * 16807) % 2147483647; return (x - 1) / 2147483646 end end
+    local function r() local x = 7919 * i; return Rng.from_state(x) end
     local d = ConsumableValue.card_econ_value(gs2, g.card, r()) - ConsumableValue.card_econ_value(gs, g.card, r())
     total = total + g.n * d
   end
@@ -1826,7 +1827,7 @@ local function trade_rng(i, key)
   local s = 7919 * i + 104729
   for c in tostring(key):gmatch(".") do s = (s * 31 + c:byte()) % 2147483647 end
   if s <= 0 then s = s + 2147483646 end
-  return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end
+  return Rng.from_state(s)
 end
 function Eval.trade_leans_on(gs, i, sj, opts)
   if not (opts and opts.rng) or not can_measure(gs, opts) then return nil end
@@ -1967,7 +1968,7 @@ local function todo_income(gs)
   if not deck or #deck < 8 then return nil end
   local hs = math.min((gs.run and gs.run.hand_size) or 8, #deck)
   local s = (#deck * 7919 + 104729) % 2147483647
-  local rng = function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end
+  local rng = Rng.from_state(s)
   local SAMPLES = 12
   local avail = 0
   for _ = 1, SAMPLES do
@@ -1990,7 +1991,7 @@ local function delayed_grat_income(gs)
   local d = (gs.blind and (gs.blind.base_discards or gs.blind.discards_left)) or 3
   local need = Mechanics.blind_requirement(math.floor((gs.meta and gs.meta.ante) or 1), "Big")
   local s = (#deck * 104729 + 7919) % 2147483647
-  local rng = function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end
+  local rng = Rng.from_state(s)
   local SAMPLES, ok = 8, 0
   for _ = 1, SAMPLES do
     local ev = HandEval.best_play(gs, JokerValue._sample_hand(gs, deck, hs, rng))
@@ -2192,7 +2193,7 @@ function Eval.play_money_delta(gs, key)
   local s = (#deck * 15485863 + #sig * 7919 + 104729) % 2147483647
   for c = 1, #key do s = (s + key:byte(c) * 131 * c) % 2147483647 end
   if s <= 0 then s = 1 end
-  local rng = function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end
+  local rng = Rng.from_state(s)
   local base = gs.jokers or {}
   local with = {}
   for i, j in ipairs(base) do with[i] = j end
@@ -2349,7 +2350,7 @@ function Eval.negative_slot_fv(gs, opts)
     local rng = opts.rng
     if not rng then
       local s = (math.floor((gs and gs.meta and gs.meta.ante) or 1) * 7919 + jfree * 104729 + #((gs and gs.deck) or {})) % 2147483646 + 1
-      rng = function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end
+      rng = Rng.from_state(s)
     end
     local Packs = require("engine.packs")
     local ok, e = pcall(Packs.expected_shop_joker, gs, 2, { rng = rng, samples = 3, measure_count = 4 })

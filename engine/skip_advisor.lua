@@ -4,6 +4,7 @@
 -- visit, and the unused-hand money you'd bank. Boss blinds can't be skipped.
 -- PURE.
 
+local Rng = require("util.rng")
 local Flags = require("engine.flags")
 local Tags = require("engine.tags")
 local Mechanics = require("engine.mechanics")
@@ -46,15 +47,10 @@ SK.RISK_SHOP_MULT = Flags.num("BES_SKIP_RISK", 0)
 
 -- Deterministic per-state RNG so the measured tag values (Orbital, pack tags) are
 -- stable across re-evaluations of the same blind-select.
-local function lcg(seed)
-  local s = seed % 2147483647
-  if s <= 0 then s = s + 2147483646 end
-  return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end
-end
+local lcg = Rng.stream
 local function state_seed(gs)
   local d = #(gs.deck or {}) * 40503 + ((gs.economy and gs.economy.dollars) or 0) * 7919
-  d = math.floor(math.abs(d)) % 2147483647
-  return (d <= 0) and 1 or d
+  return Rng.seed(d)
 end
 
 -- recommend(gs, opts) -> { recommend="SKIP"|"PLAY", tag, tag_value, play_value, reason }

@@ -35,6 +35,7 @@ if SMODS and SMODS.load_file then
   if searchers then table.insert(searchers, bes_searcher) end
 end
 
+local Rng = require("util.rng")
 local Log = require("util.log")
 
 local function try_require(name)
@@ -435,14 +436,9 @@ local function sim_seed(gs)
   local s = (#(gs.hand or {}) * 2654435761) + ((b.chips_scored or 0) * 40503)
     + ((b.hands_left or 0) * 1299709) + ((b.discards_left or 0) * 7919)
     + (#(gs.jokers or {}) * 131071)
-  s = math.floor(math.abs(s)) % 2147483647
-  return (s <= 0) and 1 or s
+  return Rng.seed(s)
 end
-local function bes_lcg(seed)
-  local s = seed % 2147483647
-  if s <= 0 then s = s + 2147483646 end
-  return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end
-end
+local bes_lcg = Rng.stream
 
 -- Is this a state where the expensive blind-survival sim is meaningful? (an
 -- active hand to play -- NOT a pack/shop/blind-select/transition screen).

@@ -4,6 +4,7 @@
 -- real score gain from leveling it. Leveling a hand you rarely make is worth
 -- little; leveling your bread-and-butter hand is worth a lot. PURE.
 
+local Rng = require("util.rng")
 local Flags = require("engine.flags")
 local HandEval = require("engine.hand_eval")
 local Mechanics = require("engine.mechanics")
@@ -137,11 +138,7 @@ end
 -- discards, boss), and sampled with an RNG seeded from that content: a pure function of the state, so a cached
 -- value is the value, and it is identical across sim worker processes (the caller's rng is not consumed).
 local HF_CACHE, HF_N = {}, 0
-local function lcg_rng(seed)
-  local st = math.floor(seed) % 2147483647
-  if st <= 0 then st = st + 2147483646 end
-  return function() st = (st * 16807) % 2147483647; return (st - 1) / 2147483646 end
-end
+local function lcg_rng(seed) return Rng.stream(math.floor(seed)) end
 CV.HAND_NAMES = { "High Card", "Pair", "Two Pair", "Three of a Kind", "Straight", "Flush", "Full House",
   "Four of a Kind", "Straight Flush", "Five of a Kind", "Flush House", "Flush Five" }
 local function num_sig(t)
@@ -577,11 +574,7 @@ function CV.deck_baseline(gs, opts)
   return JokerValue.avg_score(gs, opts)
 end
 
-local function lcg(seed)
-  local s = seed % 2147483647
-  if s <= 0 then s = s + 2147483646 end
-  return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end
-end
+local lcg = Rng.stream
 
 -- Flush-plan-aware value (fraction of a boss hand) of a suit-conversion tarot
 -- (Star/Moon/Sun/World). It permanently converts up to 3 cards to a FIXED suit,
@@ -635,8 +628,7 @@ function CV.suit_tarot_value(gs, key, need, opts)
   local samples = mc(opts.samples or 8)
   local seed = (#deck * 2654435761) + (#idxs * 40503)
   for c = 1, #key do seed = seed + key:byte(c) * (c * 131) end
-  seed = math.floor(math.abs(seed)) % 2147483647
-  if seed <= 0 then seed = 1 end
+  seed = Rng.seed(seed)
   local base = JokerValue.avg_score(gs, { samples = samples, rng = lcg(seed) }) or 0
   local with = JokerValue.avg_score(g2, { samples = samples, rng = lcg(seed) }) or 0
   local gain = with - base

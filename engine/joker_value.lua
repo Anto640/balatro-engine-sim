@@ -8,6 +8,7 @@
 -- The joker_data `tier` is used ONLY as a fallback prior for jokers we cannot
 -- simulate yet (no scoring model). PURE.
 
+local Rng = require("util.rng")
 local Flags = require("engine.flags")
 local HandEval = require("engine.hand_eval")
 local Jokers = require("engine.joker_effects")
@@ -108,7 +109,7 @@ local function deal_dig(board_gs, deck, dkey, hs, seed)
   local hit = DIG_CACHE[key]
   if hit then return hit end
   local st = seed
-  local function rng() st = (st * 16807) % 2147483647; return (st - 1) / 2147483646 end
+  local rng = Rng.from_state(st)
   local sh = {}
   for i = 1, #deck do sh[i] = deck[i] end
   for i = #sh, 2, -1 do local r = math.floor(rng() * i) + 1; sh[i], sh[r] = sh[r], sh[i] end
@@ -202,7 +203,7 @@ local function crn_hand(deck, dkey, hs, k)
   local h = per[hk]
   if h then return h end
   local st = deal_seed(deck, dkey, k)
-  local function rng() st = (st * 16807) % 2147483647; return (st - 1) / 2147483646 end
+  local rng = Rng.from_state(st)
   local sh = {}
   for i = 1, #deck do sh[i] = deck[i] end
   for i = #sh, 2, -1 do local r = math.floor(rng() * i) + 1; sh[i], sh[r] = sh[r], sh[i] end

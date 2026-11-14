@@ -8,6 +8,7 @@
 -- PURE: consumes a GameState, no G access -> fully unit-testable headless.
 -- Confidence numbers are documented heuristics (calibrated in M3).
 
+local Rng = require("util.rng")
 local Flags = require("engine.flags")
 local DecisionState = require("engine.decision_state")
 local HandEval = require("engine.hand_eval")
@@ -37,17 +38,12 @@ local function clamp(x, lo, hi) return math.max(lo, math.min(hi, x)) end
 -- valuation uses global math.random, so the live recommendation WOBBLES between
 -- ticks on an unchanged state (panel flicker) -- the same issue the shop advisor
 -- fixed. A state-seeded stream makes a given hand always yield the same advice.
-local function lcg(seed)
-  local s = seed % 2147483647
-  if s <= 0 then s = s + 2147483646 end
-  return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end
-end
+local lcg = Rng.stream
 local function disc_seed(gs)
   local b = gs.blind or {}
   local s = (#(gs.hand or {}) * 2654435761) + ((b.chips_scored or 0) * 40503)
     + ((b.hands_left or 0) * 1299709) + ((b.discards_left or 0) * 7919)
-  s = math.floor(math.abs(s)) % 2147483647
-  return (s <= 0) and 1 or s
+  return Rng.seed(s)
 end
 
 -- F5: engine-side boss play-legality filter. Under Psychic (min 5 cards) / Eye (no
@@ -364,7 +360,7 @@ local function held_card_use_value(gs, c, need)
   local seed = (#(gs.deck or {}) * 40503 + c.key:byte(3) * 131 + 29) % 2147483647
   if seed <= 0 then seed = 1 end
   local s = seed
-  local rng = function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end
+  local rng = Rng.from_state(s)
   if c.key == "c_wheel_of_fortune" then
     local v = ConsumableValue.wheel_value(gs, need, rng) or 0
     return v * need, "1 in 4: an edition on a joker without one"
@@ -407,7 +403,7 @@ local function generator_use(gs)
           local seed = (#(gs.deck or {}) * 40503 + c.key:byte(3) * 131 + 17) % 2147483647
           if seed <= 0 then seed = 1 end
           local s = seed
-          local rng = function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end
+          local rng = Rng.from_state(s)
           local vfrac = ConsumableValue.card_value(gs, "Spectral", c.key, nil, need, rng, 6)
           if vfrac and vfrac > 0 then val = vfrac * need end
         end

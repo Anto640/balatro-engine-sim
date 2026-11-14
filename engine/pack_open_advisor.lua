@@ -8,6 +8,7 @@
 -- Temperance's payout), so chosen picks are ordered by a sequencing priority.
 -- PURE (consumes gs.pack).
 
+local Rng = require("util.rng")
 local JokerValue = require("engine.joker_value")
 local JokerData = require("engine.joker_data")
 local Eval = require("engine.eval_function")
@@ -31,11 +32,7 @@ local function per_hand_need(gs) return Mechanics.boss_per_hand_need(gs) end
 -- items while the pack sits open. Seeding from the pack contents makes a given
 -- open pack always yield the same pick (it legitimately changes only once you take
 -- a card and the pack state changes).
-local function lcg(seed)
-  local s = seed % 2147483647
-  if s <= 0 then s = s + 2147483646 end
-  return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end
-end
+local lcg = Rng.stream
 local function po_seed(gs)
   local p = gs.pack or {}
   local s = (#(p.items or {}) * 2654435761) + ((p.picks_left or 1) * 40503)
@@ -44,8 +41,7 @@ local function po_seed(gs)
     local k = tostring(it.key or "")
     for c = 1, #k do s = s + k:byte(c) * (i * 131 + c) end
   end
-  s = math.floor(math.abs(s)) % 2147483647
-  return (s <= 0) and 1 or s
+  return Rng.seed(s)
 end
 
 -- Use-order priority (lower = use earlier):

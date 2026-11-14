@@ -10,6 +10,7 @@
 -- Feed the joker with the largest gain - loss when gain clearly exceeds loss; otherwise park the Dagger rightmost.
 -- PURE: returns a plan; the overlay states it and the self-player applies it (ui/autoplay.lua).
 
+local Rng = require("util.rng")
 local JokerValue = require("engine.joker_value")
 local Eval       = require("engine.eval_function")
 local JokerWorth = require("engine.joker_worth")
@@ -19,11 +20,7 @@ local Mechanics  = require("engine.mechanics")
 local Dagger = {}
 Dagger.FEED_MARGIN = 1.2   -- feed only when the Mult it gains beats what is lost by 20% (a 6-sample read is noisy)
 
-local function lcg(seed)
-  local s = seed % 2147483647
-  if s <= 0 then s = s + 2147483646 end
-  return function() s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 end
-end
+local lcg = Rng.stream
 
 local function eternal(j)
   local ab = j.ability
