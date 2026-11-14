@@ -22,6 +22,7 @@
 local Json = require("util.json")
 local Cards = require("util.cards")
 
+local RunRecord = require("core.run_record")
 local Telemetry = {}
 Telemetry.__index = Telemetry
 
@@ -41,30 +42,10 @@ Telemetry.GAME_OVER_STATES = { GAME_OVER = true }
 
 -- ---- frame derivation (pure: POD GameState -> light frame) -------------------
 
-local function joker_keys(gs)
-  local out = {}
-  for _, j in ipairs(gs.jokers or {}) do out[#out + 1] = j.key or "?" end
-  return out
-end
-
-local function hand_level_sum(gs)
-  local s = 0
-  for _, h in pairs((gs.run and gs.run.hand_levels) or {}) do
-    s = s + math.max(0, (h.level or 1) - 1)
-  end
-  return s
-end
-
--- name -> level, LEVELED hands only (the base-1 entries are noise in a log line). Mirrors
--- the sim driver's `hand_level_map` so live and sim ante records read the same.
-local function hand_level_map(gs)
-  local m, any = {}, false
-  for name, h in pairs((gs.run and gs.run.hand_levels) or {}) do
-    local lvl = h.level or 1
-    if lvl > 1 then m[name] = lvl; any = true end
-  end
-  return any and m or nil
-end
+-- shared with the simulator's records: core/run_record.lua
+local function joker_keys(gs) return RunRecord.joker_keys(gs.jokers) end
+local function hand_level_sum(gs) return RunRecord.hand_level_sum(gs.run and gs.run.hand_levels) end
+local function hand_level_map(gs) return RunRecord.hand_level_map(gs.run and gs.run.hand_levels) end
 
 -- A frame is everything the state machine needs from one snapshot, and nothing
 -- that holds a live object. `ctx` (the gs itself) is forwarded to enrich only.

@@ -59,6 +59,7 @@ local suites = {
   "tests.test_decision_state",
   "tests.test_joker_worth",
   "tests.test_advice",
+  "tests.test_run_record",
   "tests.test_replay_fixture",
   "tests.test_fixture_run_state",
   "tests.test_trade_dependence",

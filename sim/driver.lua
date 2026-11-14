@@ -21,6 +21,7 @@ local Pacing      = require("engine.pacing")
 local Eval        = require("engine.eval_function")
 local Json        = require("util.json")
 local SkipAdvisor = require("engine.skip_advisor")
+local RunRecord   = require("core.run_record")
 local Advice      = require("engine.advice")
 local GS          = require("model.game_state")
 local SimState    = require("sim.state")
@@ -159,17 +160,9 @@ function Driver.features(run)
   return f
 end
 
-local function joker_keys(run)
-  local out = {}
-  for _, j in ipairs(run.jokers or {}) do out[#out + 1] = j.key or "?" end
-  return out
-end
-
-local function hand_level_sum(run)
-  local s = 0
-  for _, h in pairs(run.hand_levels or {}) do s = s + math.max(0, (h.level or 1) - 1) end
-  return s
-end
+-- shared with the live telemetry's records: core/run_record.lua
+local function joker_keys(run) return RunRecord.joker_keys(run.jokers) end
+local function hand_level_sum(run) return RunRecord.hand_level_sum(run.hand_levels) end
 
 -- per-joker detail (P5): key + edition + stickers. A negative-edition joker is
 -- slot-free (it doesn't consume a board slot), flagged so the analyzer can reason
@@ -190,14 +183,7 @@ end
 
 -- hand levels as a per-hand-type map (P5): { ["Pair"] = 3, ... }, only hands above
 -- base level (keeps the record small). hand_level_sum is kept for backward compat.
-local function hand_level_map(run)
-  local m = {}
-  for name, h in pairs(run.hand_levels or {}) do
-    local lvl = h.level or 1
-    if lvl > 1 then m[name] = lvl end
-  end
-  return m
-end
+local function hand_level_map(run) return RunRecord.hand_level_map(run.hand_levels, true) end
 
 local function board(run)
   return { dollars = run.economy.dollars, njokers = #(run.jokers or {}),
