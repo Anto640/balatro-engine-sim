@@ -85,8 +85,8 @@ So:
 
 - **Determinism.** Live advice is recomputed on every state change. Anything that samples must draw from a stream
   seeded by the state it is deciding on, built with `util/rng.lua` (`Rng.stream(seed)`; each advisor keeps its own
-  `*_seed(gs)` formula). Don't write a generator inline (a test checks for it) and never use global `math.random`: it
-  makes the panel flicker between ticks.
+  `*_seed(gs)` formula). Don't write a generator inline and never use global `math.random` (tests check for both):
+  it makes the panel flicker between ticks. A sampler called without a stream falls back to `Rng.fixed()`.
 - **No choice may depend on `pairs()` order.** Iteration order over string keys differs between processes, so a
   tie broken by it makes two runs of the same seed disagree. Sort the keys first (the simulator's Telescope planet
   did this wrong until November 2026, which made arms differ on a few seeds).
@@ -94,8 +94,8 @@ So:
   environment or a `BES_*` global (a test enforces it), and `Flags.list()` is the inventory of every switch.
 - **Build decision states through `engine/decision_state.lua`.** The live mod, the simulator (`sim/state.lua`) and
   fixture replay all call `DecisionState.derive`, which adds the derived and carried fields (the boss effect, the
-  build commitment). `DecisionState.CONTRACT` lists what each decision kind reads; a fact the simulator does not yet
-  carry is listed in `SimState.GAPS`, and closing a gap is a behaviour change to measure as its own arm.
+  build commitment). `DecisionState.CONTRACT` lists what each decision kind reads, and a test holds the simulator's
+  three builders to it; giving the simulator a fact it did not carry is a behaviour change to measure as its own arm.
 - **Ask `JokerWorth.of(gs, joker, side)` what a joker is worth** (`engine/joker_worth.lua`; sides `buy`, `pick`,
   `add`, `own`) instead of calling a valuation path directly: the sides differ in unit and in whether the edition is
   included, and the module's header says which.

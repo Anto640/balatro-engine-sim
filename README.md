@@ -107,8 +107,9 @@ core/     state_extraction (reads G), run telemetry, run_record (fields shared w
           replay fixtures, change signatures
 model/    game_state / shop_state PODs
 engine/   hand_eval (scoring), joker_effects / joker_data / joker_value (measured jokers),
-          joker_worth (the one "what is this joker worth" entry), eval_function (run strength,
-          forward valuation), decision_engine / discard_value / ordering / simulation (in-blind play),
+          joker_worth (the one "what is this joker worth" entry, trades), joker_income ($ a round),
+          eval_function (run strength, forward valuation),
+          decision_engine / discard_value / ordering / simulation (in-blind play),
           shop_advisor, pack_open_advisor, consumable_value, tarot, packs, vouchers, tags, skip_advisor,
           build_plan, pacing, boss_effect, ...
           decision_state (derives and carries what an advisor needs beyond the raw snapshot),
