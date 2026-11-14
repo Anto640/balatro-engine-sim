@@ -561,11 +561,633 @@ local function trading_card_discard(gs, play_ev, rng, dig_value)
   }
 end
 
--- decide(gs, opts) -> RankedActionList
--- opts.sim (optional SimulationResult) refines confidence with real survival
--- odds and attaches probabilities for the overlay. Omitting opts keeps the
--- pure M2 behaviour (used by the headless tests).
-function DE.decide(gs, opts)
+-- ---- the stages of decide_core -------------------------------------------------
+-- Each reads the play situation P (built in decide_core once the base play is settled) and returns one result.
+
+-- ---- SURPLUS DIG (probe; DE.DIG_SURPLUS, off by default) --------------------------
+-- The clear is already GUARANTEED and discards remain: the overkill score is wasted, so
+-- spend the surplus discards on a free redraw instead of banking them. Pitches only cards
+-- OUTSIDE the guaranteed play, so the clear survives the discard by construction.
+-- ACTIVE money dig (2026-08-28). Once the clear is LOCKED and discards remain, actively WORK a
+-- discard-payout joker instead of banking the surplus. Faceless pays $5 per 3 face cards discarded
+-- at once; a spare discard costs nothing (unused DISCARDS pay no round reward) and the clear's cards
+-- are protected, so this is free money. It FARMS when 3+ faces are already spare, otherwise it
+-- SEARCHES -- keeping the faces, pitching chaff to draw TOWARD a 3-face trigger. (The engine should
+-- actively utilise its econ jokers, not only fire on a rare Faceless+Pareidolia hand.)
+--
+-- FUTURE (resource-aware aggressive farm, user 2026-08-28): today the dig only pitches cards OUTSIDE
+-- the guaranteed play, protecting the current winner absolutely. But with ABUNDANT resources (spare
+-- hands AND discards well beyond what the clear needs) it is correct to break up the winner itself --
+-- discard its face cards to farm Faceless, then simply re-draw and re-make a winning hand on a later
+-- hand. The clear does not have to be THIS hand when a spare hand can re-clear. The gate that makes
+-- this safe (not a death) is a survival estimate: Simulation.survive_after must show the clear is
+-- still near-certain after the aggressive farm (like MILK's frac gate). Relax `keep` from "the whole
+-- current play" toward "only the minimum a future clear needs" as (hands_left+discards_left) grows.
+-- GENERAL: any owned discard lever (Faceless/Mail/Trading money, or a discard-fed scaler) -- valued
+-- and harm-guarded by engine/discard_fuel, so the dig works every applicable joker and refuses to
+-- BLEED a loser (Ramen/Green Joker) for less than it earns.
+local function surplus_dig(P)
+  local gs, guaranteed, discards_left, hands_left, hand = P.gs, P.guaranteed, P.discards_left, P.hands_left, P.hand
+  local play_cards, play_ev, remaining, play_action = P.play_cards, P.play_ev, P.remaining, P.play_action
+  local dig_action
+  local want_money_dig = DE.DIG_FOR_MONEY and DiscardFuel.has_lever(gs)
+  if (DE.DIG_SURPLUS or want_money_dig) and guaranteed and discards_left > 0
+     and hands_left >= DE.DIG_MIN_HANDS and #hand > 0 then
+    local keep = {}
+    if DE.DIG_KEEP_GUARANTEE then
+      -- MONEY DIG KEEPS ONLY THE CARDS THAT CLEAR (2026-10-04, owner on live NSWJJKK8: "it had 4 discards to find 1 or
+      -- 2 sets of [faces] while keeping the winning hand"). Protecting the whole play -- its non-scoring kickers too --
+      -- left ~3 spare slots, so a Faceless search needed all 3 redraws to be faces (sim: Faceless paid \$0.72 a blind).
+      -- When the play's SCORING cards alone still guarantee the clear, only they are protected; the kickers become
+      -- spare and can be pitched or collect faces. The guarantee holds by construction (re-scored on those cards).
+      local protect = play_cards or {}
+      local sc = play_ev and play_ev.scoring_cards
+      if DE.DIG_KEEP_SCORING and want_money_dig and sc and #sc > 0 and #sc < #protect then
+        local ok, ev = pcall(HandEval.score, gs, sc)
+        if ok and ev and (ev.score_min or ev.score or 0) >= remaining then protect = sc end
+      end
+      for _, c in ipairs(protect) do keep[c] = true end
+    end
+    -- DiscardValue.keep_value prices held value (a plain card <= ~11, any enhancement/edition >= 25, a
+    -- debuffed card < 0), so pitching by it never throws a Gold/Steel/Glass card.
+    local spare = {}
+    for _, c in ipairs(hand) do
+      if not keep[c] and DiscardValue.keep_value(c, gs) < DE.DIG_MAX_KEEP then spare[#spare + 1] = c end
+    end
+    local function by_keep(a, b) return DiscardValue.keep_value(a, gs) < DiscardValue.keep_value(b, gs) end
+    table.sort(spare, by_keep)                                    -- cheapest chaff first
+    local pareidolia = owns(gs, "j_pareidolia")
+    local function is_face(c) return (pareidolia or Cards.is_face(c)) and not HandEval.is_debuffed(gs, c) end
+    -- candidate pitches, one per lever family (cheapest matching spare cards):
+    local function pick(pred, cap)
+      local out = {}
+      for _, c in ipairs(spare) do if pred(c) and #out < (cap or 5) then out[#out + 1] = c end end
+      return out
+    end
+    local cands = {}
+    if want_money_dig then
+      cands[#cands + 1] = pick(is_face, 5)                        -- Faceless (3+ faces) / Hit the Road (Jacks)
+      if owns(gs, "j_mail") or owns(gs, "j_castle") or owns(gs, "j_yorick") then
+        cands[#cands + 1] = pick(function() return true end, 5)   -- Mail (rank) / Castle (suit) / Yorick (any)
+      end
+      if owns(gs, "j_trading") then cands[#cands + 1] = pick(function() return true end, 1) end  -- Trading (single)
+    end
+    -- FARM: the highest-value, non-harmful lever pitch (DiscardFuel prices $ + scaler feed - harm).
+    local pitch, mode, note, best_v = {}, nil, nil, 0
+    for _, cand in ipairs(cands) do
+      if #cand > 0 then
+        local v, n, harm = DiscardFuel.value(gs, cand)
+        if v > best_v and not harm then pitch, best_v, mode, note = cand, v, "farm", n end
+      end
+    end
+    -- AGGRESSIVE FARM (user 2026-08-28): no farm from the SPARE alone, but with SPARE HANDS to re-clear
+    -- it is correct to break the current winner -- pitch the best-value LEVER cards from the WHOLE hand
+    -- (Faceless faces / Mail's rank / Trading single, incl. the clear's own cards) to hit a trigger NOW,
+    -- then re-make a winner later. STRICTLY gated: >= AGGRO_MIN_HANDS hands AND survive_after (at 2x
+    -- samples) shows the clear stays >= 99% certain -- a bad re-draw here kills the run. Never bleeds
+    -- Ramen/Green Joker. (Widened + hardened after a directionally-negative A/B on the Faceless-only,
+    -- 2-hand, 97% version -- the death channel is exactly the re-clear miss.)
+    if mode == nil and DE.DIG_AGGRESSIVE and want_money_dig and not DiscardFuel.bleeds_scaler(gs)
+       and hands_left >= DE.AGGRO_MIN_HANDS then
+      local whole = {}
+      for _, c in ipairs(hand) do
+        if DiscardValue.keep_value(c, gs) < DE.DIG_MAX_KEEP then whole[#whole + 1] = c end
+      end
+      table.sort(whole, by_keep)
+      local function wpick(pred, cap)
+        local out = {}
+        for _, c in ipairs(whole) do if pred(c) and #out < (cap or 5) then out[#out + 1] = c end end
+        return out
+      end
+      local acands = {}
+      if owns(gs, "j_faceless") then acands[#acands + 1] = wpick(is_face, 5) end
+      if owns(gs, "j_mail") or owns(gs, "j_castle") or owns(gs, "j_yorick") then acands[#acands + 1] = wpick(function() return true end, 5) end
+      if owns(gs, "j_trading") then acands[#acands + 1] = wpick(function() return true end, 1) end
+      -- highest-value non-harmful candidate, then a SINGLE survival check on it
+      local best_aggr, best_v = nil, 0
+      for _, aggr in ipairs(acands) do
+        if #aggr > 0 and #aggr < #hand then
+          local v, _, harm = DiscardFuel.value(gs, aggr)
+          if v > best_v and not harm then best_aggr, best_v = aggr, v end
+        end
+      end
+      if best_aggr then
+        local vs = Simulation.survive_after(gs, { kind = "DISCARD", cards = best_aggr }, DE.AGGRO_SAMPLES, lcg(disc_seed(gs)), false)
+        if vs and vs.frac and vs.frac >= 1 - DE.AGGRO_SURV_TOL then
+          pitch, mode, note = best_aggr, "farm", "aggressive: break the winner to farm — spare hands re-clear"
+        end
+      end
+    end
+
+    -- SEARCH (Faceless only): no farm yet, but keep faces and pitch chaff to draw TOWARD a 3-face
+    -- trigger. Never when a discard would bleed Ramen/Green Joker.
+    if mode == nil and want_money_dig and owns(gs, "j_faceless") and not DiscardFuel.bleeds_scaler(gs)
+       and deck_has_faces(gs, pareidolia) then
+      local chaff = pick(function(c) return not is_face(c) end, 5)
+      if #chaff > 0 then pitch, mode = chaff, "search" end
+    end
+    -- general free-redraw probe (DE.DIG_SURPLUS), unrelated to jokers
+    if mode == nil and DE.DIG_SURPLUS then
+      for i = 1, math.min(5, #spare) do pitch[i] = spare[i] end
+      mode = "probe"
+    end
+    if #pitch > 0 and mode then
+      local money = (select(1, Heuristics.discard_econ(gs, pitch)))
+      dig_action = {
+        type = "DISCARD", cards = pitch,
+        -- ranked ABOVE the play: while the clear is locked the play banks nothing extra, and a spare
+        -- discard is free. It stops as soon as discards run out.
+        value = (play_action and play_action.value or 0) + 1,
+        surplus_dig = true, farms_money = money > 0, banked_money = money,
+        money_dig = (mode == "farm" or mode == "search"),
+        reason = (mode == "farm") and (money > 0
+            and string.format("Discard %d to farm $%d (%s) — the clear is locked, the cards return to your deck.",
+                  #pitch, money, note or "econ joker")
+            or string.format("Discard %d to work your econ joker (%s) — the clear is locked.", #pitch, note or ""))
+          or (mode == "search") and
+            "Dig toward Faceless: keep your face cards and pitch chaff to build a 3-face discard for $5 (clear is locked)."
+          or string.format(
+            "Dig with a spare discard (%d) — the clear is already locked, so the extra score is wasted.", discards_left),
+      }
+    end
+  end
+  return dig_action
+end
+
+-- ---- MILK: farm in-blind $ when the clear is already assured (DE.MILK_MONEY) -------
+-- The clear is GUARANTEED this hand and hands remain -> consider playing a money-MAXIMAL hand
+-- instead and clearing on a later hand. Only commit when the money-aware survive_after shows the
+-- clear still lands (frac within tol) AND more $ is farmed. See DE.MILK_MONEY note above.
+local function milk_play(P)
+  local guaranteed, hands_left, remaining, hand, gs = P.guaranteed, P.hands_left, P.remaining, P.hand, P.gs
+  local play_cards, pfilter, play_ev, play_action = P.play_cards, P.pfilter, P.play_ev, P.play_action
+  local milk_action
+  if DE.MILK_MONEY and guaranteed and hands_left >= 2 and remaining > 0 and #hand > 0 then
+    -- HELD-money aware (HoldFuel): a play also earns $ from the econ cards it KEEPS BACK (Reserved
+    -- Parking $/held-face, gold $3/held). Crediting E[held $] on the un-played cards is what makes the
+    -- engine play a MINIMAL hand and hold a hand of faces for Parking -- not just play money cards.
+    local hold_on = HoldFuel.has_lever(gs)
+    if not hold_on then for _, c in ipairs(hand) do if c.enhancement == "m_gold" then hold_on = true; break end end end
+    -- The guaranteed clear's SCORING cards (the poker hand itself, not its kickers). These matter twice:
+    -- (1) the milk may only spend cards OUTSIDE them, so the clearing hand survives for a later turn;
+    -- (2) their one-time m_gold round-end value is ILLUSORY for a milk that holds them -- you must play
+    -- them to clear, forfeiting the $3. Both come from the live round-6 bug: a trivially-clearing Flush
+    -- was DEFERRED to "hold" its own gold hearts, and the flush degraded away, nearly dying.
+    local in_clear = {}
+    do
+      local _, scoring_set = HandEval.analyze(play_cards or {})
+      for i, c in ipairs(play_cards or {}) do
+        if (not scoring_set) or scoring_set[i] then in_clear[c] = true end  -- keep scoring cards; kickers are free
+      end
+    end
+    local function milk_money(sel, ev)
+      local m = (ev and ev.money) or 0
+      if hold_on and sel then
+        local played = {}
+        for _, c in ipairs(sel) do played[c] = true end
+        local held = {}
+        for _, c in ipairs(hand) do if not played[c] then held[#held + 1] = c end end
+        m = m + HoldFuel.money(gs, held, in_clear)   -- clear's gold cards don't count as held $ (illusory)
+      end
+      return m
+    end
+    -- max-$ play in this hand: remaining=0 makes every subset tier-0, so best_fuel_play ranks by the
+    -- fuel credit (played $ + held $) then score -> the highest-total-$ legal play (minimal for Parking).
+    local milk_pool = {}
+    for _, c in ipairs(hand) do if not in_clear[c] then milk_pool[#milk_pool + 1] = c end end
+    local mev, mcards
+    if #milk_pool > 0 then mev, mcards = HandEval.best_fuel_play(gs, milk_pool, 0, milk_money, pfilter) end
+    if mev and mcards and not same_cards(mcards, play_cards)
+       and milk_money(mcards, mev) > milk_money(play_cards, play_ev) + 1e-9 then
+      local seed = disc_seed(gs)
+      -- clear line: play the clear now, finish clear-ASAP.  milk line: play the money hand now,
+      -- finish with the MILK policy (defer the clear, cycle more $). CRN (same seed) pairs them.
+      local vc = Simulation.survive_after(gs, { kind = "PLAY", sel = play_cards },
+        DE.SURV_SAMPLES, lcg(seed), false)
+      local vm = Simulation.survive_after(gs, { kind = "PLAY", sel = mcards },
+        DE.SURV_SAMPLES, lcg(seed), true)
+      -- Compare against the MONEY-ORDERED clear, not the raw one: the engine already reorders a
+      -- locked clear for $ (e.g. Gold-seal card first for a Hanging Chad retrigger), and the rollout
+      -- scores in default order -- so credit the clear that reorder before judging the milk. Without
+      -- this the milk "wins" merely by ordering, farming the SAME $ over more hands (loses a banked
+      -- hand for nothing). Real milk still fires: it cycles NEW $ cards from the deck the clear can't.
+      local clear_reorder = (play_action.ordering and play_action.ordering.objective == "money"
+        and (play_action.ordering.money_gain or 0)) or 0
+      -- NET milk gain = extra $ farmed MINUS the round-end reward on the hands milking burns
+      -- (each unused hand pays Mechanics.HAND_REWARD). survive_after reports E[banked hands] so the
+      -- milk only wins when the $ it cycles beats the hand-rewards it forgoes.
+      local hand_cost = ((vc.banked or 0) - (vm.banked or 0)) * Mechanics.HAND_REWARD
+      -- the survival rollout's money is PLAYED-only, so credit the held-money advantage of the milk
+      -- play directly: the extra E[$] its held cards earn THIS hand over the clear's (Parking/gold).
+      local hold_delta = milk_money(mcards, mev) - (mev.money or 0)
+        - (milk_money(play_cards, play_ev) - (play_ev.money or 0))
+      local net_gain = (vm.money or 0) - (vc.money or 0) - clear_reorder - hand_cost + hold_delta
+      if vm.frac >= vc.frac - DE.MILK_SURV_TOL and net_gain > DE.MILK_MONEY_MARGIN then
+        milk_action = {
+          type = "PLAY", cards = mcards, hand_type = mev.hand_type,
+          score = mev.score, approx = mev.approx,
+          -- ranked just above the straight clear: while the clear is locked the extra score is
+          -- overkill, and this farms real $. It only exists when the survival gate passed.
+          value = (play_action and play_action.value or 0) + 1,
+          play_econ = HandEval.play_econ(gs, mev, mcards),
+          ordering = Ordering.optimize(gs, mcards, { objective = "money", remaining = remaining }),
+          milk = true,
+          reason = string.format(
+            "Milk the blind: play the %s to farm ~+$%.0f — the clear is locked for a later hand.",
+            mev.hand_type, net_gain),
+        }
+      end
+    end
+  end
+  return milk_action
+end
+
+-- ---- candidate: best discard ----
+-- Two ways to value a discard, take the better:
+--  (a) MEASURED upgrade: keep your strong cards (editions/enhancements/high
+--      ranks), pitch chaff, and simulate the expected best hand after redraw.
+--      This is what holds a polychrome to build one big hand vs two average.
+--  (b) Heuristic draw/money discard (flush/straight/set draws, money tarots).
+local function discard_candidate(P)
+  local discards_left, clears, gs_eval, rng, pfilter = P.discards_left, P.clears, P.gs_eval, P.rng, P.pfilter
+  local gs, held, play_ev, b = P.gs, P.held, P.play_ev, P.b
+  local discard_action
+  -- Allow a dig even on the LAST hand (hands_left==1): with discards still in hand you
+  -- can improve the single hand you're about to play. This is the Needle boss (1 hand,
+  -- discards intact) and any last hand with discards left -- the engine used to refuse
+  -- to dig there. Selection below only PREFERS the dig when it turns a loss into a
+  -- plausible clear, so a hopeless dig against an unreachable target still just plays.
+  if discards_left > 0 and not clears then
+    local cands = {}
+    -- Heuristic shape-draw (flush/straight/set) + money discard. We feed its
+    -- discard SET into the measured search below so a suit-blind keep-value
+    -- ordering can't miss "discard the high offsuit to complete the flush"; the
+    -- heuristic's own (optimistic) estimate is only used as a fallback when there's
+    -- no deck to measure, or for the MONEY discard a score-based measure can't value.
+    local d = Heuristics.best_discard(gs_eval)
+    -- Measured, joker-aware discard. Valued on gs_eval so the expected post-redraw
+    -- hand includes any held-planet level-up. Includes the heuristic's set as a
+    -- candidate so the realistic, joker-aware measurement is the decider.
+    local md = DiscardValue.best(gs_eval,
+      { samples = 10, rng = rng, filter = pfilter,   -- Mouth/Eye: dig toward the LEGAL (locked) type
+        extra_discards = (d and d.cards and #d.cards > 0) and { d.cards } or nil })
+    if md and #md.cards > 0 then
+      -- CREDIT the money the pitched cards EARN (Faceless $5/3-faces, Mail/Trading), on the SAME frac
+      -- scale as md.value. The measured discard scores the REDRAW only, so a hand-improving discard that
+      -- ALSO dumps 3 faces was under-valued by $5 and Faceless under-fired (owner: "had Faceless but
+      -- didn't dig/use it"). Now a discard that improves the hand AND triggers an econ joker is valued
+      -- for both -- without proposing a face-dump that hurts the build (md's score already prices that).
+      local mmoney = select(1, Heuristics.discard_econ(gs, md.cards)) or 0
+      cands[#cands + 1] = { cards = md.cards, value = md.value + mmoney * Heuristics.DOLLAR_VALUE,
+        measured = true, farms_money = mmoney > 0, banked_money = mmoney,
+        reason = string.format("Discard %d (keep your strong cards) to build a stronger hand (~%d expected)%s.",
+          #md.cards, math.floor(md.value), mmoney > 0 and string.format(" + $%d", mmoney) or "") }
+      -- keep the heuristic ONLY for the money discard the score-based measure can't
+      -- value (Faceless/Mail-In dump cards for $).
+      if d and #d.cards > 0 and d.target == "economy" then
+        cands[#cands + 1] = { cards = d.cards, value = d.expected, target = d.target, reason = d.reason }
+      end
+    elseif d and #d.cards > 0 then
+      -- no deck to measure against -> fall back to the heuristic estimate
+      cands[#cands + 1] = { cards = d.cards, value = d.expected, target = d.target, reason = d.reason }
+    end
+    local pick
+    for _, c in ipairs(cands) do if not pick or c.value > pick.value then pick = c end end
+    if pick then
+      discard_action = { type = "DISCARD", cards = pick.cards, target = pick.target,
+        score = pick.value, value = pick.value, measured = pick.measured, reason = pick.reason }
+      -- if a held planet levels the hand this discard builds toward, say to use it
+      local th = TARGET_HAND[pick.target]
+      for _, p in ipairs(held) do
+        if p.hand == th then
+          discard_action.use_planet = p.name
+          discard_action.reason = discard_action.reason
+            .. string.format(" (use %s first to level %s)", p.name, th)
+          break
+        end
+      end
+    end
+  end
+
+  -- Trading Card: a single-card destroy+$3 on the first discard. Prefer it when it
+  -- beats the generic (multi-card) discard -- otherwise it's never even considered.
+  if discards_left > 0 and not clears then
+    local dig_value = discard_action and discard_action.value or nil
+    local trade = trading_card_discard(gs_eval, play_ev, rng, dig_value)
+    if trade and (not discard_action or trade.value > discard_action.value) then
+      discard_action = trade
+    end
+  end
+
+  -- Delayed Gratification pays $2 per discard at round end IF you use NONE, so
+  -- the FIRST discard forfeits the whole bonus. Charge the discard for it (only
+  -- while you haven't discarded yet); the value comparison below then keeps a
+  -- marginal discard from costing you the money when you can clear without it.
+  if discard_action then
+    local base_d = (b.base_discards and b.base_discards > 0) and b.base_discards or discards_left
+    local used = math.max(0, base_d - discards_left)
+    local has_dg = false
+    for _, jk in ipairs(gs.jokers or {}) do if jk.key == "j_delayed_grat" then has_dg = true break end end
+    if has_dg and used == 0 and base_d > 0 then
+      local forfeit = 2 * base_d
+      discard_action.value = discard_action.value - forfeit * Heuristics.DOLLAR_VALUE
+      discard_action.forfeit = forfeit
+      discard_action.reason = (discard_action.reason or "")
+        .. string.format(" (costs $%d of Delayed Gratification)", forfeit)
+    end
+  end
+  return discard_action
+end
+
+-- HOLD-CONDITIONAL PLAY TIMING (2026-08-31, owner: with Mystic Summit "use all its discards before
+-- playing"). Mystic Summit gives +15 mult ONLY at 0 discards, so a SCORING play lands FAR bigger once
+-- the discards are spent (a Flush's mult ~quintuples). While we still hold discards and the play does
+-- NOT clear, playing an accumulate hand NOW forfeits that uplift. Re-score the best play as if at 0
+-- discards -- the real scorer arms Mystic / any 0-discard effect -- and credit the positive delta to
+-- DIGGING (spend the discards out first, then play at 0 discards). Fully GENERAL, no joker hardcoded:
+--  * an ordinary board's score is discard-independent  -> delta 0, no behaviour change;
+--  * Banner (+30 chips per discard REMAINING) scores LESS at 0 discards -> delta <= 0, so it is NOT
+--    deferred -- correctly, since Banner wants to play WITH discards in hand. The owner's "what if you
+--    hold both?" is thus resolved by the NET score delta, not a special case.
+local function hold_play_uplift(P)
+  local discards_left, clears, discard_action, gs, b = P.discards_left, P.clears, P.discard_action, P.gs, P.b
+  local hand, remaining, play_ev = P.hand, P.remaining, P.play_ev
+  local defer_uplift = 0
+  if discards_left > 0 and not clears and discard_action then
+    local gs0 = {}
+    for k, v in pairs(gs) do gs0[k] = v end
+    gs0.blind = {}
+    for k, v in pairs(b) do gs0.blind[k] = v end
+    gs0.blind.discards_left = 0
+    local ev0 = HandEval.best_play_target(gs0, hand, remaining, boss_filter(gs0))
+    if ev0 and ev0.score > play_ev.score then defer_uplift = ev0.score - play_ev.score end
+  end
+  return defer_uplift
+end
+
+-- Selection rule (DESIGN.md Phase 4) + hand economy:
+--   clears OR last hand -> PLAY
+--   else compare discard vs play. A non-clearing PLAY *burns a hand* ($1 of
+--   end-of-round reward, since unused hands pay $1 each), while a DISCARD
+--   preserves hands -> credit the discard with that saved hand. This makes
+--   "discard to set up one clean clearing hand" beat "chip away over several
+--   hands", which also keeps more money.
+local function arbitrate(P)
+  local discard_action, defer_uplift, play_action, clears = P.discard_action, P.defer_uplift, P.play_action, P.clears
+  local dig_action, milk_action, gs, discards_left = P.dig_action, P.milk_action, P.gs, P.discards_left
+  local play_cards, hand, hands_left, remaining = P.play_cards, P.hand, P.hands_left, P.remaining
+  local forced_play, play_scores_zero, mouth_lock = P.forced_play, P.play_scores_zero, P.mouth_lock
+  local gs_eval, rng = P.gs_eval, P.rng
+  local HAND_ECON = Mechanics.HAND_REWARD * Heuristics.DOLLAR_VALUE
+  local function greedy_choice()
+    -- + defer_uplift: digging out the discards preserves the option to play at 0 discards, where a
+    -- held Mystic Summit (etc.) makes the scoring play far bigger. 0 for an ordinary board.
+    if discard_action and (discard_action.value + HAND_ECON + defer_uplift) > play_action.value then
+      return discard_action
+    end
+    return play_action
+  end
+
+  local best
+  if clears then
+    -- The clear is in hand. Baseline plays immediately and forfeits every remaining
+    -- discard; with DE.DIG_SURPLUS on we first spend the surplus on a free redraw
+    -- (the dig keeps the guaranteed play's cards, so the clear cannot be lost); with
+    -- DE.MILK_MONEY on we instead play a money-maximal hand now and clear later, but only
+    -- when its survival gate passed (milk_action is nil otherwise).
+    -- An active money-dig wins outright: a spare DISCARD costs no hand-reward and keeps the clear in
+    -- hand, so working Faceless (farm 3 faces now, or search toward them) strictly dominates milking a
+    -- HAND. It chains down through the discards (fires again next decision); once discards run out,
+    -- milk uses the spare HANDS, then the clear plays. (Free discards before hands.)
+    if dig_action and dig_action.money_dig then
+      best = dig_action
+    else
+      best = milk_action or dig_action or play_action
+    end
+    -- Burnt Joker: the round's FIRST discard is a free level for its poker hand -- take it before playing
+    -- the clear (or before the money dig, which the next decision resumes).
+    -- SIXTH SENSE (2026-09-25): the round's first discard, if it is a SINGLE 8, destroys it and makes a Spectral
+    -- (sim/world discard_effects; the card is destroyed even with no room, so only with a free consumable slot).
+    -- With the clear in hand that discard is free -- pitch a spare 8 (never one of the clearing cards) first.
+    -- It takes precedence over a Burnt discard (a lone 8 still levels High Card for Burnt).
+    local sixth_done = false
+    if owns(gs, "j_sixth_sense") and discards_left > 0 and first_discard(gs)
+       and ((gs.run and gs.run.consumable_slots) or 2) > #(gs.consumables or {})
+       and not owns(gs, "j_delayed_grat") and not DiscardFuel.bleeds_scaler(gs) then
+      local in_play = {}
+      for _, c in ipairs(play_cards or {}) do in_play[c] = true end
+      local eight, eight_v
+      for _, c in ipairs(hand) do
+        if not in_play[c] and Cards.rank_id(c) == 8 then
+          local v = DiscardValue.keep_value(c, gs)
+          if not eight or v < eight_v then eight, eight_v = c, v end
+        end
+      end
+      if eight then
+        best = { type = "DISCARD", cards = { eight }, sixth_sense = true, value = (play_action.value or 0) + 2,
+          reason = "Discard the spare 8 alone first — Sixth Sense turns it into a Spectral card; the clear stays in hand." }
+        sixth_done = true
+      end
+    end
+    -- Not when a discard costs something: Delayed Gratification pays $2/discard only if NONE is used, and
+    -- Green Joker / Ramen lose value per discard (DiscardFuel.bleeds_scaler).
+    if not sixth_done and owns(gs, "j_burnt") and discards_left > 0 and #hand > 0 and first_discard(gs)
+       and not owns(gs, "j_delayed_grat") and not DiscardFuel.bleeds_scaler(gs) then
+      local ba = burnt_discard(gs, hand, play_cards, hands_left, remaining)
+      if ba then ba.value = (play_action.value or 0) + 2; best = ba end
+    end
+  elseif forced_play then
+    -- last hand with discards left: E-6 (the corrected F3). The old mean-rule dug only
+    -- when the expected dug hand ALSO beat the target in expectation -- refusing digs
+    -- that are the only chance to live (mean below target but P(clear) real). Arbitrate
+    -- by the SAME boss-aware survive_after E[frac] the F1/F2 mid-blind branch uses: it
+    -- credits the partial score a failed dig sacrifices (the exact F3 failure mode the
+    -- mean-rule guarded against), under CRN, and only overrides toward the dig on a
+    -- clear margin -- otherwise play the sure points.
+    best = play_action
+    -- Mouth off-type play scores 0 even on the last hand -- but discards don't consume the hand, so
+    -- digging for the locked type (3 tries here) can only help: worst case you still play a 0-scorer.
+    if play_scores_zero and discard_action and discard_action.cards and #discard_action.cards > 0 then
+      best = discard_action; best.plan = true
+    elseif discard_action and remaining > 0 and play_action.score < remaining
+       and discard_action.cards and #discard_action.cards > 0
+       and play_action.cards and #play_action.cards > 0 then
+      local seed = disc_seed(gs)
+      local vp = Simulation.survive_after(gs, { kind = "PLAY", sel = play_action.cards },
+        DE.SURV_SAMPLES, lcg(seed))
+      local vd = Simulation.survive_after(gs, { kind = "DISCARD", cards = discard_action.cards },
+        DE.SURV_SAMPLES, lcg(seed))
+      -- (2026-10-10 audit, see DE.LAST_CLEAR): on the LAST hand a failed blind ends the run, so partial credit is
+      -- worth nothing -- arbitrate by P(clear). E[frac] is capped at 1 and the sure play's frac sits near it on a
+      -- near miss, so the 0.06 frac margin refused digs with P(clear) 0.995 vs 0 (sim 102003 a4 Needle: played a
+      -- 4738/5000 High Card with 4 discards unused) and 0.225 vs 0 (117003 a6 Needle). frac stays the tie-break.
+      if DE.LAST_CLEAR then
+        if vd.clear > vp.clear + DE.LAST_CLEAR_MARGIN
+           or (vd.clear >= vp.clear and vd.frac > vp.frac + DE.SURV_MARGIN) then
+          best = discard_action; best.plan = true
+        end
+      elseif vd.frac > vp.frac + DE.SURV_MARGIN then
+        best = discard_action; best.plan = true
+      end
+    end
+  else
+    best = greedy_choice()
+    -- SEQUENCE-AWARE refinement (F1/F2): arbitrate PLAY-now vs DISCARD-now by EXPECTED
+    -- SURVIVAL, using the BOSS-AWARE simulation rollout instead of the mean-of-one-hand
+    -- heuristic (greedy_choice) or the boss-blind depth-2 search. `survive_after` forces
+    -- each candidate opening move then finishes with the greedy policy, returning
+    -- E[frac] = P(clear) + partial-score credit (so a high-variance dig that usually
+    -- falls short is not over-valued -- the F3 lesson). Common random numbers (same
+    -- seed) make the paired delta low-variance; it only OVERRIDES on a clear margin, so
+    -- the rich heuristics stand otherwise. Gated to multi-hand, no-held-consumable states
+    -- (those have their own logic) to stay cheap and non-conflicting.
+    -- E-5 (replay-screened 2026-07-13): the old `#consumables == 0` gate switched the
+    -- proven arbitration OFF in the ~65% of states holding a consumable. The E-9 harness
+    -- verdict on 161 held-consumable fixtures: mean regret 0.0196 -> 0.0075 (-62%),
+    -- oracle-match 67.9% -> 77.1%, E[frac] +0.010 -- strictly better decisions (the old
+    -- batch revert was cascade redistribution on the pre-E-11 world, not bad choices).
+    -- Held consumables don't enter the rollout; use_action promotion runs independently.
+    local can_search = discards_left > 0 and hands_left >= 2
+    if can_search and discard_action and play_action.cards and #play_action.cards > 0 then
+      local seed = disc_seed(gs)
+      local vp = Simulation.survive_after(gs, { kind = "PLAY", sel = play_action.cards },
+        DE.SURV_SAMPLES, lcg(seed))
+      local vd = Simulation.survive_after(gs, { kind = "DISCARD", cards = discard_action.cards },
+        DE.SURV_SAMPLES, lcg(seed))
+      -- DIG_BIAS credits the discard branch to offset the rollout's under-digging greedy continuation
+      -- (see DE.DIG_BIAS) -- easier to switch TO a set-up discard, harder to switch away from one.
+      local vdf = vd.frac + DE.DIG_BIAS
+      if vdf > vp.frac + DE.SURV_MARGIN and best.type ~= "DISCARD" then
+        best = discard_action; best.plan = true        -- survival: discard to set up
+      elseif DE.PACE_PLAY and best.type == "DISCARD" and not best.plan and not best.trade and not best.sixth_sense
+             and defer_uplift <= 0 and (play_action.score or 0) * hands_left >= remaining
+             and vp.clear >= vd.clear - DE.PACE_TIE and vp.frac >= vd.frac - DE.PACE_TIE then
+        best = play_action                              -- pace: bank an on-pace hand, keep the discards
+      elseif vp.frac > vdf + DE.SURV_MARGIN and best.type == "DISCARD" and not best.trade
+             and (defer_uplift <= 0 or vp.frac > vd.frac + DE.DEFER_SURV_TOL) then
+        best = play_action                              -- survival: just play now (but keep a Mystic
+                                                        -- dig unless play is MUCH safer -- rollout is
+                                                        -- blind to the 0-discard uplift)
+        -- (the Trading Card trade is exempt: the rollout can't see its $3 + thinning)
+      end
+    end
+
+    -- MOUTH: LOCK NOW OR DIG (2026-09-30). Before the lock every discard is also one fewer to remake the locked
+    -- type afterwards; sim 35003 locking Three of a Kind at 4 discards cleared 75%, but four digs later (a Trading
+    -- Card trade first, exempt from the rollout above) it locked at ~50%. The arbitration above ranks by E[frac]
+    -- with a margin; here, before the lock, dig only if the dig CLEARS more often than the chosen lock (the lock
+    -- choice's own P(clear), same CRN seed).
+    if mouth_lock and best.type == "DISCARD" and best.cards and #best.cards > 0
+       and play_action.cards and same_cards(play_action.cards, mouth_lock.cards) then
+      local vd = Simulation.survive_after(gs, { kind = "DISCARD", cards = best.cards }, DE.SURV_SAMPLES, lcg(disc_seed(gs)))
+      if mouth_lock.clear >= vd.clear and mouth_lock.clear > 0 then
+        best = play_action; best.plan = true
+        best.lock_note = string.format("The Mouth: lock %s now (clears ~%d%%) -- digging first clears ~%d%% and spends a discard the lock needs.",
+          play_action.hand_type, math.floor(mouth_lock.clear * 100 + 0.5), math.floor(vd.clear * 100 + 0.5))
+      end
+    end
+
+    -- DIG-PLAY when OUT OF DISCARDS (owner 2026-08-31). With no discards, hands to spare, and no clear,
+    -- the best-SCORING play spends your build cards on a hand that doesn't clear -- often worse than
+    -- PLAYING YOUR CHAFF to cycle (a play removes+redraws its cards just like a discard) while KEEPING
+    -- your build cards for a real hand ("play a 2-pair of 7s/4s and don't even play the spare face in a
+    -- face build" was the exact complaint). DiscardValue.best is joker-aware (it measures the redraw
+    -- through the full pipeline), so its "discard set" is the chaff that keeps build-relevant cards.
+    -- Arbitrate by E[frac] over the remaining hands, same rollout as the discard branch; only overrides
+    -- on a clear margin, so a play that IS near enough still just plays.
+    if not can_search and discards_left == 0 and hands_left >= 2 and best.type == "PLAY"
+       and not play_action.cycle_play   -- already the LEGAL-type dig (the unfiltered one below is not)
+       and play_action.cards and #play_action.cards > 0 then
+      local md = DiscardValue.best(gs_eval, { samples = 10, rng = rng })
+      if md and md.cards and #md.cards > 0 and not same_cards(md.cards, play_action.cards) then
+        local seed = disc_seed(gs)
+        local vp = Simulation.survive_after(gs, { kind = "PLAY", sel = play_action.cards },
+          DE.SURV_SAMPLES, lcg(seed))
+        local vdig = Simulation.survive_after(gs, { kind = "PLAY", sel = md.cards },
+          DE.SURV_SAMPLES, lcg(seed))
+        if vdig.frac > vp.frac + DE.SURV_MARGIN then
+          local dev = HandEval.score(gs, md.cards)
+          best = { type = "PLAY", cards = md.cards, dig_play = true, plan = true,
+            hand_type = (dev and dev.hand_type) or "High Card",
+            score = (dev and dev.score) or 0, value = play_action.value,
+            reason = string.format(
+              "No discards left and this hand can't clear — play your chaff (%d) to cycle for a better hand, keeping your build cards.",
+              #md.cards) }
+        end
+      end
+    end
+  end
+  return best
+end
+
+-- ---- FARM: milk the board's money jokers before clearing (engine/farm.lua) ----
+local function farm_choice(P, best, candidates)
+  local forced_play, hands_left, remaining = P.forced_play, P.hands_left, P.remaining
+  local play_scores_zero, gs, play_cards, hand = P.play_scores_zero, P.gs, P.play_cards, P.hand
+  local discards_left, pfilter = P.discards_left, P.pfilter
+  if Flags.global("BES_FARM_DEBUG") then io.stderr:write(string.format("FARMCHK best %s cards %d forced %s hl %d rem %d zero %s md %s milk %s lever %s\n",
+    tostring(best and best.type), best and best.cards and #best.cards or -1, tostring(forced_play), hands_left, remaining,
+    tostring(play_scores_zero), tostring(best and best.money_dig), tostring(best and best.milk), tostring(Farm.has_lever(gs)))) end
+  if DE.FARM and best and (best.type == "PLAY" or best.type == "DISCARD") and best.cards and #best.cards > 0
+     and not forced_play and hands_left >= 2 and remaining > 0 and not play_scores_zero
+     and not best.money_dig and not best.milk and Farm.has_lever(gs) then
+    local prot = {}
+    for _, c in ipairs(play_cards or {}) do prot[c] = true end
+    local seed = disc_seed(gs)
+    local first_n = (best.type == "DISCARD") and { kind = "DISCARD", cards = best.cards } or { kind = "PLAY", sel = best.cards }
+    local vn
+    local pick
+    for _, r in ipairs(DE.FARM_RESERVES) do
+      local st = Farm.step(gs, hand, remaining, hands_left, discards_left, r, pfilter, prot)
+      if st and not (pick and same_cards(pick.st.cards or pick.st.sel, st.cards or st.sel)) then
+        vn = vn or Simulation.survive_after(gs, first_n, DE.FARM_SAMPLES, lcg(seed), false)
+        local fa = (st.kind == "DISCARD") and { kind = "DISCARD", cards = st.cards } or { kind = "PLAY", sel = st.sel }
+        local vf = Simulation.survive_after(gs, fa, DE.FARM_SAMPLES, lcg(seed), { farm = true, reserve = r })
+        local net = (vf.money or 0) - (vn.money or 0) - ((vn.banked or 0) - (vf.banked or 0)) * Mechanics.HAND_REWARD
+        if Flags.global("BES_FARM_DEBUG") then io.stderr:write(string.format("FARM r%d %s vf.clear %.2f vn.clear %.2f vf$ %.1f vn$ %.1f banked %.1f/%.1f net %.1f hl %d dl %d rem %d\n",
+          r, st.kind, vf.clear, vn.clear, vf.money or 0, vn.money or 0, vf.banked or 0, vn.banked or 0, net, hands_left, discards_left, remaining)) end
+        if vf.clear >= vn.clear - DE.FARM_TOL and net > DE.FARM_MARGIN and (not pick or net > pick.net) then
+          pick = { st = st, vf = vf, vn = vn, net = net, r = r }
+        end
+      end
+    end
+    if pick then
+      local st = pick.st
+      local why = string.format("Farm your money joker%s: ~$%.0f more this blind, still clears ~%d%% (vs ~%d%%); keep %d hand%s to clear.",
+        (st.kind == "DISCARD") and string.format(" (discard for $%d)", st.money or 0) or " (play a non-clearing hand to cycle cards)",
+        pick.net, math.floor(pick.vf.clear * 100 + 0.5), math.floor(pick.vn.clear * 100 + 0.5), pick.r, pick.r == 1 and "" or "s")
+      candidates[#candidates + 1] = best
+      if st.kind == "DISCARD" then
+        best = { type = "DISCARD", cards = st.cards, value = (best.value or 0) + 1, farm = true, plan = true,
+                 farms_money = (st.money or 0) > 0, banked_money = st.money, reason = why }
+      else
+        best = { type = "PLAY", cards = st.sel, hand_type = st.ev.hand_type, score = st.ev.score,
+                 value = (best.value or 0) + 1, farm = true, plan = true,
+                 play_econ = HandEval.play_econ(gs, st.ev, st.sel), reason = why }
+        -- REPOINT (BES_REPOINT=1): a farm hand is played for money, so order the jokers / cards for MONEY (a copier on
+        -- Golden Ticket); the clearing hand's own score reorder points it back.
+        -- narrowed after rp_7 (2026-10-21: a money reorder on EVERY farm hand changed 96/160 seeds, wins 64 -> 62 n.s.,
+        -- in-blind \$ no higher): only the owner's case -- a copier that can point at a per-card money joker
+        local copier, payer = false, false
+        for _, j in ipairs(gs.jokers or {}) do
+          if j.key == "j_blueprint" or j.key == "j_brainstorm" then copier = true end
+          if j.key == "j_ticket" or j.key == "j_rough_gem" or j.key == "j_business" then payer = true end
+        end
+        if require("engine.joker_effects").REPOINT and copier and payer then
+          local o = Ordering.optimize(gs, st.sel, { objective = "money", remaining = 0 })
+          if o and o.improves and (o.money_gain or 0) > 1e-9 then
+            best.reorder = o
+            best.reason = best.reason .. string.format("  Reorder for +$%g on this hand.", o.money_gain)
+          end
+        end
+      end
+    end
+  end
+  return best
+end
+
+-- The ranked in-blind actions for one state, before the exit guards below (decide_guarded).
+local function decide_core(gs, opts)
   local hand = gs.hand or {}
   local b = gs.blind or {}
   -- LIVE boss_effect gap (2026-09-20 replay audit, provable): HandEval scores suit/face
@@ -762,6 +1384,14 @@ function DE.decide(gs, opts)
   -- hand is credited the boost (not just the immediate play).
   local held = held_planet_hands(gs)
   local gs_eval = leveled_gs(gs, held)
+  -- The play situation: what the candidates below all read, settled from here on. The stages add their
+  -- results (dig_action, milk_action, discard_action, defer_uplift) as they are found.
+  local P = {
+    gs = gs, b = b, hand = hand, hands_left = hands_left, discards_left = discards_left, remaining = remaining,
+    rng = rng, pfilter = pfilter, play_ev = play_ev, play_cards = play_cards, play_action = play_action,
+    clears = clears, guaranteed = guaranteed, forced_play = forced_play, play_scores_zero = play_scores_zero,
+    mouth_lock = mouth_lock, held = held, gs_eval = gs_eval,
+  }
   -- CYCLE PLAY under a play restriction (2026-09-30). A 0-scoring play is still PLAYED: its cards leave and new
   -- ones are drawn, so with the discards gone it is the only dig left for the locked (Mouth) / unplayed (Eye)
   -- type. The fallback above picked the best OFF-TYPE hand, which throws away the very cards the lock needs
@@ -803,347 +1433,14 @@ function DE.decide(gs, opts)
     use_action = gen_action
   end
 
-  -- ---- candidate: best discard ----
-  -- Two ways to value a discard, take the better:
-  --  (a) MEASURED upgrade: keep your strong cards (editions/enhancements/high
-  --      ranks), pitch chaff, and simulate the expected best hand after redraw.
-  --      This is what holds a polychrome to build one big hand vs two average.
-  --  (b) Heuristic draw/money discard (flush/straight/set draws, money tarots).
-  local discard_action = nil
+  local dig_action = surplus_dig(P)
 
-  -- ---- SURPLUS DIG (probe; DE.DIG_SURPLUS, off by default) --------------------------
-  -- The clear is already GUARANTEED and discards remain: the overkill score is wasted, so
-  -- spend the surplus discards on a free redraw instead of banking them. Pitches only cards
-  -- OUTSIDE the guaranteed play, so the clear survives the discard by construction.
-  local dig_action = nil
-  -- ACTIVE money dig (2026-08-28). Once the clear is LOCKED and discards remain, actively WORK a
-  -- discard-payout joker instead of banking the surplus. Faceless pays $5 per 3 face cards discarded
-  -- at once; a spare discard costs nothing (unused DISCARDS pay no round reward) and the clear's cards
-  -- are protected, so this is free money. It FARMS when 3+ faces are already spare, otherwise it
-  -- SEARCHES -- keeping the faces, pitching chaff to draw TOWARD a 3-face trigger. (The engine should
-  -- actively utilise its econ jokers, not only fire on a rare Faceless+Pareidolia hand.)
-  --
-  -- FUTURE (resource-aware aggressive farm, user 2026-08-28): today the dig only pitches cards OUTSIDE
-  -- the guaranteed play, protecting the current winner absolutely. But with ABUNDANT resources (spare
-  -- hands AND discards well beyond what the clear needs) it is correct to break up the winner itself --
-  -- discard its face cards to farm Faceless, then simply re-draw and re-make a winning hand on a later
-  -- hand. The clear does not have to be THIS hand when a spare hand can re-clear. The gate that makes
-  -- this safe (not a death) is a survival estimate: Simulation.survive_after must show the clear is
-  -- still near-certain after the aggressive farm (like MILK's frac gate). Relax `keep` from "the whole
-  -- current play" toward "only the minimum a future clear needs" as (hands_left+discards_left) grows.
-  -- GENERAL: any owned discard lever (Faceless/Mail/Trading money, or a discard-fed scaler) -- valued
-  -- and harm-guarded by engine/discard_fuel, so the dig works every applicable joker and refuses to
-  -- BLEED a loser (Ramen/Green Joker) for less than it earns.
-  local want_money_dig = DE.DIG_FOR_MONEY and DiscardFuel.has_lever(gs)
-  if (DE.DIG_SURPLUS or want_money_dig) and guaranteed and discards_left > 0
-     and hands_left >= DE.DIG_MIN_HANDS and #hand > 0 then
-    local keep = {}
-    if DE.DIG_KEEP_GUARANTEE then
-      -- MONEY DIG KEEPS ONLY THE CARDS THAT CLEAR (2026-10-04, owner on live NSWJJKK8: "it had 4 discards to find 1 or
-      -- 2 sets of [faces] while keeping the winning hand"). Protecting the whole play -- its non-scoring kickers too --
-      -- left ~3 spare slots, so a Faceless search needed all 3 redraws to be faces (sim: Faceless paid \$0.72 a blind).
-      -- When the play's SCORING cards alone still guarantee the clear, only they are protected; the kickers become
-      -- spare and can be pitched or collect faces. The guarantee holds by construction (re-scored on those cards).
-      local protect = play_cards or {}
-      local sc = play_ev and play_ev.scoring_cards
-      if DE.DIG_KEEP_SCORING and want_money_dig and sc and #sc > 0 and #sc < #protect then
-        local ok, ev = pcall(HandEval.score, gs, sc)
-        if ok and ev and (ev.score_min or ev.score or 0) >= remaining then protect = sc end
-      end
-      for _, c in ipairs(protect) do keep[c] = true end
-    end
-    -- DiscardValue.keep_value prices held value (a plain card <= ~11, any enhancement/edition >= 25, a
-    -- debuffed card < 0), so pitching by it never throws a Gold/Steel/Glass card.
-    local spare = {}
-    for _, c in ipairs(hand) do
-      if not keep[c] and DiscardValue.keep_value(c, gs) < DE.DIG_MAX_KEEP then spare[#spare + 1] = c end
-    end
-    local function by_keep(a, b) return DiscardValue.keep_value(a, gs) < DiscardValue.keep_value(b, gs) end
-    table.sort(spare, by_keep)                                    -- cheapest chaff first
-    local pareidolia = owns(gs, "j_pareidolia")
-    local function is_face(c) return (pareidolia or Cards.is_face(c)) and not HandEval.is_debuffed(gs, c) end
-    -- candidate pitches, one per lever family (cheapest matching spare cards):
-    local function pick(pred, cap)
-      local out = {}
-      for _, c in ipairs(spare) do if pred(c) and #out < (cap or 5) then out[#out + 1] = c end end
-      return out
-    end
-    local cands = {}
-    if want_money_dig then
-      cands[#cands + 1] = pick(is_face, 5)                        -- Faceless (3+ faces) / Hit the Road (Jacks)
-      if owns(gs, "j_mail") or owns(gs, "j_castle") or owns(gs, "j_yorick") then
-        cands[#cands + 1] = pick(function() return true end, 5)   -- Mail (rank) / Castle (suit) / Yorick (any)
-      end
-      if owns(gs, "j_trading") then cands[#cands + 1] = pick(function() return true end, 1) end  -- Trading (single)
-    end
-    -- FARM: the highest-value, non-harmful lever pitch (DiscardFuel prices $ + scaler feed - harm).
-    local pitch, mode, note, best_v = {}, nil, nil, 0
-    for _, cand in ipairs(cands) do
-      if #cand > 0 then
-        local v, n, harm = DiscardFuel.value(gs, cand)
-        if v > best_v and not harm then pitch, best_v, mode, note = cand, v, "farm", n end
-      end
-    end
-    -- AGGRESSIVE FARM (user 2026-08-28): no farm from the SPARE alone, but with SPARE HANDS to re-clear
-    -- it is correct to break the current winner -- pitch the best-value LEVER cards from the WHOLE hand
-    -- (Faceless faces / Mail's rank / Trading single, incl. the clear's own cards) to hit a trigger NOW,
-    -- then re-make a winner later. STRICTLY gated: >= AGGRO_MIN_HANDS hands AND survive_after (at 2x
-    -- samples) shows the clear stays >= 99% certain -- a bad re-draw here kills the run. Never bleeds
-    -- Ramen/Green Joker. (Widened + hardened after a directionally-negative A/B on the Faceless-only,
-    -- 2-hand, 97% version -- the death channel is exactly the re-clear miss.)
-    if mode == nil and DE.DIG_AGGRESSIVE and want_money_dig and not DiscardFuel.bleeds_scaler(gs)
-       and hands_left >= DE.AGGRO_MIN_HANDS then
-      local whole = {}
-      for _, c in ipairs(hand) do
-        if DiscardValue.keep_value(c, gs) < DE.DIG_MAX_KEEP then whole[#whole + 1] = c end
-      end
-      table.sort(whole, by_keep)
-      local function wpick(pred, cap)
-        local out = {}
-        for _, c in ipairs(whole) do if pred(c) and #out < (cap or 5) then out[#out + 1] = c end end
-        return out
-      end
-      local acands = {}
-      if owns(gs, "j_faceless") then acands[#acands + 1] = wpick(is_face, 5) end
-      if owns(gs, "j_mail") or owns(gs, "j_castle") or owns(gs, "j_yorick") then acands[#acands + 1] = wpick(function() return true end, 5) end
-      if owns(gs, "j_trading") then acands[#acands + 1] = wpick(function() return true end, 1) end
-      -- highest-value non-harmful candidate, then a SINGLE survival check on it
-      local best_aggr, best_v = nil, 0
-      for _, aggr in ipairs(acands) do
-        if #aggr > 0 and #aggr < #hand then
-          local v, _, harm = DiscardFuel.value(gs, aggr)
-          if v > best_v and not harm then best_aggr, best_v = aggr, v end
-        end
-      end
-      if best_aggr then
-        local vs = Simulation.survive_after(gs, { kind = "DISCARD", cards = best_aggr }, DE.AGGRO_SAMPLES, lcg(disc_seed(gs)), false)
-        if vs and vs.frac and vs.frac >= 1 - DE.AGGRO_SURV_TOL then
-          pitch, mode, note = best_aggr, "farm", "aggressive: break the winner to farm — spare hands re-clear"
-        end
-      end
-    end
+  local milk_action = milk_play(P)
 
-    -- SEARCH (Faceless only): no farm yet, but keep faces and pitch chaff to draw TOWARD a 3-face
-    -- trigger. Never when a discard would bleed Ramen/Green Joker.
-    if mode == nil and want_money_dig and owns(gs, "j_faceless") and not DiscardFuel.bleeds_scaler(gs)
-       and deck_has_faces(gs, pareidolia) then
-      local chaff = pick(function(c) return not is_face(c) end, 5)
-      if #chaff > 0 then pitch, mode = chaff, "search" end
-    end
-    -- general free-redraw probe (DE.DIG_SURPLUS), unrelated to jokers
-    if mode == nil and DE.DIG_SURPLUS then
-      for i = 1, math.min(5, #spare) do pitch[i] = spare[i] end
-      mode = "probe"
-    end
-    if #pitch > 0 and mode then
-      local money = (select(1, Heuristics.discard_econ(gs, pitch)))
-      dig_action = {
-        type = "DISCARD", cards = pitch,
-        -- ranked ABOVE the play: while the clear is locked the play banks nothing extra, and a spare
-        -- discard is free. It stops as soon as discards run out.
-        value = (play_action and play_action.value or 0) + 1,
-        surplus_dig = true, farms_money = money > 0, banked_money = money,
-        money_dig = (mode == "farm" or mode == "search"),
-        reason = (mode == "farm") and (money > 0
-            and string.format("Discard %d to farm $%d (%s) — the clear is locked, the cards return to your deck.",
-                  #pitch, money, note or "econ joker")
-            or string.format("Discard %d to work your econ joker (%s) — the clear is locked.", #pitch, note or ""))
-          or (mode == "search") and
-            "Dig toward Faceless: keep your face cards and pitch chaff to build a 3-face discard for $5 (clear is locked)."
-          or string.format(
-            "Dig with a spare discard (%d) — the clear is already locked, so the extra score is wasted.", discards_left),
-      }
-    end
-  end
+  local discard_action = discard_candidate(P)
+  P.dig_action, P.milk_action, P.discard_action = dig_action, milk_action, discard_action
 
-  -- ---- MILK: farm in-blind $ when the clear is already assured (DE.MILK_MONEY) -------
-  -- The clear is GUARANTEED this hand and hands remain -> consider playing a money-MAXIMAL hand
-  -- instead and clearing on a later hand. Only commit when the money-aware survive_after shows the
-  -- clear still lands (frac within tol) AND more $ is farmed. See DE.MILK_MONEY note above.
-  local milk_action = nil
-  if DE.MILK_MONEY and guaranteed and hands_left >= 2 and remaining > 0 and #hand > 0 then
-    -- HELD-money aware (HoldFuel): a play also earns $ from the econ cards it KEEPS BACK (Reserved
-    -- Parking $/held-face, gold $3/held). Crediting E[held $] on the un-played cards is what makes the
-    -- engine play a MINIMAL hand and hold a hand of faces for Parking -- not just play money cards.
-    local hold_on = HoldFuel.has_lever(gs)
-    if not hold_on then for _, c in ipairs(hand) do if c.enhancement == "m_gold" then hold_on = true; break end end end
-    -- The guaranteed clear's SCORING cards (the poker hand itself, not its kickers). These matter twice:
-    -- (1) the milk may only spend cards OUTSIDE them, so the clearing hand survives for a later turn;
-    -- (2) their one-time m_gold round-end value is ILLUSORY for a milk that holds them -- you must play
-    -- them to clear, forfeiting the $3. Both come from the live round-6 bug: a trivially-clearing Flush
-    -- was DEFERRED to "hold" its own gold hearts, and the flush degraded away, nearly dying.
-    local in_clear = {}
-    do
-      local _, scoring_set = HandEval.analyze(play_cards or {})
-      for i, c in ipairs(play_cards or {}) do
-        if (not scoring_set) or scoring_set[i] then in_clear[c] = true end  -- keep scoring cards; kickers are free
-      end
-    end
-    local function milk_money(sel, ev)
-      local m = (ev and ev.money) or 0
-      if hold_on and sel then
-        local played = {}
-        for _, c in ipairs(sel) do played[c] = true end
-        local held = {}
-        for _, c in ipairs(hand) do if not played[c] then held[#held + 1] = c end end
-        m = m + HoldFuel.money(gs, held, in_clear)   -- clear's gold cards don't count as held $ (illusory)
-      end
-      return m
-    end
-    -- max-$ play in this hand: remaining=0 makes every subset tier-0, so best_fuel_play ranks by the
-    -- fuel credit (played $ + held $) then score -> the highest-total-$ legal play (minimal for Parking).
-    local milk_pool = {}
-    for _, c in ipairs(hand) do if not in_clear[c] then milk_pool[#milk_pool + 1] = c end end
-    local mev, mcards
-    if #milk_pool > 0 then mev, mcards = HandEval.best_fuel_play(gs, milk_pool, 0, milk_money, pfilter) end
-    if mev and mcards and not same_cards(mcards, play_cards)
-       and milk_money(mcards, mev) > milk_money(play_cards, play_ev) + 1e-9 then
-      local seed = disc_seed(gs)
-      -- clear line: play the clear now, finish clear-ASAP.  milk line: play the money hand now,
-      -- finish with the MILK policy (defer the clear, cycle more $). CRN (same seed) pairs them.
-      local vc = Simulation.survive_after(gs, { kind = "PLAY", sel = play_cards },
-        DE.SURV_SAMPLES, lcg(seed), false)
-      local vm = Simulation.survive_after(gs, { kind = "PLAY", sel = mcards },
-        DE.SURV_SAMPLES, lcg(seed), true)
-      -- Compare against the MONEY-ORDERED clear, not the raw one: the engine already reorders a
-      -- locked clear for $ (e.g. Gold-seal card first for a Hanging Chad retrigger), and the rollout
-      -- scores in default order -- so credit the clear that reorder before judging the milk. Without
-      -- this the milk "wins" merely by ordering, farming the SAME $ over more hands (loses a banked
-      -- hand for nothing). Real milk still fires: it cycles NEW $ cards from the deck the clear can't.
-      local clear_reorder = (play_action.ordering and play_action.ordering.objective == "money"
-        and (play_action.ordering.money_gain or 0)) or 0
-      -- NET milk gain = extra $ farmed MINUS the round-end reward on the hands milking burns
-      -- (each unused hand pays Mechanics.HAND_REWARD). survive_after reports E[banked hands] so the
-      -- milk only wins when the $ it cycles beats the hand-rewards it forgoes.
-      local hand_cost = ((vc.banked or 0) - (vm.banked or 0)) * Mechanics.HAND_REWARD
-      -- the survival rollout's money is PLAYED-only, so credit the held-money advantage of the milk
-      -- play directly: the extra E[$] its held cards earn THIS hand over the clear's (Parking/gold).
-      local hold_delta = milk_money(mcards, mev) - (mev.money or 0)
-        - (milk_money(play_cards, play_ev) - (play_ev.money or 0))
-      local net_gain = (vm.money or 0) - (vc.money or 0) - clear_reorder - hand_cost + hold_delta
-      if vm.frac >= vc.frac - DE.MILK_SURV_TOL and net_gain > DE.MILK_MONEY_MARGIN then
-        milk_action = {
-          type = "PLAY", cards = mcards, hand_type = mev.hand_type,
-          score = mev.score, approx = mev.approx,
-          -- ranked just above the straight clear: while the clear is locked the extra score is
-          -- overkill, and this farms real $. It only exists when the survival gate passed.
-          value = (play_action and play_action.value or 0) + 1,
-          play_econ = HandEval.play_econ(gs, mev, mcards),
-          ordering = Ordering.optimize(gs, mcards, { objective = "money", remaining = remaining }),
-          milk = true,
-          reason = string.format(
-            "Milk the blind: play the %s to farm ~+$%.0f — the clear is locked for a later hand.",
-            mev.hand_type, net_gain),
-        }
-      end
-    end
-  end
-
-  -- Allow a dig even on the LAST hand (hands_left==1): with discards still in hand you
-  -- can improve the single hand you're about to play. This is the Needle boss (1 hand,
-  -- discards intact) and any last hand with discards left -- the engine used to refuse
-  -- to dig there. Selection below only PREFERS the dig when it turns a loss into a
-  -- plausible clear, so a hopeless dig against an unreachable target still just plays.
-  if discards_left > 0 and not clears then
-    local cands = {}
-    -- Heuristic shape-draw (flush/straight/set) + money discard. We feed its
-    -- discard SET into the measured search below so a suit-blind keep-value
-    -- ordering can't miss "discard the high offsuit to complete the flush"; the
-    -- heuristic's own (optimistic) estimate is only used as a fallback when there's
-    -- no deck to measure, or for the MONEY discard a score-based measure can't value.
-    local d = Heuristics.best_discard(gs_eval)
-    -- Measured, joker-aware discard. Valued on gs_eval so the expected post-redraw
-    -- hand includes any held-planet level-up. Includes the heuristic's set as a
-    -- candidate so the realistic, joker-aware measurement is the decider.
-    local md = DiscardValue.best(gs_eval,
-      { samples = 10, rng = rng, filter = pfilter,   -- Mouth/Eye: dig toward the LEGAL (locked) type
-        extra_discards = (d and d.cards and #d.cards > 0) and { d.cards } or nil })
-    if md and #md.cards > 0 then
-      -- CREDIT the money the pitched cards EARN (Faceless $5/3-faces, Mail/Trading), on the SAME frac
-      -- scale as md.value. The measured discard scores the REDRAW only, so a hand-improving discard that
-      -- ALSO dumps 3 faces was under-valued by $5 and Faceless under-fired (owner: "had Faceless but
-      -- didn't dig/use it"). Now a discard that improves the hand AND triggers an econ joker is valued
-      -- for both -- without proposing a face-dump that hurts the build (md's score already prices that).
-      local mmoney = select(1, Heuristics.discard_econ(gs, md.cards)) or 0
-      cands[#cands + 1] = { cards = md.cards, value = md.value + mmoney * Heuristics.DOLLAR_VALUE,
-        measured = true, farms_money = mmoney > 0, banked_money = mmoney,
-        reason = string.format("Discard %d (keep your strong cards) to build a stronger hand (~%d expected)%s.",
-          #md.cards, math.floor(md.value), mmoney > 0 and string.format(" + $%d", mmoney) or "") }
-      -- keep the heuristic ONLY for the money discard the score-based measure can't
-      -- value (Faceless/Mail-In dump cards for $).
-      if d and #d.cards > 0 and d.target == "economy" then
-        cands[#cands + 1] = { cards = d.cards, value = d.expected, target = d.target, reason = d.reason }
-      end
-    elseif d and #d.cards > 0 then
-      -- no deck to measure against -> fall back to the heuristic estimate
-      cands[#cands + 1] = { cards = d.cards, value = d.expected, target = d.target, reason = d.reason }
-    end
-    local pick
-    for _, c in ipairs(cands) do if not pick or c.value > pick.value then pick = c end end
-    if pick then
-      discard_action = { type = "DISCARD", cards = pick.cards, target = pick.target,
-        score = pick.value, value = pick.value, measured = pick.measured, reason = pick.reason }
-      -- if a held planet levels the hand this discard builds toward, say to use it
-      local th = TARGET_HAND[pick.target]
-      for _, p in ipairs(held) do
-        if p.hand == th then
-          discard_action.use_planet = p.name
-          discard_action.reason = discard_action.reason
-            .. string.format(" (use %s first to level %s)", p.name, th)
-          break
-        end
-      end
-    end
-  end
-
-  -- Trading Card: a single-card destroy+$3 on the first discard. Prefer it when it
-  -- beats the generic (multi-card) discard -- otherwise it's never even considered.
-  if discards_left > 0 and not clears then
-    local dig_value = discard_action and discard_action.value or nil
-    local trade = trading_card_discard(gs_eval, play_ev, rng, dig_value)
-    if trade and (not discard_action or trade.value > discard_action.value) then
-      discard_action = trade
-    end
-  end
-
-  -- Delayed Gratification pays $2 per discard at round end IF you use NONE, so
-  -- the FIRST discard forfeits the whole bonus. Charge the discard for it (only
-  -- while you haven't discarded yet); the value comparison below then keeps a
-  -- marginal discard from costing you the money when you can clear without it.
-  if discard_action then
-    local base_d = (b.base_discards and b.base_discards > 0) and b.base_discards or discards_left
-    local used = math.max(0, base_d - discards_left)
-    local has_dg = false
-    for _, jk in ipairs(gs.jokers or {}) do if jk.key == "j_delayed_grat" then has_dg = true break end end
-    if has_dg and used == 0 and base_d > 0 then
-      local forfeit = 2 * base_d
-      discard_action.value = discard_action.value - forfeit * Heuristics.DOLLAR_VALUE
-      discard_action.forfeit = forfeit
-      discard_action.reason = (discard_action.reason or "")
-        .. string.format(" (costs $%d of Delayed Gratification)", forfeit)
-    end
-  end
-
-  -- HOLD-CONDITIONAL PLAY TIMING (2026-08-31, owner: with Mystic Summit "use all its discards before
-  -- playing"). Mystic Summit gives +15 mult ONLY at 0 discards, so a SCORING play lands FAR bigger once
-  -- the discards are spent (a Flush's mult ~quintuples). While we still hold discards and the play does
-  -- NOT clear, playing an accumulate hand NOW forfeits that uplift. Re-score the best play as if at 0
-  -- discards -- the real scorer arms Mystic / any 0-discard effect -- and credit the positive delta to
-  -- DIGGING (spend the discards out first, then play at 0 discards). Fully GENERAL, no joker hardcoded:
-  --  * an ordinary board's score is discard-independent  -> delta 0, no behaviour change;
-  --  * Banner (+30 chips per discard REMAINING) scores LESS at 0 discards -> delta <= 0, so it is NOT
-  --    deferred -- correctly, since Banner wants to play WITH discards in hand. The owner's "what if you
-  --    hold both?" is thus resolved by the NET score delta, not a special case.
-  local defer_uplift = 0
-  if discards_left > 0 and not clears and discard_action then
-    local gs0 = {}
-    for k, v in pairs(gs) do gs0[k] = v end
-    gs0.blind = {}
-    for k, v in pairs(b) do gs0.blind[k] = v end
-    gs0.blind.discards_left = 0
-    local ev0 = HandEval.best_play_target(gs0, hand, remaining, boss_filter(gs0))
-    if ev0 and ev0.score > play_ev.score then defer_uplift = ev0.score - play_ev.score end
-  end
+  P.defer_uplift = hold_play_uplift(P)   -- what digging first adds to the play (Mystic Summit)
 
   -- ---- choose + rank ----
   local candidates = { play_action }
@@ -1151,252 +1448,9 @@ function DE.decide(gs, opts)
   if dig_action then candidates[#candidates + 1] = dig_action end
   if milk_action then candidates[#candidates + 1] = milk_action end
 
-  -- Selection rule (DESIGN.md Phase 4) + hand economy:
-  --   clears OR last hand -> PLAY
-  --   else compare discard vs play. A non-clearing PLAY *burns a hand* ($1 of
-  --   end-of-round reward, since unused hands pay $1 each), while a DISCARD
-  --   preserves hands -> credit the discard with that saved hand. This makes
-  --   "discard to set up one clean clearing hand" beat "chip away over several
-  --   hands", which also keeps more money.
-  local HAND_ECON = Mechanics.HAND_REWARD * Heuristics.DOLLAR_VALUE
-  local function greedy_choice()
-    -- + defer_uplift: digging out the discards preserves the option to play at 0 discards, where a
-    -- held Mystic Summit (etc.) makes the scoring play far bigger. 0 for an ordinary board.
-    if discard_action and (discard_action.value + HAND_ECON + defer_uplift) > play_action.value then
-      return discard_action
-    end
-    return play_action
-  end
+  local best = arbitrate(P)
 
-  local best
-  if clears then
-    -- The clear is in hand. Baseline plays immediately and forfeits every remaining
-    -- discard; with DE.DIG_SURPLUS on we first spend the surplus on a free redraw
-    -- (the dig keeps the guaranteed play's cards, so the clear cannot be lost); with
-    -- DE.MILK_MONEY on we instead play a money-maximal hand now and clear later, but only
-    -- when its survival gate passed (milk_action is nil otherwise).
-    -- An active money-dig wins outright: a spare DISCARD costs no hand-reward and keeps the clear in
-    -- hand, so working Faceless (farm 3 faces now, or search toward them) strictly dominates milking a
-    -- HAND. It chains down through the discards (fires again next decision); once discards run out,
-    -- milk uses the spare HANDS, then the clear plays. (Free discards before hands.)
-    if dig_action and dig_action.money_dig then
-      best = dig_action
-    else
-      best = milk_action or dig_action or play_action
-    end
-    -- Burnt Joker: the round's FIRST discard is a free level for its poker hand -- take it before playing
-    -- the clear (or before the money dig, which the next decision resumes).
-    -- SIXTH SENSE (2026-09-25): the round's first discard, if it is a SINGLE 8, destroys it and makes a Spectral
-    -- (sim/world discard_effects; the card is destroyed even with no room, so only with a free consumable slot).
-    -- With the clear in hand that discard is free -- pitch a spare 8 (never one of the clearing cards) first.
-    -- It takes precedence over a Burnt discard (a lone 8 still levels High Card for Burnt).
-    local sixth_done = false
-    if owns(gs, "j_sixth_sense") and discards_left > 0 and first_discard(gs)
-       and ((gs.run and gs.run.consumable_slots) or 2) > #(gs.consumables or {})
-       and not owns(gs, "j_delayed_grat") and not DiscardFuel.bleeds_scaler(gs) then
-      local in_play = {}
-      for _, c in ipairs(play_cards or {}) do in_play[c] = true end
-      local eight, eight_v
-      for _, c in ipairs(hand) do
-        if not in_play[c] and Cards.rank_id(c) == 8 then
-          local v = DiscardValue.keep_value(c, gs)
-          if not eight or v < eight_v then eight, eight_v = c, v end
-        end
-      end
-      if eight then
-        best = { type = "DISCARD", cards = { eight }, sixth_sense = true, value = (play_action.value or 0) + 2,
-          reason = "Discard the spare 8 alone first — Sixth Sense turns it into a Spectral card; the clear stays in hand." }
-        sixth_done = true
-      end
-    end
-    -- Not when a discard costs something: Delayed Gratification pays $2/discard only if NONE is used, and
-    -- Green Joker / Ramen lose value per discard (DiscardFuel.bleeds_scaler).
-    if not sixth_done and owns(gs, "j_burnt") and discards_left > 0 and #hand > 0 and first_discard(gs)
-       and not owns(gs, "j_delayed_grat") and not DiscardFuel.bleeds_scaler(gs) then
-      local ba = burnt_discard(gs, hand, play_cards, hands_left, remaining)
-      if ba then ba.value = (play_action.value or 0) + 2; best = ba end
-    end
-  elseif forced_play then
-    -- last hand with discards left: E-6 (the corrected F3). The old mean-rule dug only
-    -- when the expected dug hand ALSO beat the target in expectation -- refusing digs
-    -- that are the only chance to live (mean below target but P(clear) real). Arbitrate
-    -- by the SAME boss-aware survive_after E[frac] the F1/F2 mid-blind branch uses: it
-    -- credits the partial score a failed dig sacrifices (the exact F3 failure mode the
-    -- mean-rule guarded against), under CRN, and only overrides toward the dig on a
-    -- clear margin -- otherwise play the sure points.
-    best = play_action
-    -- Mouth off-type play scores 0 even on the last hand -- but discards don't consume the hand, so
-    -- digging for the locked type (3 tries here) can only help: worst case you still play a 0-scorer.
-    if play_scores_zero and discard_action and discard_action.cards and #discard_action.cards > 0 then
-      best = discard_action; best.plan = true
-    elseif discard_action and remaining > 0 and play_action.score < remaining
-       and discard_action.cards and #discard_action.cards > 0
-       and play_action.cards and #play_action.cards > 0 then
-      local seed = disc_seed(gs)
-      local vp = Simulation.survive_after(gs, { kind = "PLAY", sel = play_action.cards },
-        DE.SURV_SAMPLES, lcg(seed))
-      local vd = Simulation.survive_after(gs, { kind = "DISCARD", cards = discard_action.cards },
-        DE.SURV_SAMPLES, lcg(seed))
-      -- (2026-10-10 audit, see DE.LAST_CLEAR): on the LAST hand a failed blind ends the run, so partial credit is
-      -- worth nothing -- arbitrate by P(clear). E[frac] is capped at 1 and the sure play's frac sits near it on a
-      -- near miss, so the 0.06 frac margin refused digs with P(clear) 0.995 vs 0 (sim 102003 a4 Needle: played a
-      -- 4738/5000 High Card with 4 discards unused) and 0.225 vs 0 (117003 a6 Needle). frac stays the tie-break.
-      if DE.LAST_CLEAR then
-        if vd.clear > vp.clear + DE.LAST_CLEAR_MARGIN
-           or (vd.clear >= vp.clear and vd.frac > vp.frac + DE.SURV_MARGIN) then
-          best = discard_action; best.plan = true
-        end
-      elseif vd.frac > vp.frac + DE.SURV_MARGIN then
-        best = discard_action; best.plan = true
-      end
-    end
-  else
-    best = greedy_choice()
-    -- SEQUENCE-AWARE refinement (F1/F2): arbitrate PLAY-now vs DISCARD-now by EXPECTED
-    -- SURVIVAL, using the BOSS-AWARE simulation rollout instead of the mean-of-one-hand
-    -- heuristic (greedy_choice) or the boss-blind depth-2 search. `survive_after` forces
-    -- each candidate opening move then finishes with the greedy policy, returning
-    -- E[frac] = P(clear) + partial-score credit (so a high-variance dig that usually
-    -- falls short is not over-valued -- the F3 lesson). Common random numbers (same
-    -- seed) make the paired delta low-variance; it only OVERRIDES on a clear margin, so
-    -- the rich heuristics stand otherwise. Gated to multi-hand, no-held-consumable states
-    -- (those have their own logic) to stay cheap and non-conflicting.
-    -- E-5 (replay-screened 2026-07-13): the old `#consumables == 0` gate switched the
-    -- proven arbitration OFF in the ~65% of states holding a consumable. The E-9 harness
-    -- verdict on 161 held-consumable fixtures: mean regret 0.0196 -> 0.0075 (-62%),
-    -- oracle-match 67.9% -> 77.1%, E[frac] +0.010 -- strictly better decisions (the old
-    -- batch revert was cascade redistribution on the pre-E-11 world, not bad choices).
-    -- Held consumables don't enter the rollout; use_action promotion runs independently.
-    local can_search = discards_left > 0 and hands_left >= 2
-    if can_search and discard_action and play_action.cards and #play_action.cards > 0 then
-      local seed = disc_seed(gs)
-      local vp = Simulation.survive_after(gs, { kind = "PLAY", sel = play_action.cards },
-        DE.SURV_SAMPLES, lcg(seed))
-      local vd = Simulation.survive_after(gs, { kind = "DISCARD", cards = discard_action.cards },
-        DE.SURV_SAMPLES, lcg(seed))
-      -- DIG_BIAS credits the discard branch to offset the rollout's under-digging greedy continuation
-      -- (see DE.DIG_BIAS) -- easier to switch TO a set-up discard, harder to switch away from one.
-      local vdf = vd.frac + DE.DIG_BIAS
-      if vdf > vp.frac + DE.SURV_MARGIN and best.type ~= "DISCARD" then
-        best = discard_action; best.plan = true        -- survival: discard to set up
-      elseif DE.PACE_PLAY and best.type == "DISCARD" and not best.plan and not best.trade and not best.sixth_sense
-             and defer_uplift <= 0 and (play_action.score or 0) * hands_left >= remaining
-             and vp.clear >= vd.clear - DE.PACE_TIE and vp.frac >= vd.frac - DE.PACE_TIE then
-        best = play_action                              -- pace: bank an on-pace hand, keep the discards
-      elseif vp.frac > vdf + DE.SURV_MARGIN and best.type == "DISCARD" and not best.trade
-             and (defer_uplift <= 0 or vp.frac > vd.frac + DE.DEFER_SURV_TOL) then
-        best = play_action                              -- survival: just play now (but keep a Mystic
-                                                        -- dig unless play is MUCH safer -- rollout is
-                                                        -- blind to the 0-discard uplift)
-        -- (the Trading Card trade is exempt: the rollout can't see its $3 + thinning)
-      end
-    end
-
-    -- MOUTH: LOCK NOW OR DIG (2026-09-30). Before the lock every discard is also one fewer to remake the locked
-    -- type afterwards; sim 35003 locking Three of a Kind at 4 discards cleared 75%, but four digs later (a Trading
-    -- Card trade first, exempt from the rollout above) it locked at ~50%. The arbitration above ranks by E[frac]
-    -- with a margin; here, before the lock, dig only if the dig CLEARS more often than the chosen lock (the lock
-    -- choice's own P(clear), same CRN seed).
-    if mouth_lock and best.type == "DISCARD" and best.cards and #best.cards > 0
-       and play_action.cards and same_cards(play_action.cards, mouth_lock.cards) then
-      local vd = Simulation.survive_after(gs, { kind = "DISCARD", cards = best.cards }, DE.SURV_SAMPLES, lcg(disc_seed(gs)))
-      if mouth_lock.clear >= vd.clear and mouth_lock.clear > 0 then
-        best = play_action; best.plan = true
-        best.lock_note = string.format("The Mouth: lock %s now (clears ~%d%%) -- digging first clears ~%d%% and spends a discard the lock needs.",
-          play_action.hand_type, math.floor(mouth_lock.clear * 100 + 0.5), math.floor(vd.clear * 100 + 0.5))
-      end
-    end
-
-    -- DIG-PLAY when OUT OF DISCARDS (owner 2026-08-31). With no discards, hands to spare, and no clear,
-    -- the best-SCORING play spends your build cards on a hand that doesn't clear -- often worse than
-    -- PLAYING YOUR CHAFF to cycle (a play removes+redraws its cards just like a discard) while KEEPING
-    -- your build cards for a real hand ("play a 2-pair of 7s/4s and don't even play the spare face in a
-    -- face build" was the exact complaint). DiscardValue.best is joker-aware (it measures the redraw
-    -- through the full pipeline), so its "discard set" is the chaff that keeps build-relevant cards.
-    -- Arbitrate by E[frac] over the remaining hands, same rollout as the discard branch; only overrides
-    -- on a clear margin, so a play that IS near enough still just plays.
-    if not can_search and discards_left == 0 and hands_left >= 2 and best.type == "PLAY"
-       and not play_action.cycle_play   -- already the LEGAL-type dig (the unfiltered one below is not)
-       and play_action.cards and #play_action.cards > 0 then
-      local md = DiscardValue.best(gs_eval, { samples = 10, rng = rng })
-      if md and md.cards and #md.cards > 0 and not same_cards(md.cards, play_action.cards) then
-        local seed = disc_seed(gs)
-        local vp = Simulation.survive_after(gs, { kind = "PLAY", sel = play_action.cards },
-          DE.SURV_SAMPLES, lcg(seed))
-        local vdig = Simulation.survive_after(gs, { kind = "PLAY", sel = md.cards },
-          DE.SURV_SAMPLES, lcg(seed))
-        if vdig.frac > vp.frac + DE.SURV_MARGIN then
-          local dev = HandEval.score(gs, md.cards)
-          best = { type = "PLAY", cards = md.cards, dig_play = true, plan = true,
-            hand_type = (dev and dev.hand_type) or "High Card",
-            score = (dev and dev.score) or 0, value = play_action.value,
-            reason = string.format(
-              "No discards left and this hand can't clear — play your chaff (%d) to cycle for a better hand, keeping your build cards.",
-              #md.cards) }
-        end
-      end
-    end
-  end
-
-  -- ---- FARM: milk the board's money jokers before clearing (engine/farm.lua) ----
-  if Flags.global("BES_FARM_DEBUG") then io.stderr:write(string.format("FARMCHK best %s cards %d forced %s hl %d rem %d zero %s md %s milk %s lever %s\n",
-    tostring(best and best.type), best and best.cards and #best.cards or -1, tostring(forced_play), hands_left, remaining,
-    tostring(play_scores_zero), tostring(best and best.money_dig), tostring(best and best.milk), tostring(Farm.has_lever(gs)))) end
-  if DE.FARM and best and (best.type == "PLAY" or best.type == "DISCARD") and best.cards and #best.cards > 0
-     and not forced_play and hands_left >= 2 and remaining > 0 and not play_scores_zero
-     and not best.money_dig and not best.milk and Farm.has_lever(gs) then
-    local prot = {}
-    for _, c in ipairs(play_cards or {}) do prot[c] = true end
-    local seed = disc_seed(gs)
-    local first_n = (best.type == "DISCARD") and { kind = "DISCARD", cards = best.cards } or { kind = "PLAY", sel = best.cards }
-    local vn
-    local pick
-    for _, r in ipairs(DE.FARM_RESERVES) do
-      local st = Farm.step(gs, hand, remaining, hands_left, discards_left, r, pfilter, prot)
-      if st and not (pick and same_cards(pick.st.cards or pick.st.sel, st.cards or st.sel)) then
-        vn = vn or Simulation.survive_after(gs, first_n, DE.FARM_SAMPLES, lcg(seed), false)
-        local fa = (st.kind == "DISCARD") and { kind = "DISCARD", cards = st.cards } or { kind = "PLAY", sel = st.sel }
-        local vf = Simulation.survive_after(gs, fa, DE.FARM_SAMPLES, lcg(seed), { farm = true, reserve = r })
-        local net = (vf.money or 0) - (vn.money or 0) - ((vn.banked or 0) - (vf.banked or 0)) * Mechanics.HAND_REWARD
-        if Flags.global("BES_FARM_DEBUG") then io.stderr:write(string.format("FARM r%d %s vf.clear %.2f vn.clear %.2f vf$ %.1f vn$ %.1f banked %.1f/%.1f net %.1f hl %d dl %d rem %d\n",
-          r, st.kind, vf.clear, vn.clear, vf.money or 0, vn.money or 0, vf.banked or 0, vn.banked or 0, net, hands_left, discards_left, remaining)) end
-        if vf.clear >= vn.clear - DE.FARM_TOL and net > DE.FARM_MARGIN and (not pick or net > pick.net) then
-          pick = { st = st, vf = vf, vn = vn, net = net, r = r }
-        end
-      end
-    end
-    if pick then
-      local st = pick.st
-      local why = string.format("Farm your money joker%s: ~$%.0f more this blind, still clears ~%d%% (vs ~%d%%); keep %d hand%s to clear.",
-        (st.kind == "DISCARD") and string.format(" (discard for $%d)", st.money or 0) or " (play a non-clearing hand to cycle cards)",
-        pick.net, math.floor(pick.vf.clear * 100 + 0.5), math.floor(pick.vn.clear * 100 + 0.5), pick.r, pick.r == 1 and "" or "s")
-      candidates[#candidates + 1] = best
-      if st.kind == "DISCARD" then
-        best = { type = "DISCARD", cards = st.cards, value = (best.value or 0) + 1, farm = true, plan = true,
-                 farms_money = (st.money or 0) > 0, banked_money = st.money, reason = why }
-      else
-        best = { type = "PLAY", cards = st.sel, hand_type = st.ev.hand_type, score = st.ev.score,
-                 value = (best.value or 0) + 1, farm = true, plan = true,
-                 play_econ = HandEval.play_econ(gs, st.ev, st.sel), reason = why }
-        -- REPOINT (BES_REPOINT=1): a farm hand is played for money, so order the jokers / cards for MONEY (a copier on
-        -- Golden Ticket); the clearing hand's own score reorder points it back.
-        -- narrowed after rp_7 (2026-10-21: a money reorder on EVERY farm hand changed 96/160 seeds, wins 64 -> 62 n.s.,
-        -- in-blind \$ no higher): only the owner's case -- a copier that can point at a per-card money joker
-        local copier, payer = false, false
-        for _, j in ipairs(gs.jokers or {}) do
-          if j.key == "j_blueprint" or j.key == "j_brainstorm" then copier = true end
-          if j.key == "j_ticket" or j.key == "j_rough_gem" or j.key == "j_business" then payer = true end
-        end
-        if require("engine.joker_effects").REPOINT and copier and payer then
-          local o = Ordering.optimize(gs, st.sel, { objective = "money", remaining = 0 })
-          if o and o.improves and (o.money_gain or 0) > 1e-9 then
-            best.reorder = o
-            best.reason = best.reason .. string.format("  Reorder for +$%g on this hand.", o.money_gain)
-          end
-        end
-      end
-    end
-  end
+  best = farm_choice(P, best, candidates)
 
   -- order alternatives by comparable value, excluding the chosen one
   local alternatives = {}
@@ -1509,8 +1563,7 @@ function DE.free_slot_for_purple(gs, best)
   return nil
 end
 
-local decide_core = DE.decide
-function DE.decide(gs, opts)
+local function decide_guarded(gs, opts)
   local r = decide_core(gs, opts)
   local leaf = r and DE.leaf_sell(gs)
   if leaf then
@@ -1669,10 +1722,13 @@ function DE.summary(ranked)
     math.floor((a.expected_value or 0) * 100 + 0.5), a.reason or "")
 end
 
--- PERKEO SEED (engine/perkeo.lua, BES_PERKEO=1): the held copy target is never spent in a blind
-local decide_seeded = DE.decide
+-- decide(gs, opts) -> RankedActionList
+-- opts.sim (optional SimulationResult) refines confidence with real survival
+-- odds and attaches probabilities for the overlay. Omitting opts keeps the
+-- pure M2 behaviour (used by the headless tests).
+-- PERKEO SEED (engine/perkeo.lua, BES_PERKEO=1): the held copy target is never spent in a blind.
 function DE.decide(gs, opts)
-  return require("engine.perkeo").with_seed_hidden(gs, decide_seeded, opts)
+  return require("engine.perkeo").with_seed_hidden(gs, decide_guarded, opts)
 end
 
 return DE
