@@ -193,6 +193,268 @@ local function weakest_owned_joker(gs, mopts)
   return b.i, b.name, b.bar
 end
 
+-- ---- the stages of PO.recommend ----------------------------------------------
+
+-- CARD-MAKING TAROTS NEED A FREE CONSUMABLE SLOT TO BE USED AT ALL (the game's can_use: Emperor / High Priestess /
+-- Fool opened from a pack, with the tray full, have no use button -- live KGJ9UMQH lost a Fool pick this way). Room
+-- can be made by USING a held planet first (always usable), which the self-player can do; otherwise the pick is
+-- unusable and worth nothing.
+local function tray_room_first(gs, valued, free_cslots, held_cons)
+  local use_first
+  if free_cslots <= 0 then
+    for _, c in ipairs(held_cons) do
+      if (c.set == "Planet" or c.key == "c_black_hole") and not use_first then use_first = c end
+    end
+    -- ...or a held TAROT that is worth using right now (owner 2026-10-05: "emperor shouldn't be priced at 0 if
+    -- consumables are full, it should consider using or selling them to make room"): a money tarot (Hermit /
+    -- Temperance) or the Devil (Gold on a spare card, Tarot.money_enh_dollars). Selling a consumable is not an
+    -- action the self-player has yet.
+    if not use_first then
+      for _, c in ipairs(held_cons) do
+        if not use_first and (c.key == "c_hermit" or c.key == "c_temperance"
+            or (gs.hand and #gs.hand > 0 and Tarot.money_enh_dollars(gs, c.key) > 0)) then
+          use_first = c
+        end
+      end
+    end
+    if not use_first then
+      for _, e in ipairs(valued) do
+        if GEN[e.key] and GEN[e.key].out == "consumable" then e.v = 0 end
+      end
+    end
+  end
+  return use_first
+end
+
+-- JOKER-MAKING CARDS ON A FULL BOARD (Judgement / Wraith / The Soul): the game gives them NO use button until a
+-- joker slot is free (live NPB9HYPN ante 7: Judgement picked on a 5/5 board, the pick failed three times and the
+-- self-player skipped the whole Mega Arcana). Room means SELLING a joker, so the measured pass judges them like a
+-- joker pick on a full board: the created joker's measured value must clear the same swap bar (weakest owned joker
+-- + the shop's hysteresis) and the survival check. Then it is worth its full value, with the sell as its own first
+-- step (below); otherwise it can't be used and is worth nothing. (The cheap pass keeps the room_credit prior --
+-- it is provisional and never executed.)
+local function joker_maker_swap(gs, valued, mopts, cheap, free_jslots)
+  local gen_swap
+  if not cheap and free_jslots <= 0 then
+    local wi, wname, wfv, sv
+    for _, e in ipairs(valued) do
+      local meta = GEN[e.key]
+      if meta and meta.out == "joker" then
+        if wi == nil and wfv == nil then
+          wi, wname, wfv = weakest_owned_joker(gs, mopts)
+          wfv = wfv or math.huge
+          sv = JokerWorth.sell_survival(gs)
+        end
+        local fv = VU.frac_to_fv(math.max(0, e.raw or 0))
+        local safe = not (sv and wi and sv.unsafe(wi, math.max(0, e.raw or 0)))
+        if wi and fv > wfv and safe then
+          e.v = e.raw
+          if not gen_swap or e.v > gen_swap.v then gen_swap = { v = e.v, e = e, wi = wi, wname = wname } end
+        else
+          e.v = 0
+        end
+      end
+    end
+  end
+  return gen_swap
+end
+
+-- order the chosen picks for use. The Fool copies the last Tarot/Planet used,
+-- so we place it right after the most valuable card it can copy (and value it
+-- as a copy of that). Everything else orders by ORDER_PRIO.
+local function order_with_fool(gs, picks, cheap, rng, need, gen_factor)
+  local fool, others = nil, {}
+  for _, pk in ipairs(picks) do
+    if pk.key == "c_fool" then fool = pk else others[#others + 1] = pk end
+  end
+  table.sort(others, function(a, b2)
+    local pa, pb = order_prio(a.key), order_prio(b2.key)
+    if pa ~= pb then return pa < pb end
+    return a.v > b2.v
+  end)
+  if fool and cheap then
+    -- cheap pass: skip the copy-target MEASUREMENT, but still check one exists -- a Fool with
+    -- nothing to copy is a no-op and must not keep its prior (reported from live run 8).
+    local any = ConsumableValue.fool_target(gs) ~= nil
+    if not any then
+      for _, pk in ipairs(others) do
+        if pk.it and (pk.it.set == "Tarot" or pk.it.set == "Planet") then any = true; break end
+      end
+    end
+    if not any then fool.v = 0; fool.copies = nil end
+    table.insert(others, fool)
+  elseif fool then
+    -- value of any tarot/planet The Fool could copy
+    local function copyable_value(set, key)
+      if not key then return 0 end
+      set = set or (ConsumableValue.PLANET_KEY_HAND[key] and "Planet" or "Tarot")
+      local f, fctx
+      if set == "Planet" then f, fctx = ConsumableValue.hand_frequencies(gs, { samples = 8, rng = rng }) end
+      local vfrac, gain = ConsumableValue.card_value(gs, set, key, f, need, rng, nil, fctx)
+      if set == "Planet" then
+        vfrac = (vfrac or 0) + BuildPlan.planet_credit(gs, ConsumableValue.PLANET_KEY_HAND[key])
+      end
+      return (vfrac or 0) + VU.income_frac(gs, gain or 0)
+    end
+    -- candidate copy targets: best in-pack tarot/planet (use it then Fool); your
+    -- last-used tarot/planet (Fool first copies it); held tarot/planet in a slot.
+    local cands = {}
+    local bi, bv
+    for i, pk in ipairs(others) do
+      if (pk.it.set == "Tarot" or pk.it.set == "Planet") and (not bv or pk.v > bv) then bv, bi = pk.v, i end
+    end
+    if bi then cands[#cands + 1] = { v = bv, mode = "pack", idx = bi, name = others[bi].name } end
+    if gs.last_tarot_planet and gs.last_tarot_planet.key then
+      cands[#cands + 1] = { v = copyable_value(nil, gs.last_tarot_planet.key), mode = "prev",
+        name = gs.last_tarot_planet.name or gs.last_tarot_planet.key }
+    end
+    for _, h in ipairs(gs.consumables or {}) do
+      if h.set == "Tarot" or h.set == "Planet" then
+        cands[#cands + 1] = { v = copyable_value(h.set, h.key), mode = "held", name = h.name or h.key }
+      end
+    end
+    local bestt
+    for _, c in ipairs(cands) do if not bestt or c.v > bestt.v then bestt = c end end
+    if bestt then
+      -- the Fool copies a card into a consumable slot, so its value is slot-gated too
+      fool.v = bestt.v * gen_factor("c_fool"); fool.copies = bestt.name; fool.copy_mode = bestt.mode
+      if bestt.mode == "pack" then
+        table.insert(others, bestt.idx + 1, fool)  -- use the in-pack card, then Fool
+      else
+        table.insert(others, 1, fool)              -- copies a prior/held card -> Fool first
+      end
+    else
+      -- nothing in the pack, nothing used, nothing held -> The Fool copies NOTHING
+      fool.v = 0; fool.copies = nil
+      table.insert(others, fool)
+    end
+  end
+  return fool, others
+end
+
+-- Joker slots full: you CAN'T take a joker pick without first selling one (the game blocks it). Three
+-- outcomes, and we NEVER leave "Take <joker>" standing on a full board (the actuator can't execute it
+-- and take-to-immediately-sell isn't worth a slot):
+--   (a) a worthwhile SWAP exists -> the SELL becomes the primary action ("Sell X to make room for Y");
+--   (b) no swap, but a non-joker pick FITS (a Tarot/Planet used on the spot) -> take THAT instead;
+--   (c) nothing fits -> SKIP, and say plainly why.
+-- The pack joker and owned jokers are valued in the SAME FV currency (econ + downside included).
+local function full_board_pick(gs, valued, mopts, ordered, reason)
+  local sell = nil
+  local skip_full = false
+  local jcap = (gs.run and gs.run.joker_slots) or 5
+  if #(gs.jokers or {}) >= jcap then
+    -- best pack joker by FV (what you'd actually slot), not just use-order first.
+    -- R12: over EVERY joker in the pack (`valued`), not just the chosen picks -- the pick ranking and this
+    -- swap measure differently (a scaler keeps its tier floor in the ranking), so the ranking's top joker
+    -- (Lucky Cat, 0.58 FV here) could fail the bar while another (Half Joker, 2.58) clears it (Y1U5TZWJ a4).
+    local jpick, jpick_fv
+    local picks = {}
+    for _, pk in ipairs(valued) do
+      if pk.it.set == "Joker" and pk.it.joker then
+        local fv = JokerWorth.of(gs, pk.it.joker, "add", mopts)
+        picks[#picks + 1] = { pk = pk, fv = fv }
+        if not jpick or fv > jpick_fv then jpick, jpick_fv = pk, fv end
+      end
+    end
+    local bars = owned_sell_bars(gs, mopts)
+    local wi, wname, wfv
+    if bars[1] then wi, wname, wfv = bars[1].i, bars[1].name, bars[1].bar end
+    -- THE TRADE IS A PAIR (2026-10-02, live Z9ZPREGI a5): the pick was priced on the board that still holds the
+    -- joker sold for it, and the sale chosen apart from it -- so Raised Fist was sold to take a Mime whose whole
+    -- gain came from retriggering Raised Fist (the board measured -19%). A (pick, sale) pair where the pick leans
+    -- on the sold joker (Eval.trade_leans_on) is not a trade. The sale is still the cheapest bar a pick clears --
+    -- the weakest joker unless every pick leans on it, then the next. The cheap pass has no measurement and keeps
+    -- the additive pair.  survival-first (JokerWorth.sell_survival): the swap must not leave a board materially
+    -- less likely to clear the boss -- judged on the board AFTER it (the pick's measured gain added back).
+    -- Skipped on the cheap pass (no measurement).
+    local measured = not (mopts and mopts.measure == false)
+    local sv = measured and JokerWorth.sell_survival(gs) or nil
+    local trade
+    for _, b in ipairs(bars) do
+      for _, p in ipairs(picks) do
+        if p.fv > b.bar then
+          local fv = p.fv
+          local leans = measured and Eval.trade_leans_on(gs, b.i, p.pk.it.joker, mopts)
+          local safe = not (sv and sv.unsafe(b.i, VU.fv_to_frac(math.max(0, fv))))
+          if not leans and safe and (not trade or fv - b.bar > trade.up) then
+            trade = { up = fv - b.bar, pk = p.pk, fv = fv, i = b.i, name = b.name, bar = b.bar,
+                      weakest = (b == bars[1]) }
+          end
+        end
+      end
+      if trade then break end
+    end
+    -- PAIRED TRADE (2026-10-03, live NUJ9ENYU a3, owner-confirmed flag 3): every flat common reads the same tier
+    -- floor, so a Buffoon pick (Crafty 0.54, Delayed Gratification 0.54) never cleared the bar against a board of
+    -- redundant flat Mult and the pack was skipped. When the FV test finds no trade, measure each (plain owned ->
+    -- plain or money-only pick) trade on shared hands, as the shop does (JokerWorth.trade_out_plain / trade_in_plain).
+    if not trade and measured then
+      local need = Mechanics.boss_per_hand_need(gs)
+      if need and need > 0 then
+        for _, b in ipairs(bars) do
+          local jk = gs.jokers[b.i]
+          if jk and JokerWorth.trade_out_plain(jk.key) then
+            for _, p in ipairs(picks) do
+              local pj = p.pk.it.joker
+              if JokerWorth.trade_in_plain(pj.key) then
+                local up = JokerWorth.paired_trade_gain(gs, b.i, pj, mopts.rng)
+                if up then
+                  local safe = not (sv and sv.unsafe(b.i, VU.fv_to_frac(math.max(0, p.fv))))
+                  if safe and (not trade or up > trade.up) then
+                    trade = { up = up, pk = p.pk, fv = p.fv, i = b.i, name = b.name, bar = b.bar,
+                              weakest = (b == bars[1]), paired = true }
+                  end
+                end
+              end
+            end
+          end
+        end
+      end
+    end
+    if trade then jpick, jpick_fv, wi, wname, wfv = trade.pk, trade.fv, trade.i, trade.name, trade.bar end
+    if trade then
+      -- (a) carry the make-room joker's IDENTITY (key/id) + what it makes room FOR, so the overlay can
+      -- promote the SELL to its OWN primary action and the actuator can address the live joker.
+      local wj = gs.jokers[wi]
+      sell = { name = wname, index = wi, key = wj and wj.key, id = wj and wj.id,
+               for_name = jpick.name, for_key = jpick.key }
+      -- the swap's joker IS the joker pick: if the ranking chose a different one, take jpick instead
+      local ji
+      for i, pk in ipairs(ordered) do if pk.it.set == "Joker" then ji = i; break end end
+      if ji and ordered[ji] ~= jpick then
+        ordered[ji] = jpick
+        if ji == 1 then reason = string.format("Take %s (clears the swap bar)", jpick.name) end
+      elseif not ji then
+        table.insert(ordered, 1, jpick)
+        reason = string.format("Take %s (clears the swap bar)", jpick.name)
+      end
+      reason = reason .. string.format(" — Joker slots full: sell %s (%s) to make room for %s.",
+        wname, trade.paired and "measured upgrade" or (trade.weakest and "your weakest" or "it leans on your weakest"),
+        jpick.name)
+    elseif ordered[1] and ordered[1].it.set == "Joker" then
+      -- The recommended pick is a joker but the board is full and no swap is worth it (jpick doesn't beat
+      -- the weakest, or every owned joker is a protected keeper). Demote to the best FITTING pick, else SKIP.
+      local wtxt = wname and (" (" .. wname .. ")") or " (your board is all keepers)"
+      local fit
+      for _, pk in ipairs(ordered) do
+        if pk.it.set ~= "Joker" and pk.v and pk.v > 0 then fit = pk; break end
+      end
+      if fit then
+        for i, pk in ipairs(ordered) do if pk == fit then table.remove(ordered, i); break end end
+        table.insert(ordered, 1, fit)
+        reason = string.format("Take %s — Joker slots full and %s doesn't beat your weakest%s, so keep your board.",
+          fit.name, (jpick and jpick.name) or "the joker", wtxt)
+      else
+        skip_full = true
+        reason = string.format("Skip — Joker slots full and %s doesn't beat your weakest%s; keep your board.",
+          (jpick and jpick.name) or "the pack joker", wtxt)
+      end
+    end
+  end
+  return sell, skip_full, reason
+end
+
 -- recommend(gs, opts) -> { ranked, picks, best, skip, reason, sell }
 -- opts.cheap = priors-only instant pass (no Monte-Carlo); the measured pass runs
 -- in the background and refines it. Both produce the same shape.
@@ -271,63 +533,8 @@ function PO.recommend(gs, opts)
       for _, e in ipairs(valued) do if e.key == "c_fool" then e.v = 0 end end
     end
   end
-  -- CARD-MAKING TAROTS NEED A FREE CONSUMABLE SLOT TO BE USED AT ALL (the game's can_use: Emperor / High Priestess /
-  -- Fool opened from a pack, with the tray full, have no use button -- live KGJ9UMQH lost a Fool pick this way). Room
-  -- can be made by USING a held planet first (always usable), which the self-player can do; otherwise the pick is
-  -- unusable and worth nothing.
-  local use_first
-  if free_cslots <= 0 then
-    for _, c in ipairs(held_cons) do
-      if (c.set == "Planet" or c.key == "c_black_hole") and not use_first then use_first = c end
-    end
-    -- ...or a held TAROT that is worth using right now (owner 2026-10-05: "emperor shouldn't be priced at 0 if
-    -- consumables are full, it should consider using or selling them to make room"): a money tarot (Hermit /
-    -- Temperance) or the Devil (Gold on a spare card, Tarot.money_enh_dollars). Selling a consumable is not an
-    -- action the self-player has yet.
-    if not use_first then
-      for _, c in ipairs(held_cons) do
-        if not use_first and (c.key == "c_hermit" or c.key == "c_temperance"
-            or (gs.hand and #gs.hand > 0 and Tarot.money_enh_dollars(gs, c.key) > 0)) then
-          use_first = c
-        end
-      end
-    end
-    if not use_first then
-      for _, e in ipairs(valued) do
-        if GEN[e.key] and GEN[e.key].out == "consumable" then e.v = 0 end
-      end
-    end
-  end
-  -- JOKER-MAKING CARDS ON A FULL BOARD (Judgement / Wraith / The Soul): the game gives them NO use button until a
-  -- joker slot is free (live NPB9HYPN ante 7: Judgement picked on a 5/5 board, the pick failed three times and the
-  -- self-player skipped the whole Mega Arcana). Room means SELLING a joker, so the measured pass judges them like a
-  -- joker pick on a full board: the created joker's measured value must clear the same swap bar (weakest owned joker
-  -- + the shop's hysteresis) and the survival check. Then it is worth its full value, with the sell as its own first
-  -- step (below); otherwise it can't be used and is worth nothing. (The cheap pass keeps the room_credit prior --
-  -- it is provisional and never executed.)
-  local gen_swap
-  if not cheap and free_jslots <= 0 then
-    local wi, wname, wfv, sv
-    for _, e in ipairs(valued) do
-      local meta = GEN[e.key]
-      if meta and meta.out == "joker" then
-        if wi == nil and wfv == nil then
-          wi, wname, wfv = weakest_owned_joker(gs, mopts)
-          wfv = wfv or math.huge
-          local ok, SA = pcall(require, "engine.shop_advisor")
-          sv = ok and SA.sell_survival and SA.sell_survival(gs) or nil
-        end
-        local fv = VU.frac_to_fv(math.max(0, e.raw or 0))
-        local safe = not (sv and wi and sv.unsafe(wi, math.max(0, e.raw or 0)))
-        if wi and fv > wfv and safe then
-          e.v = e.raw
-          if not gen_swap or e.v > gen_swap.v then gen_swap = { v = e.v, e = e, wi = wi, wname = wname } end
-        else
-          e.v = 0
-        end
-      end
-    end
-  end
+  local use_first = tray_room_first(gs, valued, free_cslots, held_cons)
+  local gen_swap = joker_maker_swap(gs, valued, mopts, cheap, free_jslots)
   table.sort(valued, function(a, b2) return a.v > b2.v end)
 
   -- choose up to picks_left items. The v>0 gate exists to skip deck-BLOATING cards (a Standard
@@ -351,75 +558,7 @@ function PO.recommend(gs, opts)
              reason = "Skip this pack — nothing improves your deck (bloat)." }
   end
 
-  -- order the chosen picks for use. The Fool copies the last Tarot/Planet used,
-  -- so we place it right after the most valuable card it can copy (and value it
-  -- as a copy of that). Everything else orders by ORDER_PRIO.
-  local fool, others = nil, {}
-  for _, pk in ipairs(picks) do
-    if pk.key == "c_fool" then fool = pk else others[#others + 1] = pk end
-  end
-  table.sort(others, function(a, b2)
-    local pa, pb = order_prio(a.key), order_prio(b2.key)
-    if pa ~= pb then return pa < pb end
-    return a.v > b2.v
-  end)
-  if fool and cheap then
-    -- cheap pass: skip the copy-target MEASUREMENT, but still check one exists -- a Fool with
-    -- nothing to copy is a no-op and must not keep its prior (reported from live run 8).
-    local any = ConsumableValue.fool_target(gs) ~= nil
-    if not any then
-      for _, pk in ipairs(others) do
-        if pk.it and (pk.it.set == "Tarot" or pk.it.set == "Planet") then any = true; break end
-      end
-    end
-    if not any then fool.v = 0; fool.copies = nil end
-    table.insert(others, fool)
-  elseif fool then
-    -- value of any tarot/planet The Fool could copy
-    local function copyable_value(set, key)
-      if not key then return 0 end
-      set = set or (ConsumableValue.PLANET_KEY_HAND[key] and "Planet" or "Tarot")
-      local f, fctx
-      if set == "Planet" then f, fctx = ConsumableValue.hand_frequencies(gs, { samples = 8, rng = rng }) end
-      local vfrac, gain = ConsumableValue.card_value(gs, set, key, f, need, rng, nil, fctx)
-      if set == "Planet" then
-        vfrac = (vfrac or 0) + BuildPlan.planet_credit(gs, ConsumableValue.PLANET_KEY_HAND[key])
-      end
-      return (vfrac or 0) + VU.income_frac(gs, gain or 0)
-    end
-    -- candidate copy targets: best in-pack tarot/planet (use it then Fool); your
-    -- last-used tarot/planet (Fool first copies it); held tarot/planet in a slot.
-    local cands = {}
-    local bi, bv
-    for i, pk in ipairs(others) do
-      if (pk.it.set == "Tarot" or pk.it.set == "Planet") and (not bv or pk.v > bv) then bv, bi = pk.v, i end
-    end
-    if bi then cands[#cands + 1] = { v = bv, mode = "pack", idx = bi, name = others[bi].name } end
-    if gs.last_tarot_planet and gs.last_tarot_planet.key then
-      cands[#cands + 1] = { v = copyable_value(nil, gs.last_tarot_planet.key), mode = "prev",
-        name = gs.last_tarot_planet.name or gs.last_tarot_planet.key }
-    end
-    for _, h in ipairs(gs.consumables or {}) do
-      if h.set == "Tarot" or h.set == "Planet" then
-        cands[#cands + 1] = { v = copyable_value(h.set, h.key), mode = "held", name = h.name or h.key }
-      end
-    end
-    local bestt
-    for _, c in ipairs(cands) do if not bestt or c.v > bestt.v then bestt = c end end
-    if bestt then
-      -- the Fool copies a card into a consumable slot, so its value is slot-gated too
-      fool.v = bestt.v * gen_factor("c_fool"); fool.copies = bestt.name; fool.copy_mode = bestt.mode
-      if bestt.mode == "pack" then
-        table.insert(others, bestt.idx + 1, fool)  -- use the in-pack card, then Fool
-      else
-        table.insert(others, 1, fool)              -- copies a prior/held card -> Fool first
-      end
-    else
-      -- nothing in the pack, nothing used, nothing held -> The Fool copies NOTHING
-      fool.v = 0; fool.copies = nil
-      table.insert(others, fool)
-    end
-  end
+  local fool, others = order_with_fool(gs, picks, cheap, rng, need, gen_factor)
   local ordered = others
 
   local names = {}
@@ -470,130 +609,8 @@ function PO.recommend(gs, opts)
     end
   end
 
-  -- Joker slots full: you CAN'T take a joker pick without first selling one (the game blocks it). Three
-  -- outcomes, and we NEVER leave "Take <joker>" standing on a full board (the actuator can't execute it
-  -- and take-to-immediately-sell isn't worth a slot):
-  --   (a) a worthwhile SWAP exists -> the SELL becomes the primary action ("Sell X to make room for Y");
-  --   (b) no swap, but a non-joker pick FITS (a Tarot/Planet used on the spot) -> take THAT instead;
-  --   (c) nothing fits -> SKIP, and say plainly why.
-  -- The pack joker and owned jokers are valued in the SAME FV currency (econ + downside included).
-  local sell = nil
-  local skip_full = false
-  local jcap = (gs.run and gs.run.joker_slots) or 5
-  if #(gs.jokers or {}) >= jcap then
-    -- best pack joker by FV (what you'd actually slot), not just use-order first.
-    -- R12: over EVERY joker in the pack (`valued`), not just the chosen picks -- the pick ranking and this
-    -- swap measure differently (a scaler keeps its tier floor in the ranking), so the ranking's top joker
-    -- (Lucky Cat, 0.58 FV here) could fail the bar while another (Half Joker, 2.58) clears it (Y1U5TZWJ a4).
-    local jpick, jpick_fv
-    local picks = {}
-    for _, pk in ipairs(valued) do
-      if pk.it.set == "Joker" and pk.it.joker then
-        local fv = JokerWorth.of(gs, pk.it.joker, "add", mopts)
-        picks[#picks + 1] = { pk = pk, fv = fv }
-        if not jpick or fv > jpick_fv then jpick, jpick_fv = pk, fv end
-      end
-    end
-    local bars = owned_sell_bars(gs, mopts)
-    local wi, wname, wfv
-    if bars[1] then wi, wname, wfv = bars[1].i, bars[1].name, bars[1].bar end
-    -- THE TRADE IS A PAIR (2026-10-02, live Z9ZPREGI a5): the pick was priced on the board that still holds the
-    -- joker sold for it, and the sale chosen apart from it -- so Raised Fist was sold to take a Mime whose whole
-    -- gain came from retriggering Raised Fist (the board measured -19%). A (pick, sale) pair where the pick leans
-    -- on the sold joker (Eval.trade_leans_on) is not a trade. The sale is still the cheapest bar a pick clears --
-    -- the weakest joker unless every pick leans on it, then the next. The cheap pass has no measurement and keeps
-    -- the additive pair.  survival-first (SA.sell_survival): the swap must not leave a board materially
-    -- less likely to clear the boss -- judged on the board AFTER it (the pick's measured gain added back). Lazy
-    -- require: the shop advisor is a sibling module. Skipped on the cheap pass (no measurement).
-    local measured = not (mopts and mopts.measure == false)
-    local sv
-    if measured then
-      local ok, SA = pcall(require, "engine.shop_advisor")
-      sv = ok and SA.sell_survival and SA.sell_survival(gs) or nil
-    end
-    local trade
-    for _, b in ipairs(bars) do
-      for _, p in ipairs(picks) do
-        if p.fv > b.bar then
-          local fv = p.fv
-          local leans = measured and Eval.trade_leans_on(gs, b.i, p.pk.it.joker, mopts)
-          local safe = not (sv and sv.unsafe(b.i, VU.fv_to_frac(math.max(0, fv))))
-          if not leans and safe and (not trade or fv - b.bar > trade.up) then
-            trade = { up = fv - b.bar, pk = p.pk, fv = fv, i = b.i, name = b.name, bar = b.bar,
-                      weakest = (b == bars[1]) }
-          end
-        end
-      end
-      if trade then break end
-    end
-    -- PAIRED TRADE (2026-10-03, live NUJ9ENYU a3, owner-confirmed flag 3): every flat common reads the same tier
-    -- floor, so a Buffoon pick (Crafty 0.54, Delayed Gratification 0.54) never cleared the bar against a board of
-    -- redundant flat Mult and the pack was skipped. When the FV test finds no trade, measure each (plain owned ->
-    -- plain or money-only pick) trade on shared hands, as the shop does (SA.trade_out_plain / trade_in_plain).
-    if not trade and measured then
-      local okSA, SA = pcall(require, "engine.shop_advisor")
-      local need = Mechanics.boss_per_hand_need(gs)
-      if okSA and SA.trade_out_plain and need and need > 0 then
-        for _, b in ipairs(bars) do
-          local jk = gs.jokers[b.i]
-          if jk and SA.trade_out_plain(jk.key) then
-            for _, p in ipairs(picks) do
-              local pj = p.pk.it.joker
-              if SA.trade_in_plain(pj.key) then
-                local up = SA.paired_trade_gain(gs, b.i, pj, mopts.rng)
-                if up then
-                  local safe = not (sv and sv.unsafe(b.i, VU.fv_to_frac(math.max(0, p.fv))))
-                  if safe and (not trade or up > trade.up) then
-                    trade = { up = up, pk = p.pk, fv = p.fv, i = b.i, name = b.name, bar = b.bar,
-                              weakest = (b == bars[1]), paired = true }
-                  end
-                end
-              end
-            end
-          end
-        end
-      end
-    end
-    if trade then jpick, jpick_fv, wi, wname, wfv = trade.pk, trade.fv, trade.i, trade.name, trade.bar end
-    if trade then
-      -- (a) carry the make-room joker's IDENTITY (key/id) + what it makes room FOR, so the overlay can
-      -- promote the SELL to its OWN primary action and the actuator can address the live joker.
-      local wj = gs.jokers[wi]
-      sell = { name = wname, index = wi, key = wj and wj.key, id = wj and wj.id,
-               for_name = jpick.name, for_key = jpick.key }
-      -- the swap's joker IS the joker pick: if the ranking chose a different one, take jpick instead
-      local ji
-      for i, pk in ipairs(ordered) do if pk.it.set == "Joker" then ji = i; break end end
-      if ji and ordered[ji] ~= jpick then
-        ordered[ji] = jpick
-        if ji == 1 then reason = string.format("Take %s (clears the swap bar)", jpick.name) end
-      elseif not ji then
-        table.insert(ordered, 1, jpick)
-        reason = string.format("Take %s (clears the swap bar)", jpick.name)
-      end
-      reason = reason .. string.format(" — Joker slots full: sell %s (%s) to make room for %s.",
-        wname, trade.paired and "measured upgrade" or (trade.weakest and "your weakest" or "it leans on your weakest"),
-        jpick.name)
-    elseif ordered[1] and ordered[1].it.set == "Joker" then
-      -- The recommended pick is a joker but the board is full and no swap is worth it (jpick doesn't beat
-      -- the weakest, or every owned joker is a protected keeper). Demote to the best FITTING pick, else SKIP.
-      local wtxt = wname and (" (" .. wname .. ")") or " (your board is all keepers)"
-      local fit
-      for _, pk in ipairs(ordered) do
-        if pk.it.set ~= "Joker" and pk.v and pk.v > 0 then fit = pk; break end
-      end
-      if fit then
-        for i, pk in ipairs(ordered) do if pk == fit then table.remove(ordered, i); break end end
-        table.insert(ordered, 1, fit)
-        reason = string.format("Take %s — Joker slots full and %s doesn't beat your weakest%s, so keep your board.",
-          fit.name, (jpick and jpick.name) or "the joker", wtxt)
-      else
-        skip_full = true
-        reason = string.format("Skip — Joker slots full and %s doesn't beat your weakest%s; keep your board.",
-          (jpick and jpick.name) or "the pack joker", wtxt)
-      end
-    end
-  end
+  local sell, skip_full
+  sell, skip_full, reason = full_board_pick(gs, valued, mopts, ordered, reason)
 
   -- (d) the top pick MAKES a joker (Judgement / Wraith / Soul) and cleared the swap bar above: sell the weakest
   -- joker first, as its own step, exactly like a joker pick.

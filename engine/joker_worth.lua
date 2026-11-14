@@ -21,6 +21,8 @@
 --   JokerWorth.keep_strength(c)   what giving up an owned joker contributing c FV costs (super-linear in c)
 --   JokerWorth.keep_bar(c, kb)    the FV a replacement must beat: keep_strength + the larger of the upgrade
 --                                 margin and the build's keep bias
+--   JokerWorth.sell_survival(gs)  how much each sale would cost in P(clear the boss)
+--   JokerWorth.trade_out_plain / trade_in_plain / paired_trade_gain   the measured plain-scorer trade
 --
 -- STATE OF THE INSIDE (2026-11-13): the four sides still run four ladders -- "buy" below, the other three in
 -- eval_function (jp_from_measure and joker_pick_frac). They agree on the steps (money-only -> modelled ->
@@ -29,6 +31,7 @@
 -- will hold and credits a copier's future target. Folding them into one ladder changes values, so each such step
 -- is a separate, measured change. Callers no longer need to know any of this.
 
+local Rng             = require("util.rng")
 local Flags           = require("engine.flags")
 local Eval            = require("engine.eval_function")
 local JokerData       = require("engine.joker_data")
@@ -38,6 +41,8 @@ local Generators      = require("engine.generators")
 local Mechanics       = require("engine.mechanics")
 local Packs           = require("engine.packs")
 local ShopState       = require("model.shop_state")
+local Downside        = require("engine.joker_downside")
+local VU              = require("engine.value_units")
 
 local JW = {}
 
@@ -62,6 +67,88 @@ function JW.keep_strength(c)
 end
 function JW.keep_bar(c, keep_bias)
   return c * (1 + JW.SWAP_KEEP_SLOPE * c) + math.max(JW.UPGRADE_MARGIN, keep_bias)
+end
+
+-- ---- trades ----------------------------------------------------------------
+-- The shop's per-state seed (money, deck, board, reroll price): the measurements below hang their own streams
+-- off it, so they are deterministic per state and do not shift the advisor's shared stream.
+function JW.state_seed(gs)
+  local d = (gs.economy and gs.economy.dollars) or 0
+  local s = (d * 2654435761)
+    + (#(gs.deck or {}) * 40503)
+    + (#(gs.jokers or {}) * 1299709)
+    + (((gs.shop and gs.shop.reroll_cost) or 0) * 7919)
+  return Rng.seed(s)
+end
+
+
+-- PAIRED TRADE eligibility: jokers whose whole value is their SCORE NOW -- what JV.swap_delta measures. Both sides
+-- must be plain scorers with no downside and no money of their own: arm pt (2026-10-03, wins 35 -> 17, p~0) let a
+-- money joker's \$/round (0.8 FV per \$) swamp a real score value of ~0.2-0.6 FV (sold Ice Cream for Mail-In Rebate,
+-- Shoot the Moon for Trading Card) and bought decaying jokers on a today-only measurement (Popcorn, Ice Cream).
+-- OUT: plain flat scorers (scalers, xmult/retrigger cores and utility keep their own protections).
+JW.PAIRED_SAMPLES = 12
+JW.PAIRED_MIN_SHARE = 0.25   -- the trade must add >= this share of what the sold joker itself scores
+local PLAIN_OUT = { flat_mult = true, flat_chips = true }
+-- IN may also be a MONEY joker (2026-10-03, live NUJ9ENYU a7: Holo Golden Joker over Swashbuckler): the trade is still
+-- judged on its measured SCORE alone (an edition's +Mult/+Chips/xMult), so its income is a bonus the trade never counts
+-- -- the pt failure needed money ON the scale, and selling a money joker (OUT) still is not allowed. A plain econ joker
+-- scores nothing and never passes the measured-gain test.
+local PLAIN_IN = { flat_mult = true, flat_chips = true, xmult = true, retrigger = true, economy = true }
+local function plain_scorer(key, cats, money_ok)
+  local d = JokerData.resolve(key)
+  return cats[d.cat or ""] == true and not JokerData.is_scaling(key) and not JokerData.is_unmodelled(key)
+    and (money_ok or (d.econ or 0) == 0) and not Downside.has_downside(key)
+end
+function JW.trade_out_plain(key) return plain_scorer(key, PLAIN_OUT) end
+function JW.trade_in_plain(key) return plain_scorer(key, PLAIN_IN, true) end
+-- the paired trade's measured score gain in FV (nil = not a trade): gain beats 2 SE and >= MIN_SHARE of the sold
+-- joker's own paired contribution. Shared by the shop's best-trade swap and the pack swap.
+function JW.paired_trade_gain(gs, i, sj, rng)
+  local need = Mechanics.boss_per_hand_need(gs)
+  if not (need and need > 0) then return nil end
+  local m, se = JokerValue.swap_delta(gs, i, sj, { rng = rng, samples = JW.PAIRED_SAMPLES })
+  if not m or m - 2 * (se or 0) <= 0 then return nil end
+  local own = JokerValue.remove_delta(gs, i, { rng = rng, samples = JW.PAIRED_SAMPLES })
+  if not own or own <= 0 or m < JW.PAIRED_MIN_SHARE * own then return nil end
+  return VU.frac_to_fv((m - 2 * (se or 0)) / need)
+end
+
+-- SURVIVAL-FIRST SELLING (owner 2026-09-23, seed DGTW4TTP). The sell side priced a joker's lost score
+-- LINEARLY against money: 0.75 of a boss hand read the same whether the board had 3x the score it needed or
+-- barely enough, so a $4/round econ joker (3.2 FV) outranked Smiley Face (2.28 FV) -- the board's biggest
+-- scorer, whose removal takes it from ~1165 to ~430 per hand against a ~1000 need (full engine: keeping it
+-- clears The House 40/40). Money is only worth anything if the run survives. So measure, per owned joker,
+-- how much selling it drops P(clear the boss) (Eval.clear_prob, fitted to the full engine's real clear
+-- rates) and push a sale that drops it by more than SURVIVAL_EPS behind every safe one, in proportion to
+-- the drop. A SWAP is judged on the board AFTER it (a sold scorer the bought joker replaces is fine), so
+-- genuine upgrades still happen. SURVIVAL_EPS is the tolerance below which a drop is treated as noise
+-- (the ratio is measured on SURVIVAL_SAMPLES paired hands).
+JW.SURVIVAL_EPS = 0.05
+JW.SURVIVAL_SAMPLES = 16
+JW.SURVIVAL_W = 100       -- FV per unit of clear-probability lost beyond EPS: survival dominates money
+function JW.sell_survival(gs)
+  local need = Mechanics.boss_per_hand_need(gs)
+  if not need or need <= 0 or #(gs.jokers or {}) == 0 then return nil end
+  -- own seeded stream: deterministic per state, and does not shift the shared valuation RNG
+  local o = { rng = Rng.stream(JW.state_seed(gs) + 7919), samples = JW.SURVIVAL_SAMPLES }
+  local base = JokerValue.avg_score(gs, o)
+  if not base then return nil end
+  local t = { ratio = base / need, loss = {} }
+  t.p0 = Eval.clear_prob(t.ratio)
+  for i = 1, #gs.jokers do
+    local d = JokerValue.remove_delta(gs, i, { rng = Rng.stream(JW.state_seed(gs) + 7919 + i), samples = JW.SURVIVAL_SAMPLES })
+    t.loss[i] = math.max(0, d or 0) / need
+  end
+  -- clear-probability lost by selling joker i and (optionally) adding `gain` of per-hand ratio back
+  function t.drop(i, gain)
+    local r = math.max(1e-3, t.ratio - (t.loss[i] or 0) + (gain or 0))
+    return math.max(0, t.p0 - Eval.clear_prob(r))
+  end
+  function t.penalty(i, gain) return JW.SURVIVAL_W * math.max(0, t.drop(i, gain) - JW.SURVIVAL_EPS) end
+  function t.unsafe(i, gain) return t.drop(i, gain) > JW.SURVIVAL_EPS end
+  t.need = need
+  return t
 end
 
 -- ---- the buy side -----------------------------------------------------------

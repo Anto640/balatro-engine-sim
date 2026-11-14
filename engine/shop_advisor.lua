@@ -188,16 +188,11 @@ end
 -- for a lateral one" churn the owner has reported every run.
 SA.DEAD_FUNDER_FV = 0.1
 SA.SWAP_SAMPLES = Flags.num("BES_SWAP_SAMPLES")   -- env: deals per swap measurement (A/B)
--- PAIRED TRADE eligibility: jokers whose whole value is their SCORE NOW -- what JV.swap_delta measures. Both sides
--- must be plain scorers with no downside and no money of their own: arm pt (2026-10-03, wins 35 -> 17, p~0) let a
--- money joker's \$/round (0.8 FV per \$) swamp a real score value of ~0.2-0.6 FV (sold Ice Cream for Mail-In Rebate,
--- Shoot the Moon for Trading Card) and bought decaying jokers on a today-only measurement (Popcorn, Ice Cream).
--- OUT: plain flat scorers (scalers, xmult/retrigger cores and utility keep their own protections).
+-- (paired-trade eligibility and the survival-first sale check: engine/joker_worth.lua)
 -- BES_LEVEL_AMP_ALWAYS=1 restores the B1 level amplifier on top of the measured board context (A/B of the 2026-10-05
 -- double-count fix).
 SA.LEVEL_AMP_ALWAYS = Flags.off("BES_LEVEL_AMP_ALWAYS")
 SA.TRADE_FLOORED = Flags.off("BES_TRADE_FLOORED")   -- A/B switch: trades measure plain scorers with the tier floor
-SA.PAIRED_SAMPLES = 12
 -- SWAP ADMISSION (2026-10-20, BES_SWAP_ADMIT=1, sim A/B). On a full board (the norm from ante 3) both trade paths only
 -- weigh an offer whose single-deal score delta is > 0. Every scaling xmult starts at x1 and every round-state xmult
 -- (Card Sharp, Acrobat, Loyalty, Idol, Ancient) or last-hand retrigger reads exactly 0 there, so they never reach the
@@ -212,32 +207,6 @@ SA.SWAP_ADMIT = Flags.on("BES_SWAP_ADMIT")
 function SA.swap_admits_zero(key)
   return SA.SWAP_ADMIT and (JokerData.is_xmult(key) or JokerData.has_tag(key, "retrigger") or JokerData.has_tag(key, "copy"))
 end
-SA.PAIRED_MIN_SHARE = 0.25   -- the trade must add >= this share of what the sold joker itself scores
-local PLAIN_OUT = { flat_mult = true, flat_chips = true }
--- IN may also be a MONEY joker (2026-10-03, live NUJ9ENYU a7: Holo Golden Joker over Swashbuckler): the trade is still
--- judged on its measured SCORE alone (an edition's +Mult/+Chips/xMult), so its income is a bonus the trade never counts
--- -- the pt failure needed money ON the scale, and selling a money joker (OUT) still is not allowed. A plain econ joker
--- scores nothing and never passes the measured-gain test.
-local PLAIN_IN = { flat_mult = true, flat_chips = true, xmult = true, retrigger = true, economy = true }
-local function plain_scorer(key, cats, money_ok)
-  local d = JokerData.resolve(key)
-  return cats[d.cat or ""] == true and not JokerData.is_scaling(key) and not JokerData.is_unmodelled(key)
-    and (money_ok or (d.econ or 0) == 0) and not Downside.has_downside(key)
-end
-function SA.trade_out_plain(key) return plain_scorer(key, PLAIN_OUT) end
-function SA.trade_in_plain(key) return plain_scorer(key, PLAIN_IN, true) end
--- the paired trade's measured score gain in FV (nil = not a trade): gain beats 2 SE and >= MIN_SHARE of the sold
--- joker's own paired contribution. Shared by the shop's best-trade swap and the pack swap.
-function SA.paired_trade_gain(gs, i, sj, rng)
-  local need = Mechanics.boss_per_hand_need(gs)
-  if not (need and need > 0) then return nil end
-  local m, se = JokerValue.swap_delta(gs, i, sj, { rng = rng, samples = SA.PAIRED_SAMPLES })
-  if not m or m - 2 * (se or 0) <= 0 then return nil end
-  local own = JokerValue.remove_delta(gs, i, { rng = rng, samples = SA.PAIRED_SAMPLES })
-  if not own or own <= 0 or m < SA.PAIRED_MIN_SHARE * own then return nil end
-  return VU.frac_to_fv((m - 2 * (se or 0)) / need)
-end
-
 -- First-scorer priority (in the sgain*5 buy-value units). When the board has NO effective
 -- scorer, a flat immediate scorer is worth much more than its marginal -- it's the jump from
 -- "can't clear a blind" to "can". Sized to clearly out-rank an econ/utility joker without
@@ -290,15 +259,7 @@ local function clamp(x, lo, hi) return math.max(lo, math.min(hi, x)) end
 -- single deterministic RNG across every measured call in one recommend(), so a
 -- given shop always yields the same, internally-consistent recommendation.
 local lcg = Rng.stream
-local function state_seed(gs)
-  local d = (gs.economy and gs.economy.dollars) or 0
-  local s = (d * 2654435761)
-    + (#(gs.deck or {}) * 40503)
-    + (#(gs.jokers or {}) * 1299709)
-    + (((gs.shop and gs.shop.reroll_cost) or 0) * 7919)
-  return Rng.seed(s)
-end
-
+local state_seed = JokerWorth.state_seed   -- the shop's per-state seed
 -- Shallow gs clone with a replaced joker list (Eval only reads .jokers /
 -- .economy / .run / .deck, so a top-level copy is enough).
 local function with_jokers(gs, list)
@@ -567,43 +528,6 @@ local function synergy_bonus(gs, sj)
 end
 SA.synergy_bonus = synergy_bonus
 
--- SURVIVAL-FIRST SELLING (owner 2026-09-23, seed DGTW4TTP). The sell side priced a joker's lost score
--- LINEARLY against money: 0.75 of a boss hand read the same whether the board had 3x the score it needed or
--- barely enough, so a $4/round econ joker (3.2 FV) outranked Smiley Face (2.28 FV) -- the board's biggest
--- scorer, whose removal takes it from ~1165 to ~430 per hand against a ~1000 need (full engine: keeping it
--- clears The House 40/40). Money is only worth anything if the run survives. So measure, per owned joker,
--- how much selling it drops P(clear the boss) (Eval.clear_prob, fitted to the full engine's real clear
--- rates) and push a sale that drops it by more than SURVIVAL_EPS behind every safe one, in proportion to
--- the drop. A SWAP is judged on the board AFTER it (a sold scorer the bought joker replaces is fine), so
--- genuine upgrades still happen. SURVIVAL_EPS is the tolerance below which a drop is treated as noise
--- (the ratio is measured on SURVIVAL_SAMPLES paired hands).
-SA.SURVIVAL_EPS = 0.05
-SA.SURVIVAL_SAMPLES = 16
-SA.SURVIVAL_W = 100       -- FV per unit of clear-probability lost beyond EPS: survival dominates money
-function SA.sell_survival(gs)
-  local need = Mechanics.boss_per_hand_need(gs)
-  if not need or need <= 0 or #(gs.jokers or {}) == 0 then return nil end
-  -- own seeded stream: deterministic per state, and does not shift the shared valuation RNG
-  local o = { rng = lcg(state_seed(gs) + 7919), samples = SA.SURVIVAL_SAMPLES }
-  local base = JokerValue.avg_score(gs, o)
-  if not base then return nil end
-  local t = { ratio = base / need, loss = {} }
-  t.p0 = Eval.clear_prob(t.ratio)
-  for i = 1, #gs.jokers do
-    local d = JokerValue.remove_delta(gs, i, { rng = lcg(state_seed(gs) + 7919 + i), samples = SA.SURVIVAL_SAMPLES })
-    t.loss[i] = math.max(0, d or 0) / need
-  end
-  -- clear-probability lost by selling joker i and (optionally) adding `gain` of per-hand ratio back
-  function t.drop(i, gain)
-    local r = math.max(1e-3, t.ratio - (t.loss[i] or 0) + (gain or 0))
-    return math.max(0, t.p0 - Eval.clear_prob(r))
-  end
-  function t.penalty(i, gain) return SA.SURVIVAL_W * math.max(0, t.drop(i, gain) - SA.SURVIVAL_EPS) end
-  function t.unsafe(i, gain) return t.drop(i, gain) > SA.SURVIVAL_EPS end
-  t.need = need
-  return t
-end
-
 -- FV lost by removing one of our jokers (its marginal contribution). Now a
 -- DIRECT measured marginal (deck-aware, paired) instead of a tier-based
 -- future_value delta -- this is the fix that stops the advisor ranking the joker
@@ -844,7 +768,7 @@ local function shop_situation(gs, opts, reserve, plan)
   -- survival table for sell decisions, computed once on first use (see SA.sell_survival)
   local surv_t
   local function surv()
-    if surv_t == nil then surv_t = SA.sell_survival(gs) or false end
+    if surv_t == nil then surv_t = JokerWorth.sell_survival(gs) or false end
     return surv_t or nil
   end
   local credit = OwnedSynergy.credit(gs) -- Credit Card: spend down to -$credit
@@ -1525,11 +1449,11 @@ local function offer_joker_sale(S)
           local ab = jk.ability
           local ex = (type(ab) == "table" and type(ab.extra) == "table") and ab.extra or nil
           local eternal = type(ab) == "table" and (ab.eternal or (ex and ex.eternal))
-          if not eternal and SA.trade_out_plain(jk.key) then
+          if not eternal and JokerWorth.trade_out_plain(jk.key) then
             local cash_i = jk.sell_value or 1
             for _, sj in ipairs(shop.jokers) do
-              if SA.trade_in_plain(sj.key) and (dollars(gs) + cash_i - (sj.cost or 0)) >= reserve then
-                local up = SA.paired_trade_gain(gs, i, sj, rng)
+              if JokerWorth.trade_in_plain(sj.key) and (dollars(gs) + cash_i - (sj.cost or 0)) >= reserve then
+                local up = JokerWorth.paired_trade_gain(gs, i, sj, rng)
                 if up then
                   if (not best_t or up > best_t.up) then
                     best_t = { up = up, i = i, sj = sj, cash = cash_i, paired = true,

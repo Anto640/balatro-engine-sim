@@ -4,6 +4,7 @@
 -- The trade's buy is then honoured once the sale is made (gs.run.pending_swap).
 local GS = require("model.game_state")
 local SA = require("engine.shop_advisor")
+local JW = require("engine.joker_worth")
 
 return function(t)
   local deck, id = {}, 0
@@ -25,8 +26,8 @@ return function(t)
       blind = { base_hands = 4, base_discards = 3 },
       shop = { jokers = { abstract }, boosters = {}, vouchers = {}, consumables = {}, reroll_cost = 5, joker_slots = 5 } }
   end
-  t.ok(SA.trade_out_plain("j_swashbuckler") and SA.trade_in_plain("j_abstract"), "flat scorers are paired-trade eligible")
-  t.ok(not SA.trade_out_plain("j_ride_the_bus"), "a scaler keeps its own protection")
+  t.ok(JW.trade_out_plain("j_swashbuckler") and JW.trade_in_plain("j_abstract"), "flat scorers are paired-trade eligible")
+  t.ok(not JW.trade_out_plain("j_ride_the_bus"), "a scaler keeps its own protection")
   local r = SA.recommend(state(board()), {})
   local sell
   for _, a in ipairs(r.alternatives or {}) do

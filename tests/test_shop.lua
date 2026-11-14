@@ -1481,7 +1481,7 @@ return function(t)
       shop = { jokers = {}, vouchers = {}, reroll_cost = 5, joker_slots = 5 },
       run = { hand_size = 8, joker_slots = 5 },
     }
-    local sv = SA.sell_survival and SA.sell_survival(gs)
+    local sv = JokerWorth.sell_survival(gs)
     t.ok(sv ~= nil and sv.unsafe(1), "selling the only scorer (Smiley) is flagged survival-UNSAFE")
     t.ok(sv ~= nil and not sv.unsafe(2), "selling an economy joker costs no survival")
     local sell = find(SA.recommend(gs), "SELL_JOKER")
