@@ -8,6 +8,8 @@ how its advice is tested in the real game.
 Every recommendation comes from **measuring** options against your actual deck and board (Monte-Carlo over
 real hands, scored by a faithful re-implementation of Balatro's scoring), not from fixed tier lists.
 
+![The self-player in the real game: in-blind play at ante 1, a whole 11-minute run sped up, the ante 8 boss (100,000 chips) beaten with a Full House, then the shop advice panel recommending The Order](docs/images/demo.gif)
+
 ![The advice panel (top left) in an Arcana Pack: it recommends The Tower, names the card to apply it to (TARGET) and the pick (TAKE), with a confidence](docs/images/screenshot-pack-advice.jpg)
 
 *Unofficial fan project. Not affiliated with or endorsed by Playstack or LocalThunk, and it ships no game code or
